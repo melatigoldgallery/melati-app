@@ -761,21 +761,22 @@ function applyFilters() {
   const statusPengambilanFilter = document.getElementById("statusPengambilanFilter")?.value || "";
 
   filteredData = currentData.filter((item) => {
-    // Search filter
     const matchesSearch =
       !searchTerm ||
       item.namaCustomer?.toLowerCase().includes(searchTerm) ||
       item.noHp?.includes(searchTerm) ||
       item.namaBarang?.toLowerCase().includes(searchTerm);
 
-    // Status filters
     const matchesStatusServis = !statusServisFilter || item.statusServis === statusServisFilter;
     const matchesStatusPengambilan = !statusPengambilanFilter || item.statusPengambilan === statusPengambilanFilter;
 
     return matchesSearch && matchesStatusServis && matchesStatusPengambilan;
   });
 
-  displayData();
+  // PERBAIKAN: Delay display untuk memastikan data sudah terupdate
+  setTimeout(() => {
+    displayData();
+  }, 100);
 }
 
 function displayData() {
@@ -1006,7 +1007,6 @@ async function saveStatusUpdate() {
     let stafHandle = null;
     let waktuPengambilan = null;
 
-    // PERBAIKAN: Pastikan data pengambilan disiapkan dengan benar
     if (statusPengambilan === "Sudah Diambil") {
       stafHandle = document.getElementById("stafHandle").value.trim();
       const waktuInput = document.getElementById("waktuPengambilan").value;
@@ -1016,39 +1016,57 @@ async function saveStatusUpdate() {
         return;
       }
 
-      waktuPengambilan = waktuInput; // Kirim sebagai string ISO
+      waktuPengambilan = waktuInput;
     }
 
     showLoading(true);
 
-    // PERBAIKAN: Panggil updateServisStatus dengan parameter lengkap
-    await updateServisStatus(servisId, statusServis, statusPengambilan, stafHandle, waktuPengambilan);
+    try {
+      // 1. Update ke Firestore terlebih dahulu
+      await updateServisStatus(servisId, statusServis, statusPengambilan, stafHandle, waktuPengambilan);
+      
+      // 2. Update local data dengan data yang konsisten
+      const updateData = {
+        statusServis,
+        statusPengambilan,
+        stafHandle,
+        waktuPengambilan: waktuPengambilan ? new Date(waktuPengambilan).toISOString() : null,
+      };
 
-    // PERBAIKAN: Update local data dengan semua field
-    const updateData = {
-      statusServis,
-      statusPengambilan,
-      stafHandle,
-      waktuPengambilan: waktuPengambilan ? new Date(waktuPengambilan).toISOString() : null,
-    };
+      updateLocalDataAndCache(servisId, updateData);
 
-    updateLocalDataAndCache(servisId, updateData);
+      // 3. Tutup modal setelah update berhasil
+      const modal = bootstrap.Modal.getInstance(document.getElementById("updateStatusModal"));
+      if (modal) {
+        modal.hide();
+      }
 
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById("updateStatusModal"));
-    modal.hide();
+      // 4. PERBAIKAN: Adjust filter jika item berubah status
+      const statusServisFilter = document.getElementById("statusServisFilter");
+      if (statusServis === "Sudah Selesai" && statusServisFilter.value === "Belum Selesai") {
+        statusServisFilter.value = "Sudah Selesai";
+        handleFilterLogic(); // Gunakan fungsi yang sudah ada
+      }
 
-    // Re-apply filters untuk refresh tampilan (termasuk WhatsApp button)
-    applyFilters();
+      // 5. Re-apply filters dengan delay untuk memastikan DOM ready
+      setTimeout(() => {
+        applyFilters();
+      }, 200);
 
-    // TAMBAHAN: Show success message dengan info WhatsApp jika status berubah ke "Sudah Selesai"
-    if (statusServis === "Sudah Selesai") {
-      showAlert("success", "Status berhasil diperbarui! Sekarang Anda dapat menghubungi customer via WhatsApp.");
-    } else {
-      showAlert("success", "Status berhasil diperbarui dan disimpan");
+      // 6. Show success message
+      if (statusServis === "Sudah Selesai") {
+        showAlert("success", "Status berhasil diperbarui! Sekarang Anda dapat menghubungi customer via WhatsApp.");
+      } else {
+        showAlert("success", "Status berhasil diperbarui dan disimpan");
+      }
+
+    } catch (updateError) {
+      console.error("Error during update process:", updateError);
+      throw updateError;
     }
 
     showLoading(false);
+
   } catch (error) {
     console.error("Error updating status:", error);
     showAlert("danger", "Terjadi kesalahan saat memperbarui status: " + error.message);
