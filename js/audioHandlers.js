@@ -98,7 +98,7 @@ export async function playTakeQueueMessage() {
     await playAudio(AUDIO_PATHS.informasi);
     
     // Putar pesan
-    const message = "Kepada pelanggan yang belum mendapat nomor antrian, harap meminta nomor antrian terlebih dahulu kepada staff Melati. Terima kasih atas perhatiannya";
+    const message = "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian di tempat yang sudah disediakan. Terima kasih atas perhatiannya";
     await speak(message);
     
     // Putar nada penutup
