@@ -773,10 +773,8 @@ function applyFilters() {
     return matchesSearch && matchesStatusServis && matchesStatusPengambilan;
   });
 
-  // PERBAIKAN: Delay display untuk memastikan data sudah terupdate
-  setTimeout(() => {
-    displayData();
-  }, 100);
+  // PERBAIKAN: Langsung display tanpa delay
+  displayData();
 }
 
 function displayData() {
@@ -790,15 +788,11 @@ function displayData() {
     return;
   }
 
-  // SELALU tampilkan table container (termasuk search section)
   tableContainer.style.display = "block";
 
   if (filteredData.length === 0) {
-    // Kosongkan tbody tapi tetap tampilkan table structure
     tbody.innerHTML = "";
     noDataMessage.style.display = "block";
-
-    // Pastikan table tetap terlihat dengan header
     const tableWrapper = document.getElementById("tableWrapper");
     if (tableWrapper) {
       tableWrapper.style.display = "block";
@@ -806,9 +800,9 @@ function displayData() {
     return;
   }
 
-  // Ada data - sembunyikan pesan no data
   noDataMessage.style.display = "none";
 
+  // PERBAIKAN: Selalu clear dan rebuild tbody
   tbody.innerHTML = "";
 
   const fragment = document.createDocumentFragment();
@@ -817,7 +811,7 @@ function displayData() {
     const row = document.createElement("tr");
     const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
 
-    // PERBAIKAN: Status servis hanya badge (tanpa WhatsApp button)
+    // Status servis badge
     let statusServisContent = "";
     if (item.statusServis === "Sudah Selesai") {
       statusServisContent = '<span class="badge bg-success">Sudah Selesai</span>';
@@ -825,11 +819,11 @@ function displayData() {
       statusServisContent = '<span class="badge bg-warning">Belum Selesai</span>';
     }
 
-    // BARU: Kolom WhatsApp terpisah
+    // WhatsApp content
     let whatsappContent = "";
     if (item.statusServis === "Sudah Selesai") {
       const customerId = `${item.noHp}_${item.namaCustomer}`;
-      const isContacted = WhatsAppUtils.isContacted(customerId); // Ganti dari isContactedToday
+      const isContacted = WhatsAppUtils.isContacted(customerId);
       const contactInfo = WhatsAppUtils.getContactedInfo(customerId);
 
       if (WhatsAppUtils.isValidPhoneNumber(item.noHp)) {
@@ -837,24 +831,23 @@ function displayData() {
         const buttonText = isContacted ? "Sudah Dihubungi" : "Hubungi";
 
         whatsappContent = `
-      <button class="btn ${buttonClass}" 
-              data-customer-id="${customerId}"
-              onclick="contactCustomer('${item.noHp}', '${item.namaCustomer.replace(
+          <button class="btn ${buttonClass}" 
+                  data-customer-id="${customerId}"
+                  onclick="contactCustomer('${item.noHp}', '${item.namaCustomer.replace(
           /'/g,
           "\\'"
         )}', '${item.namaBarang.replace(/'/g, "\\'")}', '${customerId}')"
-              title="Hubungi customer via WhatsApp">
-        <i class="fab fa-whatsapp me-1"></i>
-        ${buttonText}
-      </button>`;
+                  title="Hubungi customer via WhatsApp">
+            <i class="fab fa-whatsapp me-1"></i>
+            ${buttonText}
+          </button>`;
 
         if (isContacted && contactInfo.contacted) {
-          // Tampilkan info kapan dihubungi
           const timeInfo = contactInfo.daysAgo === 0 ? "Hari ini" : `${contactInfo.daysAgo} hari lalu`;
           whatsappContent += `
-        <div class="whatsapp-status text-success">
-          <i class="fas fa-check-circle me-1"></i>Dihubungi ${timeInfo}
-        </div>`;
+            <div class="whatsapp-status text-success">
+              <i class="fas fa-check-circle me-1"></i>Dihubungi ${timeInfo}
+            </div>`;
         }
       } else {
         whatsappContent = '<small class="text-muted">No HP tidak valid</small>';
@@ -868,7 +861,7 @@ function displayData() {
         ? '<span class="badge bg-success">Sudah Diambil</span>'
         : '<span class="badge bg-danger">Belum Diambil</span>';
 
-    // Handle waktu pengambilan dengan proper error handling
+    // Handle waktu pengambilan
     let waktuPengambilan = "-";
     let waktuForModal = "";
 
@@ -876,25 +869,19 @@ function displayData() {
       try {
         let waktuDate;
 
-        // Handle berbagai format waktu
         if (item.waktuPengambilan.toDate) {
-          // Firestore Timestamp
           waktuDate = item.waktuPengambilan.toDate();
         } else if (item.waktuPengambilan.seconds) {
-          // Firestore Timestamp object dengan seconds
           waktuDate = new Date(item.waktuPengambilan.seconds * 1000);
         } else if (typeof item.waktuPengambilan === "string") {
-          // ISO string
           waktuDate = new Date(item.waktuPengambilan);
         } else {
-          // Direct Date object
           waktuDate = new Date(item.waktuPengambilan);
         }
 
-        // Validasi date
         if (!isNaN(waktuDate.getTime())) {
           waktuPengambilan = waktuDate.toLocaleString("id-ID");
-          waktuForModal = waktuDate.toISOString().slice(0, 16); // Format untuk datetime-local input
+          waktuForModal = waktuDate.toISOString().slice(0, 16);
         }
       } catch (error) {
         console.error("Error formatting waktu pengambilan for item:", item.id, error);
@@ -1022,10 +1009,10 @@ async function saveStatusUpdate() {
     showLoading(true);
 
     try {
-      // 1. Update ke Firestore terlebih dahulu
+      // 1. Update ke Firestore
       await updateServisStatus(servisId, statusServis, statusPengambilan, stafHandle, waktuPengambilan);
       
-      // 2. Update local data dengan data yang konsisten
+      // 2. PERBAIKAN SEDERHANA: Update data lokal langsung
       const updateData = {
         statusServis,
         statusPengambilan,
@@ -1033,27 +1020,43 @@ async function saveStatusUpdate() {
         waktuPengambilan: waktuPengambilan ? new Date(waktuPengambilan).toISOString() : null,
       };
 
-      updateLocalDataAndCache(servisId, updateData);
+      // Update currentData
+      const currentIndex = currentData.findIndex(item => item.id === servisId);
+      if (currentIndex !== -1) {
+        currentData[currentIndex] = { ...currentData[currentIndex], ...updateData };
+      }
 
-      // 3. Tutup modal setelah update berhasil
+      // Update filteredData
+      const filteredIndex = filteredData.findIndex(item => item.id === servisId);
+      if (filteredIndex !== -1) {
+        filteredData[filteredIndex] = { ...filteredData[filteredIndex], ...updateData };
+      }
+
+      // 3. Update cache
+      if (currentMonthYear) {
+        const { month, year } = currentMonthYear;
+        const cacheKey = `month_${month}_${year}`;
+        setCachedData(cacheKey, currentData);
+      }
+
+      // 4. PERBAIKAN: Langsung tampilkan ulang data tanpa filter ulang
+      displayData();
+
+      // 5. Tutup modal
       const modal = bootstrap.Modal.getInstance(document.getElementById("updateStatusModal"));
       if (modal) {
         modal.hide();
       }
 
-      // 4. PERBAIKAN: Adjust filter jika item berubah status
+      // 6. PERBAIKAN: Auto-adjust filter jika perlu
       const statusServisFilter = document.getElementById("statusServisFilter");
       if (statusServis === "Sudah Selesai" && statusServisFilter.value === "Belum Selesai") {
         statusServisFilter.value = "Sudah Selesai";
-        handleFilterLogic(); // Gunakan fungsi yang sudah ada
+        handleFilterLogic();
+        applyFilters(); // Re-apply dengan filter baru
       }
 
-      // 5. Re-apply filters dengan delay untuk memastikan DOM ready
-      setTimeout(() => {
-        applyFilters();
-      }, 200);
-
-      // 6. Show success message
+      // 7. Show success message
       if (statusServis === "Sudah Selesai") {
         showAlert("success", "Status berhasil diperbarui! Sekarang Anda dapat menghubungi customer via WhatsApp.");
       } else {
