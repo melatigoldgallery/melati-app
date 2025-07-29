@@ -131,21 +131,21 @@ function initializeDisplayPageWithFirebase() {
   const carousel = document.getElementById("promotionFullscreen");
   if (carousel) {
     // Ensure carousel keeps running even when tab is not active
-    window.addEventListener("blur", function() {
+    window.addEventListener("blur", function () {
       if (carouselInstance) {
         carouselInstance.cycle();
       }
     });
 
     // Refresh AOS animations on slide change
-    carousel.addEventListener("slide.bs.carousel", function(e) {
+    carousel.addEventListener("slide.bs.carousel", function (e) {
       console.log(`Sliding to slide ${e.to + 1}`);
-      
+
       // Refresh AOS animations on the next slide
       const nextSlide = e.relatedTarget;
       if (nextSlide) {
         const animations = nextSlide.querySelectorAll("[data-aos]");
-        animations.forEach(element => {
+        animations.forEach((element) => {
           element.classList.remove("aos-animate");
           setTimeout(() => {
             element.classList.add("aos-animate");
@@ -156,7 +156,7 @@ function initializeDisplayPageWithFirebase() {
   }
 
   // Periodically ensure carousel is running
-  setInterval(function() {
+  setInterval(function () {
     if (carouselInstance) {
       carouselInstance.cycle();
       console.log("Ensuring carousel is running");
@@ -215,13 +215,13 @@ function applySettings(settings) {
 
     // Count slides to determine if we should auto-advance
     const slideCount = carousel.querySelectorAll(".carousel-item").length;
-    const actualInterval = slideCount <= 1 ? false : (autoPlay ? slideInterval * 1000 : false);
+    const actualInterval = slideCount <= 1 ? false : autoPlay ? slideInterval * 1000 : false;
 
     carouselInstance = new bootstrap.Carousel(carousel, {
       interval: actualInterval,
       wrap: true,
       keyboard: false,
-      pause: false // Don't pause on hover
+      pause: false, // Don't pause on hover
     });
 
     console.log(`Carousel initialized with ${slideCount} slides, interval: ${actualInterval}`);
@@ -273,7 +273,7 @@ function updateCarouselContent(content) {
 
   // Check if we're on the display page
   const isDisplayPage = document.querySelector(".fullscreen-container") !== null;
-  
+
   // For display page, add default slides if no content
   if (isDisplayPage && allSlides.length === 0) {
     // Default slides for display page
@@ -296,7 +296,7 @@ function updateCarouselContent(content) {
               <div class="decorative-element right"></div>
             </div>
           </div>
-        `
+        `,
       },
       {
         type: "default",
@@ -316,7 +316,7 @@ function updateCarouselContent(content) {
               <div class="decorative-element right"></div>
             </div>
           </div>
-        `
+        `,
       },
       {
         type: "default",
@@ -336,10 +336,10 @@ function updateCarouselContent(content) {
               <div class="decorative-element right"></div>
             </div>
           </div>
-        `
-      }
+        `,
+      },
     ];
-    
+
     allSlides = defaultSlides;
   } else if (!isDisplayPage && allSlides.length === 0) {
     // For admin preview, add a default slide
@@ -387,14 +387,16 @@ function updateCarouselContent(content) {
 
   // Get settings and apply them
   const settingsRef = ref(rtdb, "settings/promotion");
-  get(settingsRef).then((snapshot) => {
-    const settings = snapshot.val() || {};
-    applySettings(settings);
-  }).catch(error => {
-    console.error("Error getting settings:", error);
-    // Apply default settings
-    applySettings({});
-  });
+  get(settingsRef)
+    .then((snapshot) => {
+      const settings = snapshot.val() || {};
+      applySettings(settings);
+    })
+    .catch((error) => {
+      console.error("Error getting settings:", error);
+      // Apply default settings
+      applySettings({});
+    });
 }
 
 // Add default slide when no content is available
@@ -431,27 +433,31 @@ function createEventSlide(slide) {
         <!-- Optional: Add overlay with event title if needed -->
         <div class="event-overlay">
           <h2>${slide.title}</h2>
-          ${slide.subtitle ? `<h3>${slide.subtitle}</h3>` : ''}
-          ${slide.highlight ? `<div class="event-highlight">${slide.highlight}</div>` : ''}
+          ${slide.subtitle ? `<h3>${slide.subtitle}</h3>` : ""}
+          ${slide.highlight ? `<div class="event-highlight">${slide.highlight}</div>` : ""}
         </div>
       </div>
     `;
   } else {
     // If no image, use standard display
     return `
-      <div class="promo-slide ${slide.variant || 'luxury-gold'}">
+      <div class="promo-slide ${slide.variant || "luxury-gold"}">
         <div class="slide-content" data-aos="fade-up">
           <div class="decorative-element left"></div>
           <div class="content-wrapper">
             <h2>${slide.title}</h2>
-            <div class="divider"><span><i class="fas fa-${slide.icon || 'percentage'}"></i></span></div>
-            <h3>${slide.subtitle || ''}</h3>
-            <p>${slide.description || ''}</p>
-            ${slide.highlight ? `
+            <div class="divider"><span><i class="fas fa-${slide.icon || "percentage"}"></i></span></div>
+            <h3>${slide.subtitle || ""}</h3>
+            <p>${slide.description || ""}</p>
+            ${
+              slide.highlight
+                ? `
               <div class="promo-highlight">
                 <span class="highlight-text">${slide.highlight}</span>
               </div>
-            ` : ''}
+            `
+                : ""
+            }
           </div>
           <div class="decorative-element right"></div>
         </div>
@@ -462,65 +468,69 @@ function createEventSlide(slide) {
 
 // Create custom slide HTML for display page
 function createCustomSlide(slide) {
-  if (slide.contentType === 'HTML') {
+  if (slide.contentType === "HTML") {
     return `
       <div class="custom-slide">
         <div class="slide-content" data-aos="fade-up">
           <div class="decorative-element left"></div>
           <div class="content-wrapper">
-            ${slide.htmlContent || '<p>No content available</p>'}
+            ${slide.htmlContent || "<p>No content available</p>"}
           </div>
           <div class="decorative-element right"></div>
         </div>
       </div>
     `;
-  } else if (slide.contentType === 'Gambar') {
+  } else if (slide.contentType === "Gambar") {
     // For images, display fullscreen without additional elements
     return `
       <div class="fullscreen-image-slide">
         <img src="${slide.fileUrl}" alt="${slide.title}" class="fullscreen-image">
       </div>
     `;
-  } else if (slide.contentType === 'Video') {
+  } else if (slide.contentType === "Video") {
     // For videos, display fullscreen like images
     return `
       <div class="fullscreen-image-slide">
         <video src="${slide.fileUrl}" autoplay muted loop class="fullscreen-image"></video>
       </div>
     `;
-  } else if (slide.contentType === 'Gallery') {
-    const galleryItems = (slide.images || []).map(img => `
+  } else if (slide.contentType === "Gallery") {
+    const galleryItems = (slide.images || [])
+      .map(
+        (img) => `
       <div class="gallery-item">
-        <img src="${img.url}" alt="${img.caption || ''}" class="gallery-img">
-        ${img.caption ? `<div class="item-caption">${img.caption}</div>` : ''}
+        <img src="${img.url}" alt="${img.caption || ""}" class="gallery-img">
+        ${img.caption ? `<div class="item-caption">${img.caption}</div>` : ""}
       </div>
-    `).join('');
-    
+    `
+      )
+      .join("");
+
     return `
       <div class="custom-slide collection-display">
         <div class="slide-content" data-aos="fade-up">
           <div class="decorative-element left"></div>
           <div class="content-wrapper">
             <h2>${slide.title}</h2>
-            <div class="divider"><span><i class="fas fa-${slide.icon || 'crown'}"></i></span></div>
+            <div class="divider"><span><i class="fas fa-${slide.icon || "crown"}"></i></span></div>
             <div class="image-gallery">
               ${galleryItems}
             </div>
-            <p>${slide.description || ''}</p>
+            <p>${slide.description || ""}</p>
           </div>
           <div class="decorative-element right"></div>
         </div>
       </div>
     `;
   }
-  
-  return '';
+
+  return "";
 }
 
 // Create event slide HTML for preview in admin page
 function createPreviewEventSlide(slide) {
-  const slideTitle = slide.title || 'Untitled Event';
-  
+  const slideTitle = slide.title || "Untitled Event";
+
   // If there's an image, display it in the preview
   if (slide.imageUrl) {
     return `
@@ -530,11 +540,15 @@ function createPreviewEventSlide(slide) {
           <div class="preview-image-container">
             <img src="${slide.imageUrl}" alt="${slideTitle}">
           </div>
-          ${slide.highlight ? `
+          ${
+            slide.highlight
+              ? `
             <div class="preview-highlight">
               <span class="highlight-text">${slide.highlight}</span>
             </div>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
       </div>
     `;
@@ -545,13 +559,17 @@ function createPreviewEventSlide(slide) {
         <div class="slide-title-badge">Event: ${slideTitle}</div>
         <div class="slide-content">
           <h2>${slideTitle}</h2>
-          ${slide.subtitle ? `<h3>${slide.subtitle}</h3>` : ''}
-          <p>${slide.description || 'No description'}</p>
-          ${slide.highlight ? `
+          ${slide.subtitle ? `<h3>${slide.subtitle}</h3>` : ""}
+          <p>${slide.description || "No description"}</p>
+          ${
+            slide.highlight
+              ? `
             <div class="preview-highlight">
               <span class="highlight-text">${slide.highlight}</span>
             </div>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
       </div>
     `;
@@ -560,20 +578,20 @@ function createPreviewEventSlide(slide) {
 
 // Create custom slide HTML for preview in admin page
 function createPreviewCustomSlide(slide) {
-  const slideTitle = slide.title || 'Untitled Content';
-  
-  if (slide.contentType === 'HTML') {
+  const slideTitle = slide.title || "Untitled Content";
+
+  if (slide.contentType === "HTML") {
     return `
       <div class="preview-slide">
         <div class="slide-title-badge">HTML: ${slideTitle}</div>
         <div class="slide-content">
           <div class="preview-html-content">
-            ${slide.htmlContent || '<p>No content available</p>'}
+            ${slide.htmlContent || "<p>No content available</p>"}
           </div>
         </div>
       </div>
     `;
-  } else if (slide.contentType === 'Gambar') {
+  } else if (slide.contentType === "Gambar") {
     return `
       <div class="preview-slide">
         <div class="slide-title-badge">Image: ${slideTitle}</div>
@@ -584,7 +602,7 @@ function createPreviewCustomSlide(slide) {
         </div>
       </div>
     `;
-  } else if (slide.contentType === 'Video') {
+  } else if (slide.contentType === "Video") {
     return `
       <div class="preview-slide">
         <div class="slide-title-badge">Video: ${slideTitle}</div>
@@ -595,14 +613,19 @@ function createPreviewCustomSlide(slide) {
         </div>
       </div>
     `;
-  } else if (slide.contentType === 'Gallery') {
-    const galleryItems = (slide.images || []).slice(0, 6).map(img => `
+  } else if (slide.contentType === "Gallery") {
+    const galleryItems = (slide.images || [])
+      .slice(0, 6)
+      .map(
+        (img) => `
       <div class="preview-gallery-item">
-        <img src="${img.url}" alt="${img.caption || ''}">
-        ${img.caption ? `<div class="preview-item-caption">${img.caption}</div>` : ''}
+        <img src="${img.url}" alt="${img.caption || ""}">
+        ${img.caption ? `<div class="preview-item-caption">${img.caption}</div>` : ""}
       </div>
-    `).join('');
-    
+    `
+      )
+      .join("");
+
     return `
       <div class="preview-slide">
         <div class="slide-title-badge">Gallery: ${slideTitle}</div>
@@ -611,13 +634,13 @@ function createPreviewCustomSlide(slide) {
           <div class="preview-gallery">
             ${galleryItems}
           </div>
-          <p>${slide.description || ''}</p>
+          <p>${slide.description || ""}</p>
         </div>
       </div>
     `;
   }
-  
-  return '';
+
+  return "";
 }
 
 // ADMIN PAGE SPECIFIC FUNCTIONS
@@ -629,50 +652,57 @@ function initializeEventListeners() {
   if (eventForm) {
     eventForm.addEventListener("submit", handleEventFormSubmit);
   }
-
   // Custom content form submission
   const customForm = document.getElementById("customContentForm");
   if (customForm) {
     customForm.addEventListener("submit", handleCustomFormSubmit);
   }
-
   // Settings form submission
   const settingsForm = document.getElementById("settingsForm");
   if (settingsForm) {
     settingsForm.addEventListener("submit", handleSettingsFormSubmit);
   }
-
   // Content type change handler
   const contentTypeSelect = document.getElementById("contentType");
   if (contentTypeSelect) {
     contentTypeSelect.addEventListener("change", handleContentTypeChange);
   }
-
   // Preview button
   const previewBtn = document.getElementById("previewBtn");
   if (previewBtn) {
     previewBtn.addEventListener("click", openFullscreenPreview);
   }
-
   // Logout button
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", handleLogout);
+  }
+  // Tambah event button
+  const addEventBtn = document.getElementById("addEventBtn");
+  if (addEventBtn) {
+    addEventBtn.addEventListener("click", function () {
+      document.getElementById("eventForm").style.display = "block";
+    });
+  }
+  // Tambah custom button
+  const addCustomBtn = document.getElementById("addCustomBtn");
+  if (addCustomBtn) {
+    addCustomBtn.addEventListener("click", function () {
+      document.getElementById("customContentForm").style.display = "block";
+    });
   }
 }
 
 // Handle event form submission
 async function handleEventFormSubmit(e) {
   e.preventDefault();
-  
   const form = e.target;
   const submitBtn = form.querySelector('button[type="submit"]');
   const originalBtnText = submitBtn.innerHTML;
-  
   try {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
-    
+    submitBtn.innerHTML =
+      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
     const eventData = {
       title: form.eventTitle.value,
       subtitle: form.eventSubtitle.value,
@@ -681,38 +711,37 @@ async function handleEventFormSubmit(e) {
       variant: form.eventVariant.value,
       icon: form.eventIcon.value,
       isActive: form.eventActive.checked,
-      type: 'event',
+      type: "event",
       order: parseInt(form.eventOrder.value) || 0,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-    
     // Handle image upload if provided
     const imageFile = form.eventImage.files[0];
     if (imageFile) {
       const imageUrl = await uploadFile(imageFile);
-      eventData.imageUrl = imageUrl;
+      eventData.imageUrl = imageUrl.url; // hanya url string
     }
-    
-    // Save to Firebase
-    const eventsRef = ref(rtdb, 'content/promotion/events');
-    const newEventRef = push(eventsRef);
-    await set(newEventRef, eventData);
-    
-    // Show success message
-    showToast('Event berhasil disimpan!', 'success');
-    
-    // Reset form
+    // Jika edit mode, update data lama
+    if (form.dataset.mode === "edit" && form.dataset.editId) {
+      const eventRef = ref(rtdb, `content/promotion/events/${form.dataset.editId}`);
+      await set(eventRef, eventData);
+      form.dataset.mode = "";
+      form.dataset.editId = "";
+      submitBtn.textContent = "Simpan Event";
+    } else {
+      // Save to Firebase (tambah baru)
+      const eventsRef = ref(rtdb, "content/promotion/events");
+      const newEventRef = push(eventsRef);
+      await set(newEventRef, eventData);
+    }
+    showToast("Event berhasil disimpan!", "success");
     form.reset();
-    
-    // Refresh event list
+    form.style.display = "none";
     refreshEventList();
-    
-    // Update preview carousel
     updatePreviewCarousel();
-    
   } catch (error) {
-    console.error('Error saving event:', error);
-    showToast('Gagal menyimpan event: ' + error.message, 'danger');
+    console.error("Error saving event:", error);
+    showToast("Gagal menyimpan event: " + error.message, "danger");
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = originalBtnText;
@@ -722,90 +751,75 @@ async function handleEventFormSubmit(e) {
 // Handle custom content form submission
 async function handleCustomFormSubmit(e) {
   e.preventDefault();
-  
   const form = e.target;
   const submitBtn = form.querySelector('button[type="submit"]');
   const originalBtnText = submitBtn.innerHTML;
-  
   try {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
-    
+    submitBtn.innerHTML =
+      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
     const contentType = form.contentType.value;
-    
     const customData = {
       title: form.contentTitle.value,
-      description: form.contentDescription?.value || '',
+      description: form.contentDescription?.value || "",
       contentType: contentType,
       isActive: form.contentActive.checked,
-      type: 'custom',
+      type: "custom",
       order: parseInt(form.contentOrder.value) || 0,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-    
-    // Handle different content types
-    if (contentType === 'HTML') {
+    if (contentType === "HTML") {
       customData.htmlContent = form.htmlContent.value;
-    } else if (contentType === 'Gambar') {
+    } else if (contentType === "Gambar") {
       const imageFile = form.contentFile.files[0];
-      if (!imageFile) throw new Error('Pilih file gambar terlebih dahulu');
-      
+      if (!imageFile) throw new Error("Pilih file gambar terlebih dahulu");
       const fileUrl = await uploadFile(imageFile);
-      customData.fileUrl = fileUrl;
-    } else if (contentType === 'Video') {
+      customData.fileUrl = fileUrl.url; // hanya url string
+    } else if (contentType === "Video") {
       const videoFile = form.contentFile.files[0];
-      if (!videoFile) throw new Error('Pilih file video terlebih dahulu');
-      
+      if (!videoFile) throw new Error("Pilih file video terlebih dahulu");
       const fileUrl = await uploadFile(videoFile);
-      customData.fileUrl = fileUrl;
-    } else if (contentType === 'Gallery') {
-      // Handle gallery images
+      customData.fileUrl = fileUrl.url; // hanya url string
+    } else if (contentType === "Gallery") {
       const galleryImages = [];
-      const galleryContainer = document.getElementById('galleryContainer');
-      const imageItems = galleryContainer.querySelectorAll('.gallery-upload-item');
-      
+      const galleryContainer = document.getElementById("galleryContainer");
+      const imageItems = galleryContainer.querySelectorAll(".gallery-upload-item");
       for (const item of imageItems) {
         const imageUrl = item.dataset.url;
-        const caption = item.querySelector('.gallery-caption').value;
-        
+        const caption = item.querySelector(".gallery-caption").value;
         if (imageUrl) {
-          galleryImages.push({
-            url: imageUrl,
-            caption: caption
-          });
+          galleryImages.push({ url: imageUrl, caption: caption });
         }
       }
-      
       if (galleryImages.length === 0) {
-        throw new Error('Tambahkan minimal satu gambar ke galeri');
+        throw new Error("Tambahkan minimal satu gambar ke galeri");
       }
-      
       customData.images = galleryImages;
       customData.icon = form.galleryIcon.value;
     }
-    
-    // Save to Firebase
-    const customItemsRef = ref(rtdb, 'content/promotion/customItems');
-    const newItemRef = push(customItemsRef);
-    await set(newItemRef, customData);
-    
-    // Show success message
-    showToast('Konten berhasil disimpan!', 'success');
-    
-    // Reset form
+    // Jika edit mode, update data lama
+    if (form.dataset.mode === "edit" && form.dataset.editId) {
+      const itemRef = ref(rtdb, `content/promotion/customItems/${form.dataset.editId}`);
+      await set(itemRef, customData);
+      form.dataset.mode = "";
+      form.dataset.editId = "";
+      submitBtn.textContent = "Simpan Konten";
+    } else {
+      // Save to Firebase (tambah baru)
+      const customItemsRef = ref(rtdb, "content/promotion/customItems");
+      const newItemRef = push(customItemsRef);
+      await set(newItemRef, customData);
+    }
+    showToast("Konten berhasil disimpan!", "success");
     form.reset();
     resetGalleryContainer();
     handleContentTypeChange();
-    
-    // Refresh custom content list
+    form.style.display = "none";
     refreshCustomList();
-    
-    // Update preview carousel
     updatePreviewCarousel();
-    
   } catch (error) {
-    console.error('Error saving custom content:', error);
-    showToast('Gagal menyimpan konten: ' + error.message, 'danger');
+    console.error("Error saving custom content:", error);
+    showToast("Gagal menyimpan konten: " + error.message, "danger");
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = originalBtnText;
@@ -815,35 +829,35 @@ async function handleCustomFormSubmit(e) {
 // Handle settings form submission
 async function handleSettingsFormSubmit(e) {
   e.preventDefault();
-  
+
   const form = e.target;
   const submitBtn = form.querySelector('button[type="submit"]');
   const originalBtnText = submitBtn.innerHTML;
   try {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
-    
+    submitBtn.innerHTML =
+      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
+
     const settingsData = {
       slideInterval: parseInt(form.slideInterval.value) || 30,
       transitionEffect: form.transitionEffect.value,
       enableAnimation: form.enableAnimation.checked,
       showControls: form.showControls.checked,
-      autoPlay: form.autoPlay.checked
+      autoPlay: form.autoPlay.checked,
     };
-    
+
     // Save to Firebase
-    const settingsRef = ref(rtdb, 'settings/promotion');
+    const settingsRef = ref(rtdb, "settings/promotion");
     await set(settingsRef, settingsData);
-    
+
     // Show success message
-    showToast('Pengaturan berhasil disimpan!', 'success');
-    
+    showToast("Pengaturan berhasil disimpan!", "success");
+
     // Update preview carousel with new settings
     applySettings(settingsData);
-    
   } catch (error) {
-    console.error('Error saving settings:', error);
-    showToast('Gagal menyimpan pengaturan: ' + error.message, 'danger');
+    console.error("Error saving settings:", error);
+    showToast("Gagal menyimpan pengaturan: " + error.message, "danger");
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = originalBtnText;
@@ -852,74 +866,75 @@ async function handleSettingsFormSubmit(e) {
 
 // Handle content type change
 function handleContentTypeChange() {
-  const contentType = document.getElementById('contentType').value;
-  
+  const contentType = document.getElementById("contentType").value;
+
   // Hide all content type specific sections
-  document.querySelectorAll('.content-type-section').forEach(section => {
-    section.style.display = 'none';
+  document.querySelectorAll(".content-type-section").forEach((section) => {
+    section.style.display = "none";
   });
-  
+
   // Show the selected content type section
   const selectedSection = document.getElementById(`${contentType}Section`);
   if (selectedSection) {
-    selectedSection.style.display = 'block';
+    selectedSection.style.display = "block";
   }
-  
+
   // Update file input label based on content type
-  const fileInputLabel = document.getElementById('contentFileLabel');
+  const fileInputLabel = document.getElementById("contentFileLabel");
   if (fileInputLabel) {
-    if (contentType === 'Gambar') {
-      fileInputLabel.textContent = 'Pilih Gambar';
-    } else if (contentType === 'Video') {
-      fileInputLabel.textContent = 'Pilih Video';
+    if (contentType === "Gambar") {
+      fileInputLabel.textContent = "Pilih Gambar";
+    } else if (contentType === "Video") {
+      fileInputLabel.textContent = "Pilih Video";
     }
   }
-  
+
   // Show/hide file input section
-  const fileInputSection = document.getElementById('fileInputSection');
+  const fileInputSection = document.getElementById("fileInputSection");
   if (fileInputSection) {
-    fileInputSection.style.display = (contentType === 'Gambar' || contentType === 'Video') ? 'block' : 'none';
+    fileInputSection.style.display = contentType === "Gambar" || contentType === "Video" ? "block" : "none";
   }
 }
 
 // Reset gallery container
 function resetGalleryContainer() {
-  const galleryContainer = document.getElementById('galleryContainer');
+  const galleryContainer = document.getElementById("galleryContainer");
   if (galleryContainer) {
-    galleryContainer.innerHTML = '';
+    galleryContainer.innerHTML = "";
   }
 }
 
 // Add gallery image
 async function addGalleryImage(e) {
   e.preventDefault();
-  
-  const fileInput = document.getElementById('galleryFileInput');
+
+  const fileInput = document.getElementById("galleryFileInput");
   const file = fileInput.files[0];
-  
+
   if (!file) {
-    showToast('Pilih gambar terlebih dahulu', 'warning');
+    showToast("Pilih gambar terlebih dahulu", "warning");
     return;
   }
-  
+
   try {
     // Show loading indicator
-    const galleryAddBtn = document.getElementById('galleryAddBtn');
+    const galleryAddBtn = document.getElementById("galleryAddBtn");
     const originalBtnText = galleryAddBtn.innerHTML;
     galleryAddBtn.disabled = true;
-    galleryAddBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
-    
+    galleryAddBtn.innerHTML =
+      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
+
     // Upload file
     const imageUrl = await uploadFile(file);
-    
+
     // Create gallery item
-    const galleryContainer = document.getElementById('galleryContainer');
-    const itemId = 'gallery-item-' + Date.now();
-    
+    const galleryContainer = document.getElementById("galleryContainer");
+    const itemId = "gallery-item-" + Date.now();
+
     const itemHtml = `
-      <div class="gallery-upload-item" id="${itemId}" data-url="${imageUrl}">
+      <div class="gallery-upload-item" id="${itemId}" data-url="${imageUrl.url}">
         <div class="gallery-upload-preview">
-          <img src="${imageUrl}" alt="Gallery image">
+          <img src="${imageUrl.url}" alt="Gallery image">
         </div>
         <div class="gallery-upload-controls">
           <input type="text" class="form-control form-control-sm gallery-caption" placeholder="Caption (optional)">
@@ -929,18 +944,17 @@ async function addGalleryImage(e) {
         </div>
       </div>
     `;
-    
-    galleryContainer.insertAdjacentHTML('beforeend', itemHtml);
-    
+
+    galleryContainer.insertAdjacentHTML("beforeend", itemHtml);
+
     // Reset file input
-    fileInput.value = '';
-    
+    fileInput.value = "";
   } catch (error) {
-    console.error('Error adding gallery image:', error);
-    showToast('Gagal menambahkan gambar: ' + error.message, 'danger');
+    console.error("Error adding gallery image:", error);
+    showToast("Gagal menambahkan gambar: " + error.message, "danger");
   } finally {
     // Reset button
-    const galleryAddBtn = document.getElementById('galleryAddBtn');
+    const galleryAddBtn = document.getElementById("galleryAddBtn");
     galleryAddBtn.disabled = false;
     galleryAddBtn.innerHTML = '<i class="fas fa-plus"></i> Add Image';
   }
@@ -956,67 +970,69 @@ function removeGalleryItem(itemId) {
 
 // Load settings from Firebase
 function loadSettingsFromFirebase() {
-  const settingsRef = ref(rtdb, 'settings/promotion');
-  
-  get(settingsRef).then((snapshot) => {
-    const settings = snapshot.val() || {};
-    
-    // Populate settings form
-    const form = document.getElementById('settingsForm');
-    if (form) {
-      form.slideInterval.value = settings.slideInterval || 30;
-      form.transitionEffect.value = settings.transitionEffect || 'fade';
-      form.enableAnimation.checked = settings.enableAnimation !== false;
-      form.showControls.checked = settings.showControls !== false;
-      form.autoPlay.checked = settings.autoPlay !== false;
-    }
-    
-    // Apply settings to preview carousel
-    applySettings(settings);
-    
-  }).catch(error => {
-    console.error('Error loading settings:', error);
-    showToast('Gagal memuat pengaturan', 'danger');
-  });
+  const settingsRef = ref(rtdb, "settings/promotion");
+
+  get(settingsRef)
+    .then((snapshot) => {
+      const settings = snapshot.val() || {};
+
+      // Populate settings form
+      const form = document.getElementById("settingsForm");
+      if (form) {
+        form.slideInterval.value = settings.slideInterval || 30;
+        form.transitionEffect.value = settings.transitionEffect || "fade";
+        form.enableAnimation.checked = settings.enableAnimation !== false;
+        form.showControls.checked = settings.showControls !== false;
+        form.autoPlay.checked = settings.autoPlay !== false;
+      }
+
+      // Apply settings to preview carousel
+      applySettings(settings);
+    })
+    .catch((error) => {
+      console.error("Error loading settings:", error);
+      showToast("Gagal memuat pengaturan", "danger");
+    });
 }
 
 // Refresh event list
 function refreshEventList() {
-  const eventsRef = ref(rtdb, 'content/promotion/events');
-  
-  get(eventsRef).then((snapshot) => {
-    const events = snapshot.val() || {};
-    const eventsList = document.getElementById('eventsList');
-    
-    if (eventsList) {
-      // Clear current list
-      eventsList.innerHTML = '';
-      
-      // Check if there are any events
-      if (Object.keys(events).length === 0) {
-        eventsList.innerHTML = '<div class="list-group-item text-center text-muted">Tidak ada event</div>';
-        return;
-      }
-      
-      // Convert to array and sort
-      const eventsArray = Object.entries(events).map(([id, event]) => ({
-        id,
-        ...event
-      }));
-      
-      eventsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
-      
-      // Add each event to the list
-      eventsArray.forEach(event => {
-        const statusBadge = event.isActive 
-          ? '<span class="badge bg-success">Active</span>' 
-          : '<span class="badge bg-secondary">Inactive</span>';
-        
-        const itemHtml = `
+  const eventsRef = ref(rtdb, "content/promotion/events");
+
+  get(eventsRef)
+    .then((snapshot) => {
+      const events = snapshot.val() || {};
+      const eventsList = document.getElementById("eventsList");
+
+      if (eventsList) {
+        // Clear current list
+        eventsList.innerHTML = "";
+
+        // Check if there are any events
+        if (Object.keys(events).length === 0) {
+          eventsList.innerHTML = '<div class="list-group-item text-center text-muted">Tidak ada event</div>';
+          return;
+        }
+
+        // Convert to array and sort
+        const eventsArray = Object.entries(events).map(([id, event]) => ({
+          id,
+          ...event,
+        }));
+
+        eventsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Add each event to the list
+        eventsArray.forEach((event) => {
+          const statusBadge = event.isActive
+            ? '<span class="badge bg-success">Active</span>'
+            : '<span class="badge bg-secondary">Inactive</span>';
+
+          const itemHtml = `
           <div class="list-group-item d-flex justify-content-between align-items-center">
             <div>
               <h6 class="mb-1">${event.title}</h6>
-              <small>${event.subtitle || ''}</small>
+              <small>${event.subtitle || ""}</small>
               <div>${statusBadge}</div>
             </div>
             <div class="btn-group">
@@ -1029,55 +1045,56 @@ function refreshEventList() {
             </div>
           </div>
         `;
-        
-        eventsList.insertAdjacentHTML('beforeend', itemHtml);
-      });
-    }
-    
-    // Update preview carousel
-    updatePreviewCarousel();
-    
-  }).catch(error => {
-    console.error('Error loading events:', error);
-    showToast('Gagal memuat daftar event', 'danger');
-  });
+
+          eventsList.insertAdjacentHTML("beforeend", itemHtml);
+        });
+      }
+
+      // Update preview carousel
+      updatePreviewCarousel();
+    })
+    .catch((error) => {
+      console.error("Error loading events:", error);
+      showToast("Gagal memuat daftar event", "danger");
+    });
 }
 
 // Refresh custom content list
 function refreshCustomList() {
-  const customItemsRef = ref(rtdb, 'content/promotion/customItems');
-  
-  get(customItemsRef).then((snapshot) => {
-    const customItems = snapshot.val() || {};
-    const customList = document.getElementById('customContentList');
-    
-    if (customList) {
-      // Clear current list
-      customList.innerHTML = '';
-      
-      // Check if there are any items
-      if (Object.keys(customItems).length === 0) {
-        customList.innerHTML = '<div class="list-group-item text-center text-muted">Tidak ada konten kustom</div>';
-        return;
-      }
-      
-      // Convert to array and sort
-      const itemsArray = Object.entries(customItems).map(([id, item]) => ({
-        id,
-        ...item
-      }));
-      
-      itemsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
-      
-      // Add each item to the list
-      itemsArray.forEach(item => {
-        const statusBadge = item.isActive 
-          ? '<span class="badge bg-success">Active</span>' 
-          : '<span class="badge bg-secondary">Inactive</span>';
-        
-        const typeBadge = `<span class="badge bg-info">${item.contentType}</span>`;
-        
-        const itemHtml = `
+  const customItemsRef = ref(rtdb, "content/promotion/customItems");
+
+  get(customItemsRef)
+    .then((snapshot) => {
+      const customItems = snapshot.val() || {};
+      const customList = document.getElementById("customContentList");
+
+      if (customList) {
+        // Clear current list
+        customList.innerHTML = "";
+
+        // Check if there are any items
+        if (Object.keys(customItems).length === 0) {
+          customList.innerHTML = '<div class="list-group-item text-center text-muted">Tidak ada konten kustom</div>';
+          return;
+        }
+
+        // Convert to array and sort
+        const itemsArray = Object.entries(customItems).map(([id, item]) => ({
+          id,
+          ...item,
+        }));
+
+        itemsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Add each item to the list
+        itemsArray.forEach((item) => {
+          const statusBadge = item.isActive
+            ? '<span class="badge bg-success">Active</span>'
+            : '<span class="badge bg-secondary">Inactive</span>';
+
+          const typeBadge = `<span class="badge bg-info">${item.contentType}</span>`;
+
+          const itemHtml = `
           <div class="list-group-item d-flex justify-content-between align-items-center">
             <div>
               <h6 class="mb-1">${item.title}</h6>
@@ -1093,224 +1110,207 @@ function refreshCustomList() {
             </div>
           </div>
         `;
-        
-        customList.insertAdjacentHTML('beforeend', itemHtml);
-      });
-    }
-    
-    // Update preview carousel
-    updatePreviewCarousel();
-    
-  }).catch(error => {
-    console.error('Error loading custom content:', error);
-    showToast('Gagal memuat daftar konten kustom', 'danger');
-  });
+
+          customList.insertAdjacentHTML("beforeend", itemHtml);
+        });
+      }
+
+      // Update preview carousel
+      updatePreviewCarousel();
+    })
+    .catch((error) => {
+      console.error("Error loading custom content:", error);
+      showToast("Gagal memuat daftar konten kustom", "danger");
+    });
 }
 
 // Update preview carousel
 function updatePreviewCarousel() {
   // Get all content from Firebase
-  Promise.all([
-    get(ref(rtdb, 'content/promotion/events')),
-    get(ref(rtdb, 'content/promotion/customItems'))
-  ]).then(([eventsSnapshot, customItemsSnapshot]) => {
-    const events = eventsSnapshot.val() || {};
-    const customItems = customItemsSnapshot.val() || {};
-    
-    // Combine all content
-    const content = {
-      events: events,
-      customItems: customItems
-    };
-    
-    // Update carousel
-    updateCarouselContent(content);
-    
-  }).catch(error => {
-    console.error('Error updating preview carousel:', error);
-  });
+  Promise.all([get(ref(rtdb, "content/promotion/events")), get(ref(rtdb, "content/promotion/customItems"))])
+    .then(([eventsSnapshot, customItemsSnapshot]) => {
+      const events = eventsSnapshot.val() || {};
+      const customItems = customItemsSnapshot.val() || {};
+
+      // Combine all content
+      const content = {
+        events: events,
+        customItems: customItems,
+      };
+
+      // Update carousel
+      updateCarouselContent(content);
+    })
+    .catch((error) => {
+      console.error("Error updating preview carousel:", error);
+    });
 }
 
 // Edit event
 function editEvent(eventId) {
   const eventRef = ref(rtdb, `content/promotion/events/${eventId}`);
-  
-  get(eventRef).then((snapshot) => {
-    const event = snapshot.val();
-    if (!event) {
-      showToast('Event tidak ditemukan', 'warning');
-      return;
-    }
-    
-    // Populate form
-    const form = document.getElementById('eventForm');
-    form.eventTitle.value = event.title || '';
-    form.eventSubtitle.value = event.subtitle || '';
-    form.eventDescription.value = event.description || '';
-    form.eventHighlight.value = event.highlight || '';
-    form.eventVariant.value = event.variant || 'luxury-gold';
-    form.eventIcon.value = event.icon || 'percentage';
-    form.eventActive.checked = event.isActive !== false;
-    form.eventOrder.value = event.order || 0;
-    
-    // Set form mode to edit
-    form.dataset.mode = 'edit';
-    form.dataset.editId = eventId;
-    
-    // Update submit button text
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.textContent = 'Update Event';
-    
-    // Scroll to form
-    form.scrollIntoView({ behavior: 'smooth' });
-    
-  }).catch(error => {
-    console.error('Error loading event for edit:', error);
-    showToast('Gagal memuat data event', 'danger');
-  });
+  get(eventRef)
+    .then((snapshot) => {
+      const event = snapshot.val();
+      if (!event) {
+        showToast("Event tidak ditemukan", "warning");
+        return;
+      }
+      const form = document.getElementById("eventForm");
+      form.eventTitle.value = event.title || "";
+      form.eventSubtitle.value = event.subtitle || "";
+      form.eventDescription.value = event.description || "";
+      form.eventHighlight.value = event.highlight || "";
+      form.eventVariant.value = event.variant || "luxury-gold";
+      form.eventIcon.value = event.icon || "percentage";
+      form.eventActive.checked = event.isActive !== false;
+      form.eventOrder.value = event.order || 0;
+      form.dataset.mode = "edit";
+      form.dataset.editId = eventId;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.textContent = "Update Event";
+      form.style.display = "block"; // tampilkan form edit
+      form.scrollIntoView({ behavior: "smooth" });
+    })
+    .catch((error) => {
+      console.error("Error loading event for edit:", error);
+      showToast("Gagal memuat data event", "danger");
+    });
 }
 
 // Delete event
 function deleteEvent(eventId) {
-  if (confirm('Apakah Anda yakin ingin menghapus event ini?')) {
+  if (confirm("Apakah Anda yakin ingin menghapus event ini?")) {
     const eventRef = ref(rtdb, `content/promotion/events/${eventId}`);
-    
-    remove(eventRef).then(() => {
-      showToast('Event berhasil dihapus', 'success');
-      refreshEventList();
-      updatePreviewCarousel();
-    }).catch(error => {
-      console.error('Error deleting event:', error);
-      showToast('Gagal menghapus event', 'danger');
-    });
+
+    remove(eventRef)
+      .then(() => {
+        showToast("Event berhasil dihapus", "success");
+        refreshEventList();
+        updatePreviewCarousel();
+      })
+      .catch((error) => {
+        console.error("Error deleting event:", error);
+        showToast("Gagal menghapus event", "danger");
+      });
   }
 }
 
 // Edit custom item
 function editCustomItem(itemId) {
   const itemRef = ref(rtdb, `content/promotion/customItems/${itemId}`);
-  
-  get(itemRef).then((snapshot) => {
-    const item = snapshot.val();
-    if (!item) {
-      showToast('Konten tidak ditemukan', 'warning');
-      return;
-    }
-    
-    // Populate form
-    const form = document.getElementById('customContentForm');
-    form.contentTitle.value = item.title || '';
-    form.contentType.value = item.contentType || 'HTML';
-    form.contentActive.checked = item.isActive !== false;
-    form.contentOrder.value = item.order || 0;
-    
-    // Handle content type specific fields
-    handleContentTypeChange();
-    
-    if (item.contentType === 'HTML') {
-      form.htmlContent.value = item.htmlContent || '';
-    } else if (item.contentType === 'Gallery') {
-      form.contentDescription.value = item.description || '';
-      form.galleryIcon.value = item.icon || 'crown';
-      
-      // Populate gallery images
-      resetGalleryContainer();
-      const galleryContainer = document.getElementById('galleryContainer');
-      
-      if (item.images && item.images.length > 0) {
-        item.images.forEach((image, index) => {
-          const itemId = `gallery-item-edit-${index}`;
-          const itemHtml = `
+  get(itemRef)
+    .then((snapshot) => {
+      const item = snapshot.val();
+      if (!item) {
+        showToast("Konten tidak ditemukan", "warning");
+        return;
+      }
+      const form = document.getElementById("customContentForm");
+      form.contentTitle.value = item.title || "";
+      form.contentType.value = item.contentType || "HTML";
+      form.contentActive.checked = item.isActive !== false;
+      form.contentOrder.value = item.order || 0;
+      handleContentTypeChange();
+      if (item.contentType === "HTML") {
+        form.htmlContent.value = item.htmlContent || "";
+      } else if (item.contentType === "Gallery") {
+        form.contentDescription.value = item.description || "";
+        form.galleryIcon.value = item.icon || "crown";
+        resetGalleryContainer();
+        const galleryContainer = document.getElementById("galleryContainer");
+        if (item.images && item.images.length > 0) {
+          item.images.forEach((image, index) => {
+            const itemId = `gallery-item-edit-${index}`;
+            const itemHtml = `
             <div class="gallery-upload-item" id="${itemId}" data-url="${image.url}">
               <div class="gallery-upload-preview">
                 <img src="${image.url}" alt="Gallery image">
               </div>
               <div class="gallery-upload-controls">
-                <input type="text" class="form-control form-control-sm gallery-caption" placeholder="Caption (optional)" value="${image.caption || ''}">
+                <input type="text" class="form-control form-control-sm gallery-caption" placeholder="Caption (optional)" value="${
+                  image.caption || ""
+                }">
                 <button type="button" class="btn btn-sm btn-danger" onclick="removeGalleryItem('${itemId}')">
                   <i class="fas fa-trash"></i>
                 </button>
               </div>
             </div>
           `;
-          
-          galleryContainer.insertAdjacentHTML('beforeend', itemHtml);
-        });
+            galleryContainer.insertAdjacentHTML("beforeend", itemHtml);
+          });
+        }
+      } else {
+        form.contentDescription.value = item.description || "";
+        const fileInputNote = document.getElementById("fileInputNote");
+        if (fileInputNote) {
+          fileInputNote.textContent = "Uploading a new file will replace the existing one";
+          fileInputNote.style.display = "block";
+        }
       }
-    } else {
-      // For image and video, we can't populate the file input for security reasons
-      // Just show a message that a new file will replace the existing one
-      form.contentDescription.value = item.description || '';
-      
-      const fileInputNote = document.getElementById('fileInputNote');
-      if (fileInputNote) {
-        fileInputNote.textContent = 'Uploading a new file will replace the existing one';
-        fileInputNote.style.display = 'block';
-      }
-    }
-    
-    // Set form mode to edit
-    form.dataset.mode = 'edit';
-    form.dataset.editId = itemId;
-    
-    // Update submit button text
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.textContent = 'Update Content';
-    
-    // Scroll to form
-    form.scrollIntoView({ behavior: 'smooth' });
-    
-  }).catch(error => {
-    console.error('Error loading custom item for edit:', error);
-    showToast('Gagal memuat data konten', 'danger');
-  });
+      form.dataset.mode = "edit";
+      form.dataset.editId = itemId;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.textContent = "Update Content";
+      form.style.display = "block"; // tampilkan form edit
+      form.scrollIntoView({ behavior: "smooth" });
+    })
+    .catch((error) => {
+      console.error("Error loading custom item for edit:", error);
+      showToast("Gagal memuat data konten", "danger");
+    });
 }
 
 // Delete custom item
 function deleteCustomItem(itemId) {
-  if (confirm('Apakah Anda yakin ingin menghapus konten ini?')) {
+  if (confirm("Apakah Anda yakin ingin menghapus konten ini?")) {
     const itemRef = ref(rtdb, `content/promotion/customItems/${itemId}`);
-    
-    remove(itemRef).then(() => {
-      showToast('Konten berhasil dihapus', 'success');
-      refreshCustomList();
-      updatePreviewCarousel();
-    }).catch(error => {
-      console.error('Error deleting custom item:', error);
-      showToast('Gagal menghapus konten', 'danger');
-    });
+
+    remove(itemRef)
+      .then(() => {
+        showToast("Konten berhasil dihapus", "success");
+        refreshCustomList();
+        updatePreviewCarousel();
+      })
+      .catch((error) => {
+        console.error("Error deleting custom item:", error);
+        showToast("Gagal menghapus konten", "danger");
+      });
   }
 }
 
 // Open fullscreen preview
 function openFullscreenPreview() {
   // Open a new window with the display page
-  const previewWindow = window.open('promosi-display.html', 'PreviewWindow', 'width=1024,height=768');
-  
+  const previewWindow = window.open("promosi-display.html", "PreviewWindow", "width=1024,height=768");
+
   // Focus the new window
   if (previewWindow) {
     previewWindow.focus();
   } else {
-    showToast('Popup blocked. Please allow popups for this site.', 'warning');
+    showToast("Popup blocked. Please allow popups for this site.", "warning");
   }
 }
 
 // Handle logout
 function handleLogout() {
-  auth.signOut().then(() => {
-    window.location.href = 'index.html';
-  }).catch((error) => {
-    console.error('Error signing out:', error);
-    showToast('Gagal logout: ' + error.message, 'danger');
-  });
+  auth
+    .signOut()
+    .then(() => {
+      window.location.href = "index.html";
+    })
+    .catch((error) => {
+      console.error("Error signing out:", error);
+      showToast("Gagal logout: " + error.message, "danger");
+    });
 }
 
 // Show toast notification
-function showToast(message, type = 'info') {
-  const toastContainer = document.querySelector('.toast-container');
+function showToast(message, type = "info") {
+  const toastContainer = document.querySelector(".toast-container");
   if (!toastContainer) return;
-  
-  const toastId = 'toast-' + Date.now();
+
+  const toastId = "toast-" + Date.now();
   const toastHtml = `
     <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="toast-header">
@@ -1322,16 +1322,16 @@ function showToast(message, type = 'info') {
       </div>
     </div>
   `;
-  
-  toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-  
+
+  toastContainer.insertAdjacentHTML("beforeend", toastHtml);
+
   const toastElement = document.getElementById(toastId);
   const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
-  
+
   toast.show();
-  
+
   // Remove toast from DOM after it's hidden
-  toastElement.addEventListener('hidden.bs.toast', () => {
+  toastElement.addEventListener("hidden.bs.toast", () => {
     toastElement.remove();
   });
 }
@@ -1344,5 +1344,3 @@ window.deleteCustomItem = deleteCustomItem;
 window.addGalleryImage = addGalleryImage;
 window.removeGalleryItem = removeGalleryItem;
 window.openFullscreenPreview = openFullscreenPreview;
-              
-
