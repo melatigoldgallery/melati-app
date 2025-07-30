@@ -363,199 +363,6 @@
         padding-right: 17px !important; /* Konsisten untuk semua browser */
       }
 
-      /* ===== PREVIEW CAROUSEL STYLES ===== */
-      .promotion-preview {
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-        margin: 20px 0;
-      }
-
-      #promotionCarousel {
-        background-color: #000;
-      }
-
-      #promotionCarousel .carousel-item {
-        height: 400px;
-      }
-
-      .preview-slide {
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
-        text-align: center;
-      }
-
-      .preview-slide .slide-content {
-        width: 100%;
-        max-width: 800px;
-        color: #fff;
-        padding: 30px;
-        position: relative;
-        z-index: 2;
-      }
-
-      /* Slide variants */
-      .thank-you-slide {
-        background: linear-gradient(135deg, #1a1a1a 0%, #333 50%, #1a1a1a 100%);
-        position: relative;
-        height: 100%;
-      }
-
-      .thank-you-slide::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: radial-gradient(ellipse at center, rgba(255, 215, 0, 0.2) 0%, rgba(0, 0, 0, 0) 70%);
-        z-index: 1;
-      }
-
-      .variant-2 {
-        background: linear-gradient(135deg, #2c3e50 0%, #4a6572 50%, #2c3e50 100%);
-        position: relative;
-        height: 100%;
-      }
-
-      .variant-2::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: radial-gradient(ellipse at center, rgba(192, 192, 192, 0.2) 0%, rgba(0, 0, 0, 0) 70%);
-        z-index: 1;
-      }
-
-      .variant-3 {
-        background: linear-gradient(135deg, #4a3c29 0%, #8a6d3b 50%, #4a3c29 100%);
-        position: relative;
-        height: 100%;
-      }
-
-      .variant-3::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: radial-gradient(ellipse at center, rgba(218, 165, 32, 0.2) 0%, rgba(0, 0, 0, 0) 70%);
-        z-index: 1;
-      }
-
-      /* Slide content styling */
-      .preview-slide h2 {
-        font-family: "Playfair Display", serif;
-        font-size: 2.5rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      }
-
-      .preview-slide h3 {
-        font-size: 1.5rem;
-        font-weight: 500;
-        margin-bottom: 1rem;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      }
-
-      .preview-slide p {
-        font-size: 1.2rem;
-        margin-bottom: 1.5rem;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-      }
-
-      .preview-slide .logo-container {
-        margin-top: 1.5rem;
-      }
-
-      .preview-slide .slide-logo {
-        max-width: 100px;
-        border-radius: 50%;
-        border: 3px solid #ffd700;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
-      }
-
-      /* Divider styling */
-      .preview-slide .divider {
-        width: 100%;
-        max-width: 200px;
-        margin: 15px auto;
-        position: relative;
-        height: 1px;
-        background: rgba(255, 255, 255, 0.3);
-      }
-
-      .preview-slide .divider span {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .preview-slide .divider i {
-        color: #ffd700;
-      }
-
-      /* Carousel controls */
-      #promotionCarousel .carousel-indicators {
-        margin-bottom: 10px;
-      }
-
-      #promotionCarousel .carousel-indicators button {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin: 0 5px;
-        background-color: rgba(255, 255, 255, 0.5);
-        border: none;
-      }
-
-      #promotionCarousel .carousel-indicators button.active {
-        background-color: #fff;
-        transform: scale(1.2);
-      }
-
-      #promotionCarousel .carousel-control-prev,
-      #promotionCarousel .carousel-control-next {
-        width: 10%;
-        opacity: 0.7;
-      }
-
-      #promotionCarousel .carousel-control-prev:hover,
-      #promotionCarousel .carousel-control-next:hover {
-        opacity: 1;
-      }
-
-      /* ===== FULLSCREEN PREVIEW MODAL ===== */
-      .promotion-fullscreen-preview {
-        width: 100%;
-        height: 100%;
-        background-color: #000;
-      }
-
-      #fullscreenCarousel {
-        height: 100%;
-      }
-
-      #fullscreenCarousel .carousel-inner,
-      #fullscreenCarousel .carousel-item {
-        height: 100%;
-      }
-
       /* ===== TOAST NOTIFICATIONS ===== */
       .toast-container {
         z-index: 1060;
@@ -573,43 +380,9 @@
       }
 
       /* ===== RESPONSIVE ADJUSTMENTS ===== */
-      @media (max-width: 992px) {
-        .preview-slide h2 {
-          font-size: 2rem;
-        }
-
-        .preview-slide h3 {
-          font-size: 1.3rem;
-        }
-
-        .preview-slide p {
-          font-size: 1rem;
-        }
-
-        #promotionCarousel .carousel-item {
-          height: 350px;
-        }
-      }
-
       @media (max-width: 768px) {
         .card-body {
           padding: 15px;
-        }
-
-        .preview-slide h2 {
-          font-size: 1.8rem;
-        }
-
-        .preview-slide h3 {
-          font-size: 1.1rem;
-        }
-
-        .preview-slide p {
-          font-size: 0.9rem;
-        }
-
-        #promotionCarousel .carousel-item {
-          height: 300px;
         }
 
         .btn {
@@ -626,22 +399,6 @@
 
         .page-header h1 {
           margin-bottom: 10px;
-        }
-
-        .preview-slide h2 {
-          font-size: 1.5rem;
-        }
-
-        .preview-slide h3 {
-          font-size: 1rem;
-        }
-
-        #promotionCarousel .carousel-item {
-          height: 250px;
-        }
-
-        .preview-slide .slide-logo {
-          max-width: 80px;
         }
       }
 
@@ -957,73 +714,10 @@
                   <i class="fas fa-save me-2"></i>
                   Simpan Pengaturan
                 </button>
-                <button class="btn btn-success ms-2" id="previewBtn" type="button">
+                <a href="promosi-display.html" target="_blank" class="btn btn-success ms-2">
                   <i class="fas fa-eye me-2"></i>
                   Pratinjau
-                </button>
-              </div>
-            </div>
-          </form>
-
-          <!-- Event Form (hidden by default, shown for add/edit) -->
-          <form id="eventForm" class="mb-4 card" style="display: none">
-            <div class="card-header">
-              <h5 class="card-title mb-0">
-                <i class="fas fa-calendar-plus me-2"></i>
-                Tambah/Edit Event & Promo
-              </h5>
-            </div>
-            <div class="card-body row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="eventTitle" class="form-label">Judul Event</label>
-                  <input type="text" class="form-control" id="eventTitle" name="eventTitle" required />
-                </div>
-                <div class="mb-3">
-                  <label for="eventSubtitle" class="form-label">Sub Judul</label>
-                  <input type="text" class="form-control" id="eventSubtitle" name="eventSubtitle" />
-                </div>
-                <div class="mb-3">
-                  <label for="eventDescription" class="form-label">Deskripsi</label>
-                  <textarea class="form-control" id="eventDescription" name="eventDescription" rows="2"></textarea>
-                </div>
-                <div class="mb-3">
-                  <label for="eventHighlight" class="form-label">Highlight</label>
-                  <input type="text" class="form-control" id="eventHighlight" name="eventHighlight" />
-                </div>
-                <div class="mb-3">
-                  <label for="eventOrder" class="form-label">Urutan</label>
-                  <input type="number" class="form-control" id="eventOrder" name="eventOrder" value="0" />
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="eventVariant" class="form-label">Varian Slide</label>
-                  <select class="form-select" id="eventVariant" name="eventVariant">
-                    <option value="luxury-gold">Luxury Gold</option>
-                    <option value="elegant-silver">Elegant Silver</option>
-                    <option value="elegant-rose">Elegant Rose</option>
-                  </select>
-                </div>
-                <div class="mb-3">
-                  <label for="eventIcon" class="form-label">Icon</label>
-                  <input type="text" class="form-control" id="eventIcon" name="eventIcon" value="percentage" />
-                  <small class="form-text text-muted">Contoh: percentage, gem, star, dll (FontAwesome)</small>
-                </div>
-                <div class="mb-3">
-                  <label for="eventImage" class="form-label">Gambar Event</label>
-                  <input type="file" class="form-control" id="eventImage" name="eventImage" accept="image/*" />
-                </div>
-                <div class="form-check form-switch mb-3">
-                  <input class="form-check-input" type="checkbox" id="eventActive" name="eventActive" checked />
-                  <label class="form-check-label" for="eventActive">Aktif</label>
-                </div>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button class="btn btn-primary" type="submit">
-                  <i class="fas fa-save me-2"></i>
-                  Simpan Event
-                </button>
+                </a>
               </div>
             </div>
           </form>
@@ -1115,235 +809,27 @@
                   </h5>
                 </div>
                 <div class="card-body">
-                  <ul class="nav nav-tabs" id="promoTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
+                  <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h6>Daftar Konten</h6>
                       <button
-                        class="nav-link active"
-                        id="events-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#events"
+                        class="btn btn-sm btn-primary"
+                        id="addCustomBtn"
                         type="button"
-                        role="tab"
-                        aria-controls="events"
-                        aria-selected="true"
+                        onclick="document.getElementById('customContentForm').style.display='block';"
                       >
-                        Event & Promo
+                        <i class="fas fa-plus me-1"></i>
+                        Tambah Konten
                       </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                      <button
-                        class="nav-link"
-                        id="custom-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#custom"
-                        type="button"
-                        role="tab"
-                        aria-controls="custom"
-                        aria-selected="false"
-                      >
-                        Konten Kustom
-                      </button>
-                    </li>
-                  </ul>
-                  <div class="tab-content p-3" id="promoTabsContent">
-                    <!-- Events & Promos Tab -->
-                    <div class="tab-pane fade show active" id="events" role="tabpanel" aria-labelledby="events-tab">
-                      <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                          <h6>Daftar Event & Promo</h6>
-                          <button
-                            class="btn btn-sm btn-primary"
-                            id="addEventBtn"
-                            type="button"
-                            onclick="document.getElementById('eventForm').style.display='block';"
-                          >
-                            <i class="fas fa-plus me-1"></i>
-                            Tambah Event
-                          </button>
-                        </div>
-                        <div class="list-group" id="eventsList"></div>
-                      </div>
                     </div>
-                    <!-- Custom Content Tab -->
-                    <div class="tab-pane fade" id="custom" role="tabpanel" aria-labelledby="custom-tab">
-                      <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                          <h6>Konten Kustom</h6>
-                          <button
-                            class="btn btn-sm btn-primary"
-                            id="addCustomBtn"
-                            type="button"
-                            onclick="document.getElementById('customContentForm').style.display='block';"
-                          >
-                            <i class="fas fa-plus me-1"></i>
-                            Tambah Konten
-                          </button>
-                        </div>
-                        <div class="list-group" id="customContentList"></div>
-                      </div>
-                    </div>
+                    <div class="list-group" id="customContentList"></div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <!-- Bagian Pratinjau Tampilan di promosi.html -->
-          <div class="row mb-4">
-            <div class="col-md-12">
-              <div class="card">
-                <div class="card-header">
-                  <h5 class="card-title mb-0">
-                    <i class="fas fa-tv me-2"></i>
-                    Pratinjau Tampilan
-                  </h5>
-                </div>
-                <div class="card-body">
-                  <div class="promotion-preview">
-                    <div id="promotionCarousel" class="carousel slide" data-bs-ride="carousel">
-                      <div class="carousel-indicators">
-                        <button
-                          type="button"
-                          data-bs-target="#promotionCarousel"
-                          data-bs-slide-to="0"
-                          class="active"
-                          aria-current="true"
-                          aria-label="Slide 1"
-                        ></button>
-                        <button
-                          type="button"
-                          data-bs-target="#promotionCarousel"
-                          data-bs-slide-to="1"
-                          aria-label="Slide 2"
-                        ></button>
-                        <button
-                          type="button"
-                          data-bs-target="#promotionCarousel"
-                          data-bs-slide-to="2"
-                          aria-label="Slide 3"
-                        ></button>
-                      </div>
-                      <div class="carousel-inner">
-                        <!-- Slide 1: Terima Kasih -->
-                        <div class="carousel-item active">
-                          <div class="preview-slide thank-you-slide">
-                            <div class="slide-content">
-                              <h2>Terima Kasih</h2>
-                              <h3>Telah Mengunjungi Melati Gold Shop</h3>
-                              <p>Kami sangat menghargai kepercayaan Anda</p>
-                              <div class="logo-container">
-                                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Slide 2: Kami Senang -->
-                        <div class="carousel-item">
-                          <div class="preview-slide variant-2">
-                            <div class="slide-content">
-                              <h2>Kami Senang</h2>
-                              <h3>Dapat Melayani Anda di Melati Gold Shop</h3>
-                              <p>Semoga pengalaman berbelanja Anda menyenangkan</p>
-                              <div class="logo-container">
-                                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Slide 3: Terima Kasih Atas Kepercayaan -->
-                        <div class="carousel-item">
-                          <div class="preview-slide variant-3">
-                            <div class="slide-content">
-                              <h2>Terima Kasih</h2>
-                              <h3>Atas Kepercayaan Anda Kepada Melati Gold Shop</h3>
-                              <p>Kami berkomitmen memberikan produk dan layanan terbaik</p>
-                              <div class="logo-container">
-                                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        class="carousel-control-prev"
-                        type="button"
-                        data-bs-target="#promotionCarousel"
-                        data-bs-slide="prev"
-                      >
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Previous</span>
-                      </button>
-                      <button
-                        class="carousel-control-next"
-                        type="button"
-                        data-bs-target="#promotionCarousel"
-                        data-bs-slide="next"
-                      >
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Next</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <div class="d-flex justify-content-end">
-              <a href="promosi-display.html" target="_blank" class="btn btn-success ms-2">
-                <i class="fas fa-external-link-alt me-2"></i>
-                Buka Tampilan Promosi
-              </a>
             </div>
           </div>
         </div>
       </main>
-    </div>
-
-    <!-- Modal for Adding/Editing Events -->
-    <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="eventModalLabel">Tambah Event</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form id="eventForm">
-              <input type="hidden" id="eventId" value="" />
-              <div class="mb-3">
-                <label for="eventTitle" class="form-label">Judul Event</label>
-                <input type="text" class="form-control" id="eventTitle" placeholder="Masukkan judul event" required />
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label for="eventStartDate" class="form-label">Tanggal Mulai</label>
-                  <input type="date" class="form-control" id="eventStartDate" required />
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label for="eventEndDate" class="form-label">Tanggal Selesai</label>
-                  <input type="date" class="form-control" id="eventEndDate" />
-                </div>
-              </div>
-              <div class="mb-3">
-                <label for="eventImage" class="form-label">Gambar Event</label>
-                <input type="file" class="form-control" id="eventImage" accept="image/*" />
-              </div>
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="eventActive" checked />
-                <label class="form-check-label" for="eventActive">Aktif</label>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-primary" id="saveEvent">Simpan</button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Modal for Adding/Editing Custom Content -->
@@ -1391,90 +877,6 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
             <button type="button" class="btn btn-primary" id="saveCustom">Simpan</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Preview Modal -->
-    <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="previewModalLabel">Pratinjau Tampilan Promosi</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body p-0">
-            <div class="promotion-fullscreen-preview">
-              <div id="fullscreenCarousel" class="carousel slide" data-bs-ride="carousel">
-                <div class="carousel-inner">
-                  <div class="carousel-item active">
-                    <div class="thank-you-slide">
-                      <div class="slide-content">
-                        <h2>Terima Kasih</h2>
-                        <h3>Telah Mengunjungi Melati Gold Shop</h3>
-                        <p>Kami sangat menghargai kepercayaan Anda</p>
-                        <div class="logo-container">
-                          <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="carousel-item">
-                    <div class="thank-you-slide variant-2">
-                      <div class="slide-content">
-                        <h2>Kami Senang</h2>
-                        <h3>Dapat Melayani Anda di Melati Gold Shop</h3>
-                        <p>Semoga pengalaman berbelanja Anda menyenangkan</p>
-                        <div class="logo-container">
-                          <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="carousel-item">
-                    <div class="promo-slide">
-                      <div class="slide-content">
-                        <h2>Promo Spesial Hari Raya</h2>
-                        <h3>Diskon hingga 20% untuk semua koleksi perhiasan</h3>
-                        <p>Periode: 1 April - 15 April 2024</p>
-                        <div class="promo-highlight">Jangan lewatkan kesempatan ini!</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="carousel-item">
-                    <div class="info-slide">
-                      <div class="slide-content">
-                        <h2>Informasi Penting</h2>
-                        <h3>Perubahan Jam Operasional Selama Bulan Ramadhan</h3>
-                        <div class="info-details">
-                          <p>Senin - Jumat: 09.00 - 17.00</p>
-                          <p>Sabtu: 09.00 - 15.00</p>
-                          <p>Minggu: Tutup</p>
-                        </div>
-                        <p class="info-note">Terima kasih atas pengertian Anda</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="carousel-item">
-                    <div class="custom-slide">
-                      <div class="slide-content">
-                        <h2>Koleksi Perhiasan Terbaru</h2>
-                        <!-- <div class="image-gallery">
-                          <img src="img/jewelry1.jpg" alt="Perhiasan 1" class="gallery-img" />
-                          <img src="img/jewelry2.jpg" alt="Perhiasan 2" class="gallery-img" />
-                          <img src="img/jewelry3.jpg" alt="Perhiasan 3" class="gallery-img" />
-                        </div> -->
-                        <p>Kunjungi toko kami untuk melihat koleksi lengkap</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
           </div>
         </div>
       </div>

@@ -38,10 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
       loadSettingsFromFirebase();
 
       // Refresh content lists
-      refreshEventList();
       refreshCustomList();
-      // Update preview carousel
-      updatePreviewCarousel();
     });
   } else if (isDisplayPage) {
     // Initialize display page with Firebase
@@ -243,19 +240,8 @@ function updateCarouselContent(content) {
   carouselInner.innerHTML = "";
   carouselIndicators.innerHTML = "";
 
-  // Combine all content types
+  // Get custom items
   let allSlides = [];
-
-  // Add events if they exist
-  if (content.events) {
-    // Convert to array if it's an object
-    const events =
-      typeof content.events === "object" && !Array.isArray(content.events)
-        ? Object.values(content.events)
-        : content.events;
-
-    allSlides = allSlides.concat(events.filter((event) => event && event.isActive));
-  }
 
   // Add custom items if they exist
   if (content.customItems) {
@@ -275,76 +261,72 @@ function updateCarouselContent(content) {
   const isDisplayPage = document.querySelector(".fullscreen-container") !== null;
 
   // For display page, add default slides if no content
-  if (isDisplayPage && allSlides.length === 0) {
+  if (isDisplayPage) {
     // Default slides for display page
     const defaultSlides = [
       {
-        type: "default",
-        template: `
-          <div class="thank-you-slide elegant-gold">
-            <div class="slide-content" data-aos="fade-up">
-              <div class="decorative-element left"></div>
-              <div class="content-wrapper">
-                <h2>Terima Kasih</h2>
-                <div class="divider"><span><i class="fas fa-gem"></i></span></div>
-                <h3>Telah Mengunjungi Melati Gold Shop</h3>
-                <p>Kami sangat menghargai kepercayaan Anda</p>
-                <div class="logo-container">
-                  <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo">
-                </div>
+      type: "default",
+      template: `
+        <div class="thank-you-slide elegant-gold">
+          <div class="slide-content" data-aos="fade-up">
+            <div class="decorative-element left"></div>
+            <div class="content-wrapper">
+              <h2>Terima Kasih</h2>
+              <div class="divider"><span><i class="fas fa-gem"></i></span></div>
+              <h3>Telah Mengunjungi Melati Gold Shop</h3>
+              <p >Kami sangat menghargai kepercayaan Anda</p>
+              <div class="logo-container">
+                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo">
               </div>
-              <div class="decorative-element right"></div>
             </div>
+            <div class="decorative-element right"></div>
           </div>
-        `,
-      },
-      {
-        type: "default",
-        template: `
-          <div class="thank-you-slide elegant-silver">
-            <div class="slide-content" data-aos="fade-up">
-              <div class="decorative-element left"></div>
-              <div class="content-wrapper">
-                <h2>Kami Senang</h2>
-                <div class="divider"><span><i class="fas fa-gem"></i></span></div>
-                <h3>Dapat Melayani Anda di Melati Gold Shop</h3>
-                <p>Semoga pengalaman berbelanja Anda menyenangkan</p>
-                <div class="logo-container">
-                  <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo">
-                </div>
+        </div>
+      `,
+    },
+    {
+      type: "default",
+      template: `
+        <div class="thank-you-slide variant-2">
+          <div class="slide-content" data-aos="fade-up">
+            <div class="decorative-element left"></div>
+            <div class="content-wrapper">
+              <h2>Kami Senang</h2>
+              <div class="divider"><span><i class="fas fa-gem"></i></span></div>
+              <h3>Dapat Melayani Anda di Melati Gold Shop</h3>
+              <p>Semoga pengalaman berbelanja Anda menyenangkan</p>
+              <div class="logo-container">
+                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo">
               </div>
-              <div class="decorative-element right"></div>
             </div>
+            <div class="decorative-element right"></div>
           </div>
-        `,
-      },
-      {
-        type: "default",
-        template: `
-          <div class="thank-you-slide elegant-rose">
-            <div class="slide-content" data-aos="fade-up">
-              <div class="decorative-element left"></div>
-              <div class="content-wrapper">
-                <h2>Terima Kasih</h2>
-                <div class="divider"><span><i class="fas fa-gem"></i></span></div>
-                <h3>Atas Kepercayaan Anda Kepada Melati Gold Shop</h3>
-                <p>Kami berkomitmen memberikan produk dan layanan terbaik</p>
-                <div class="logo-container">
-                  <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo">
-                </div>
+        </div>
+      `,
+    },
+    {
+      type: "default",
+      template: `
+        <div class="thank-you-slide variant-3">
+          <div class="slide-content" data-aos="fade-up">
+            <div class="decorative-element left"></div>
+            <div class="content-wrapper">
+              <h2>Terima Kasih</h2>
+              <div class="divider"><span><i class="fas fa-gem"></i></span></div>
+              <h3>Atas Kepercayaan Anda Kepada Melati Gold Shop</h3>
+              <p>Kami berkomitmen memberikan produk dan layanan terbaik</p>
+              <div class="logo-container">
+                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="slide-logo">
               </div>
-              <div class="decorative-element right"></div>
             </div>
+            <div class="decorative-element right"></div>
           </div>
-        `,
-      },
+        </div>
+      `,
+    },
     ];
 
-    allSlides = defaultSlides;
-  } else if (!isDisplayPage && allSlides.length === 0) {
-    // For admin preview, add a default slide
-    addDefaultSlide(carouselInner, carouselIndicators);
-    return;
+    allSlides = defaultSlides.concat(allSlides);
   }
 
   // Add slides to carousel
@@ -369,10 +351,8 @@ function updateCarouselContent(content) {
     // Determine slide content based on type
     if (slide.type === "default") {
       slideElement.innerHTML = slide.template;
-    } else if (slide.type === "event") {
-      slideElement.innerHTML = isDisplayPage ? createEventSlide(slide) : createPreviewEventSlide(slide);
     } else if (slide.type === "custom") {
-      slideElement.innerHTML = isDisplayPage ? createCustomSlide(slide) : createPreviewCustomSlide(slide);
+      slideElement.innerHTML = createCustomSlide(slide);
     }
 
     carouselInner.appendChild(slideElement);
@@ -399,73 +379,6 @@ function updateCarouselContent(content) {
     });
 }
 
-// Add default slide when no content is available
-function addDefaultSlide(carouselInner, carouselIndicators) {
-  carouselInner.innerHTML = `
-    <div class="carousel-item active">
-      <div class="thank-you-slide">
-        <div class="slide-content">
-                   <div class="slide-title-badge">Default: Welcome Slide</div>
-          <div class="content-wrapper">
-            <h2>Tidak Ada Konten</h2>
-            <div class="divider"><span><i class="fas fa-gem"></i></span></div>
-            <h3>Tambahkan konten promosi untuk ditampilkan</h3>
-            <p>Gunakan form di atas untuk menambahkan event atau konten kustom</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  carouselIndicators.innerHTML = `
-    <button type="button" data-bs-target="#promotionCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
-  `;
-}
-
-// Create event slide HTML for display page
-function createEventSlide(slide) {
-  // If there's an image, display as fullscreen
-  if (slide.imageUrl) {
-    return `
-      <div class="fullscreen-image-slide">
-        <img src="${slide.imageUrl}" alt="${slide.title}" class="fullscreen-image">
-        
-        <!-- Optional: Add overlay with event title if needed -->
-        <div class="event-overlay">
-          <h2>${slide.title}</h2>
-          ${slide.subtitle ? `<h3>${slide.subtitle}</h3>` : ""}
-          ${slide.highlight ? `<div class="event-highlight">${slide.highlight}</div>` : ""}
-        </div>
-      </div>
-    `;
-  } else {
-    // If no image, use standard display
-    return `
-      <div class="promo-slide ${slide.variant || "luxury-gold"}">
-        <div class="slide-content" data-aos="fade-up">
-          <div class="decorative-element left"></div>
-          <div class="content-wrapper">
-            <h2>${slide.title}</h2>
-            <div class="divider"><span><i class="fas fa-${slide.icon || "percentage"}"></i></span></div>
-            <h3>${slide.subtitle || ""}</h3>
-            <p>${slide.description || ""}</p>
-            ${
-              slide.highlight
-                ? `
-              <div class="promo-highlight">
-                <span class="highlight-text">${slide.highlight}</span>
-              </div>
-            `
-                : ""
-            }
-          </div>
-          <div class="decorative-element right"></div>
-        </div>
-      </div>
-    `;
-  }
-}
-
 // Create custom slide HTML for display page
 function createCustomSlide(slide) {
   if (slide.contentType === "HTML") {
@@ -474,7 +387,9 @@ function createCustomSlide(slide) {
         <div class="slide-content" data-aos="fade-up">
           <div class="decorative-element left"></div>
           <div class="content-wrapper">
-            ${slide.htmlContent || "<p>No content available</p>"}
+            <div class="custom-html-content">
+              ${slide.htmlContent || "<p>No content available</p>"}
+            </div>
           </div>
           <div class="decorative-element right"></div>
         </div>
@@ -482,16 +397,55 @@ function createCustomSlide(slide) {
     `;
   } else if (slide.contentType === "Gambar") {
     // For images, display fullscreen without additional elements
+    // Ensure proper URL handling
+    const imageUrl = slide.fileUrl || slide.url || "";
+    if (!imageUrl) {
+      return `
+        <div class="custom-slide">
+          <div class="slide-content" data-aos="fade-up">
+            <div class="content-wrapper">
+              <h2>${slide.title || "Image Not Found"}</h2>
+              <p>Image URL is missing or invalid</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="fullscreen-image-slide">
-        <img src="${slide.fileUrl}" alt="${slide.title}" class="fullscreen-image">
+        <img src="${imageUrl}" alt="${
+      slide.title || "Custom Image"
+    }" class="fullscreen-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <div class="image-error-fallback" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px;">
+          <h2>${slide.title || "Image Not Available"}</h2>
+          <p>Image could not be loaded</p>
+        </div>
       </div>
     `;
   } else if (slide.contentType === "Video") {
     // For videos, display fullscreen like images
+    const videoUrl = slide.fileUrl || slide.url || "";
+    if (!videoUrl) {
+      return `
+        <div class="custom-slide">
+          <div class="slide-content" data-aos="fade-up">
+            <div class="content-wrapper">
+              <h2>${slide.title || "Video Not Found"}</h2>
+              <p>Video URL is missing or invalid</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="fullscreen-image-slide">
-        <video src="${slide.fileUrl}" autoplay muted loop class="fullscreen-image"></video>
+        <video src="${videoUrl}" autoplay muted loop class="fullscreen-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"></video>
+        <div class="video-error-fallback" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px;">
+          <h2>${slide.title || "Video Not Available"}</h2>
+          <p>Video could not be loaded</p>
+        </div>
       </div>
     `;
   } else if (slide.contentType === "Gallery") {
@@ -499,7 +453,7 @@ function createCustomSlide(slide) {
       .map(
         (img) => `
       <div class="gallery-item">
-        <img src="${img.url}" alt="${img.caption || ""}" class="gallery-img">
+        <img src="${img.url}" alt="${img.caption || ""}" class="gallery-img" onerror="this.style.display='none';">
         ${img.caption ? `<div class="item-caption">${img.caption}</div>` : ""}
       </div>
     `
@@ -527,131 +481,10 @@ function createCustomSlide(slide) {
   return "";
 }
 
-// Create event slide HTML for preview in admin page
-function createPreviewEventSlide(slide) {
-  const slideTitle = slide.title || "Untitled Event";
-
-  // If there's an image, display it in the preview
-  if (slide.imageUrl) {
-    return `
-      <div class="preview-slide">
-        <div class="slide-title-badge">Event: ${slideTitle}</div>
-        <div class="slide-content">
-          <div class="preview-image-container">
-            <img src="${slide.imageUrl}" alt="${slideTitle}">
-          </div>
-          ${
-            slide.highlight
-              ? `
-            <div class="preview-highlight">
-              <span class="highlight-text">${slide.highlight}</span>
-            </div>
-          `
-              : ""
-          }
-        </div>
-      </div>
-    `;
-  } else {
-    // If no image, show text preview
-    return `
-      <div class="preview-slide">
-        <div class="slide-title-badge">Event: ${slideTitle}</div>
-        <div class="slide-content">
-          <h2>${slideTitle}</h2>
-          ${slide.subtitle ? `<h3>${slide.subtitle}</h3>` : ""}
-          <p>${slide.description || "No description"}</p>
-          ${
-            slide.highlight
-              ? `
-            <div class="preview-highlight">
-              <span class="highlight-text">${slide.highlight}</span>
-            </div>
-          `
-              : ""
-          }
-        </div>
-      </div>
-    `;
-  }
-}
-
-// Create custom slide HTML for preview in admin page
-function createPreviewCustomSlide(slide) {
-  const slideTitle = slide.title || "Untitled Content";
-
-  if (slide.contentType === "HTML") {
-    return `
-      <div class="preview-slide">
-        <div class="slide-title-badge">HTML: ${slideTitle}</div>
-        <div class="slide-content">
-          <div class="preview-html-content">
-            ${slide.htmlContent || "<p>No content available</p>"}
-          </div>
-        </div>
-      </div>
-    `;
-  } else if (slide.contentType === "Gambar") {
-    return `
-      <div class="preview-slide">
-        <div class="slide-title-badge">Image: ${slideTitle}</div>
-        <div class="slide-content">
-          <div class="preview-image-container">
-            <img src="${slide.fileUrl}" alt="${slideTitle}">
-          </div>
-        </div>
-      </div>
-    `;
-  } else if (slide.contentType === "Video") {
-    return `
-      <div class="preview-slide">
-        <div class="slide-title-badge">Video: ${slideTitle}</div>
-        <div class="slide-content">
-          <div class="preview-video-container">
-            <video src="${slide.fileUrl}" controls muted class="preview-video"></video>
-          </div>
-        </div>
-      </div>
-    `;
-  } else if (slide.contentType === "Gallery") {
-    const galleryItems = (slide.images || [])
-      .slice(0, 6)
-      .map(
-        (img) => `
-      <div class="preview-gallery-item">
-        <img src="${img.url}" alt="${img.caption || ""}">
-        ${img.caption ? `<div class="preview-item-caption">${img.caption}</div>` : ""}
-      </div>
-    `
-      )
-      .join("");
-
-    return `
-      <div class="preview-slide">
-        <div class="slide-title-badge">Gallery: ${slideTitle}</div>
-        <div class="slide-content">
-          <h2>${slideTitle}</h2>
-          <div class="preview-gallery">
-            ${galleryItems}
-          </div>
-          <p>${slide.description || ""}</p>
-        </div>
-      </div>
-    `;
-  }
-
-  return "";
-}
-
 // ADMIN PAGE SPECIFIC FUNCTIONS
 
 // Initialize event listeners for admin page
 function initializeEventListeners() {
-  // Event form submission
-  const eventForm = document.getElementById("eventForm");
-  if (eventForm) {
-    eventForm.addEventListener("submit", handleEventFormSubmit);
-  }
   // Custom content form submission
   const customForm = document.getElementById("customContentForm");
   if (customForm) {
@@ -667,22 +500,11 @@ function initializeEventListeners() {
   if (contentTypeSelect) {
     contentTypeSelect.addEventListener("change", handleContentTypeChange);
   }
-  // Preview button
-  const previewBtn = document.getElementById("previewBtn");
-  if (previewBtn) {
-    previewBtn.addEventListener("click", openFullscreenPreview);
-  }
+
   // Logout button
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", handleLogout);
-  }
-  // Tambah event button
-  const addEventBtn = document.getElementById("addEventBtn");
-  if (addEventBtn) {
-    addEventBtn.addEventListener("click", function () {
-      document.getElementById("eventForm").style.display = "block";
-    });
   }
   // Tambah custom button
   const addCustomBtn = document.getElementById("addCustomBtn");
@@ -690,61 +512,6 @@ function initializeEventListeners() {
     addCustomBtn.addEventListener("click", function () {
       document.getElementById("customContentForm").style.display = "block";
     });
-  }
-}
-
-// Handle event form submission
-async function handleEventFormSubmit(e) {
-  e.preventDefault();
-  const form = e.target;
-  const submitBtn = form.querySelector('button[type="submit"]');
-  const originalBtnText = submitBtn.innerHTML;
-  try {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML =
-      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
-    const eventData = {
-      title: form.eventTitle.value,
-      subtitle: form.eventSubtitle.value,
-      description: form.eventDescription.value,
-      highlight: form.eventHighlight.value,
-      variant: form.eventVariant.value,
-      icon: form.eventIcon.value,
-      isActive: form.eventActive.checked,
-      type: "event",
-      order: parseInt(form.eventOrder.value) || 0,
-      createdAt: new Date().toISOString(),
-    };
-    // Handle image upload if provided
-    const imageFile = form.eventImage.files[0];
-    if (imageFile) {
-      const imageUrl = await uploadFile(imageFile);
-      eventData.imageUrl = imageUrl.url; // hanya url string
-    }
-    // Jika edit mode, update data lama
-    if (form.dataset.mode === "edit" && form.dataset.editId) {
-      const eventRef = ref(rtdb, `content/promotion/events/${form.dataset.editId}`);
-      await set(eventRef, eventData);
-      form.dataset.mode = "";
-      form.dataset.editId = "";
-      submitBtn.textContent = "Simpan Event";
-    } else {
-      // Save to Firebase (tambah baru)
-      const eventsRef = ref(rtdb, "content/promotion/events");
-      const newEventRef = push(eventsRef);
-      await set(newEventRef, eventData);
-    }
-    showToast("Event berhasil disimpan!", "success");
-    form.reset();
-    form.style.display = "none";
-    refreshEventList();
-    updatePreviewCarousel();
-  } catch (error) {
-    console.error("Error saving event:", error);
-    showToast("Gagal menyimpan event: " + error.message, "danger");
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = originalBtnText;
   }
 }
 
@@ -774,12 +541,12 @@ async function handleCustomFormSubmit(e) {
       const imageFile = form.contentFile.files[0];
       if (!imageFile) throw new Error("Pilih file gambar terlebih dahulu");
       const fileUrl = await uploadFile(imageFile);
-      customData.fileUrl = fileUrl.url; // hanya url string
+      customData.fileUrl = fileUrl.url; // Store the full URL
     } else if (contentType === "Video") {
       const videoFile = form.contentFile.files[0];
       if (!videoFile) throw new Error("Pilih file video terlebih dahulu");
       const fileUrl = await uploadFile(videoFile);
-      customData.fileUrl = fileUrl.url; // hanya url string
+      customData.fileUrl = fileUrl.url; // Store the full URL
     } else if (contentType === "Gallery") {
       const galleryImages = [];
       const galleryContainer = document.getElementById("galleryContainer");
@@ -816,7 +583,6 @@ async function handleCustomFormSubmit(e) {
     handleContentTypeChange();
     form.style.display = "none";
     refreshCustomList();
-    updatePreviewCarousel();
   } catch (error) {
     console.error("Error saving custom content:", error);
     showToast("Gagal menyimpan konten: " + error.message, "danger");
@@ -995,70 +761,6 @@ function loadSettingsFromFirebase() {
     });
 }
 
-// Refresh event list
-function refreshEventList() {
-  const eventsRef = ref(rtdb, "content/promotion/events");
-
-  get(eventsRef)
-    .then((snapshot) => {
-      const events = snapshot.val() || {};
-      const eventsList = document.getElementById("eventsList");
-
-      if (eventsList) {
-        // Clear current list
-        eventsList.innerHTML = "";
-
-        // Check if there are any events
-        if (Object.keys(events).length === 0) {
-          eventsList.innerHTML = '<div class="list-group-item text-center text-muted">Tidak ada event</div>';
-          return;
-        }
-
-        // Convert to array and sort
-        const eventsArray = Object.entries(events).map(([id, event]) => ({
-          id,
-          ...event,
-        }));
-
-        eventsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-        // Add each event to the list
-        eventsArray.forEach((event) => {
-          const statusBadge = event.isActive
-            ? '<span class="badge bg-success">Active</span>'
-            : '<span class="badge bg-secondary">Inactive</span>';
-
-          const itemHtml = `
-          <div class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="mb-1">${event.title}</h6>
-              <small>${event.subtitle || ""}</small>
-              <div>${statusBadge}</div>
-            </div>
-            <div class="btn-group">
-              <button class="btn btn-sm btn-outline-primary" onclick="editEvent('${event.id}')">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-sm btn-outline-danger" onclick="deleteEvent('${event.id}')">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        `;
-
-          eventsList.insertAdjacentHTML("beforeend", itemHtml);
-        });
-      }
-
-      // Update preview carousel
-      updatePreviewCarousel();
-    })
-    .catch((error) => {
-      console.error("Error loading events:", error);
-      showToast("Gagal memuat daftar event", "danger");
-    });
-}
-
 // Refresh custom content list
 function refreshCustomList() {
   const customItemsRef = ref(rtdb, "content/promotion/customItems");
@@ -1114,86 +816,11 @@ function refreshCustomList() {
           customList.insertAdjacentHTML("beforeend", itemHtml);
         });
       }
-
-      // Update preview carousel
-      updatePreviewCarousel();
     })
     .catch((error) => {
       console.error("Error loading custom content:", error);
       showToast("Gagal memuat daftar konten kustom", "danger");
     });
-}
-
-// Update preview carousel
-function updatePreviewCarousel() {
-  // Get all content from Firebase
-  Promise.all([get(ref(rtdb, "content/promotion/events")), get(ref(rtdb, "content/promotion/customItems"))])
-    .then(([eventsSnapshot, customItemsSnapshot]) => {
-      const events = eventsSnapshot.val() || {};
-      const customItems = customItemsSnapshot.val() || {};
-
-      // Combine all content
-      const content = {
-        events: events,
-        customItems: customItems,
-      };
-
-      // Update carousel
-      updateCarouselContent(content);
-    })
-    .catch((error) => {
-      console.error("Error updating preview carousel:", error);
-    });
-}
-
-// Edit event
-function editEvent(eventId) {
-  const eventRef = ref(rtdb, `content/promotion/events/${eventId}`);
-  get(eventRef)
-    .then((snapshot) => {
-      const event = snapshot.val();
-      if (!event) {
-        showToast("Event tidak ditemukan", "warning");
-        return;
-      }
-      const form = document.getElementById("eventForm");
-      form.eventTitle.value = event.title || "";
-      form.eventSubtitle.value = event.subtitle || "";
-      form.eventDescription.value = event.description || "";
-      form.eventHighlight.value = event.highlight || "";
-      form.eventVariant.value = event.variant || "luxury-gold";
-      form.eventIcon.value = event.icon || "percentage";
-      form.eventActive.checked = event.isActive !== false;
-      form.eventOrder.value = event.order || 0;
-      form.dataset.mode = "edit";
-      form.dataset.editId = eventId;
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.textContent = "Update Event";
-      form.style.display = "block"; // tampilkan form edit
-      form.scrollIntoView({ behavior: "smooth" });
-    })
-    .catch((error) => {
-      console.error("Error loading event for edit:", error);
-      showToast("Gagal memuat data event", "danger");
-    });
-}
-
-// Delete event
-function deleteEvent(eventId) {
-  if (confirm("Apakah Anda yakin ingin menghapus event ini?")) {
-    const eventRef = ref(rtdb, `content/promotion/events/${eventId}`);
-
-    remove(eventRef)
-      .then(() => {
-        showToast("Event berhasil dihapus", "success");
-        refreshEventList();
-        updatePreviewCarousel();
-      })
-      .catch((error) => {
-        console.error("Error deleting event:", error);
-        showToast("Gagal menghapus event", "danger");
-      });
-  }
 }
 
 // Edit custom item
@@ -1270,25 +897,11 @@ function deleteCustomItem(itemId) {
       .then(() => {
         showToast("Konten berhasil dihapus", "success");
         refreshCustomList();
-        updatePreviewCarousel();
       })
       .catch((error) => {
         console.error("Error deleting custom item:", error);
         showToast("Gagal menghapus konten", "danger");
       });
-  }
-}
-
-// Open fullscreen preview
-function openFullscreenPreview() {
-  // Open a new window with the display page
-  const previewWindow = window.open("promosi-display.html", "PreviewWindow", "width=1024,height=768");
-
-  // Focus the new window
-  if (previewWindow) {
-    previewWindow.focus();
-  } else {
-    showToast("Popup blocked. Please allow popups for this site.", "warning");
   }
 }
 
@@ -1337,10 +950,7 @@ function showToast(message, type = "info") {
 }
 
 // Make functions available globally
-window.editEvent = editEvent;
-window.deleteEvent = deleteEvent;
 window.editCustomItem = editCustomItem;
 window.deleteCustomItem = deleteCustomItem;
 window.addGalleryImage = addGalleryImage;
 window.removeGalleryItem = removeGalleryItem;
-window.openFullscreenPreview = openFullscreenPreview;
