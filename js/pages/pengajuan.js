@@ -119,7 +119,7 @@ function updateLeaveReplacementUI() {
   // Jika replacement type adalah libur dan ada tanggal, update UI
   if (startDate && endDate && replacementType === "libur") {
     const dayCount = calculateDaysBetween(startDate, endDate);
-    
+
     // Generate array of leave dates
     const leaveDates = [];
     const start = new Date(startDate);
@@ -127,20 +127,20 @@ function updateLeaveReplacementUI() {
       const currentDate = new Date(start);
       currentDate.setDate(start.getDate() + i);
       leaveDates.push({
-        date: currentDate.toISOString().split('T')[0],
+        date: currentDate.toISOString().split("T")[0],
         formatted: currentDate.toLocaleDateString("id-ID", {
           weekday: "long",
           day: "numeric",
           month: "long",
-          year: "numeric"
-        })
+          year: "numeric",
+        }),
       });
     }
 
     // Clear and rebuild container
     if (container) {
       container.innerHTML = "";
-      
+
       leaveDates.forEach((leaveDate, index) => {
         const dateItem = document.createElement("div");
         dateItem.className = "mb-3 replacement-date-item";
@@ -154,9 +154,9 @@ function updateLeaveReplacementUI() {
           </div>
           <div class="form-text text-muted">Pilih tanggal pengganti untuk izin tanggal ${leaveDate.date}</div>
         `;
-        
+
         container.appendChild(dateItem);
-        
+
         // Enable date picker for new input
         const newDateInput = dateItem.querySelector(`#replacementDate${index}`);
         enableDatePickerOnClick(newDateInput);
@@ -393,40 +393,39 @@ document.querySelectorAll('input[name="leaveTypeRadio"]')?.forEach((radio) => {
 });
 
 // Event listener for replacement type selection
-document.getElementById("replacementType")?.addEventListener("change", function() {
+document.getElementById("replacementType")?.addEventListener("change", function () {
   const liburSection = document.getElementById("replacementLibur");
   const jamSection = document.getElementById("replacementJam");
-  
+
   // Reset required attributes
-  document.querySelectorAll(".replacement-date").forEach(input => {
+  document.querySelectorAll(".replacement-date").forEach((input) => {
     input.removeAttribute("required");
   });
-  
+
   const hourDate = document.getElementById("replacementHourDate");
   const timeValue = document.getElementById("replacementTimeValue");
-  
+
   if (hourDate) hourDate.removeAttribute("required");
   if (timeValue) timeValue.removeAttribute("required");
-  
+
   // Set required berdasarkan pilihan
   if (this.value === "libur") {
     if (liburSection) liburSection.style.display = "block";
     if (jamSection) jamSection.style.display = "none";
-    
+
     // PANGGIL updateLeaveReplacementUI() SETELAH MEMILIH GANTI LIBUR
     updateLeaveReplacementUI();
-    
+
     // Set required untuk tanggal ganti libur setelah UI diupdate
     setTimeout(() => {
-      document.querySelectorAll(".replacement-date").forEach(input => {
+      document.querySelectorAll(".replacement-date").forEach((input) => {
         input.setAttribute("required", "");
       });
     }, 100);
-    
   } else if (this.value === "jam") {
     if (liburSection) liburSection.style.display = "none";
     if (jamSection) jamSection.style.display = "block";
-    
+
     // Set required untuk pengganti jam
     if (hourDate) hourDate.setAttribute("required", "");
     if (timeValue) timeValue.setAttribute("required", "");
@@ -437,7 +436,7 @@ document.getElementById("replacementType")?.addEventListener("change", function(
 });
 
 // Add event listeners for date inputs
-document.getElementById("leaveStartDate")?.addEventListener("change", function() {
+document.getElementById("leaveStartDate")?.addEventListener("change", function () {
   // Hanya update jika replacement type sudah dipilih sebagai libur
   const replacementType = document.getElementById("replacementType")?.value;
   if (replacementType === "libur") {
@@ -445,7 +444,7 @@ document.getElementById("leaveStartDate")?.addEventListener("change", function()
   }
 });
 
-document.getElementById("leaveEndDate")?.addEventListener("change", function() {
+document.getElementById("leaveEndDate")?.addEventListener("change", function () {
   // Hanya update jika replacement type sudah dipilih sebagai libur
   const replacementType = document.getElementById("replacementType")?.value;
   if (replacementType === "libur") {
@@ -787,6 +786,38 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
         hasMedicalCertificate: hasMedicalCertificate,
         medicalCertificateFile: medicalCertificateFileInfo,
       };
+
+      // Jika tidak ada surat dokter DAN user memilih ganti-libur
+      if (!hasMedicalCertificate && replacementType === "libur") {
+        const replacementDateInputs = document.querySelectorAll(".replacement-date");
+        const collectedDates = [];
+
+        replacementDateInputs.forEach((inp) => {
+          if (inp.value) {
+            const d = new Date(inp.value);
+            collectedDates.push({
+              date: inp.value,
+              formattedDate: d.toLocaleDateString("id-ID", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }),
+            });
+          }
+        });
+
+        // Validasi minimal 1 tanggal harus diisi
+        if (collectedDates.length === 0) {
+          showFeedback("error", "Harap pilih minimal satu tanggal ganti libur!");
+          submitBtn.innerHTML = originalBtnText;
+          submitBtn.disabled = false;
+          return;
+        }
+
+        replacementDetails.replacementType = "libur";
+        replacementDetails.dates = collectedDates;
+      }
 
       console.log("Replacement details with medical certificate:", replacementDetails); // Debugging
     } else if (leaveType === "cuti") {
