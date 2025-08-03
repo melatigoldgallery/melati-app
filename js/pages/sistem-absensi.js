@@ -715,9 +715,19 @@ async function processScannedBarcode(barcode) {
  * @returns {boolean} - True jika valid, false jika tidak
  */
 function validateBarcodeInput(barcode) {
-  // Validasi input barcode
-  if (!barcode) {
-    showScanResult("error", "Barcode tidak boleh kosong!");
+  // Normalisasi barcode terlebih dahulu
+  const normalizedBarcode = normalizeBarcode(barcode);
+  
+  if (!normalizedBarcode) {
+    showScanResult("error", "Format barcode tidak valid!");
+    playNotificationSound("error", "");
+    focusBarcodeInput();
+    return false;
+  }
+
+  // Validasi panjang barcode (minimal 3 karakter)
+  if (normalizedBarcode.length < 3) {
+    showScanResult("error", "Barcode terlalu pendek!");
     playNotificationSound("error", "");
     focusBarcodeInput();
     return false;
@@ -725,17 +735,17 @@ function validateBarcodeInput(barcode) {
 
   // Cek apakah barcode ini baru saja diproses (dalam 3 detik terakhir)
   const currentTime = Date.now();
-  if (barcode === lastProcessedBarcode && currentTime - lastProcessedTime < BARCODE_COOLDOWN_MS) {
-    console.log(`Barcode ${barcode} diabaikan - sudah diproses dalam ${BARCODE_COOLDOWN_MS}ms terakhir`);
+  if (normalizedBarcode === lastProcessedBarcode && currentTime - lastProcessedTime < BARCODE_COOLDOWN_MS) {
+    console.log(`Barcode ${normalizedBarcode} diabaikan - sudah diproses dalam ${BARCODE_COOLDOWN_MS}ms terakhir`);
     showScanResult("warning", "Scan terlalu cepat, harap tunggu beberapa detik");
     focusBarcodeInput();
     return false;
   }
 
   // Update variabel tracking barcode
-  lastProcessedBarcode = barcode;
+  lastProcessedBarcode = normalizedBarcode;
   lastProcessedTime = currentTime;
-  console.log("Processing scanned barcode:", barcode);
+  console.log("Processing scanned barcode:", normalizedBarcode);
 
   return true;
 }
@@ -746,20 +756,137 @@ function validateBarcodeInput(barcode) {
  * @returns {Object|null} - Data karyawan atau null jika tidak ditemukan
  */
 async function getEmployeeData(barcode) {
-  // Check if employee exists in cache first to reduce Firestore reads
-  let employee = employeeCache.get(barcode);
-
-  // If not in cache, fetch from Firestore
-  if (!employee) {
-    employee = await findEmployeeByBarcode(barcode);
-
-    // Add to cache if found
-    if (employee && employee.barcode) {
-      employeeCache.set(employee.barcode, employee);
+  try {
+    // Normalisasi barcode
+    const normalizedBarcode = normalizeBarcode(barcode);
+    
+    if (!normalizedBarcode) {
+      console.error("Barcode tidak valid setelah normalisasi:", barcode);
+      return null;
     }
-  }
 
-  return employee;
+    console.log("Mencari karyawan dengan barcode:", normalizedBarcode);
+
+    // 1. Cek cache lokal terlebih dahulu
+    let employee = employeeCache.get(normalizedBarcode);
+    
+    if (employee) {
+      console.log("Karyawan ditemukan di cache lokal:", employee.name);
+      return employee;
+    }
+
+    // 2. Cek cache dari employee-service
+    try {
+      const employees = await getEmployees(false); // Gunakan cache jika valid
+      employee = employees.find(emp => normalizeBarcode(emp.barcode) === normalizedBarcode);
+      
+      if (employee) {
+        console.log("Karyawan ditemukan di cache employee-service:", employee.name);
+        // Update cache lokal
+        employeeCache.set(normalizedBarcode, employee);
+        return employee;
+      }
+    } catch (cacheError) {
+      console.warn("Error mengakses cache employee-service:", cacheError);
+    }
+
+    // 3. Jika tidak ada di cache, coba dari Firestore dengan retry
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        console.log(`Mencoba dari Firestore (attempt ${retryCount + 1})`);
+        employee = await findEmployeeByBarcode(normalizedBarcode);
+        
+        if (employee) {
+          console.log("Karyawan ditemukan di Firestore:", employee.name);
+          // Update cache lokal dan employee-service cache
+          employeeCache.set(normalizedBarcode, employee);
+          
+          // Refresh employee cache untuk memastikan sinkronisasi
+          try {
+            await refreshEmployeeCache();
+          } catch (refreshError) {
+            console.warn("Error refreshing employee cache:", refreshError);
+          }
+          
+          return employee;
+        }
+        
+        // Jika tidak ditemukan, coba dengan barcode yang tidak dinormalisasi
+        if (retryCount === 0 && normalizedBarcode !== barcode) {
+          employee = await findEmployeeByBarcode(barcode);
+          if (employee) {
+            console.log("Karyawan ditemukan dengan barcode asli:", employee.name);
+            employeeCache.set(normalizedBarcode, employee);
+            return employee;
+          }
+        }
+        
+        break; // Keluar dari loop jika tidak ditemukan
+      } catch (firestoreError) {
+        console.error(`Error mengakses Firestore (attempt ${retryCount + 1}):`, firestoreError);
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          throw firestoreError;
+        }
+        
+        // Tunggu sebentar sebelum retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+      }
+    }
+
+    // 4. Jika masih tidak ditemukan, coba cari dengan partial match
+    try {
+      const employees = await getEmployees(true); // Force refresh
+      employee = employees.find(emp => {
+        const empBarcode = normalizeBarcode(emp.barcode);
+        return empBarcode && empBarcode.includes(normalizedBarcode) || 
+               normalizedBarcode.includes(empBarcode);
+      });
+      
+      if (employee) {
+        console.log("Karyawan ditemukan dengan partial match:", employee.name);
+        employeeCache.set(normalizedBarcode, employee);
+        return employee;
+      }
+    } catch (partialError) {
+      console.warn("Error mencari dengan partial match:", partialError);
+    }
+
+    console.log("Karyawan tidak ditemukan untuk barcode:", normalizedBarcode);
+    return null;
+    
+  } catch (error) {
+    console.error("Error dalam getEmployeeData:", error);
+    return null;
+  }
+}
+
+/**
+ * Normalisasi barcode untuk konsistensi
+ * @param {string} barcode - Barcode yang akan dinormalisasi
+ * @returns {string|null} - Barcode yang sudah dinormalisasi atau null jika tidak valid
+ */
+function normalizeBarcode(barcode) {
+  if (!barcode || typeof barcode !== 'string') {
+    return null;
+  }
+  
+  // Trim whitespace dan ubah ke uppercase
+  let normalized = barcode.trim().toUpperCase();
+  
+  // Hapus karakter non-alphanumeric kecuali dash dan underscore
+  normalized = normalized.replace(/[^A-Z0-9\-_]/g, '');
+  
+  // Jika hasil kosong, return null
+  if (!normalized) {
+    return null;
+  }
+  
+  return normalized;
 }
 
 /**
@@ -2432,22 +2559,62 @@ function checkIfLate(timeString, employeeType, shift) {
 // Load employees and cache them
 async function loadEmployees() {
   try {
+    console.log("Memulai loading employees...");
+    
     // Periksa apakah cache perlu diperbarui berdasarkan TTL
     if (employeeCache.size === 0 || shouldUpdateEmployeeCache()) {
-      employees = await getEmployees();
+      console.log("Cache perlu diperbarui, mengambil data dari server...");
+      
+      // Coba load dengan retry
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          employees = await getEmployees(retryCount > 0); // Force refresh setelah retry pertama
+          
+          // Cache employees by barcode for faster lookup
+          employeeCache.clear(); // Clear cache lama
+          employees.forEach((employee) => {
+            if (employee.barcode) {
+              const normalizedBarcode = normalizeBarcode(employee.barcode);
+              if (normalizedBarcode) {
+                employeeCache.set(normalizedBarcode, employee);
+              }
+            }
+          });
 
-      // Cache employees by barcode for faster lookup
-      employees.forEach((employee) => {
-        if (employee.barcode) {
-          employeeCache.set(employee.barcode, employee);
+          // Update timestamp
+          employeeCacheTimestamp = Date.now();
+          
+          console.log(`Berhasil load ${employees.length} employees, cache size: ${employeeCache.size}`);
+          return;
+          
+        } catch (error) {
+          console.error(`Error loading employees (attempt ${retryCount + 1}):`, error);
+          retryCount++;
+          
+          if (retryCount > maxRetries) {
+            throw error;
+          }
+          
+          // Tunggu sebentar sebelum retry
+          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
         }
-      });
-
-      // Update timestamp
-      employeeCacheTimestamp = Date.now();
+      }
+    } else {
+      console.log("Menggunakan cache employees yang masih valid");
     }
   } catch (error) {
     console.error("Error loading employees:", error);
+    
+    // Jika gagal load, coba gunakan cache yang ada
+    if (employeeCache.size > 0) {
+      console.log("Menggunakan cache employees sebagai fallback");
+      employees = Array.from(employeeCache.values());
+    } else {
+      throw error;
+    }
   }
 }
 

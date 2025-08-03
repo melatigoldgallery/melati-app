@@ -300,11 +300,69 @@ export async function updateEmployee(id, updatedEmployee) {
 // Find employee by barcode
 export async function findEmployeeByBarcode(barcode) {
   try {
+    // Normalisasi barcode
+    const normalizedBarcode = barcode ? barcode.trim().toUpperCase() : '';
+    
+    if (!normalizedBarcode) {
+      console.error("Barcode kosong atau tidak valid");
+      return null;
+    }
+
+    console.log("Mencari karyawan dengan barcode:", normalizedBarcode);
+
     // Use cached data to avoid Firestore read
     const employees = await getEmployees();
-    return employees.find(emp => emp.barcode === barcode) || null;
+    
+    // Cari dengan exact match
+    let employee = employees.find(emp => {
+      if (!emp.barcode) return false;
+      const empBarcode = emp.barcode.trim().toUpperCase();
+      return empBarcode === normalizedBarcode;
+    });
+    
+    if (employee) {
+      console.log("Karyawan ditemukan dengan exact match:", employee.name);
+      return employee;
+    }
+    
+    // Jika tidak ditemukan, coba dengan partial match
+    employee = employees.find(emp => {
+      if (!emp.barcode) return false;
+      const empBarcode = emp.barcode.trim().toUpperCase();
+      return empBarcode.includes(normalizedBarcode) || normalizedBarcode.includes(empBarcode);
+    });
+    
+    if (employee) {
+      console.log("Karyawan ditemukan dengan partial match:", employee.name);
+      return employee;
+    }
+    
+    console.log("Karyawan tidak ditemukan untuk barcode:", normalizedBarcode);
+    return null;
+    
   } catch (error) {
     console.error("Error finding employee by barcode:", error);
+    
+    // Coba gunakan cache sebagai fallback
+    try {
+      const cachedEmployees = getFromCache();
+      if (cachedEmployees) {
+        const normalizedBarcode = barcode ? barcode.trim().toUpperCase() : '';
+        const employee = cachedEmployees.find(emp => {
+          if (!emp.barcode) return false;
+          const empBarcode = emp.barcode.trim().toUpperCase();
+          return empBarcode === normalizedBarcode;
+        });
+        
+        if (employee) {
+          console.log("Karyawan ditemukan di cache fallback:", employee.name);
+          return employee;
+        }
+      }
+    } catch (cacheError) {
+      console.warn("Error mengakses cache fallback:", cacheError);
+    }
+    
     throw error;
   }
 }
