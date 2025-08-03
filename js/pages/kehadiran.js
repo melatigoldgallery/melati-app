@@ -391,8 +391,6 @@ function toggleLateMinutesContainer(status) {
   }
 }
 
-// Fungsi untuk menyimpan perubahan (update di memory saja)
-// Fungsi untuk menyimpan perubahan (update di memory saja)
 async function saveAttendanceEdit() {
   const recordIndex = currentEditRecord.index;
   const newTimeIn = document.getElementById('editTimeIn').value;
@@ -465,30 +463,32 @@ async function saveAttendanceEdit() {
     displayAllData();
     updateSummaryCards();
     
-    // Close modal
+    // ✅ **FIX: Properly close modal and remove backdrop**
     const editModal = bootstrap.Modal.getInstance(document.getElementById('editAttendanceModal'));
-    editModal.hide();
+    if (editModal) {
+      editModal.hide();
+    }
     
-    // PERBAIKAN: Pastikan loading overlay dihilangkan
-    showLoading(false);
+    // Ensure backdrop is removed after a short delay
+    setTimeout(() => {
+      const backdrop = document.querySelector('.modal-backdrop');
+      if (backdrop) {
+        backdrop.remove();
+      }
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }, 300);
     
     showAlert('success', `<i class="fas fa-check-circle me-2"></i>Data kehadiran berhasil diperbarui!`);
     
   } catch (error) {
     console.error('Error updating attendance:', error);
-    
-    // PERBAIKAN: Pastikan loading overlay dihilangkan saat error
-    showLoading(false);
-    
     showAlert('danger', `<i class="fas fa-exclamation-circle me-2"></i>Gagal memperbarui data: ${error.message}`);
   } finally {
     saveBtn.innerHTML = originalBtnText;
     saveBtn.disabled = false;
-    
-    // PERBAIKAN: Tambahan safety net untuk memastikan loading overlay dihilangkan
-    setTimeout(() => {
-      showLoading(false);
-    }, 100);
+    showLoading(false);
   }
 }
 
