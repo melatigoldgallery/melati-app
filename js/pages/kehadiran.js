@@ -345,30 +345,66 @@ function showEditModal(record) {
   // Populate form dengan data record
   document.getElementById('editEmployeeId').textContent = record.employeeId || '-';
   document.getElementById('editName').textContent = record.name || '-';
-  document.getElementById('editDate').textContent = formatDateForDisplay(record.date || record.timeIn);
   
-  // Set shift - TAMBAHAN BARU
+  // Format tanggal dengan handling yang lebih baik
+  const displayDate = formatDateForDisplay(record.date || record.timeIn);
+  document.getElementById('editDate').textContent = displayDate;
+  
+  // Set shift
   document.getElementById('editShift').value = record.shift || 'morning';
   
   // Set waktu masuk
   if (record.timeIn) {
-    const timeIn = new Date(record.timeIn);
-    const timeString = timeIn.toTimeString().slice(0, 5); // HH:MM format
-    document.getElementById('editTimeIn').value = timeString;
+    let timeIn;
+    if (record.timeIn instanceof Date) {
+      timeIn = record.timeIn;
+    } else if (typeof record.timeIn.toDate === 'function') {
+      timeIn = record.timeIn.toDate();
+    } else if (record.timeIn._seconds) {
+      timeIn = new Date(record.timeIn._seconds * 1000);
+    } else {
+      timeIn = new Date(record.timeIn);
+    }
+    
+    if (!isNaN(timeIn.getTime())) {
+      document.getElementById('editTimeIn').value = timeIn.toTimeString().substring(0, 5);
+    }
+  }
+
+  // Set waktu pulang
+  if (record.timeOut) {
+    let timeOut;
+    if (record.timeOut instanceof Date) {
+      timeOut = record.timeOut;
+    } else if (typeof record.timeOut.toDate === 'function') {
+      timeOut = record.timeOut.toDate();
+    } else if (record.timeOut._seconds) {
+      timeOut = new Date(record.timeOut._seconds * 1000);
+    } else {
+      timeOut = new Date(record.timeOut);
+    }
+    
+    if (!isNaN(timeOut.getTime())) {
+      document.getElementById('editTimeOut').value = timeOut.toTimeString().substring(0, 5);
+    }
+  } else {
+    document.getElementById('editTimeOut').value = '';
   }
   
   // Set status
   document.getElementById('editStatus').value = record.status;
   
-  // Set menit terlambat jika ada
+  // Set menit terlambat
   if (record.lateMinutes) {
     document.getElementById('editLateMinutes').value = record.lateMinutes;
+  } else {
+    document.getElementById('editLateMinutes').value = '';
   }
   
   // Show/hide late minutes container
   toggleLateMinutesContainer(record.status);
   
-  // Store record untuk update nanti
+  // Store record ID
   document.getElementById('editRecordId').value = record.id || `${record.employeeId}_${formatDateForAPI(record.date || record.timeIn)}`;
   
   // Show modal
@@ -394,11 +430,13 @@ function toggleLateMinutesContainer(status) {
 async function saveAttendanceEdit() {
   const recordIndex = currentEditRecord.index;
   const newTimeIn = document.getElementById('editTimeIn').value;
+  const newTimeOut = document.getElementById('editTimeOut').value;
   const newStatus = document.getElementById('editStatus').value;
   const newShift = document.getElementById('editShift').value;
   const newLateMinutes = document.getElementById('editLateMinutes').value;
   const saveBtn = document.getElementById('saveEditBtn');
   
+  // Validasi input wajib
   if (!newTimeIn || !newStatus || !newShift) {
     showAlert('warning', 'Waktu masuk, shift, dan status harus diisi!');
     return;
@@ -412,19 +450,72 @@ async function saveAttendanceEdit() {
   try {
     const originalRecord = filteredData[recordIndex];
     
-    // Create new time with original date but new time
-    const originalDate = new Date(originalRecord.timeIn || originalRecord.date);
-    const [hours, minutes] = newTimeIn.split(':');
-    const newDateTime = new Date(originalDate);
-    newDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    // Ambil tanggal dengan fallback yang lebih robust
+    let baseDate = new Date();
+    let targetDateString = "";
+    
+    // Coba berbagai cara untuk mendapatkan tanggal
+    if (originalRecord.date && typeof originalRecord.date === 'string') {
+      // Jika ada field date sebagai string
+      targetDateString = originalRecord.date;
+      baseDate = new Date(originalRecord.date + 'T00:00:00');
+    } else if (originalRecord.timeIn) {
+      // Jika ada timeIn, extract tanggal dari situ
+      let timeInDate;
+      if (originalRecord.timeIn instanceof Date) {
+        timeInDate = originalRecord.timeIn;
+      } else if (typeof originalRecord.timeIn.toDate === 'function') {
+        timeInDate = originalRecord.timeIn.toDate();
+      } else if (originalRecord.timeIn._seconds) {
+        timeInDate = new Date(originalRecord.timeIn._seconds * 1000);
+      } else {
+        timeInDate = new Date(originalRecord.timeIn);
+      }
+      
+      if (!isNaN(timeInDate.getTime())) {
+        baseDate = timeInDate;
+        targetDateString = formatDateForAPI(timeInDate);
+      }
+    }
+    
+    // Jika masih tidak valid, gunakan hari ini
+    if (isNaN(baseDate.getTime()) || !targetDateString) {
+      const today = new Date();
+      baseDate = today;
+      targetDateString = formatDateForAPI(today);
+      console.warn('Using today as fallback date');
+    }
+    
+    console.log('Using base date:', baseDate, 'target date string:', targetDateString);
+    
+    // Buat tanggal baru untuk timeIn
+    const [hoursIn, minutesIn] = newTimeIn.split(':');
+    const newTimeInDateTime = new Date(baseDate);
+    newTimeInDateTime.setHours(parseInt(hoursIn), parseInt(minutesIn), 0, 0);
     
     // Prepare update data
     const updateData = {
-      timeIn: newDateTime,
+      timeIn: newTimeInDateTime,
       status: newStatus,
       shift: newShift,
       updatedAt: new Date()
     };
+    
+    // Handle timeOut
+    if (newTimeOut && newTimeOut.trim() !== '') {
+      const [hoursOut, minutesOut] = newTimeOut.split(':');
+      const newTimeOutDateTime = new Date(baseDate);
+      newTimeOutDateTime.setHours(parseInt(hoursOut), parseInt(minutesOut), 0, 0);
+      
+      // Jika waktu pulang lebih kecil dari waktu masuk, anggap hari berikutnya
+      if (newTimeOutDateTime <= newTimeInDateTime) {
+        newTimeOutDateTime.setDate(newTimeOutDateTime.getDate() + 1);
+      }
+      
+      updateData.timeOut = newTimeOutDateTime;
+    } else {
+      updateData.timeOut = null;
+    }
     
     // Handle late minutes
     if (newStatus === 'Terlambat' || newStatus === 'Izin Terlambat') {
@@ -433,26 +524,19 @@ async function saveAttendanceEdit() {
       updateData.lateMinutes = null;
     }
     
-    // Update menggunakan query berdasarkan employeeId dan tanggal
-    const targetDate = formatDateForAPI(originalRecord.timeIn || originalRecord.date);
-    await updateAttendanceByEmployeeAndDate(originalRecord.employeeId, targetDate, updateData);
+    // Update ke database
+    await updateAttendanceByEmployeeAndDate(originalRecord.employeeId, targetDateString, updateData);
     
     // Update local data
-    const currentRecord = currentAttendanceData.find(r => 
-      r.employeeId === originalRecord.employeeId && 
-      formatDateForDisplay(r.date || r.timeIn) === formatDateForDisplay(originalRecord.date || originalRecord.timeIn)
-    );
-    
-    if (currentRecord) {
-      Object.assign(currentRecord, updateData);
-      filteredData[recordIndex] = { ...currentRecord };
-    }
+    Object.assign(originalRecord, updateData);
+    filteredData[recordIndex] = { ...originalRecord };
     
     // Clear cache
     const startDate = document.getElementById("startDate").value;
     const endDate = document.getElementById("endDate").value;
     const selectedShift = document.getElementById("shiftFilter").value;
-    const cacheKey = `range_${startDate}_${endDate}_${selectedShift}`;
+    const selectedStatus = document.getElementById("statusFilter").value;
+    const cacheKey = `range_${startDate}_${endDate}_${selectedShift}_${selectedStatus}`;
     
     if (attendanceCache.has(cacheKey)) {
       attendanceCache.delete(cacheKey);
@@ -463,24 +547,21 @@ async function saveAttendanceEdit() {
     displayAllData();
     updateSummaryCards();
     
-    // ✅ **FIX: Properly close modal and remove backdrop**
+    // Close modal
     const editModal = bootstrap.Modal.getInstance(document.getElementById('editAttendanceModal'));
     if (editModal) {
       editModal.hide();
     }
     
-    // Ensure backdrop is removed after a short delay
     setTimeout(() => {
       const backdrop = document.querySelector('.modal-backdrop');
-      if (backdrop) {
-        backdrop.remove();
-      }
+      if (backdrop) backdrop.remove();
       document.body.classList.remove('modal-open');
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
     }, 300);
     
-    showAlert('success', `<i class="fas fa-check-circle me-2"></i>Data kehadiran berhasil diperbarui!`);
+    showAlert('success', '<i class="fas fa-check-circle me-2"></i>Data kehadiran berhasil diperbarui!');
     
   } catch (error) {
     console.error('Error updating attendance:', error);
@@ -492,11 +573,42 @@ async function saveAttendanceEdit() {
   }
 }
 
+// Tambahkan helper function untuk validasi tanggal
+function isValidDate(date) {
+  return date instanceof Date && !isNaN(date.getTime());
+}
 
-// Helper function untuk format tanggal ke API format
+// Perbaikan helper function formatDateForAPI
 function formatDateForAPI(dateTime) {
   if (!dateTime) return "";
-  const date = new Date(dateTime);
+  
+  let date;
+  
+  // Handle berbagai format tanggal
+  if (dateTime instanceof Date && !isNaN(dateTime)) {
+    date = dateTime;
+  } else if (typeof dateTime === 'string') {
+    // Jika sudah format YYYY-MM-DD, return langsung
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateTime)) {
+      return dateTime;
+    }
+    date = new Date(dateTime);
+  } else if (dateTime && typeof dateTime.toDate === 'function') {
+    // Firestore Timestamp
+    date = dateTime.toDate();
+  } else if (dateTime && dateTime._seconds) {
+    // Firestore Timestamp format lain
+    date = new Date(dateTime._seconds * 1000);
+  } else {
+    return "";
+  }
+  
+  // Final check
+  if (!date || isNaN(date.getTime())) {
+    console.warn('Cannot format date for API:', dateTime);
+    return "";
+  }
+  
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -1362,7 +1474,35 @@ function formatTime(dateTime) {
 // Fungsi helper untuk format tanggal
 function formatDateForDisplay(dateTime) {
   if (!dateTime) return "-";
-  const date = new Date(dateTime);
+  
+  let date;
+  
+  // Handle berbagai format tanggal
+  if (dateTime instanceof Date && !isNaN(dateTime)) {
+    date = dateTime;
+  } else if (typeof dateTime === 'string') {
+    // Jika string tanggal format YYYY-MM-DD, tambahkan waktu
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateTime)) {
+      date = new Date(dateTime + 'T00:00:00');
+    } else {
+      date = new Date(dateTime);
+    }
+  } else if (dateTime && typeof dateTime.toDate === 'function') {
+    // Firestore Timestamp
+    date = dateTime.toDate();
+  } else if (dateTime && dateTime._seconds) {
+    // Firestore Timestamp format lain
+    date = new Date(dateTime._seconds * 1000);
+  } else {
+    return "-";
+  }
+  
+  // Final check
+  if (!date || isNaN(date.getTime())) {
+    console.warn('Cannot format date:', dateTime);
+    return "-";
+  }
+  
   return date.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "2-digit", 

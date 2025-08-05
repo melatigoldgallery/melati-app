@@ -47,11 +47,38 @@ const CACHE_TTL_TODAY = 5 * 60 * 1000;     // 5 menit untuk data hari ini
 
 export async function updateAttendanceByEmployeeAndDate(employeeId, dateString, updateData) {
   try {
-    // Query untuk mencari document berdasarkan employeeId dan tanggal
-    const attendanceRef = collection(db, "attendance");
-    const startOfDay = new Date(dateString + "T00:00:00");
-    const endOfDay = new Date(dateString + "T23:59:59");
+    // Validasi basic
+    if (!employeeId || !dateString || !updateData) {
+      throw new Error('Parameter tidak lengkap');
+    }
     
+    // Pastikan dateString dalam format YYYY-MM-DD
+    let targetDate = dateString;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      // Coba konversi jika bukan format yang benar
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        targetDate = `${year}-${month}-${day}`;
+      } else {
+        throw new Error(`Format tanggal tidak valid: ${dateString}`);
+      }
+    }
+    
+    console.log('Updating attendance for:', employeeId, 'on date:', targetDate);
+    
+    // Buat range tanggal untuk query
+    const startOfDay = new Date(targetDate + "T00:00:00.000");
+    const endOfDay = new Date(targetDate + "T23:59:59.999");
+    
+    if (isNaN(startOfDay.getTime()) || isNaN(endOfDay.getTime())) {
+      throw new Error(`Tidak dapat membuat range tanggal untuk: ${targetDate}`);
+    }
+    
+    // Query document
+    const attendanceRef = collection(db, "attendance");
     const q = query(
       attendanceRef,
       where("employeeId", "==", employeeId),
@@ -62,19 +89,15 @@ export async function updateAttendanceByEmployeeAndDate(employeeId, dateString, 
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
-      throw new Error(`Data kehadiran untuk ${employeeId} pada tanggal ${dateString} tidak ditemukan`);
+      throw new Error(`Data kehadiran untuk ${employeeId} pada tanggal ${targetDate} tidak ditemukan`);
     }
     
-    if (querySnapshot.size > 1) {
-      throw new Error(`Ditemukan lebih dari 1 record untuk ${employeeId} pada tanggal ${dateString}. Tidak dapat melakukan update.`);
-    }
-    
-    // Update document yang ditemukan
+    // Update document pertama yang ditemukan
     const docToUpdate = querySnapshot.docs[0];
     await updateDoc(docToUpdate.ref, updateData);
     
-    console.log(`Attendance record updated for ${employeeId} on ${dateString}`);
-    return true;
+    console.log(`Attendance updated successfully for ${employeeId} on ${targetDate}`);
+    return { success: true, docId: docToUpdate.id };
     
   } catch (error) {
     console.error("Error updating attendance record:", error);
