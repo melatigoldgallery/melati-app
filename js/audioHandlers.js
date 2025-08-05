@@ -143,7 +143,7 @@ export async function playQueueAnnouncement(queueNumber) {
     // Siapkan teks pengumuman terlebih dahulu
     const letter = queueNumber.charAt(0);
     const numbers = queueNumber.substring(1);
-    const text = `Nomor antrian, ${letter}, ${numbers.split("").join("")}`;
+    const text = `Nomor antrian, ${letter}, ${numbers.split("").join("")}, silahkan menyerahkan antrian kepada staff melati`;
     
     // Siapkan utterance sebelum memulai audio
     const utterance = new SpeechSynthesisUtterance(text);

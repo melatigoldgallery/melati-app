@@ -46,7 +46,7 @@ function initializeDatePicker() {
     orientation: "bottom auto",
   });
 
-    // Tambahkan datepicker untuk field tanggal edit
+  // Tambahkan datepicker untuk field tanggal edit
   $("#tanggalEdit").datepicker({
     format: "dd/mm/yyyy",
     language: "id",
@@ -206,7 +206,7 @@ function openServisModal(index = -1) {
     document.getElementById("jenisServis").value = item.jenisServis;
     document.getElementById("statusPembayaran").value = item.statusPembayaran || "nominal";
     document.getElementById("ongkos").value = item.ongkos;
-    
+
     // Trigger status change untuk set proper state
     handleStatusPembayaranChange();
   } else {
@@ -219,9 +219,13 @@ function openServisModal(index = -1) {
   modal.show();
 
   // Auto focus pada nama sales setelah modal terbuka
-  document.getElementById("modalInputServis").addEventListener("shown.bs.modal", function () {
-    document.getElementById("namaSales").focus();
-  }, { once: true });
+  document.getElementById("modalInputServis").addEventListener(
+    "shown.bs.modal",
+    function () {
+      document.getElementById("namaSales").focus();
+    },
+    { once: true }
+  );
 }
 
 function resetModalForm() {
@@ -232,7 +236,7 @@ function resetModalForm() {
   editingIndex = -1;
   editingRiwayatId = null;
   document.getElementById("modalInputServisLabel").textContent = "Input Data Servis";
-  
+
   // Sembunyikan field tanggal edit
   document.getElementById("tanggalEditRow").style.display = "none";
 }
@@ -253,8 +257,8 @@ async function saveServisItem() {
   }
 
   // Validasi ongkos berdasarkan status
-  if ((statusPembayaran === 'nominal' || statusPembayaran === 'custom') && ongkos <= 0) {
-    const labelText = statusPembayaran === 'custom' ? 'DP' : 'Ongkos';
+  if ((statusPembayaran === "nominal" || statusPembayaran === "custom") && ongkos <= 0) {
+    const labelText = statusPembayaran === "custom" ? "DP" : "Ongkos";
     showErrorModal("Validasi Error", `${labelText} harus diisi untuk status ${statusPembayaran}!`);
     return;
   }
@@ -265,7 +269,7 @@ async function saveServisItem() {
     noHp,
     namaBarang,
     jenisServis,
-    ongkos: statusPembayaran === 'free' ? 0 : ongkos,
+    ongkos: statusPembayaran === "free" ? 0 : ongkos,
     statusPembayaran,
   };
 
@@ -303,6 +307,21 @@ async function saveServisItem() {
   else if (editingIndex >= 0) {
     servisItems[editingIndex] = servisItem;
   } else {
+    // Cek duplikasi sebelum menambah data baru
+    const isDuplicate = servisItems.some(
+      (item) =>
+        item.namaCustomer.toLowerCase() === namaCustomer.toLowerCase() &&
+        item.noHp === noHp &&
+        item.namaBarang.toLowerCase() === namaBarang.toLowerCase() &&
+        item.jenisServis.toLowerCase() === jenisServis.toLowerCase()
+    );
+    if (isDuplicate) {
+      showErrorModal(
+        "Duplikasi Data",
+        "Data servis dengan kombinasi customer, no HP, barang, dan jenis servis yang sama sudah ada!"
+      );
+      return;
+    }
     servisItems.push(servisItem);
   }
 
@@ -323,10 +342,10 @@ function updateServisTable() {
 
   servisItems.forEach((item, index) => {
     const row = document.createElement("tr");
-    const statusPembayaran = item.statusPembayaran || 'nominal';
-    
+    const statusPembayaran = item.statusPembayaran || "nominal";
+
     // Hitung total untuk status nominal dan custom
-    if (statusPembayaran === 'nominal' || statusPembayaran === 'custom') {
+    if (statusPembayaran === "nominal" || statusPembayaran === "custom") {
       totalOngkos += item.ongkos;
     }
 
@@ -358,13 +377,13 @@ function updateServisTable() {
 }
 
 function getOngkosDisplay(item) {
-  const statusPembayaran = item.statusPembayaran || 'nominal';
-  
-  if (statusPembayaran === 'free') {
-    return 'GRATIS';
-  } else if (statusPembayaran === 'belum_lunas') {
-    return item.ongkos > 0 ? `Rp ${item.ongkos.toLocaleString("id-ID")}` : 'BELUM LUNAS';
-  } else if (statusPembayaran === 'custom') {
+  const statusPembayaran = item.statusPembayaran || "nominal";
+
+  if (statusPembayaran === "free") {
+    return "GRATIS";
+  } else if (statusPembayaran === "belum_lunas") {
+    return item.ongkos > 0 ? `Rp ${item.ongkos.toLocaleString("id-ID")}` : "BELUM LUNAS";
+  } else if (statusPembayaran === "custom") {
     return `DP: Rp ${item.ongkos.toLocaleString("id-ID")}`;
   } else {
     return `Rp ${item.ongkos.toLocaleString("id-ID")}`;
@@ -373,22 +392,22 @@ function getOngkosDisplay(item) {
 
 function getStatusLabel(status) {
   const labels = {
-    'nominal': 'LUNAS',
-    'free': 'GRATIS',
-    'belum_lunas': 'BELUM LUNAS',
-    'custom': 'CUSTOM'
+    nominal: "LUNAS",
+    free: "GRATIS",
+    belum_lunas: "BELUM LUNAS",
+    custom: "CUSTOM",
   };
-  return labels[status] || 'LUNAS';
+  return labels[status] || "LUNAS";
 }
 
 function getStatusBadgeColor(status) {
   const colors = {
-    'nominal': 'success',
-    'free': 'info',
-    'belum_lunas': 'warning',
-    'custom': 'secondary'
+    nominal: "success",
+    free: "info",
+    belum_lunas: "warning",
+    custom: "secondary",
   };
-  return colors[status] || 'success';
+  return colors[status] || "success";
 }
 
 // Global functions for button clicks
@@ -410,9 +429,13 @@ window.editRiwayatItem = function (id, index) {
   modal.show();
 
   // Auto focus pada input kode verifikasi setelah modal terbuka
-  document.getElementById("verifikasiModal").addEventListener("shown.bs.modal", function () {
-    document.getElementById("kodeVerifikasi").focus();
-  }, { once: true });
+  document.getElementById("verifikasiModal").addEventListener(
+    "shown.bs.modal",
+    function () {
+      document.getElementById("kodeVerifikasi").focus();
+    },
+    { once: true }
+  );
 };
 
 window.deleteRiwayatItem = function (id, index) {
@@ -422,16 +445,20 @@ window.deleteRiwayatItem = function (id, index) {
   modal.show();
 
   // Auto focus pada input kode verifikasi setelah modal terbuka
-  document.getElementById("verifikasiModal").addEventListener("shown.bs.modal", function () {
-    document.getElementById("kodeVerifikasi").focus();
-  }, { once: true });
+  document.getElementById("verifikasiModal").addEventListener(
+    "shown.bs.modal",
+    function () {
+      document.getElementById("kodeVerifikasi").focus();
+    },
+    { once: true }
+  );
 };
 
 async function handleVerifikasi() {
-  const kode = document.getElementById('kodeVerifikasi').value;
-  
-  if (kode !== 'smlt116') {
-    alert('Kode verifikasi salah!');
+  const kode = document.getElementById("kodeVerifikasi").value;
+
+  if (kode !== "smlt116") {
+    alert("Kode verifikasi salah!");
     document.getElementById("kodeVerifikasi").focus();
     return;
   }
@@ -447,7 +474,7 @@ async function handleVerifikasi() {
       document.getElementById("noHp").value = item.noHp;
       document.getElementById("namaBarang").value = item.namaBarang;
       document.getElementById("jenisServis").value = item.jenisServis;
-      document.getElementById("statusPembayaran").value = item.statusPembayaran || 'nominal';
+      document.getElementById("statusPembayaran").value = item.statusPembayaran || "nominal";
       document.getElementById("ongkos").value = item.ongkos;
 
       // Tampilkan dan isi field tanggal edit
@@ -465,9 +492,13 @@ async function handleVerifikasi() {
         const modal = new bootstrap.Modal(document.getElementById("modalInputServis"));
         modal.show();
 
-        document.getElementById("modalInputServis").addEventListener("shown.bs.modal", function () {
-          document.getElementById("namaSales").focus();
-        }, { once: true });
+        document.getElementById("modalInputServis").addEventListener(
+          "shown.bs.modal",
+          function () {
+            document.getElementById("namaSales").focus();
+          },
+          { once: true }
+        );
       }, 300);
 
       return;
@@ -529,18 +560,18 @@ async function saveAllServisData() {
 
     showLoading(false);
     // Broadcast each new item
-    savedItems.forEach(item => {
+    savedItems.forEach((item) => {
       const event = {
-        action: 'add',
+        action: "add",
         data: item,
         timestamp: Date.now(),
-        source: 'input-servis'
+        source: "input-servis",
       };
-      
-      localStorage.setItem('servisDataChange', JSON.stringify(event));
-      window.dispatchEvent(new CustomEvent('servisDataChanged', { detail: event }));
+
+      localStorage.setItem("servisDataChange", JSON.stringify(event));
+      window.dispatchEvent(new CustomEvent("servisDataChanged", { detail: event }));
     });
-    
+
     // Show success modal
     showSuccessModal("Data Berhasil Disimpan", `${savedItems.length} data servis berhasil disimpan.`, savedItems);
 
@@ -607,10 +638,10 @@ function updateRiwayatTable() {
   todayData.forEach((item, index) => {
     const row = document.createElement("tr");
     const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
-    const statusPembayaran = item.statusPembayaran || 'nominal';
-    
+    const statusPembayaran = item.statusPembayaran || "nominal";
+
     // Hitung total untuk status nominal dan custom
-    if (statusPembayaran === 'nominal' || statusPembayaran === 'custom') {
+    if (statusPembayaran === "nominal" || statusPembayaran === "custom") {
       totalOngkos += item.ongkos || 0;
     }
 
@@ -657,7 +688,7 @@ function updateRiwayatTable() {
 
 // Create shared function for generating print box HTML
 function generatePrintBox(item) {
-  const statusPembayaran = item.statusPembayaran || 'nominal';
+  const statusPembayaran = item.statusPembayaran || "nominal";
   let statusText = getStatusLabel(statusPembayaran);
 
   return `
@@ -808,22 +839,22 @@ function exportToPDF() {
 
   try {
     const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
-    
+
     // Hitung total ongkos untuk status nominal dan custom
     const totalOngkos = todayData.reduce((sum, item) => {
-      const statusPembayaran = item.statusPembayaran || 'nominal';
-      return (statusPembayaran === 'nominal' || statusPembayaran === 'custom') ? sum + (item.ongkos || 0) : sum;
+      const statusPembayaran = item.statusPembayaran || "nominal";
+      return statusPembayaran === "nominal" || statusPembayaran === "custom" ? sum + (item.ongkos || 0) : sum;
     }, 0);
-    
+
     const docDefinition = {
-      pageOrientation: 'landscape',
+      pageOrientation: "landscape",
       pageMargins: [20, 30, 20, 30],
       content: [
         {
           text: "LAPORAN INPUT SERVIS",
           style: "header",
           alignment: "center",
-          margin: [0, 0, 0, 8]
+          margin: [0, 0, 0, 8],
         },
         {
           text: `Tanggal: ${tanggalRiwayat}`,
@@ -837,126 +868,134 @@ function exportToPDF() {
             widths: [20, 80, 70, 170, 200, 80, 60, 60],
             body: [
               [
-                { text: 'No', style: 'tableHeader' },
-                { text: 'Nama Customer', style: 'tableHeader' },
-                { text: 'No HP', style: 'tableHeader' },
-                { text: 'Nama Barang', style: 'tableHeader' },
-                { text: 'Jenis Servis / Custom', style: 'tableHeader' },
-                { text: 'Ongkos / DP', style: 'tableHeader' },
-                { text: 'Status', style: 'tableHeader' },
-                { text: 'Sales', style: 'tableHeader' }
+                { text: "No", style: "tableHeader" },
+                { text: "Nama Customer", style: "tableHeader" },
+                { text: "No HP", style: "tableHeader" },
+                { text: "Nama Barang", style: "tableHeader" },
+                { text: "Jenis Servis / Custom", style: "tableHeader" },
+                { text: "Ongkos / DP", style: "tableHeader" },
+                { text: "Status", style: "tableHeader" },
+                { text: "Sales", style: "tableHeader" },
               ],
               ...todayData.map((item, index) => {
-                const statusPembayaran = item.statusPembayaran || 'nominal';
-                let ongkosText = '';
-                
-                if (statusPembayaran === 'free') {
-                  ongkosText = 'GRATIS';
-                } else if (statusPembayaran === 'belum_lunas') {
-                  ongkosText = item.ongkos > 0 ? `Rp ${(item.ongkos || 0).toLocaleString("id-ID")}` : 'BELUM LUNAS';
-                } else if (statusPembayaran === 'custom') {
+                const statusPembayaran = item.statusPembayaran || "nominal";
+                let ongkosText = "";
+
+                if (statusPembayaran === "free") {
+                  ongkosText = "GRATIS";
+                } else if (statusPembayaran === "belum_lunas") {
+                  ongkosText = item.ongkos > 0 ? `Rp ${(item.ongkos || 0).toLocaleString("id-ID")}` : "BELUM LUNAS";
+                } else if (statusPembayaran === "custom") {
                   ongkosText = `DP: Rp ${(item.ongkos || 0).toLocaleString("id-ID")}`;
                 } else {
                   ongkosText = `Rp ${(item.ongkos || 0).toLocaleString("id-ID")}`;
                 }
-                
+
                 return [
-                  { text: (index + 1).toString(), style: 'tableCell' },
-                  { text: item.namaCustomer || '', style: 'tableCell' },
-                  { text: item.noHp || '', style: 'tableCell' },
-                  { text: item.namaBarang || '', style: 'tableCell' },
-                  { text: item.jenisServis || '', style: 'tableCell' },
-                  { text: ongkosText, style: 'tableCellRight' },
-                  { text: getStatusLabel(statusPembayaran), style: 'tableCell' },
-                  { text: item.namaSales || '', style: 'tableCell' }
+                  { text: (index + 1).toString(), style: "tableCell" },
+                  { text: item.namaCustomer || "", style: "tableCell" },
+                  { text: item.noHp || "", style: "tableCell" },
+                  { text: item.namaBarang || "", style: "tableCell" },
+                  { text: item.jenisServis || "", style: "tableCell" },
+                  { text: ongkosText, style: "tableCellRight" },
+                  { text: getStatusLabel(statusPembayaran), style: "tableCell" },
+                  { text: item.namaSales || "", style: "tableCell" },
                 ];
               }),
               // Baris total
               [
-                { text: '', style: 'tableCell' },
-                { text: '', style: 'tableCell' },
-                { text: '', style: 'tableCell' },
-                { text: '', style: 'tableCell' },
-                { text: 'TOTAL NOMINAL:', style: 'tableCellBold', alignment: 'right' },
-                { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: 'tableCellBoldRight' },
-                { text: '', style: 'tableCell' },
-                { text: '', style: 'tableCell' }
-              ]
+                { text: "", style: "tableCell" },
+                { text: "", style: "tableCell" },
+                { text: "", style: "tableCell" },
+                { text: "", style: "tableCell" },
+                { text: "TOTAL NOMINAL:", style: "tableCellBold", alignment: "right" },
+                { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+                { text: "", style: "tableCell" },
+                { text: "", style: "tableCell" },
+              ],
             ],
           },
           layout: {
             hLineWidth: function (i, node) {
-              return (i === 0 || i === node.table.body.length) ? 2 : 1;
+              return i === 0 || i === node.table.body.length ? 2 : 1;
             },
             vLineWidth: function (i, node) {
-              return (i === 0 || i === node.table.widths.length) ? 2 : 1;
+              return i === 0 || i === node.table.widths.length ? 2 : 1;
             },
             hLineColor: function (i, node) {
-              return (i === 0 || i === node.table.body.length) ? '#666666' : '#cccccc';
+              return i === 0 || i === node.table.body.length ? "#666666" : "#cccccc";
             },
             vLineColor: function (i, node) {
-              return (i === 0 || i === node.table.widths.length) ? '#666666' : '#cccccc';
+              return i === 0 || i === node.table.widths.length ? "#666666" : "#cccccc";
             },
-            paddingLeft: function(i, node) { return 3; },
-            paddingRight: function(i, node) { return 3; },
-            paddingTop: function(i, node) { return 2; },
-            paddingBottom: function(i, node) { return 1; }
-          }
+            paddingLeft: function (i, node) {
+              return 3;
+            },
+            paddingRight: function (i, node) {
+              return 3;
+            },
+            paddingTop: function (i, node) {
+              return 2;
+            },
+            paddingBottom: function (i, node) {
+              return 1;
+            },
+          },
         },
         // Tambahkan keterangan di bawah tabel
         {
           text: "Keterangan: Total Nominal mencakup status LUNAS dan CUSTOM",
           style: "footnote",
           alignment: "left",
-          margin: [0, 7, 0, 0]
-        }
+          margin: [0, 7, 0, 0],
+        },
       ],
       styles: {
         header: {
           fontSize: 16,
           bold: true,
-          color: '#2c3e50'
+          color: "#2c3e50",
         },
         subheader: {
           fontSize: 12,
           bold: true,
-          color: '#34495e'
+          color: "#34495e",
         },
         tableHeader: {
           bold: true,
           fontSize: 10,
-          color: 'white',
-          fillColor: '#3498db',
-          alignment: 'center'
+          color: "white",
+          fillColor: "#3498db",
+          alignment: "center",
         },
         tableCell: {
           fontSize: 8,
-          margin: [0, 1, 0, 1]
+          margin: [0, 1, 0, 1],
         },
         tableCellRight: {
           fontSize: 8,
-          alignment: 'right',
-          margin: [0, 1, 0, 1]
+          alignment: "right",
+          margin: [0, 1, 0, 1],
         },
         tableCellBold: {
           fontSize: 8,
           bold: true,
-          fillColor: '#ecf0f1',
-          margin: [0, 1, 0, 1]
+          fillColor: "#ecf0f1",
+          margin: [0, 1, 0, 1],
         },
         tableCellBoldRight: {
           fontSize: 8,
           bold: true,
-          alignment: 'right',
-          fillColor: '#ecf0f1',
-          margin: [0, 1, 0, 1]
+          alignment: "right",
+          fillColor: "#ecf0f1",
+          margin: [0, 1, 0, 1],
         },
         footnote: {
           fontSize: 8,
           italics: true,
-          color: '#666666'
-        }
-      }
+          color: "#666666",
+        },
+      },
     };
 
     pdfMake.createPdf(docDefinition).download(`Laporan_Servis_${tanggalRiwayat.replace(/\//g, "-")}.pdf`);
@@ -982,9 +1021,9 @@ function showSuccessModal(title, message, items = []) {
   if (items.length > 0) {
     content += '<div class="item-list">';
     items.forEach((item, index) => {
-      const statusPembayaran = item.statusPembayaran || 'nominal';
+      const statusPembayaran = item.statusPembayaran || "nominal";
       let ongkosText = getOngkosDisplay(item);
-      
+
       content += `
         <div class="item">
           <strong>${index + 1}. ${item.namaCustomer}</strong><br>
@@ -1012,5 +1051,3 @@ function showErrorModal(title, message) {
   const modal = new bootstrap.Modal(document.getElementById("errorModal"));
   modal.show();
 }
-
-
