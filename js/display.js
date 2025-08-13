@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js';
-import { getco, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js';
+import { get, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js';
 import { rtdb } from './configFirebase.js';
 
 document.addEventListener("DOMContentLoaded", () => {
