@@ -92,7 +92,7 @@
         margin-left: 1rem;
         font-family: "Playfair Display", serif;
         font-weight: 700;
-        font-size: 2rem;
+        font-size: 4rem;
         color: var(--white);
         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
       }
@@ -115,12 +115,13 @@
       }
 
       .current-date {
-        font-size: 1.1rem;
+        font-size: 2rem;
         font-weight: 500;
+        font-family: "Playfair Display", serif;
       }
 
       .current-time {
-        font-size: 1.5rem;
+        font-size: 2rem;
         font-weight: 700;
         color: var(--gold-secondary);
       }
@@ -140,7 +141,7 @@
 
       .page-title h1 {
         font-family: "Playfair Display", serif;
-        font-size: 2.5rem;
+        font-size: 5rem;
         font-weight: 700;
         color: var(--dark-brown);
         margin-bottom: 0.5rem;
@@ -163,8 +164,8 @@
         overflow: hidden;
         box-shadow: var(--shadow-soft);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-        height: 400px;
-        width: 490px;
+        height: 500px;
+        width: 750px;
         max-width: 98vw;
         border: none;
         position: relative;
@@ -202,9 +203,9 @@
         border-bottom: 1px solid var(--gray-medium);
       }
 
-      .queue-card-header h2 {
+      .queue-card-header h1 {
         font-family: "Playfair Display", serif;
-        font-size: 2.25rem;
+        font-size: 4rem;
         font-weight: 600;
         margin: 0;
         color: var(--dark-brown);
@@ -213,7 +214,7 @@
         justify-content: center;
       }
 
-      .queue-card-header h2 i {
+      .queue-card-header h1 i {
         margin-right: 0.5rem;
         color: var(--gold-primary);
       }
@@ -354,7 +355,7 @@
 
       .carousel-caption h2 {
         font-family: "Playfair Display", serif;
-        font-size: 2.2rem;
+        font-size: 4rem;
         color: var(--dark-brown);
       }
       .carousel-caption p {
@@ -526,7 +527,7 @@
       <!-- Queue Cards -->
   <div class="row justify-content-center" style="gap: 2.5rem 0;">
         <!-- Ubah struktur HTML untuk Delayed Queue Card -->
-        <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
+        <!-- <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
           <div class="queue-card card-delayed gold-border">
             <div class="queue-card-header">
               <h2>
@@ -540,16 +541,16 @@
               </div>
             </div>
           </div>
-        </div>
+        </div> -->
 
         <!-- Current Queue Card -->
-        <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
+        <div class="col-md-6" data-aos="fade-up" data-aos-delay="300">
           <div class="queue-card card-current gold-border">
             <div class="queue-card-header">
-              <h2>
+              <h1>
                 <i class="fas fa-user-clock"></i>
-                AKAN DIPANGGIL
-              </h2>
+                SEDANG DILAYANI
+              </h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number active" id="queueNumber">-</div>
@@ -558,13 +559,13 @@
         </div>
 
         <!-- Next Queue Card -->
-        <div class="col-md-4" data-aos="fade-up" data-aos-delay="400">
+        <div class="col-md-6" data-aos="fade-up" data-aos-delay="400">
           <div class="queue-card card-next gold-border">
             <div class="queue-card-header">
-              <h2>
+              <h1>
                 <i class="fas fa-arrow-right"></i>
-                ANTRIAN BERIKUTNYA
-              </h2>
+                AKAN DIPANGGIL
+              </h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number" id="nextQueueNumber">-</div>
@@ -575,98 +576,6 @@
 
       <div class="elegant-divider" data-aos="fade-up" data-aos-delay="500"></div>
 
-      <!-- Promo Carousel -->
-      <div
-        id="promoCarousel"
-        class="carousel slide promo-carousel"
-        data-bs-ride="carousel"
-        data-bs-interval="10000"
-        data-aos="fade-up"
-        data-aos-delay="600"
-      >
-        <div class="carousel-inner">
-          <!-- Slide 1: Welcome -->
-          <div
-            class="carousel-item active"
-            style="background: linear-gradient(135deg, #ffebb4 30%, #f8dd83 100%); position: relative"
-          >
-            <svg
-              width="100%"
-              height="100%"
-              style="position: absolute; top: 0; left: 0; z-index: 0; opacity: 0.12"
-              viewBox="0 0 1440 320"
-            >
-              <path
-                fill="#d4af37"
-                fill-opacity="1"
-                d="M0,160L80,170.7C160,181,320,203,480,197.3C640,192,800,160,960,133.3C1120,107,1280,85,1360,74.7L1440,64L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"
-              ></path>
-            </svg>
-            <div class="carousel-caption" style="z-index: 1">
-              <h2>Selamat Datang di Melati Gold Shop</h2>
-            </div>
-          </div>
-          <!-- Slide 2: Appreciation -->
-          <div
-            class="carousel-item"
-            style="background: linear-gradient(135deg, #f8f0d7 0%, #f9d776 100%); position: relative"
-          >
-            <svg
-              width="100%"
-              height="100%"
-              style="position: absolute; top: 0; left: 0; z-index: 0; opacity: 0.1"
-              viewBox="0 0 1440 320"
-            >
-              <circle cx="1200" cy="100" r="120" fill="#d4af37" />
-            </svg>
-            <div class="carousel-caption" style="z-index: 1">
-              <h2>Kepuasan Anda Prioritas Kami</h2>
-            </div>
-          </div>
-          <!-- Slide 3: Loyalty -->
-          <div
-            class="carousel-item"
-            style="background: linear-gradient(135deg, #f9f5eb 0%, #f9d776 100%); position: relative"
-          >
-            <svg
-              width="100%"
-              height="100%"
-              style="position: absolute; top: 0; left: 0; z-index: 0; opacity: 0.1"
-              viewBox="0 0 1440 320"
-            >
-              <rect x="0" y="200" width="1440" height="120" fill="#d4af37" rx="60" />
-            </svg>
-            <div class="carousel-caption" style="z-index: 1">
-              <h2>Terima Kasih atas Kunjungan Anda</h2>
-            </div>
-          </div>
-          <!-- Slide 4: Service -->
-          <div
-            class="carousel-item"
-            style="background: linear-gradient(135deg, #f9d776 0%, #f8f0d7 100%); position: relative"
-          >
-            <svg
-              width="100%"
-              height="100%"
-              style="position: absolute; top: 0; left: 0; z-index: 0; opacity: 0.1"
-              viewBox="0 0 1440 320"
-            >
-              <ellipse cx="300" cy="220" rx="180" ry="80" fill="#d4af37" />
-            </svg>
-            <div class="carousel-caption" style="z-index: 1">
-              <h2>Slahkan mengambil Nomor Antrian Di Tempat Yang Sudah Disediakan</h2>
-            </div>
-          </div>
-        </div>
-        <button class="carousel-control-prev" type="button" data-bs-target="#promoCarousel" data-bs-slide="prev">
-          <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-          <span class="visually-hidden">Previous</span>
-        </button>
-        <button class="carousel-control-next" type="button" data-bs-target="#promoCarousel" data-bs-slide="next">
-          <span class="carousel-control-next-icon" aria-hidden="true"></span>
-          <span class="visually-hidden">Next</span>
-        </button>
-      </div>
     </main>
 
     <!-- Footer -->
