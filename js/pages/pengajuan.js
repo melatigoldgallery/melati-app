@@ -818,6 +818,52 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
         replacementDetails.replacementType = "libur";
         replacementDetails.dates = collectedDates;
       }
+      // PERBAIKAN: Jika izin sakit tanpa surat dokter dan memilih ganti jam, simpan detailnya
+      else if (!hasMedicalCertificate && replacementType === "jam") {
+        const replacementHourDate = document.getElementById("replacementHourDate")?.value;
+        const timeValue = document.getElementById("replacementTimeValue")?.value;
+        const timeUnit = document.getElementById("replacementTimeUnit")?.value || "jam";
+
+        if (!replacementHourDate || !timeValue) {
+          showFeedback("error", "Tanggal dan durasi pengganti harus diisi!");
+          submitBtn.innerHTML = originalBtnText;
+          submitBtn.disabled = false;
+          return;
+        }
+
+        const value = parseInt(timeValue);
+        if (isNaN(value) || value < 1) {
+          showFeedback("error", "Durasi pengganti harus berupa angka positif!");
+          submitBtn.innerHTML = originalBtnText;
+          submitBtn.disabled = false;
+          return;
+        }
+        if (timeUnit === "jam" && value > 12) {
+          showFeedback("error", "Jumlah jam maksimal adalah 12 jam per hari!");
+          submitBtn.innerHTML = originalBtnText;
+          submitBtn.disabled = false;
+          return;
+        }
+        if (timeUnit === "menit" && value > 300) {
+          showFeedback("error", "Jumlah menit maksimal adalah 300 menit per hari!");
+          submitBtn.innerHTML = originalBtnText;
+          submitBtn.disabled = false;
+          return;
+        }
+
+        // Tambah properti khusus ganti jam ke replacementDetails existing (izin sakit)
+        replacementDetails.replacementType = "jam";
+        replacementDetails.date = replacementHourDate;
+        replacementDetails.timeUnit = timeUnit;
+        replacementDetails.timeValue = value;
+        replacementDetails.formattedDate = new Date(replacementHourDate).toLocaleDateString("id-ID", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        replacementDetails.formattedValue = `${value} ${timeUnit}`;
+      }
 
       console.log("Replacement details with medical certificate:", replacementDetails); // Debugging
     } else if (leaveType === "cuti") {

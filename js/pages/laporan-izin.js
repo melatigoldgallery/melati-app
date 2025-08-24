@@ -751,10 +751,10 @@ function applyFilters(typeFilter, statusFilter) {
     let originalData = [];
     if (reportCache.has(cacheKey)) {
       originalData = [...reportCache.get(cacheKey).data];
-      // Update allCachedData with complete data from cache
+      // Update allCachedData dengan data lengkap dari cache
       allCachedData = [...originalData];
     } else {
-      originalData = [...allCachedData]; // Gunakan allCachedData sebagai sumber data asli
+      originalData = [...currentLeaveData]; // Gunakan allCachedData sebagai sumber data asli
     }
 
     console.log(`Applying filters - Type: ${typeFilter}, Status: ${statusFilter}, Total data: ${originalData.length}`);
@@ -2567,7 +2567,7 @@ function filterByReplacementType(type) {
       // Update allCachedData dengan data lengkap dari cache
       allCachedData = [...originalData];
     } else {
-      originalData = [...currentLeaveData];
+      originalData = [...currentLeaveData]; // Gunakan allCachedData sebagai sumber data asli
     }
 
     if (type === "all") {
@@ -2606,6 +2606,81 @@ function filterByReplacementType(type) {
     showAlert("danger", "Terjadi kesalahan saat memfilter data: " + error.message);
   }
 }
+
+// Tambahkan helper hapus single leave (ringkas)
+import { deleteLeaveRequest } from "../services/leave-service.js";
+
+function attachSingleDeleteHandlers(){
+  const table=document.getElementById("leaveReportTable");
+  if(!table)return;
+  table.querySelectorAll("button[data-delete-id]").forEach(btn=>{
+    btn.onclick=()=>{
+      const id=btn.getAttribute("data-delete-id");
+      const idInput=document.getElementById("deleteLeaveId");
+      if(idInput) idInput.value=id;
+      document.getElementById("singleDeletePassword").value="";
+      document.getElementById("singleDeleteFeedback").style.display="none";
+      const modalEl=document.getElementById("deleteSingleModal");
+      if(window.bootstrap){
+        const m=new bootstrap.Modal(modalEl);m.show();
+      } else {
+        // fallback
+        modalEl.classList.add("show");
+      }
+    };
+  });
+  const confirmBtn=document.getElementById("confirmSingleDeleteBtn");
+  if(confirmBtn && !confirmBtn._bound){
+    confirmBtn._bound=true;
+    confirmBtn.addEventListener("click", async ()=>{
+      const pass=document.getElementById("singleDeletePassword").value.trim();
+      const feedback=document.getElementById("singleDeleteFeedback");
+      if(pass!=="svmlt"){feedback.textContent="Password salah";feedback.style.display="block";return;}
+      const id=document.getElementById("deleteLeaveId").value;
+      if(!id){return;}
+      confirmBtn.disabled=true;const old=confirmBtn.innerHTML;confirmBtn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i> Menghapus';
+      try{
+        await deleteLeaveRequest(id);
+        // Hapus dari currentLeaveData & allCachedData jika ada
+        if(Array.isArray(currentLeaveData)) currentLeaveData=currentLeaveData.filter(l=>l.id!==id);
+        if(Array.isArray(allCachedData)) allCachedData=allCachedData.filter(l=>l.id!==id);
+        populateLeaveTable(); // refresh tampilan
+        showAlert("success","Data izin berhasil dihapus",true,3000);
+        const modalEl=document.getElementById("deleteSingleModal");
+        if(window.bootstrap){bootstrap.Modal.getInstance(modalEl)?.hide();}
+      }catch(err){
+        console.error(err);feedback.textContent="Gagal menghapus: "+err.message;feedback.style.display="block";
+      }finally{confirmBtn.disabled=false;confirmBtn.innerHTML=old;}
+    });
+  }
+}
+// Sisipkan pemanggilan attachSingleDeleteHandlers di akhir populateLeaveTable setelah baris ditambahkan
+(function(){
+  const oldPopulate=populateLeaveTable;
+  populateLeaveTable=function(){
+    oldPopulate.apply(this,arguments);
+    // setelah tabel ter-render, tambahkan tombol hapus ke setiap baris (kecuali header)
+    const tbody=document.getElementById("leaveReportList");
+    if(tbody){
+      Array.from(tbody.rows).forEach((tr,i)=>{
+        // Pastikan kolom aksi ada di index terakhir
+        if(!tr.querySelector("button[data-delete-id]")){
+          const idRef=(currentLeaveData[i]&&currentLeaveData[i].id)||null;
+          // Jika kolom aksi belum ada, tambahkan td
+          if(tr.cells.length<10){
+            const td=document.createElement("td");
+            td.innerHTML=idRef?`<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`:"-";
+            tr.appendChild(td);
+          } else {
+            // overwrite kolom aksi
+            tr.cells[9].innerHTML=idRef?`<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`:"-";
+          }
+        }
+      });
+      attachSingleDeleteHandlers();
+    }
+  };
+})();
 
 // Show alert message
 function showAlert(type, message, autoHide = true) {
