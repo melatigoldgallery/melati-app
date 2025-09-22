@@ -1140,22 +1140,34 @@ function initDateInputs() {
   const endDateInput = document.getElementById("leaveEndDate");
 
   if (startDateInput) {
-    // Gunakan tanggal hari ini sebagai nilai minimum
-    startDateInput.min = formattedToday;
+    // Izinkan backdate: pastikan tidak ada batas minimum untuk tanggal mulai
+    startDateInput.removeAttribute("min");
 
-    // Opsional: Set default value ke tanggal hari ini
-    // startDateInput.value = formattedToday;
     // Tambahkan event listener untuk klik pada input tanggal
     startDateInput.addEventListener("click", function () {
       if (this.showPicker) {
         this.showPicker();
       }
     });
+
+    // Saat tanggal mulai berubah, pastikan tanggal selesai tidak lebih awal dari mulai
+    startDateInput.addEventListener("change", function () {
+      if (!endDateInput) return;
+      if (this.value) {
+        endDateInput.min = this.value; // Batasi agar end >= start, namun tetap mengizinkan backdate
+        if (endDateInput.value && endDateInput.value < this.value) {
+          endDateInput.value = this.value;
+        }
+      } else {
+        // Jika tanggal mulai dikosongkan, hilangkan batas pada tanggal selesai
+        endDateInput.removeAttribute("min");
+      }
+    });
   }
 
   if (endDateInput) {
-    // Gunakan tanggal hari ini sebagai nilai minimum
-    endDateInput.min = formattedToday;
+    // Izinkan backdate: pastikan tidak ada batas minimum default untuk tanggal selesai
+    endDateInput.removeAttribute("min");
 
     // Tambahkan event listener untuk klik pada input tanggal
     endDateInput.addEventListener("click", function () {
@@ -1190,7 +1202,7 @@ function initDateInputs() {
       }
     }
   });
-  console.log("Date inputs initialized with today as minimum date:", formattedToday);
+  console.log("Date inputs initialized: backdate allowed; end date constrained to >= start date.");
 }
 
 // Tambahkan fungsi ini untuk menangani input tanggal yang ditambahkan secara dinamis

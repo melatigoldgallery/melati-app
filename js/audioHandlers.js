@@ -2,6 +2,7 @@ import { AUDIO_PATHS } from "./audioConfig.js";
 
 // Variabel untuk melacak status pemutaran audio
 let isAudioPlaying = false;
+let audioCtx = null; // WebAudio context for unlocking autoplay
 
 // Fungsi untuk memeriksa status audio
 export function isAudioBusy() {
@@ -19,7 +20,7 @@ async function playAudio(audioPath) {
   return new Promise((resolve) => {
     const audio = new Audio(audioPath);
     audio.addEventListener("ended", resolve, { once: true });
-    audio.play().catch(err => {
+    audio.play().catch((err) => {
       console.error(`Error playing audio ${audioPath}:`, err);
       resolve(); // Lanjutkan meskipun ada error
     });
@@ -28,32 +29,32 @@ async function playAudio(audioPath) {
 
 // Fungsi untuk text-to-speech
 async function speak(text, rate = 0.85, pitch = 1.2) {
-  if (!('speechSynthesis' in window)) {
+  if (!("speechSynthesis" in window)) {
     console.warn("Text-to-speech tidak didukung");
     return Promise.resolve();
   }
-  
+
   window.speechSynthesis.cancel(); // Bersihkan antrian
-  
+
   return new Promise((resolve) => {
     // Preload dan siapkan utterance
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "id-ID";
     utterance.rate = rate;
     utterance.pitch = pitch;
-    
+
     // Coba dapatkan suara Indonesia
     const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find(v => v.lang.includes('id'));
+    const idVoice = voices.find((v) => v.lang.includes("id"));
     if (idVoice) utterance.voice = idVoice;
-    
+
     // Siapkan event handlers sebelum memanggil speak
     utterance.onend = resolve;
     utterance.onerror = () => {
       console.error("TTS error");
       resolve();
     };
-    
+
     // Mulai TTS dengan prioritas tinggi
     setTimeout(() => {
       window.speechSynthesis.speak(utterance);
@@ -61,24 +62,24 @@ async function speak(text, rate = 0.85, pitch = 1.2) {
   });
 }
 
-
 // Fungsi-fungsi ekspor
 export async function playWaitMessageSequence() {
   if (isAudioPlaying) return false; // Abaikan jika sudah ada audio yang diputar
-  
+
   try {
     isAudioPlaying = true;
-    
+
     // Putar nada pembuka
     await playAudio(AUDIO_PATHS.informasi);
-    
+
     // Putar pesan
-    const message = "Kepada Pelanggan Melati yang belum dilayani, kami mohon kesabarannya untuk menunggu pelayanan. Terima kasih atas perhatiannya";
+    const message =
+      "Kepada Pelanggan Melati yang belum dilayani, kami mohon kesabarannya untuk menunggu pelayanan. Terima kasih atas perhatiannya";
     await speak(message);
-    
+
     // Putar nada penutup
     await playAudio(AUDIO_PATHS.informasiEnd);
-    
+
     isAudioPlaying = false;
     return true; // Berhasil
   } catch (error) {
@@ -90,20 +91,21 @@ export async function playWaitMessageSequence() {
 
 export async function playTakeQueueMessage() {
   if (isAudioPlaying) return false; // Abaikan jika sudah ada audio yang diputar
-  
+
   try {
     isAudioPlaying = true;
-    
+
     // Putar nada pembuka
     await playAudio(AUDIO_PATHS.informasi);
-    
+
     // Putar pesan
-    const message = "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian terlebih dahulu di tempat yang sudah disediakan. Terima kasih atas perhatiannya";
+    const message =
+      "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian terlebih dahulu di tempat yang sudah disediakan. Terima kasih atas perhatiannya";
     await speak(message);
-    
+
     // Putar nada penutup
     await playAudio(AUDIO_PATHS.informasiEnd);
-    
+
     isAudioPlaying = false;
     return true; // Berhasil
   } catch (error) {
@@ -115,16 +117,16 @@ export async function playTakeQueueMessage() {
 
 export async function announceQueueNumber(queueNumber) {
   if (isAudioPlaying) return false; // Abaikan jika sudah ada audio yang diputar
-  
+
   try {
     isAudioPlaying = true;
-    
+
     const letter = queueNumber.charAt(0);
     const numbers = queueNumber.substring(1);
     const text = `Nomor antrian, ${letter}, ${numbers.split("").join("")}`;
-    
+
     await speak(text);
-    
+
     isAudioPlaying = false;
     return true; // Berhasil
   } catch (error) {
@@ -136,49 +138,53 @@ export async function announceQueueNumber(queueNumber) {
 
 export async function playQueueAnnouncement(queueNumber) {
   if (isAudioPlaying) return false; // Abaikan jika sudah ada audio yang diputar
-  
+
   try {
     isAudioPlaying = true;
-    
+
     // Siapkan teks pengumuman terlebih dahulu
     const letter = queueNumber.charAt(0);
     const numbers = queueNumber.substring(1);
     const text = `Nomor antrian, ${letter}, ${numbers.split("").join("")}, silahkan angkat tangan`;
-    
+
     // Siapkan utterance sebelum memulai audio
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "id-ID";
     utterance.rate = 0.85;
     utterance.pitch = 1.2;
-    
+
     // Coba dapatkan suara Indonesia
     const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find(v => v.lang.includes('id'));
+    const idVoice = voices.find((v) => v.lang.includes("id"));
     if (idVoice) utterance.voice = idVoice;
-    
+
     // Putar nada pembuka dengan Promise yang lebih efisien
     const openingAudio = new Audio(AUDIO_PATHS.antrian);
-    
+
     // Gunakan event listener untuk memastikan TTS dimulai segera setelah audio selesai
     await new Promise((resolve) => {
-      openingAudio.addEventListener("ended", () => {
-        // Mulai TTS segera setelah audio selesai
-        window.speechSynthesis.speak(utterance);
-        
-        // Tunggu TTS selesai
-        utterance.onend = resolve;
-        utterance.onerror = () => {
-          console.error("TTS error");
-          resolve();
-        };
-      }, { once: true });
-      
-      openingAudio.play().catch(err => {
+      openingAudio.addEventListener(
+        "ended",
+        () => {
+          // Mulai TTS segera setelah audio selesai
+          window.speechSynthesis.speak(utterance);
+
+          // Tunggu TTS selesai
+          utterance.onend = resolve;
+          utterance.onerror = () => {
+            console.error("TTS error");
+            resolve();
+          };
+        },
+        { once: true }
+      );
+
+      openingAudio.play().catch((err) => {
         console.error(`Error playing opening audio:`, err);
         resolve(); // Lanjutkan meskipun ada error
       });
     });
-    
+
     isAudioPlaying = false;
     return true; // Berhasil
   } catch (error) {
@@ -188,25 +194,24 @@ export async function playQueueAnnouncement(queueNumber) {
   }
 }
 
-
-export async function announceVehicleMessage(carType, plateNumber, vehicleColor = '') {
+export async function announceVehicleMessage(carType, plateNumber, vehicleColor = "") {
   if (isAudioPlaying) return false; // Abaikan jika sudah ada audio yang diputar
-  
+
   try {
     isAudioPlaying = true;
-    
+
     // Putar nada pembuka
     await playAudio(AUDIO_PATHS.informasi);
-    
+
     // Buat pesan dengan kondisional untuk warna kendaraan
-    const colorInfo = vehicleColor ? `warna ${vehicleColor}` : '';
+    const colorInfo = vehicleColor ? `warna ${vehicleColor}` : "";
     const message = `Mohon kepada pemilik ${carType} ${colorInfo} dengan nomor polisi, ${plateNumber}, untuk memindahkan kendaraan karena ada kendaraan yang akan keluar. Terima kasih atas perhatiannya`;
-    
+
     await speak(message);
-    
+
     // Putar nada penutup
     await playAudio(AUDIO_PATHS.informasiEnd);
-    
+
     isAudioPlaying = false;
     return true; // Berhasil
   } catch (error) {
@@ -218,10 +223,10 @@ export async function announceVehicleMessage(carType, plateNumber, vehicleColor 
 
 export function playNotificationSound() {
   if (isAudioPlaying) return false; // Abaikan jika sudah ada audio yang diputar
-  
+
   try {
     const audio = new Audio(AUDIO_PATHS.notifOn);
-    audio.play().catch(err => console.error("Error playing notification:", err));
+    audio.play().catch((err) => console.error("Error playing notification:", err));
     return true; // Berhasil
   } catch (error) {
     console.error("Error playing notification sound:", error);
@@ -229,15 +234,68 @@ export function playNotificationSound() {
   }
 }
 
+// Prime/unlock audio playback on first user gesture (mengatasi kebijakan autoplay)
+export function primeAudioPlayback() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    // Play a 1-frame silent buffer to unlock sound
+    const buffer = audioCtx.createBuffer(1, 1, 22050);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+
+    // Kick speechSynthesis as well (some browsers require touch)
+    try {
+      const u = new SpeechSynthesisUtterance("");
+      u.volume = 0; // silent utterance
+      window.speechSynthesis.speak(u);
+      window.speechSynthesis.cancel();
+    } catch (_) {}
+  } catch (e) {
+    console.warn("primeAudioPlayback failed", e);
+  }
+}
+
+// Pengumuman penutupan toko dengan nada pembuka/penutup + TTS
+export async function playClosingAnnouncement(message, infoBoxId = "infoBox") {
+  if (isAudioPlaying) return false;
+
+  try {
+    isAudioPlaying = true;
+
+    // Nada pembuka
+    await playAudio(AUDIO_PATHS.informasi);
+
+    // TTS utama
+    await speak(message, 0.85, 1.2);
+
+    // Nada penutup
+    await playAudio(AUDIO_PATHS.informasiEnd);
+
+    isAudioPlaying = false;
+    return true;
+  } catch (error) {
+    console.error("Error playing closing announcement:", error);
+    isAudioPlaying = false;
+    return false;
+  }
+}
+
 // Inisialisasi
 (function init() {
   // Preload audio files
-  Object.values(AUDIO_PATHS).forEach(path => {
+  Object.values(AUDIO_PATHS).forEach((path) => {
     const audio = new Audio();
     audio.src = path;
-    audio.preload = 'auto';
+    audio.preload = "auto";
   });
-  
+
   // Fix untuk speechSynthesis yang "macet"
   setInterval(() => {
     if (window.speechSynthesis.speaking) {
@@ -245,10 +303,10 @@ export function playNotificationSound() {
       window.speechSynthesis.resume();
     }
   }, 5000);
-  
+
   // Reset saat halaman tidak aktif/aktif kembali
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
       window.speechSynthesis.cancel();
       isAudioPlaying = false;
     }
