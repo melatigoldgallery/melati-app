@@ -530,6 +530,7 @@
                         <th>Detail Pengganti</th>
                         <th>Status</th>
                         <th>Status Ganti</th>
+                        <th class="aksi">Aksi</th>
                       </tr>
                     </thead>
 
@@ -594,8 +595,34 @@
         </div>
       </div>
     </div>
+     <!-- Modal Konfirmasi Hapus Single Row -->
+    <div class="modal fade" id="deleteSingleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">Konfirmasi Hapus Data</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">Masukkan kata sandi untuk menghapus data izin ini.</p>
+            <div class="alert alert-warning py-2"><i class="fas fa-lock me-1"></i> Kata sandi:
+            <input type="password" id="singleDeletePassword" class="form-control" placeholder="Password" />
+            <input type="hidden" id="deleteLeaveId" />
+            <div id="singleDeleteFeedback" class="mt-2 small text-danger" style="display:none"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-danger" id="confirmSingleDeleteBtn">
+              <i class="fas fa-trash-alt me-1"></i> Hapus
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="js/melati.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/pages/laporan-izin.js"></script>
+
+   
   </body>
 </html>

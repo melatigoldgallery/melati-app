@@ -13,6 +13,7 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Tambahkan variabel untuk menyimpan unsubscribe function

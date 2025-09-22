@@ -447,7 +447,7 @@ body {
   display: none;
 }
 
-.filter {
+.filter, .aksi {
   display: none;
 }
   /* Memperlebar kolom alasan dan detail pengganti */
