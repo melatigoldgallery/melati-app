@@ -307,8 +307,12 @@ export async function playClosingAnnouncement(message, infoBoxId = "infoBox") {
   // Reset saat halaman tidak aktif/aktif kembali
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      window.speechSynthesis.cancel();
-      isAudioPlaying = false;
+      try {
+        // Jika TTS sedang paused saat tab kembali visible, lanjutkan tanpa memutus audio
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+      } catch (_) {}
     }
   });
 })();

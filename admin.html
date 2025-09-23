@@ -247,8 +247,8 @@
                 Pengingat Antrian
               </button>
             </div>
-            <div class="col-md-4 d-none">
-              <button class="btn btn-success announcement-btn" id="announceClosingNow">
+            <div class="col-md-12">
+              <button class="btn btn-success announcement-btn d-none" id="announceClosingNow">
                 <i class="fas fa-bullhorn me-2"></i>
                 Info Penutupan
               </button>
@@ -751,33 +751,37 @@
             import { playClosingAnnouncement, primeAudioPlayback } from "./js/audioHandlers.js";
 
             const MESSAGE =
-              "Kepada pelanggan Melati yang kami hormati, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan staff kami akan membantu hingga selesai. Terima kasih atas perhatiannya";
-            const STORAGE_KEY = "closing_announcement_date";
+              "Kepada pelanggan Melati yang kami hormati, kami informasikan, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga proses selesai. Terima kasih atas perhatiannya";
 
-            function todayKey() {
-              const now = new Date();
-              return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-                now.getDate()
+            // Guard otomatis: sekali per slot waktu (YYYY-MM-DD|HH:MM) di hari itu, lintas-tab
+            let lastAutoRunSlot = null;
+            const AUTO_RUN_STORAGE_KEY = "closing_auto_run_slot";
+            const makeSlotKey = (dateObj, hour, minute) => {
+              const d = dateObj || new Date();
+              const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+                d.getDate()
               ).padStart(2, "0")}`;
-            }
-
-            function alreadyAnnouncedToday() {
-              return localStorage.getItem(STORAGE_KEY) === todayKey();
-            }
-
-            function markAnnounced() {
-              localStorage.setItem(STORAGE_KEY, todayKey());
-            }
-
-            async function triggerAnnouncementOnce() {
-              if (alreadyAnnouncedToday()) return;
+              const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+              return `${day}|${hm}`;
+            };
+            async function triggerAutoForSlot(targetHour, targetMinute) {
+              const slotKey = makeSlotKey(new Date(), targetHour, targetMinute);
+              if (lastAutoRunSlot === slotKey) return;
+              if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
+                lastAutoRunSlot = slotKey; // sinkronkan memori lokal
+                return;
+              }
+              try {
+                localStorage.setItem(AUTO_RUN_STORAGE_KEY, slotKey);
+              } catch (e) {}
+              lastAutoRunSlot = slotKey;
               await playClosingAnnouncement(MESSAGE);
-              markAnnounced();
             }
 
             function scheduleDailyCheck() {
-              const TARGET_HOUR = 16; 
-              const TARGET_MINUTE = 36; 
+              // Jadwal default: 20:55 lokal
+              const TARGET_HOUR = 20;
+              const TARGET_MINUTE = 55;
               const ONE_DAY = 24 * 60 * 60 * 1000;
 
               const computeNextDelay = () => {
@@ -785,34 +789,36 @@
                 const target = new Date();
                 target.setHours(TARGET_HOUR, TARGET_MINUTE, 0, 0);
                 let delay = target.getTime() - now.getTime();
-                if (delay < 0) delay += ONE_DAY; 
+                if (delay < 0) delay += ONE_DAY; // sudah lewat, jadwalkan besok
                 return delay;
               };
 
-              const catchUp = async () => {
-                const now = new Date();
-                const target = new Date();
-                target.setHours(TARGET_HOUR, TARGET_MINUTE, 0, 0);
-                if (now >= target && !alreadyAnnouncedToday()) {
-                  await triggerAnnouncementOnce();
-                }
-              };
-              catchUp();
-
+              // Jadwalkan kejadian berikutnya secara presisi dan ulangi harian
               const scheduleNext = () => {
                 const delay = computeNextDelay();
                 setTimeout(async () => {
-                  await triggerAnnouncementOnce();
-                  scheduleNext(); 
+                  await triggerAutoForSlot(TARGET_HOUR, TARGET_MINUTE);
+                  scheduleNext(); // untuk hari berikutnya
                 }, delay);
               };
 
               scheduleNext();
-              document.addEventListener("visibilitychange", () => {
-                if (document.visibilityState === "visible") {
-                  catchUp();
-                }
-              });
+
+              // Safety poller: memastikan tetap berjalan walau tab di background (timer di-throttle)
+              const startSafetyPoller = () => {
+                const POLL_MS = 60 * 1000; // cek tiap 1 menit
+                setInterval(async () => {
+                  const now = new Date();
+                  const target = new Date();
+                  target.setHours(TARGET_HOUR, TARGET_MINUTE, 0, 0);
+                  const diff = now.getTime() - target.getTime();
+                  // Jika sudah melewati target namun masih dalam jendela 5 menit, jalankan
+                  if (diff >= 0 && diff < 5 * 60 * 1000) {
+                    await triggerAutoForSlot(TARGET_HOUR, TARGET_MINUTE);
+                  }
+                }, POLL_MS);
+              };
+              startSafetyPoller();
             }
 
             document.addEventListener("DOMContentLoaded", () => {
@@ -820,6 +826,7 @@
               const btn = document.getElementById("announceClosingNow");
               if (btn) btn.addEventListener("click", () => playClosingAnnouncement(MESSAGE));
 
+              // Unlock audio/TTS pada interaksi pertama agar pemutaran terjadwal tidak diblokir
               const unlock = () => {
                 try {
                   primeAudioPlayback();
