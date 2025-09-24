@@ -9,23 +9,17 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- jQuery first -->
     <script src="js/jquery-3.6.3.min.js"></script>
-    <!-- Bootstrap CSS and JS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
-    <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Sistem Antrian - Melati Gold Shop</title>
   </head>
   <body>
     <div class="app-container">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
           <img src="img/Melati.jfif" alt="Logo" class="logo" />
@@ -39,7 +33,6 @@
                 <span class="menu-text">Dashboard</span>
               </a>
             </li>
-            <!-- Antrian dropdown menu -->
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
@@ -74,8 +67,6 @@
                   </li>
                 </ul>
               </div>
-            </li>
-            <!-- Absensi dropdown menu -->
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
@@ -113,8 +104,6 @@
                       <i class="fas fa-file-medical"></i>
                       <span class="menu-text">Laporan Izin</span>
                     </a>
-                  </li>
-                  <!-- Ganti seluruh bagian dropdown Supervisor di dalam menu Absensi -->
                   <li class="nav-item">
                     <a
                       class="nav-link collapsed supervisor-toggle"
@@ -127,7 +116,6 @@
                       <span class="menu-text">Supervisor</span>
                       <i class="fas fa-chevron-down submenu-icon"></i>
                     </a>
-                    <!-- Penting: Hapus data-bs-parent agar tidak tertutup otomatis -->
                     <div class="collapse supervisor-menu" id="supervisorSubmenu">
                       <ul class="nav flex-column ms-3">
                         <li class="nav-item">
@@ -190,9 +178,7 @@
         </div>
       </aside>
 
-      <!-- Main Content -->
       <main class="main-content">
-        <!-- Top Navigation -->
         <header class="top-nav">
           <div class="menu-toggle d-md-flex d-none">
             <i class="fa-solid fa-minimize"></i>
@@ -221,7 +207,6 @@
           </div>
         </header>
 
-        <!-- Page Content -->
         <div class="page-content">
           <div class="page-header">
             <h1>Sistem Antrian</h1>
@@ -233,7 +218,6 @@
             </nav>
           </div>
 
-          <!-- Announcement Section -->
           <div class="row mb-2">
             <div class="col-md-6">
               <button class="btn btn-danger announcement-btn" id="waitMessage">
@@ -255,9 +239,7 @@
             </div>
           </div>
 
-          <!-- Queue Management Section -->
           <div class="row d-flex justify-content-evenly">
-            <!-- Delayed Queue Card -->
             <div class="col-md-4 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
@@ -282,7 +264,6 @@
               </div>
             </div>
 
-            <!-- Current Queue Card -->
             <div class="col-md-4 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
@@ -326,7 +307,6 @@
                 </div>
               </div>
             </div>
-            <!-- Tambahkan di bawah card Delayed Queue atau di tempat yang sesuai -->
             <div class="col-md-4 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
@@ -341,7 +321,6 @@
               </div>
             </div>
 
-            <!-- Customer Count Card -->
             <div class="col-md-4 mb-4 d-none">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
@@ -367,7 +346,6 @@
             </div>
           </div>
 
-          <!-- Vehicle Information Section -->
           <div class="card mb-4">
             <div class="card-header">
               <h5 class="card-title mb-0">
@@ -399,7 +377,6 @@
             </div>
           </div>
 
-          <!-- Modern Modal for "Sudah Dilayani" button -->
           <div
             class="modal fade"
             id="confirmModal"
@@ -442,7 +419,6 @@
             </div>
           </div>
 
-          <!-- Modern Modal for "Sudah Dilayani" button (Delayed Queue) -->
           <div
             class="modal fade"
             id="confirmDelayedModal"
@@ -488,7 +464,6 @@
             </div>
           </div>
 
-          <!-- Modal untuk Skip Nomor Antrian -->
           <div
             class="modal fade"
             id="skipQueueModal"
@@ -555,7 +530,6 @@
             </div>
           </div>
 
-          <!-- Modern Modal for "Nomor Antrian Sebelumnya" button -->
           <div
             class="modal fade"
             id="previousNumberModal"
@@ -598,7 +572,6 @@
             </div>
           </div>
 
-          <!-- Modern Modal for "Nomor Antrian Tertunda" button -->
           <div
             class="modal fade"
             id="confirmDelayModal"
@@ -641,7 +614,6 @@
             </div>
           </div>
 
-          <!-- Modern Modal for "Custom Nomor Antrian" button -->
           <div
             class="modal fade"
             id="customQueueModal"
@@ -751,9 +723,13 @@
             import { playClosingAnnouncement, primeAudioPlayback } from "./js/audioHandlers.js";
 
             const MESSAGE =
-              "Kepada pelanggan Melati yang kami hormati, kami informasikan, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga proses selesai. Terima kasih atas perhatiannya";
+              "Kepada pelanggan Melati, kami informasikan toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga proses selesai. Terima kasih atas perhatiannya";
 
-            // Guard otomatis: sekali per slot waktu (YYYY-MM-DD|HH:MM) di hari itu, lintas-tab
+            const SLOTS = [
+              { h: 20, m: 50 },
+              { h: 20, m: 55 },
+            ];
+
             let lastAutoRunSlot = null;
             const AUTO_RUN_STORAGE_KEY = "closing_auto_run_slot";
             const makeSlotKey = (dateObj, hour, minute) => {
@@ -764,11 +740,12 @@
               const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
               return `${day}|${hm}`;
             };
+
             async function triggerAutoForSlot(targetHour, targetMinute) {
               const slotKey = makeSlotKey(new Date(), targetHour, targetMinute);
               if (lastAutoRunSlot === slotKey) return;
               if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
-                lastAutoRunSlot = slotKey; // sinkronkan memori lokal
+                lastAutoRunSlot = slotKey;
                 return;
               }
               try {
@@ -779,46 +756,39 @@
             }
 
             function scheduleDailyCheck() {
-              // Jadwal default: 20:55 lokal
-              const TARGET_HOUR = 20;
-              const TARGET_MINUTE = 55;
               const ONE_DAY = 24 * 60 * 60 * 1000;
 
-              const computeNextDelay = () => {
+              const computeNextDelayFor = (hour, minute) => {
                 const now = new Date();
                 const target = new Date();
-                target.setHours(TARGET_HOUR, TARGET_MINUTE, 0, 0);
+                target.setHours(hour, minute, 0, 0);
                 let delay = target.getTime() - now.getTime();
-                if (delay < 0) delay += ONE_DAY; // sudah lewat, jadwalkan besok
+                if (delay < 0) delay += ONE_DAY;
                 return delay;
               };
 
-              // Jadwalkan kejadian berikutnya secara presisi dan ulangi harian
-              const scheduleNext = () => {
-                const delay = computeNextDelay();
+              const scheduleSlot = (hour, minute) => {
+                const delay = computeNextDelayFor(hour, minute);
                 setTimeout(async () => {
-                  await triggerAutoForSlot(TARGET_HOUR, TARGET_MINUTE);
-                  scheduleNext(); // untuk hari berikutnya
+                  await triggerAutoForSlot(hour, minute);
+                  scheduleSlot(hour, minute);
                 }, delay);
               };
 
-              scheduleNext();
-
-              // Safety poller: memastikan tetap berjalan walau tab di background (timer di-throttle)
-              const startSafetyPoller = () => {
-                const POLL_MS = 60 * 1000; // cek tiap 1 menit
-                setInterval(async () => {
-                  const now = new Date();
+              SLOTS.forEach(({ h, m }) => scheduleSlot(h, m));
+              const POLL_MS = 60 * 1000;
+              const WINDOW_MS = 5 * 60 * 1000;
+              setInterval(async () => {
+                const now = new Date();
+                for (const { h, m } of SLOTS) {
                   const target = new Date();
-                  target.setHours(TARGET_HOUR, TARGET_MINUTE, 0, 0);
+                  target.setHours(h, m, 0, 0);
                   const diff = now.getTime() - target.getTime();
-                  // Jika sudah melewati target namun masih dalam jendela 5 menit, jalankan
-                  if (diff >= 0 && diff < 5 * 60 * 1000) {
-                    await triggerAutoForSlot(TARGET_HOUR, TARGET_MINUTE);
+                  if (diff >= 0 && diff < WINDOW_MS) {
+                    await triggerAutoForSlot(h, m);
                   }
-                }, POLL_MS);
-              };
-              startSafetyPoller();
+                }
+              }, POLL_MS);
             }
 
             document.addEventListener("DOMContentLoaded", () => {
@@ -826,7 +796,6 @@
               const btn = document.getElementById("announceClosingNow");
               if (btn) btn.addEventListener("click", () => playClosingAnnouncement(MESSAGE));
 
-              // Unlock audio/TTS pada interaksi pertama agar pemutaran terjadwal tidak diblokir
               const unlock = () => {
                 try {
                   primeAudioPlayback();
