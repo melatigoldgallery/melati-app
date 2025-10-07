@@ -583,7 +583,41 @@
                 </ul>
               </div>
             </li>
-
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#servisSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-tools"></i>
+                <span class="menu-text">Servis</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="servisSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link active" href="input-servis.html">
+                      <i class="fas fa-plus-circle"></i>
+                      <span class="menu-text">Input Servis</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="data-servis.html">
+                      <i class="fas fa-database"></i>
+                      <span class="menu-text">Data Servis</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporan-servis.html">
+                      <i class="fas fa-chart-line"></i>
+                      <span class="menu-text">Laporan Servis</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
@@ -722,82 +756,6 @@
             </div>
           </form>
 
-          <!-- Custom Content Form (hidden by default, shown for add/edit) -->
-          <form id="customContentForm" class="mb-4 card" style="display: none">
-            <div class="card-header">
-              <h5 class="card-title mb-0">
-                <i class="fas fa-puzzle-piece me-2"></i>
-                Tambah/Edit Konten Kustom
-              </h5>
-            </div>
-            <div class="card-body row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="contentTitle" class="form-label">Judul Konten</label>
-                  <input type="text" class="form-control" id="contentTitle" name="contentTitle" required />
-                </div>
-                <div class="mb-3">
-                  <label for="contentType" class="form-label">Jenis Konten</label>
-                  <select class="form-select" id="contentType" name="contentType">
-                    <option value="HTML">HTML Kustom</option>
-                    <option value="Gambar">Gambar</option>
-                    <option value="Video">Video</option>
-                    <option value="Gallery">Galeri</option>
-                  </select>
-                </div>
-                <div class="mb-3">
-                  <label for="contentOrder" class="form-label">Urutan</label>
-                  <input type="number" class="form-control" id="contentOrder" name="contentOrder" value="0" />
-                </div>
-                <div class="form-check form-switch mb-3">
-                  <input class="form-check-input" type="checkbox" id="contentActive" name="contentActive" checked />
-                  <label class="form-check-label" for="contentActive">Aktif</label>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3 content-type-section" id="HTMLSection">
-                  <label for="htmlContent" class="form-label">Kode HTML</label>
-                  <textarea
-                    class="form-control"
-                    id="htmlContent"
-                    name="htmlContent"
-                    rows="5"
-                    placeholder="Masukkan kode HTML"
-                  ></textarea>
-                  <small class="form-text text-muted">Gunakan tag HTML untuk mengatur konten.</small>
-                </div>
-                <div class="mb-3 content-type-section" id="fileInputSection" style="display: none">
-                  <label id="contentFileLabel" for="contentFile" class="form-label">Pilih File</label>
-                  <input type="file" class="form-control" id="contentFile" name="contentFile" />
-                  <div id="fileInputNote" class="form-text text-muted" style="display: none"></div>
-                </div>
-                <div class="mb-3 content-type-section" id="GallerySection" style="display: none">
-                  <label for="galleryIcon" class="form-label">Icon Galeri</label>
-                  <input type="text" class="form-control" id="galleryIcon" name="galleryIcon" value="crown" />
-                  <label for="contentDescription" class="form-label mt-2">Deskripsi</label>
-                  <textarea class="form-control" id="contentDescription" name="contentDescription" rows="2"></textarea>
-                  <div class="mt-2">
-                    <label class="form-label">Tambah Gambar Galeri</label>
-                    <div class="input-group mb-2">
-                      <input type="file" class="form-control" id="galleryFileInput" accept="image/*" />
-                      <button class="btn btn-primary" type="button" id="galleryAddBtn" onclick="addGalleryImage(event)">
-                        <i class="fas fa-plus"></i>
-                        Add Image
-                      </button>
-                    </div>
-                    <div id="galleryContainer" class="d-flex flex-wrap gap-2"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button class="btn btn-primary" type="submit">
-                  <i class="fas fa-save me-2"></i>
-                  Simpan Konten
-                </button>
-              </div>
-            </div>
-          </form>
-
           <!-- Promotion Content Management -->
           <div class="row mb-4">
             <div class="col-md-12">
@@ -816,13 +774,27 @@
                         class="btn btn-sm btn-primary"
                         id="addCustomBtn"
                         type="button"
-                        onclick="document.getElementById('customContentForm').style.display='block';"
+                        data-bs-toggle="modal"
+                        data-bs-target="#customModal"
                       >
                         <i class="fas fa-plus me-1"></i>
                         Tambah Konten
                       </button>
                     </div>
-                    <div class="list-group" id="customContentList"></div>
+                    <!-- Tabel daftar konten promosi -->
+                    <div class="table-responsive">
+                      <table class="table table-striped table-hover align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th style="min-width: 240px">Judul Konten</th>
+                            <th style="width: 100px">Jenis</th>
+                            <th style="width: 80px">Urutan</th>
+                            <th style="width: 90px">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody id="customContentList"></tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -841,42 +813,82 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <form id="customForm">
+            <form id="customContentForm">
               <input type="hidden" id="customId" value="" />
               <div class="mb-3">
-                <label for="customTitle" class="form-label">Judul Konten</label>
-                <input type="text" class="form-control" id="customTitle" placeholder="Masukkan judul konten" required />
+                <label for="contentTitle" class="form-label">Judul Konten</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="contentTitle"
+                  name="contentTitle"
+                  placeholder="Masukkan judul konten"
+                  required
+                />
               </div>
               <div class="mb-3">
-                <label for="customType" class="form-label">Jenis Konten</label>
-                <select class="form-select" id="customType" required>
+                <label for="contentType" class="form-label">Jenis Konten</label>
+                <select class="form-select" id="contentType" name="contentType" required>
                   <option value="">Pilih jenis konten</option>
+                  <option value="HTML">HTML Kustom</option>
                   <option value="Gambar">Gambar</option>
                   <option value="Video">Video</option>
-                  <option value="HTML">HTML Kustom</option>
+                  <option value="Gallery">Galeri</option>
                 </select>
               </div>
-              <div class="mb-3 content-upload">
-                <label for="customFile" class="form-label">Unggah File</label>
-                <input type="file" class="form-control" id="customFile" />
+              <div class="mb-3">
+                <label for="contentOrder" class="form-label">Urutan</label>
+                <input type="number" class="form-control" id="contentOrder" name="contentOrder" value="0" />
               </div>
-              <div class="mb-3 content-html d-none">
-                <label for="customHtml" class="form-label">Kode HTML</label>
-                <textarea class="form-control" id="customHtml" rows="5" placeholder="Masukkan kode HTML"></textarea>
-                <small class="form-text text-muted">
-                  Gunakan tag HTML untuk mengatur konten. Contoh: &lt;h2&gt;Judul&lt;/h2&gt;,
-                  &lt;p&gt;Paragraf&lt;/p&gt;
-                </small>
+
+              <!-- HTML Section -->
+              <div class="mb-3 content-type-section" id="HTMLSection">
+                <label for="htmlContent" class="form-label">Kode HTML</label>
+                <textarea
+                  class="form-control"
+                  id="htmlContent"
+                  name="htmlContent"
+                  rows="5"
+                  placeholder="Masukkan kode HTML"
+                ></textarea>
+                <small class="form-text text-muted">Gunakan tag HTML untuk mengatur konten.</small>
               </div>
+
+              <!-- File Upload Section -->
+              <div class="mb-3 content-type-section" id="fileInputSection" style="display: none">
+                <label id="contentFileLabel" for="contentFile" class="form-label">Pilih File</label>
+                <input type="file" class="form-control" id="contentFile" name="contentFile" />
+                <div id="fileInputNote" class="form-text text-muted" style="display: none"></div>
+              </div>
+
+              <!-- Gallery Section -->
+              <div class="mb-3 content-type-section" id="GallerySection" style="display: none">
+                <label for="galleryIcon" class="form-label">Icon Galeri</label>
+                <input type="text" class="form-control" id="galleryIcon" name="galleryIcon" value="crown" />
+                <label for="contentDescription" class="form-label mt-2">Deskripsi</label>
+                <textarea class="form-control" id="contentDescription" name="contentDescription" rows="2"></textarea>
+                <div class="mt-2">
+                  <label class="form-label">Tambah Gambar Galeri</label>
+                  <div class="input-group mb-2">
+                    <input type="file" class="form-control" id="galleryFileInput" accept="image/*" />
+                    <button class="btn btn-primary" type="button" id="galleryAddBtn" onclick="addGalleryImage(event)">
+                      <i class="fas fa-plus"></i>
+                      Add Image
+                    </button>
+                  </div>
+                  <div id="galleryContainer" class="d-flex flex-wrap gap-2"></div>
+                </div>
+              </div>
+
               <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="customActive" checked />
-                <label class="form-check-label" for="customActive">Aktif</label>
+                <input class="form-check-input" type="checkbox" id="contentActive" name="contentActive" checked />
+                <label class="form-check-label" for="contentActive">Aktif</label>
               </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-primary" id="saveCustom">Simpan</button>
+            <button type="submit" form="customContentForm" class="btn btn-primary" id="saveCustom">Simpan</button>
           </div>
         </div>
       </div>
@@ -887,6 +899,8 @@
 
     <script type="module" src="js/melati.js"></script>
     <script type="module" src="js/main.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="module" src="js/promosi.js"></script>
   </body>
 </html>

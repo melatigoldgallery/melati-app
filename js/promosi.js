@@ -37,8 +37,10 @@ document.addEventListener("DOMContentLoaded", function () {
       // Load settings from Firebase
       loadSettingsFromFirebase();
 
-      // Refresh content lists
-      refreshCustomList();
+      // Refresh content lists with delay to ensure DOM is ready
+      setTimeout(() => {
+        refreshCustomList();
+      }, 100);
     });
   } else if (isDisplayPage) {
     // Initialize display page with Firebase
@@ -265,8 +267,8 @@ function updateCarouselContent(content) {
     // Default slides for display page
     const defaultSlides = [
       {
-      type: "default",
-      template: `
+        type: "default",
+        template: `
         <div class="thank-you-slide elegant-gold">
           <div class="slide-content" data-aos="fade-up">
             <div class="decorative-element left"></div>
@@ -283,10 +285,10 @@ function updateCarouselContent(content) {
           </div>
         </div>
       `,
-    },
-    {
-      type: "default",
-      template: `
+      },
+      {
+        type: "default",
+        template: `
         <div class="thank-you-slide variant-2">
           <div class="slide-content" data-aos="fade-up">
             <div class="decorative-element left"></div>
@@ -303,10 +305,10 @@ function updateCarouselContent(content) {
           </div>
         </div>
       `,
-    },
-    {
-      type: "default",
-      template: `
+      },
+      {
+        type: "default",
+        template: `
         <div class="thank-you-slide variant-3">
           <div class="slide-content" data-aos="fade-up">
             <div class="decorative-element left"></div>
@@ -323,7 +325,7 @@ function updateCarouselContent(content) {
           </div>
         </div>
       `,
-    },
+      },
     ];
 
     allSlides = defaultSlides.concat(allSlides);
@@ -510,7 +512,15 @@ function initializeEventListeners() {
   const addCustomBtn = document.getElementById("addCustomBtn");
   if (addCustomBtn) {
     addCustomBtn.addEventListener("click", function () {
-      document.getElementById("customContentForm").style.display = "block";
+      // Reset form for new content
+      const form = document.getElementById("customContentForm");
+      form.reset();
+      form.dataset.mode = "";
+      form.dataset.editId = "";
+      document.getElementById("customModalLabel").textContent = "Tambah Konten Kustom";
+      document.getElementById("saveCustom").textContent = "Simpan";
+      handleContentTypeChange();
+      resetGalleryContainer();
     });
   }
 }
@@ -519,7 +529,8 @@ function initializeEventListeners() {
 async function handleCustomFormSubmit(e) {
   e.preventDefault();
   const form = e.target;
-  const submitBtn = form.querySelector('button[type="submit"]');
+  // Fix: Get the submit button from modal footer instead of form
+  const submitBtn = document.getElementById("saveCustom");
   const originalBtnText = submitBtn.innerHTML;
   try {
     submitBtn.disabled = true;
@@ -570,7 +581,8 @@ async function handleCustomFormSubmit(e) {
       await set(itemRef, customData);
       form.dataset.mode = "";
       form.dataset.editId = "";
-      submitBtn.textContent = "Simpan Konten";
+      // Reset button text properly
+      document.getElementById("saveCustom").textContent = "Simpan";
     } else {
       // Save to Firebase (tambah baru)
       const customItemsRef = ref(rtdb, "content/promotion/customItems");
@@ -581,7 +593,13 @@ async function handleCustomFormSubmit(e) {
     form.reset();
     resetGalleryContainer();
     handleContentTypeChange();
-    form.style.display = "none";
+
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById("customModal"));
+    if (modal) {
+      modal.hide();
+    }
+
     refreshCustomList();
   } catch (error) {
     console.error("Error saving custom content:", error);
@@ -771,49 +789,45 @@ function refreshCustomList() {
       const customList = document.getElementById("customContentList");
 
       if (customList) {
-        // Clear current list
+        // Clear current list body (tbody)
         customList.innerHTML = "";
 
         // Check if there are any items
         if (Object.keys(customItems).length === 0) {
-          customList.innerHTML = '<div class="list-group-item text-center text-muted">Tidak ada konten kustom</div>';
+          customList.innerHTML =
+            '<tr><td colspan="4" class="text-center text-muted py-4">Tidak ada konten kustom</td></tr>';
           return;
         }
 
         // Convert to array and sort
-        const itemsArray = Object.entries(customItems).map(([id, item]) => ({
-          id,
-          ...item,
-        }));
-
+        const itemsArray = Object.entries(customItems).map(([id, item]) => ({ id, ...item }));
         itemsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-        // Add each item to the list
+        // Render rows
         itemsArray.forEach((item) => {
-          const statusBadge = item.isActive
-            ? '<span class="badge bg-success">Active</span>'
-            : '<span class="badge bg-secondary">Inactive</span>';
-
-          const typeBadge = `<span class="badge bg-info">${item.contentType}</span>`;
-
-          const itemHtml = `
-          <div class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="mb-1">${item.title}</h6>
-              <div class="d-flex gap-1">${typeBadge} ${statusBadge}</div>
-            </div>
-            <div class="btn-group">
-              <button class="btn btn-sm btn-outline-primary" onclick="editCustomItem('${item.id}')">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-sm btn-outline-danger" onclick="deleteCustomItem('${item.id}')">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        `;
-
-          customList.insertAdjacentHTML("beforeend", itemHtml);
+          const statusIndicator = item.isActive
+            ? '<i class="fas fa-circle text-success me-1" title="Aktif"></i>'
+            : '<i class="fas fa-circle text-secondary me-1" title="Tidak Aktif"></i>';
+          const rowHtml = `
+            <tr id="promo-row-${item.id}">
+              <td>
+                <div class="fw-semibold mb-1">${statusIndicator}${item.title}</div>
+                <small class="text-muted">${item.description}</small>
+              </td>
+              <td><span class="badge bg-light text-dark">${item.contentType}</span></td>
+              <td>${item.order || 0}</td>
+              <td>
+                <div class="btn-group btn-group-sm " role="group">
+                  <button class="btn btn-outline-primary" title="Edit" onclick="editCustomItem('${
+                    item.id
+                  }')"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-outline-danger" title="Hapus" onclick="deleteCustomItem('${
+                    item.id
+                  }')"><i class="fas fa-trash"></i></button>
+                </div>
+              </td>
+            </tr>`;
+          customList.insertAdjacentHTML("beforeend", rowHtml);
         });
       }
     })
@@ -877,10 +891,14 @@ function editCustomItem(itemId) {
       }
       form.dataset.mode = "edit";
       form.dataset.editId = itemId;
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.textContent = "Update Content";
-      form.style.display = "block"; // tampilkan form edit
-      form.scrollIntoView({ behavior: "smooth" });
+
+      // Update modal title and button for edit mode
+      document.getElementById("customModalLabel").textContent = "Edit Konten";
+      document.getElementById("saveCustom").textContent = "Update";
+
+      // Show modal
+      const modal = new bootstrap.Modal(document.getElementById("customModal"));
+      modal.show();
     })
     .catch((error) => {
       console.error("Error loading custom item for edit:", error);
@@ -890,19 +908,58 @@ function editCustomItem(itemId) {
 
 // Delete custom item
 function deleteCustomItem(itemId) {
-  if (confirm("Apakah Anda yakin ingin menghapus konten ini?")) {
-    const itemRef = ref(rtdb, `content/promotion/customItems/${itemId}`);
-
-    remove(itemRef)
-      .then(() => {
-        showToast("Konten berhasil dihapus", "success");
-        refreshCustomList();
-      })
-      .catch((error) => {
-        console.error("Error deleting custom item:", error);
-        showToast("Gagal menghapus konten", "danger");
-      });
+  // SweetAlert2 confirmation
+  if (typeof Swal === "undefined") {
+    // fallback confirm
+    if (!confirm("Apakah Anda yakin ingin menghapus konten ini?")) return;
+    return performDelete(itemId);
   }
+
+  Swal.fire({
+    title: "Hapus Konten?",
+    text: "Data tidak bisa dikembalikan setelah dihapus.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#6c757d",
+    confirmButtonText: "Ya, hapus!",
+    cancelButtonText: "Batal",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      performDelete(itemId);
+    }
+  });
+}
+
+function performDelete(itemId) {
+  const itemRef = ref(rtdb, `content/promotion/customItems/${itemId}`);
+  // Optimistic UI removal
+  const row = document.getElementById(`promo-row-${itemId}`);
+  if (row) row.classList.add("table-danger");
+
+  remove(itemRef)
+    .then(() => {
+      if (row) row.remove();
+      // If table becomes empty add placeholder row
+      const tbody = document.getElementById("customContentList");
+      if (tbody && tbody.children.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Tidak ada konten kustom</td></tr>';
+      }
+      if (typeof Swal !== "undefined") {
+        Swal.fire("Terhapus!", "Konten berhasil dihapus.", "success");
+      } else {
+        showToast("Konten berhasil dihapus", "success");
+      }
+    })
+    .catch((error) => {
+      console.error("Error deleting custom item:", error);
+      if (row) row.classList.remove("table-danger");
+      if (typeof Swal !== "undefined") {
+        Swal.fire("Gagal", "Konten gagal dihapus.", "error");
+      } else {
+        showToast("Gagal menghapus konten", "danger");
+      }
+    });
 }
 
 // Handle logout
