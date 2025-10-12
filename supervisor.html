@@ -21,6 +21,170 @@
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
+
+    <!-- Mobile UI Improvements for Supervisor Page -->
+    <style>
+      @media (max-width: 768px) {
+        /* Stats cards */
+        .stats-cards {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        .stat-card {
+          min-height: 100px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+        .stat-card-icon {
+          width: 35px;
+          height: 35px;
+          margin-bottom: 8px;
+          font-size: 1rem;
+        }
+        .stat-card-info h3 {
+          font-size: 1.5rem;
+        }
+        .stat-card-info p {
+          font-size: 0.8rem;
+        }
+
+        /* Typography */
+        .page-header h1 {
+          font-size: 1.3rem;
+        }
+        .breadcrumb {
+          font-size: 0.75rem;
+        }
+
+        /* Tables */
+        .table {
+          font-size: 0.8rem;
+        }
+        .table th {
+          font-size: 0.75rem;
+          padding: 8px 6px;
+        }
+        .table td {
+          padding: 8px 6px;
+        }
+        .table th:nth-child(1),
+        .table td:nth-child(1) {
+          display: none;
+        }
+        .table th:nth-child(n + 2),
+        .table td:nth-child(n + 2) {
+          min-width: 80px;
+        }
+        /* Navigation */
+        .nav-tabs .nav-link {
+          font-size: 0.8rem;
+          padding: 5px 8px;
+          gap: 20px;
+        }
+        .nav-tabs .nav-link i {
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        /* Forms */
+        .filter-container .d-flex {
+          flex-direction: column;
+          gap: 10px;
+        }
+        .filter-container select,
+        #replacementStatusFilter {
+          font-size: 0.8rem;
+          min-height: 40px;
+        }
+        #searchInput,
+        #searchBtn,
+        .input-group {
+          display: none !important;
+        }
+
+        /* Buttons */
+        .btn-sm {
+          font-size: 0.7rem;
+          padding: 4px 8px;
+        }
+        #applyFilterBtn,
+        #refreshButton {
+          width: 100%;
+          font-size: 0.8rem;
+        }
+
+        /* Modal */
+        .modal-dialog {
+          margin: 10px;
+          max-width: calc(100% - 20px);
+        }
+        .detail-label {
+          font-size: 0.8rem;
+          color: #6c757d;
+        }
+        .detail-value {
+          font-size: 0.9rem;
+        }
+        #approvalSection .d-flex,
+        #replacementCompletionSection .d-flex {
+          flex-direction: column;
+          gap: 10px;
+        }
+        #approvalSection .btn,
+        #replacementCompletionSection .btn {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 576px) {
+        .stats-cards {
+          gap: 8px;
+        }
+        .stat-card {
+          min-height: 85px;
+          padding: 10px 6px;
+        }
+        .stat-card-icon {
+          width: 28px;
+          height: 28px;
+        }
+        .stat-card-info h3 {
+          font-size: 1.3rem;
+        }
+        .stat-card-info p {
+          font-size: 0.75rem;
+        }
+        .page-header h1 {
+          font-size: 1.2rem;
+        }
+        .table {
+          font-size: 0.75rem;
+        }
+        .table th,
+        .table td {
+          padding: 6px 4px;
+        }
+        .nav-tabs .nav-link {
+          font-size: 0.75rem;
+          padding: 8px 4px;
+        }
+      }
+
+      @media (max-width: 768px) and (orientation: landscape) {
+        .stats-cards {
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .nav-tabs .nav-link i {
+          display: inline-block;
+          margin-right: 6px;
+          margin-bottom: 0;
+        }
+      }
+    </style>
+
     <title>Status Pengajuan Izin - Melati Gold Shop</title>
   </head>
   <body>
@@ -268,51 +432,51 @@
 
           <!-- Stats Cards -->
           <div class="stats-cards mb-4">
-            <div class="stat-card">
-              <div class="stat-card-icon bg-primary">
-                <i class="fas fa-clipboard-list"></i>
+            <div class="stat-card card text-center p-3 shadow-sm">
+              <div class="stat-card-icon bg-primary d-flex align-items-center justify-content-center mx-auto">
+                <i class="fas fa-clipboard-list text-white"></i>
               </div>
               <div class="stat-card-info">
-                <h3 id="totalRequests">0</h3>
-                <p>Total Pengajuan</p>
+                <h3 id="totalRequests" class="mb-1">0</h3>
+                <p class="mb-0 text-muted">Total Pengajuan</p>
               </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-card-icon bg-success">
-                <i class="fas fa-check-circle"></i>
+            <div class="stat-card card text-center p-3 shadow-sm">
+              <div class="stat-card-icon bg-success d-flex align-items-center justify-content-center mx-auto">
+                <i class="fas fa-check-circle text-white"></i>
               </div>
               <div class="stat-card-info">
-                <h3 id="approvedRequests">0</h3>
-                <p>Disetujui</p>
+                <h3 id="approvedRequests" class="mb-1">0</h3>
+                <p class="mb-0 text-muted">Disetujui</p>
               </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-card-icon bg-danger">
-                <i class="fas fa-times-circle"></i>
+            <div class="stat-card card text-center p-3 shadow-sm">
+              <div class="stat-card-icon bg-danger d-flex align-items-center justify-content-center mx-auto">
+                <i class="fas fa-times-circle text-white"></i>
               </div>
               <div class="stat-card-info">
-                <h3 id="rejectedRequests">0</h3>
-                <p>Ditolak</p>
+                <h3 id="rejectedRequests" class="mb-1">0</h3>
+                <p class="mb-0 text-muted">Ditolak</p>
               </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-card-icon bg-warning">
-                <i class="fas fa-clock"></i>
+            <div class="stat-card card text-center p-3 shadow-sm">
+              <div class="stat-card-icon bg-warning d-flex align-items-center justify-content-center mx-auto">
+                <i class="fas fa-clock text-white"></i>
               </div>
               <div class="stat-card-info">
-                <h3 id="pendingRequests">0</h3>
-                <p>Menunggu</p>
+                <h3 id="pendingRequests" class="mb-1">0</h3>
+                <p class="mb-0 text-muted">Menunggu</p>
               </div>
             </div>
           </div>
 
           <!-- Main Card -->
-          <div class="card">
-            <div class="card-header">
-              <ul class="nav nav-tabs card-header-tabs" id="leaveRequestTabs" role="tablist">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header p-3">
+              <ul class="nav nav-tabs card-header-tabs justify-content-around" id="leaveRequestTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                   <button
                     class="nav-link active"
@@ -345,8 +509,8 @@
                 </li>
               </ul>
             </div>
-            <div class="card-body">
-              <div id="filterContainer" class="d-none">
+            <div class="card-body p-3">
+              <div id="filterContainer" class="d-none mb-3">
                 <div class="d-flex justify-content-between mb-3">
                   <div class="d-flex">
                     <div class="input-group me-2" style="width: 300px">
@@ -361,15 +525,15 @@
                       </button>
                     </div>
                   </div>
-                  <div class="filter-container">
-                    <div class="d-flex align-items-center">
-                      <label class="me-2">Filter Status:</label>
-                      <select id="replacementStatusFilter" class="form-select" style="width: 200px">
+                  <div class="filter-container w-100">
+                    <div class="d-flex align-items-center flex-column flex-md-row gap-3">
+                      <label class="form-label mb-0 fw-semibold text-secondary">Filter Status:</label>
+                      <select id="replacementStatusFilter" class="form-select w-100">
                         <option value="" selected>-- Pilih Status --</option>
                         <option value="Belum Diganti">Belum Diganti</option>
                         <option value="Sudah Diganti">Sudah Diganti</option>
                       </select>
-                      <button id="applyFilterBtn" class="btn btn-primary ms-2">
+                      <button id="applyFilterBtn" class="btn btn-primary w-100 w-md-auto">
                         <i class="fas fa-filter me-1"></i>
                         Terapkan
                       </button>
@@ -386,79 +550,79 @@
                   role="tabpanel"
                   aria-labelledby="pending-tab"
                 >
-                  <div class="d-flex justify-content-end mb-3">
-                    <button id="refreshButton" class="btn btn-outline-primary">
+                  <div class="d-flex justify-content-end mb-3 d-none">
+                    <button id="refreshButton" class="btn btn-outline-primary w-100">
                       <i class="fas fa-sync-alt me-1"></i>
                       Refresh Data
                     </button>
                   </div>
-                  <div class="table-responsive">
-                    <table class="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>ID Staff</th>
-                          <th>Nama</th>
-                          <th>Tanggal Izin</th>
-                          <th>Alasan</th>
-                          <th>Detail Pengganti</th>
-                          <th>Aksi</th>
+                  <div class="table-responsive rounded shadow-sm mb-3">
+                    <table class="table table-hover mb-0">
+                      <thead class="table-light">
+                        <tr class="text-nowrap">
+                          <th class="fw-semibold">ID Staff</th>
+                          <th class="fw-semibold">Nama</th>
+                          <th class="fw-semibold">Tanggal Izin</th>
+                          <th class="fw-semibold">Alasan</th>
+                          <th class="fw-semibold">Detail Pengganti</th>
+                          <th class="fw-semibold">Aksi</th>
                         </tr>
                       </thead>
                       <tbody id="pendingLeaveList">
                         <!-- Data will be populated by JavaScript -->
                         <tr>
-                          <td colspan="6" class="text-center">
-                            <div class="loading-spinner">
-                              <div class="spinner-border text-primary" role="status">
+                          <td colspan="6" class="text-center py-5">
+                            <div class="d-flex align-items-center justify-content-center">
+                              <div class="spinner-border text-primary me-2" role="status">
                                 <span class="visually-hidden">Loading...</span>
                               </div>
-                              <span class="ms-2">Memuat data...</span>
+                              <span class="text-muted">Memuat data...</span>
                             </div>
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-                  <div class="empty-state" id="emptyPendingRequests">
-                    <img src="img/empty-data.svg" alt="No Data" class="empty-image" />
-                    <p>Tidak ada pengajuan izin yang menunggu persetujuan</p>
+                  <div class="text-center py-5 d-none" id="emptyPendingRequests">
+                    <img src="img/empty-data.svg" alt="No Data" class="mb-3" style="width: 100px; height: 100px" />
+                    <p class="text-muted">Tidak ada pengajuan izin yang menunggu persetujuan</p>
                   </div>
                 </div>
 
                 <!-- All Requests Tab -->
                 <div class="tab-pane fade" id="all-requests" role="tabpanel" aria-labelledby="all-tab">
-                  <div class="table-responsive">
-                    <table class="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>ID Staff</th>
-                          <th>Nama</th>
-                          <th>Tanggal Izin</th>
-                          <th>Alasan</th>
-                          <th>Detail Pengganti</th>
-                          <th>Status</th>
-                          <th>Status Ganti</th>
-                          <th>Aksi</th>
+                  <div class="table-responsive rounded shadow-sm mb-3">
+                    <table class="table table-hover mb-0">
+                      <thead class="table-light">
+                        <tr class="text-nowrap">
+                          <th class="fw-semibold">ID Staff</th>
+                          <th class="fw-semibold">Nama</th>
+                          <th class="fw-semibold">Tanggal Izin</th>
+                          <th class="fw-semibold">Alasan</th>
+                          <th class="fw-semibold">Detail Pengganti</th>
+                          <th class="fw-semibold">Status</th>
+                          <th class="fw-semibold">Status Ganti</th>
+                          <th class="fw-semibold">Aksi</th>
                         </tr>
                       </thead>
                       <tbody id="leaveHistoryList">
                         <!-- Data will be populated by JavaScript -->
                         <tr>
-                          <td colspan="9" class="text-center">
-                            <div class="loading-spinner">
-                              <div class="spinner-border text-primary" role="status">
+                          <td colspan="8" class="text-center py-5">
+                            <div class="d-flex align-items-center justify-content-center">
+                              <div class="spinner-border text-primary me-2" role="status">
                                 <span class="visually-hidden">Loading...</span>
                               </div>
-                              <span class="ms-2">Memuat data...</span>
+                              <span class="text-muted">Memuat data...</span>
                             </div>
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-                  <div class="empty-state" id="emptyAllRequests">
-                    <img src="img/empty-data.svg" alt="No Data" class="empty-image" />
-                    <p>Belum ada data pengajuan izin</p>
+                  <div class="text-center py-5 d-none" id="emptyAllRequests">
+                    <img src="img/empty-data.svg" alt="No Data" class="mb-3" style="width: 100px; height: 100px" />
+                    <p class="text-muted">Belum ada data pengajuan izin</p>
                   </div>
                 </div>
               </div>
@@ -671,11 +835,59 @@
     <script type="module" src="js/melati.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/pages/supervisor.js"></script>
-<!-- Proteksi halaman admin -->
-<script type="module">
-  import { protectAdminPage } from './js/protectPage.js';
-  document.addEventListener('DOMContentLoaded', protectAdminPage);
-</script>
+    <!-- Proteksi halaman admin -->
+    <script type="module">
+      import { protectAdminPage } from "./js/protectPage.js";
+      document.addEventListener("DOMContentLoaded", protectAdminPage);
+    </script>
+
+    <!-- Mobile UI Tab-specific Elements Control -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const pendingTab = document.getElementById("pending-tab");
+        const allTab = document.getElementById("all-tab");
+        const refreshButton = document.getElementById("refreshButton");
+        const filterContainer = document.getElementById("filterContainer");
+
+        function updateMobileUI() {
+          if (window.innerWidth <= 768) {
+            const activeTab = document.querySelector(".nav-link.active");
+
+            if (activeTab && activeTab.id === "pending-tab") {
+              // Tab Menunggu Persetujuan: sembunyikan refresh, sembunyikan filter
+              if (refreshButton) refreshButton.style.display = "none";
+              if (filterContainer) filterContainer.style.display = "none";
+            } else if (activeTab && activeTab.id === "all-tab") {
+              // Tab Semua Pengajuan: tampilkan refresh, tampilkan filter
+              if (refreshButton) refreshButton.style.display = "block";
+              if (filterContainer) filterContainer.style.display = "block";
+            }
+          } else {
+            // Desktop: tampilkan semua elemen normal
+            if (refreshButton) refreshButton.style.display = "block";
+            if (filterContainer) filterContainer.style.display = "block";
+          }
+        }
+
+        // Event listeners untuk tab switching
+        if (pendingTab) {
+          pendingTab.addEventListener("click", function () {
+            setTimeout(updateMobileUI, 100); // Delay untuk memastikan tab sudah aktif
+          });
+        }
+
+        if (allTab) {
+          allTab.addEventListener("click", function () {
+            setTimeout(updateMobileUI, 100);
+          });
+        }
+
+        // Event listener untuk resize window
+        window.addEventListener("resize", updateMobileUI);
+
+        // Initial call
+        updateMobileUI();
+      });
+    </script>
   </body>
 </html>
-

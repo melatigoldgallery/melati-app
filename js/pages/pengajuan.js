@@ -995,8 +995,30 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
     // Submit the leave request
     await submitLeaveRequest(leaveRequest);
 
-    // Setelah berhasil submit
-    showFeedback("success", "Pengajuan izin berhasil diajukan!");
+    // Setelah berhasil submit, kirim notifikasi email
+    try {
+      await emailNotificationService.sendLeaveRequestNotification({
+        employeeId: employeeId,
+        employeeName: employee.name,
+        leaveType: leaveType,
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        reason: leaveReason,
+        replacementType: replacementType,
+        replacementDates:
+          replacementType === "ganti" ? replacementDetails?.dates || [replacementDetails?.date].filter(Boolean) : null,
+      });
+
+      showFeedback("success", "Pengajuan izin berhasil diajukan dan notifikasi telah dikirim ke HRD!");
+    } catch (emailError) {
+      console.warn("Email notification failed:", emailError);
+      // Tetap tampilkan sukses karena data sudah tersimpan
+      showFeedback(
+        "warning",
+        "Pengajuan izin berhasil diajukan, namun notifikasi email gagal dikirim. HRD akan diberitahu secara manual."
+      );
+    }
+
     this.reset();
 
     // Perbaikan: Periksa apakah elemen ada sebelum mengakses propertinya
