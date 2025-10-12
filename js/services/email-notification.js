@@ -47,8 +47,6 @@ class EmailNotificationService {
       end_date: formatDate(leaveData.endDate),
       day_count: dayCount,
       reason: leaveData.reason || "Tidak ada alasan",
-      replacement_type: leaveData.replacementType || "tidak",
-      replacement_info: this.formatReplacementInfo(leaveData),
       submission_time: new Date().toLocaleString("id-ID"),
 
       // Variables untuk Contact Us fallback (jika diperlukan)
@@ -57,20 +55,6 @@ class EmailNotificationService {
       subject: `Pengajuan Izin Baru - ${leaveData.employeeName} - ${formatDate(leaveData.startDate)}`,
       message: `Pengajuan izin ${leaveData.leaveType} dari ${leaveData.employeeName} (${leaveData.employeeId})`,
     };
-  }
-
-  // Format informasi pengganti
-  formatReplacementInfo(leaveData) {
-    if (leaveData.replacementType === "libur") {
-      return "Tidak ada pengganti (Hari libur)";
-    } else if (leaveData.replacementType === "ganti") {
-      if (leaveData.replacementDates && leaveData.replacementDates.length > 0) {
-        const dates = leaveData.replacementDates.map((date) => new Date(date).toLocaleDateString("id-ID")).join(", ");
-        return `Penggantian waktu: ${dates}`;
-      }
-      return "Penggantian waktu (belum ditentukan)";
-    }
-    return "Tidak ada pengganti";
   }
 
   // Hitung jumlah hari
