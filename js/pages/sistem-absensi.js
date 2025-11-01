@@ -40,6 +40,20 @@ import {
 } from "../services/leave-service.js";
 // Import modul verifikasi wajah
 import { initCamera, detectAndVerifyFace } from "../face-verification.js";
+// Import Firestore untuk settings
+import { db } from "../configFirebase.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  onSnapshot,
+} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+// Konstanta untuk settings
+const ADMIN_PASSWORD = "melati2025";
+const SETTINGS_COLLECTION = "settings";
+const THRESHOLD_DOC_ID = "attendanceThresholds";
 
 // Tambahkan variabel global untuk verifikasi wajah
 let isFaceVerificationEnabled = true; // Dapat diubah menjadi false untuk menonaktifkan fitur
@@ -77,6 +91,10 @@ let scannerTimeoutId = null;
 let lastProcessedBarcode = "";
 let lastProcessedTime = 0;
 const BARCODE_COOLDOWN_MS = 3000; // Waktu tunggu 3 detik sebelum barcode yang sama bisa diproses lagi
+
+// Cache untuk threshold settings (real-time)
+let cachedThresholdSettings = null;
+let thresholdSettingsListener = null;
 
 // Tambahkan konstanta untuk TTL
 const CACHE_TTL_STANDARD = 60 * 60 * 1000; // 1 jam
@@ -717,7 +735,7 @@ async function processScannedBarcode(barcode) {
 function validateBarcodeInput(barcode) {
   // Normalisasi barcode terlebih dahulu
   const normalizedBarcode = normalizeBarcode(barcode);
-  
+
   if (!normalizedBarcode) {
     showScanResult("error", "Format barcode tidak valid!");
     playNotificationSound("error", "");
@@ -759,7 +777,7 @@ async function getEmployeeData(barcode) {
   try {
     // Normalisasi barcode
     const normalizedBarcode = normalizeBarcode(barcode);
-    
+
     if (!normalizedBarcode) {
       console.error("Barcode tidak valid setelah normalisasi:", barcode);
       return null;
@@ -769,7 +787,7 @@ async function getEmployeeData(barcode) {
 
     // 1. Cek cache lokal terlebih dahulu
     let employee = employeeCache.get(normalizedBarcode);
-    
+
     if (employee) {
       console.log("Karyawan ditemukan di cache lokal:", employee.name);
       return employee;
@@ -778,8 +796,8 @@ async function getEmployeeData(barcode) {
     // 2. Cek cache dari employee-service
     try {
       const employees = await getEmployees(false); // Gunakan cache jika valid
-      employee = employees.find(emp => normalizeBarcode(emp.barcode) === normalizedBarcode);
-      
+      employee = employees.find((emp) => normalizeBarcode(emp.barcode) === normalizedBarcode);
+
       if (employee) {
         console.log("Karyawan ditemukan di cache employee-service:", employee.name);
         // Update cache lokal
@@ -793,27 +811,27 @@ async function getEmployeeData(barcode) {
     // 3. Jika tidak ada di cache, coba dari Firestore dengan retry
     let retryCount = 0;
     const maxRetries = 2;
-    
+
     while (retryCount <= maxRetries) {
       try {
         console.log(`Mencoba dari Firestore (attempt ${retryCount + 1})`);
         employee = await findEmployeeByBarcode(normalizedBarcode);
-        
+
         if (employee) {
           console.log("Karyawan ditemukan di Firestore:", employee.name);
           // Update cache lokal dan employee-service cache
           employeeCache.set(normalizedBarcode, employee);
-          
+
           // Refresh employee cache untuk memastikan sinkronisasi
           try {
             await refreshEmployeeCache();
           } catch (refreshError) {
             console.warn("Error refreshing employee cache:", refreshError);
           }
-          
+
           return employee;
         }
-        
+
         // Jika tidak ditemukan, coba dengan barcode yang tidak dinormalisasi
         if (retryCount === 0 && normalizedBarcode !== barcode) {
           employee = await findEmployeeByBarcode(barcode);
@@ -823,30 +841,29 @@ async function getEmployeeData(barcode) {
             return employee;
           }
         }
-        
+
         break; // Keluar dari loop jika tidak ditemukan
       } catch (firestoreError) {
         console.error(`Error mengakses Firestore (attempt ${retryCount + 1}):`, firestoreError);
         retryCount++;
-        
+
         if (retryCount > maxRetries) {
           throw firestoreError;
         }
-        
+
         // Tunggu sebentar sebelum retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
       }
     }
 
     // 4. Jika masih tidak ditemukan, coba cari dengan partial match
     try {
       const employees = await getEmployees(true); // Force refresh
-      employee = employees.find(emp => {
+      employee = employees.find((emp) => {
         const empBarcode = normalizeBarcode(emp.barcode);
-        return empBarcode && empBarcode.includes(normalizedBarcode) || 
-               normalizedBarcode.includes(empBarcode);
+        return (empBarcode && empBarcode.includes(normalizedBarcode)) || normalizedBarcode.includes(empBarcode);
       });
-      
+
       if (employee) {
         console.log("Karyawan ditemukan dengan partial match:", employee.name);
         employeeCache.set(normalizedBarcode, employee);
@@ -858,7 +875,6 @@ async function getEmployeeData(barcode) {
 
     console.log("Karyawan tidak ditemukan untuk barcode:", normalizedBarcode);
     return null;
-    
   } catch (error) {
     console.error("Error dalam getEmployeeData:", error);
     return null;
@@ -871,21 +887,21 @@ async function getEmployeeData(barcode) {
  * @returns {string|null} - Barcode yang sudah dinormalisasi atau null jika tidak valid
  */
 function normalizeBarcode(barcode) {
-  if (!barcode || typeof barcode !== 'string') {
+  if (!barcode || typeof barcode !== "string") {
     return null;
   }
-  
+
   // Trim whitespace dan ubah ke uppercase
   let normalized = barcode.trim().toUpperCase();
-  
+
   // Hapus karakter non-alphanumeric kecuali dash dan underscore
-  normalized = normalized.replace(/[^A-Z0-9\-_]/g, '');
-  
+  normalized = normalized.replace(/[^A-Z0-9\-_]/g, "");
+
   // Jika hasil kosong, return null
   if (!normalized) {
     return null;
   }
-  
+
   return normalized;
 }
 
@@ -2097,6 +2113,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Setup barcode scanner detection - ini adalah satu-satunya setup yang diperlukan
     setupBarcodeScanner();
 
+    // Initialize real-time listener untuk threshold settings
+    initThresholdSettingsListener();
+
+    // Setup settings feature untuk modal password dan pengaturan jam
+    setupSettingsFeature();
+
     // TAMBAHAN: Inisialisasi verifikasi wajah jika fitur diaktifkan
     if (isFaceVerificationEnabled) {
       console.log("Memulai inisialisasi verifikasi wajah...");
@@ -2524,23 +2546,182 @@ function hideAlert() {
   hideScanResult(true);
 }
 
-// Get threshold time for lateness calculation
-function getThresholdTime(employeeType, shift) {
-  const thresholds = {
+function initThresholdSettingsListener() {
+  const docRef = doc(db, SETTINGS_COLLECTION, THRESHOLD_DOC_ID);
+
+  if (thresholdSettingsListener) thresholdSettingsListener();
+
+  thresholdSettingsListener = onSnapshot(
+    docRef,
+    (docSnap) => {
+      const defaults = {
+        staff: { morning: "09:00", afternoon: "14:21" },
+        ob: { morning: "07:31", afternoon: "13:46" },
+      };
+      cachedThresholdSettings = docSnap.exists()
+        ? {
+            staff: docSnap.data().staff || defaults.staff,
+            ob: docSnap.data().ob || defaults.ob,
+          }
+        : defaults;
+      console.log("✅ Settings updated:", cachedThresholdSettings);
+    },
+    (error) => {
+      console.error("❌ Settings listener error:", error);
+      if (!cachedThresholdSettings) {
+        cachedThresholdSettings = {
+          staff: { morning: "09:00", afternoon: "14:21" },
+          ob: { morning: "07:31", afternoon: "13:46" },
+        };
+      }
+    }
+  );
+}
+
+/**
+ * Load settings to UI modal
+ */
+async function loadThresholdSettingsToUI() {
+  const docRef = doc(db, SETTINGS_COLLECTION, THRESHOLD_DOC_ID);
+  const docSnap = await getDoc(docRef);
+  const settings = docSnap.exists()
+    ? docSnap.data()
+    : {
+        staff: { morning: "09:00", afternoon: "14:21" },
+        ob: { morning: "07:31", afternoon: "13:46" },
+      };
+
+  document.getElementById("staffMorningTime").value = settings.staff.morning;
+  document.getElementById("staffAfternoonTime").value = settings.staff.afternoon;
+  document.getElementById("obMorningTime").value = settings.ob.morning;
+  document.getElementById("obAfternoonTime").value = settings.ob.afternoon;
+}
+
+/**
+ * Save settings to Firestore
+ */
+async function saveThresholdSettings() {
+  const settings = {
     staff: {
-      morning: new Date("1970-01-01T09:00:00"),
-      afternoon: new Date("1970-01-01T14:21:00"),
+      morning: document.getElementById("staffMorningTime").value,
+      afternoon: document.getElementById("staffAfternoonTime").value,
     },
     ob: {
-      morning: new Date("1970-01-01T07:31:00"),
-      afternoon: new Date("1970-01-01T13:46:00"),
+      morning: document.getElementById("obMorningTime").value,
+      afternoon: document.getElementById("obAfternoonTime").value,
     },
   };
 
-  // Validasi employeeType dan shift
-  if (!employeeType || !shift || !thresholds[employeeType] || !thresholds[employeeType][shift]) {
+  try {
+    await setDoc(
+      doc(db, SETTINGS_COLLECTION, THRESHOLD_DOC_ID),
+      {
+        ...settings,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    return false;
+  }
+}
+
+/**
+ * Setup settings feature
+ */
+function setupSettingsFeature() {
+  const settingsBtn = document.getElementById("settingsBtn");
+  const verifyPasswordBtn = document.getElementById("verifyPasswordBtn");
+  const adminPasswordInput = document.getElementById("adminPassword");
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", () => {
+      adminPasswordInput.value = "";
+      document.getElementById("passwordError").style.display = "none";
+      new bootstrap.Modal(document.getElementById("passwordModal")).show();
+    });
+  }
+
+  if (verifyPasswordBtn) {
+    verifyPasswordBtn.addEventListener("click", async () => {
+      if (adminPasswordInput.value === ADMIN_PASSWORD) {
+        bootstrap.Modal.getInstance(document.getElementById("passwordModal")).hide();
+        await loadThresholdSettingsToUI();
+        new bootstrap.Modal(document.getElementById("settingsModal")).show();
+        adminPasswordInput.value = "";
+        document.getElementById("passwordError").style.display = "none";
+      } else {
+        document.getElementById("passwordError").style.display = "block";
+        adminPasswordInput.value = "";
+        adminPasswordInput.focus();
+      }
+    });
+  }
+
+  if (adminPasswordInput) {
+    adminPasswordInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") verifyPasswordBtn.click();
+    });
+  }
+
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener("click", async () => {
+      saveSettingsBtn.disabled = true;
+      saveSettingsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+
+      const success = await saveThresholdSettings();
+
+      saveSettingsBtn.disabled = false;
+      saveSettingsBtn.innerHTML = '<i class="fas fa-save"></i> Simpan Pengaturan';
+
+      if (success) {
+        bootstrap.Modal.getInstance(document.getElementById("settingsModal")).hide();
+
+        // SweetAlert2 untuk sukses
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Pengaturan jam masuk telah disimpan dan berlaku untuk semua perangkat",
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+        });
+      } else {
+        // SweetAlert2 untuk error
+        Swal.fire({
+          icon: "error",
+          title: "Gagal!",
+          text: "Terjadi kesalahan saat menyimpan pengaturan. Silakan coba lagi.",
+          confirmButtonText: "OK",
+        });
+      }
+    });
+  }
+}
+
+// Get threshold time for lateness calculation
+function getThresholdTime(employeeType, shift) {
+  const settings = cachedThresholdSettings || {
+    staff: { morning: "09:00", afternoon: "14:21" },
+    ob: { morning: "07:31", afternoon: "13:46" },
+  };
+
+  const thresholds = {
+    staff: {
+      morning: new Date(`1970-01-01T${settings.staff.morning}:00`),
+      afternoon: new Date(`1970-01-01T${settings.staff.afternoon}:00`),
+    },
+    ob: {
+      morning: new Date(`1970-01-01T${settings.ob.morning}:00`),
+      afternoon: new Date(`1970-01-01T${settings.ob.afternoon}:00`),
+    },
+  };
+
+  if (!employeeType || !shift || !thresholds[employeeType]?.[shift]) {
     console.warn(`Invalid employee type or shift: ${employeeType}, ${shift}`);
-    // Default ke staff morning jika tipe atau shift tidak valid
     return thresholds.staff.morning;
   }
 
@@ -2560,19 +2741,19 @@ function checkIfLate(timeString, employeeType, shift) {
 async function loadEmployees() {
   try {
     console.log("Memulai loading employees...");
-    
+
     // Periksa apakah cache perlu diperbarui berdasarkan TTL
     if (employeeCache.size === 0 || shouldUpdateEmployeeCache()) {
       console.log("Cache perlu diperbarui, mengambil data dari server...");
-      
+
       // Coba load dengan retry
       let retryCount = 0;
       const maxRetries = 3;
-      
+
       while (retryCount <= maxRetries) {
         try {
           employees = await getEmployees(retryCount > 0); // Force refresh setelah retry pertama
-          
+
           // Cache employees by barcode for faster lookup
           employeeCache.clear(); // Clear cache lama
           employees.forEach((employee) => {
@@ -2586,20 +2767,19 @@ async function loadEmployees() {
 
           // Update timestamp
           employeeCacheTimestamp = Date.now();
-          
+
           console.log(`Berhasil load ${employees.length} employees, cache size: ${employeeCache.size}`);
           return;
-          
         } catch (error) {
           console.error(`Error loading employees (attempt ${retryCount + 1}):`, error);
           retryCount++;
-          
+
           if (retryCount > maxRetries) {
             throw error;
           }
-          
+
           // Tunggu sebentar sebelum retry
-          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+          await new Promise((resolve) => setTimeout(resolve, 2000 * retryCount));
         }
       }
     } else {
@@ -2607,7 +2787,7 @@ async function loadEmployees() {
     }
   } catch (error) {
     console.error("Error loading employees:", error);
-    
+
     // Jika gagal load, coba gunakan cache yang ada
     if (employeeCache.size > 0) {
       console.log("Menggunakan cache employees sebagai fallback");
@@ -2620,3 +2800,11 @@ async function loadEmployees() {
 
 // Export fungsi dan cache yang diperlukan
 export { loadTodayAttendance, attendanceCache, employeeCache };
+
+// Cleanup listener saat page unload
+window.addEventListener("beforeunload", () => {
+  if (thresholdSettingsListener) {
+    thresholdSettingsListener();
+    console.log("🔕 Threshold settings listener unsubscribed");
+  }
+});
