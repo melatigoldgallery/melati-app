@@ -1136,6 +1136,39 @@ function padText(text, width, align = "left") {
   }
 }
 
+// Helper function untuk wrap text ke multiple lines
+function wrapText(text, width) {
+  const cleanText = text.toString().trim();
+  if (cleanText.length <= width) {
+    return [cleanText];
+  }
+
+  const lines = [];
+  let currentLine = "";
+  const words = cleanText.split(" ");
+
+  for (const word of words) {
+    if ((currentLine + " " + word).trim().length <= width) {
+      currentLine = (currentLine + " " + word).trim();
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        // Jika satu kata terlalu panjang, potong
+        lines.push(word.substring(0, width));
+        currentLine = word.substring(width);
+      }
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
 // Helper function untuk format currency
 function formatCurrency(amount) {
   return new Intl.NumberFormat("id-ID").format(amount);
@@ -1153,8 +1186,11 @@ function generateNotaText(servisData) {
   if (servisData.length > 0) {
     const firstCustomer = servisData[0];
     notaText += `                                                                     ${formattedDate}\n`;
+    notaText += `                                                                      \n`;
     notaText += `                                                                     ${firstCustomer.namaCustomer}\n`;
-    notaText += `                                                                     ${firstCustomer.noHp || firstCustomer.noTelepon || ""
+    notaText += `                                                                      \n`;
+    notaText += `                                                                     ${
+      firstCustomer.noHp || firstCustomer.noTelepon || ""
     }`;
   }
 
@@ -1245,12 +1281,20 @@ function printNotaServis(servisData) {
             padding: 5mm;
             font-family: 'Courier New', monospace;
             font-size: 14px;
-            line-height: 1.7;
             white-space: pre;
+          }
+          .customer-info {
+            line-height: 1;
+          }
+          .data-items {
+            line-height: 1.7;
           }
         </style>
       </head>
-      <body>${notaText}</body>
+      <body>
+        <div class="customer-info">${notaText.split("\n\n\n")[0]}</div>
+        <div class="data-items">${notaText.split("\n\n\n").slice(1).join("\n\n\n")}</div>
+      </body>
     </html>
   `);
 

@@ -130,6 +130,49 @@
           padding: 1px 3px !important;
         }
       }
+
+      /* Styling untuk kolom aksi agar tidak wrap vertikal */
+      #tableRiwayatServis td:last-child,
+      #tableRiwayatServis th:last-child {
+        white-space: nowrap !important;
+        min-width: 140px;
+      }
+
+      #tableRiwayatServis .btn {
+        margin: 1px;
+        font-size: 11px;
+        padding: 2px 6px;
+      }
+
+      /* Responsive untuk tabel riwayat */
+      @media (max-width: 992px) {
+        #tableRiwayatServis .btn {
+          font-size: 9px;
+          padding: 1px 4px;
+        }
+      }
+
+      /* Styling untuk card header dengan flex layout */
+      .card-header .d-flex {
+        min-height: 40px;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+      }
+
+      .card-header h6 {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .card-header .btn {
+        flex-shrink: 0;
+        margin-left: auto !important;
+      }
     </style>
     <title>Input Servis - Melati Gold Shop</title>
   </head>
@@ -489,30 +532,30 @@
                   <table class="table table-hover" id="tableRiwayatServis">
                     <thead class="table-light">
                       <tr>
-                        <th style="width: 5%">No</th>
+                        <th style="width: 4%">No</th>
                         <th style="width: 8%">Tanggal</th>
-                        <th style="width: 12%">Nama Customer</th>
-                        <th style="width: 8%">No HP</th>
-                        <th style="width: 12%">Nama Barang</th>
-                        <th style="width: 6%">Berat</th>
-                        <th style="width: 6%">Karat</th>
-                        <th style="width: 10%">Jenis Servis / Custom</th>
-                        <th style="width: 16%">Rincian Servis</th>
-                        <th style="width: 10%">Ongkos / DP</th>
-                        <th style="width: 8%">Sales</th>
-                        <th style="width: 13%">Aksi</th>
+                        <th style="width: 10%">Nama Customer</th>
+                        <th style="width: 7%">No HP</th>
+                        <th style="width: 10%">Nama Barang</th>
+                        <th style="width: 5%">Berat</th>
+                        <th style="width: 5%">Karat</th>
+                        <th style="width: 9%">Jenis Servis / Custom</th>
+                        <th style="width: 14%">Rincian Servis</th>
+                        <th style="width: 8%">Ongkos / DP</th>
+                        <th style="width: 6%">Sales</th>
+                        <th style="width: 14%; white-space: nowrap">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td colspan="11" class="text-center">Pilih tanggal dan klik "Tampilkan" untuk melihat data</td>
+                        <td colspan="12" class="text-center">Pilih tanggal dan klik "Tampilkan" untuk melihat data</td>
                       </tr>
                     </tbody>
                     <tfoot>
                       <tr class="table-info">
                         <th colspan="9" class="text-end">Total Nominal (Lunas + Custom):</th>
                         <th id="total-riwayat-ongkos">Rp 0</th>
-                        <th colspan="1"></th>
+                        <th colspan="2"></th>
                       </tr>
                     </tfoot>
                   </table>
@@ -609,7 +652,7 @@
                   <div class="d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">Detail Barang Servis</h6>
                     <button type="button" class="btn btn-sm btn-success" id="btnTambahBarang">
-                      <i class="fas fa-plus"></i>
+                      <i class="fas fa-plus me-1"></i>
                       Tambah
                     </button>
                   </div>
