@@ -725,8 +725,8 @@ function getPrintStyles() {
         gap: 3mm;
       }
       .print-service-box {
-        width: 2.7cm;
-        height: 2.7cm;
+        width: 4.5cm;
+        height: 4.5cm;
         border: 1px solid #000;
         padding: 2mm;
         box-sizing: border-box;
