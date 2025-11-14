@@ -631,7 +631,8 @@
                         <option value="custom">Custom</option>
                       </select>
                     </div>
-                    <div class="col-md-3">
+                    <!-- Field ongkos dipindahkan ke detail barang -->
+                    <div class="col-md-3" id="ongkosField" style="display: none">
                       <label for="ongkos" class="form-label" id="ongkosLabel">Total Ongkos / DP</label>
                       <input
                         type="number"
@@ -639,7 +640,6 @@
                         id="ongkos"
                         placeholder="Masukkan total ongkos"
                         min="0"
-                        required
                       />
                     </div>
                   </div>
@@ -662,12 +662,13 @@
                     <table class="table table-bordered" id="tableDetailBarang">
                       <thead class="table-light">
                         <tr>
-                          <th width="5%">No</th>
-                          <th width="25%">Nama Barang</th>
-                          <th width="12%">Berat (gr)</th>
-                          <th width="10%">Karat</th>
-                          <th width="15%">Jenis Servis</th>
-                          <th width="25%">Rincian Servis</th>
+                          <th width="4%">No</th>
+                          <th width="22%">Nama Barang</th>
+                          <th width="10%">Berat (gr)</th>
+                          <th width="8%">Karat</th>
+                          <th width="13%">Jenis Servis</th>
+                          <th width="20%">Rincian Servis</th>
+                          <th width="15%">Ongkos/DP</th>
                           <th width="8%">Aksi</th>
                         </tr>
                       </thead>

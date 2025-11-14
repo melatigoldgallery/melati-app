@@ -190,6 +190,7 @@ function addDetailBarangRow() {
     karat: "",
     jenisServis: "",
     rincianServis: "",
+    ongkos: 0,
   };
 
   detailBarangItems.push(newItem);
@@ -248,6 +249,13 @@ function updateDetailBarangTable() {
                placeholder="Rincian servis" />
       </td>
       <td>
+        <input type="number" class="form-control form-control-sm" 
+               value="${item.ongkos || 0}" 
+               onchange="updateDetailBarangItem(${item.id}, 'ongkos', this.value)" 
+               placeholder="Ongkos" 
+               min="0" />
+      </td>
+      <td>
         <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailBarangRow(${item.id})" title="Hapus">
           <i class="fas fa-trash"></i>
         </button>
@@ -282,10 +290,25 @@ function validateDetailBarang() {
     return false;
   }
 
+  const statusPembayaran = document.getElementById("statusPembayaran").value;
+
   for (let i = 0; i < detailBarangItems.length; i++) {
     const item = detailBarangItems[i];
     if (!item.namaBarang.trim() || !item.jenisServis.trim()) {
       showErrorModal("Validasi Error", `Nama barang dan jenis servis pada baris ${i + 1} harus diisi!`);
+      return false;
+    }
+
+    // Validasi ongkos untuk status nominal dan custom
+    if (
+      (statusPembayaran === "nominal" || statusPembayaran === "custom") &&
+      (!item.ongkos || parseInt(item.ongkos) <= 0)
+    ) {
+      const labelText = statusPembayaran === "custom" ? "DP" : "Ongkos";
+      showErrorModal(
+        "Validasi Error",
+        `${labelText} pada baris ${i + 1} harus diisi untuk status ${statusPembayaran}!`
+      );
       return false;
     }
   }
@@ -299,26 +322,16 @@ window.removeDetailBarangRow = removeDetailBarangRow;
 
 function handleStatusPembayaranChange() {
   const statusPembayaran = document.getElementById("statusPembayaran").value;
-  const ongkosInput = document.getElementById("ongkos");
-  const ongkosLabel = document.getElementById("ongkosLabel");
 
+  // Ongkos sekarang di level item, jadi tidak perlu handle di sini
+  // Hanya untuk info atau logic tambahan jika diperlukan
+
+  // Set semua ongkos item ke 0 jika status free
   if (statusPembayaran === "free") {
-    ongkosInput.value = 0;
-    ongkosInput.disabled = true;
-    ongkosInput.required = false;
-    ongkosLabel.textContent = "Total Ongkos / DP";
-  } else if (statusPembayaran === "custom") {
-    ongkosInput.disabled = false;
-    ongkosInput.required = true;
-    ongkosLabel.textContent = "Total DP (Down Payment)";
-  } else {
-    ongkosInput.disabled = false;
-    ongkosLabel.textContent = "Total Ongkos / DP";
-    if (statusPembayaran === "nominal") {
-      ongkosInput.required = true;
-    } else if (statusPembayaran === "belum_lunas") {
-      ongkosInput.required = false;
-    }
+    detailBarangItems.forEach((item) => {
+      item.ongkos = 0;
+    });
+    updateDetailBarangTable();
   }
 }
 
@@ -347,6 +360,7 @@ function openServisModal(index = -1) {
         karat: detail.karat || "",
         jenisServis: detail.jenisServis || "",
         rincianServis: detail.rincianServis || "",
+        ongkos: detail.ongkos || 0,
       }));
       detailBarangCounter = detailBarangItems.length + 1;
     } else {
@@ -359,6 +373,7 @@ function openServisModal(index = -1) {
           karat: item.karat || "",
           jenisServis: item.jenisServis || "",
           rincianServis: "",
+          ongkos: item.ongkos || 0,
         },
       ];
       detailBarangCounter = 2;
@@ -405,7 +420,6 @@ async function saveServisItem() {
   const namaCustomer = document.getElementById("namaCustomer").value.trim();
   const noHp = document.getElementById("noHp").value.trim();
   const statusPembayaran = document.getElementById("statusPembayaran").value;
-  const ongkos = parseInt(document.getElementById("ongkos").value) || 0;
 
   // Validation
   if (!namaSales || !namaCustomer || !noHp || !statusPembayaran) {
@@ -413,17 +427,13 @@ async function saveServisItem() {
     return;
   }
 
-  // Validate detail barang
+  // Validate detail barang (include ongkos validation)
   if (!validateDetailBarang()) {
     return;
   }
 
-  // Validasi ongkos berdasarkan status
-  if ((statusPembayaran === "nominal" || statusPembayaran === "custom") && ongkos <= 0) {
-    const labelText = statusPembayaran === "custom" ? "DP" : "Ongkos";
-    showErrorModal("Validasi Error", `${labelText} harus diisi untuk status ${statusPembayaran}!`);
-    return;
-  }
+  // Hitung total ongkos dari semua item
+  const totalOngkos = detailBarangItems.reduce((sum, item) => sum + (parseInt(item.ongkos) || 0), 0);
 
   const servisItem = {
     namaSales,
@@ -436,15 +446,16 @@ async function saveServisItem() {
       karat: item.karat.trim(),
       jenisServis: item.jenisServis.trim(),
       rincianServis: item.rincianServis.trim(),
+      ongkos: parseInt(item.ongkos) || 0,
     })),
-    totalOngkos: statusPembayaran === "free" ? 0 : ongkos,
+    totalOngkos: statusPembayaran === "free" ? 0 : totalOngkos,
 
     // Backward compatibility - keep first item data in root level
     namaBarang: detailBarangItems[0]?.namaBarang || "",
     berat: detailBarangItems[0]?.berat || "",
     karat: detailBarangItems[0]?.karat || "",
     jenisServis: detailBarangItems[0]?.jenisServis || "",
-    ongkos: statusPembayaran === "free" ? 0 : ongkos,
+    ongkos: statusPembayaran === "free" ? 0 : totalOngkos,
   };
 
   // Handle edit riwayat data
@@ -542,6 +553,7 @@ function updateServisTable() {
     const karatHtml = details.map((d) => `<div>${d.karat || "-"}</div>`).join("");
     const jenisHtml = details.map((d) => `<div>${d.jenisServis || "-"}</div>`).join("");
     const rincianHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
+    const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -552,7 +564,7 @@ function updateServisTable() {
       <td class="multi-col">${karatHtml}</td>
       <td class="multi-col">${jenisHtml}</td>
       <td class="multi-col">${rincianHtml}</td>
-      <td>${getOngkosDisplay(item)}</td>
+      <td class="multi-col">${ongkosHtml}</td>
       <td>
         <span class="badge bg-${getStatusBadgeColor(statusPembayaran)}">
           ${getStatusLabel(statusPembayaran)}
@@ -682,6 +694,7 @@ async function handleVerifikasi() {
           karat: detail.karat || "",
           jenisServis: detail.jenisServis || "",
           rincianServis: detail.rincianServis || "",
+          ongkos: detail.ongkos || 0,
         }));
         detailBarangCounter = detailBarangItems.length + 1;
       } else {
@@ -694,6 +707,7 @@ async function handleVerifikasi() {
             karat: item.karat || "",
             jenisServis: item.jenisServis || "",
             rincianServis: "",
+            ongkos: item.ongkos || 0,
           },
         ];
         detailBarangCounter = 2;
@@ -894,6 +908,7 @@ function updateRiwayatTable() {
     const karatHtml = details.map((d) => `<div>${d.karat || "-"}</div>`).join("");
     const jenisHtml = details.map((d) => `<div>${d.jenisServis || "-"}</div>`).join("");
     const rincianHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
+    const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -905,6 +920,7 @@ function updateRiwayatTable() {
       <td class="multi-col">${karatHtml}</td>
       <td class="multi-col">${jenisHtml}</td>
       <td class="multi-col">${rincianHtml}</td>
+      <td class="multi-col">${ongkosHtml}</td>
       <td>
         ${getOngkosDisplay(item)}
         <br>
@@ -1201,7 +1217,7 @@ function generateNotaText(servisData) {
   // Kolom: Jumlah(2.5cm) | Nama Barang(6.9cm) | Berat(2cm) | Karat(2cm) | Ongkos(2.9cm) | Terbilang(3cm)
   // Estimasi: 1cm ≈ 4-5 karakter untuk font monospace 12px
   const colWidths = {
-    jumlah: 13, // 2.5cm ≈ 10 char
+    jumlah: 14, // 2.5cm ≈ 10 char
     namaBarang: 31, // 6.9cm ≈ 28 char
     berat: 8, // 2cm ≈ 8 char
     karat: 5, // 2cm ≈ 8 char
@@ -1222,29 +1238,91 @@ function generateNotaText(servisData) {
   servisData.forEach((servis) => {
     if (servis.detailBarang && servis.detailBarang.length > 0) {
       servis.detailBarang.forEach((item) => {
-        const namaBarangFull = `${item.namaBarang} (${item.jenisServis})`;
-        const ongkos = servis.totalOngkos || servis.ongkos || 0;
+        const ongkos = item.ongkos || 0;
 
+        // Wrap nama barang jika terlalu panjang
+        const namaBarangLines = wrapText(item.namaBarang, colWidths.namaBarang);
+
+        // Prepare rincian servis dan wrap jika panjang
+        const rincianServisRaw = item.rincianServis?.trim()
+          ? `(${item.rincianServis.trim()})`
+          : item.jenisServis
+          ? `(${item.jenisServis})`
+          : "";
+        const rincianServisLines = rincianServisRaw ? wrapText(rincianServisRaw, colWidths.namaBarang - 2) : [];
+
+        // Baris pertama: nama barang (line 1) dengan data lengkap
         notaText += padText("", colWidths.jumlah) + " ";
-        notaText += padText(namaBarangFull, colWidths.namaBarang) + " ";
+        notaText += padText(namaBarangLines[0], colWidths.namaBarang) + " ";
         notaText += padText(item.berat || "", colWidths.berat) + " ";
         notaText += padText(item.karat || "", colWidths.karat) + " ";
         notaText += padText(formatCurrency(ongkos), colWidths.ongkos, "right") + " ";
         notaText += padText("", colWidths.terbilang) + "\n";
 
+        // Baris berikutnya: sisa nama barang (jika ada)
+        for (let i = 1; i < namaBarangLines.length; i++) {
+          notaText += padText("", colWidths.jumlah) + " ";
+          notaText += padText(namaBarangLines[i], colWidths.namaBarang) + " ";
+          notaText += padText("", colWidths.berat) + " ";
+          notaText += padText("", colWidths.karat) + " ";
+          notaText += padText("", colWidths.ongkos) + " ";
+          notaText += padText("", colWidths.terbilang) + "\n";
+        }
+
+        // Baris rincian servis: wrap multi-line dengan indentasi
+        rincianServisLines.forEach((line, idx) => {
+          notaText += padText("", colWidths.jumlah) + " ";
+          notaText += padText(idx === 0 ? `  ${line}` : `  ${line}`, colWidths.namaBarang) + " ";
+          notaText += padText("", colWidths.berat) + " ";
+          notaText += padText("", colWidths.karat) + " ";
+          notaText += padText("", colWidths.ongkos) + " ";
+          notaText += padText("", colWidths.terbilang) + "\n";
+        });
+
         totalOngkos += ongkos;
       });
     } else {
       // Fallback untuk format lama
-      const namaBarangFull = `${servis.namaBarang || ""} (${servis.jenisServis || ""})`;
       const ongkos = servis.totalOngkos || servis.ongkos || 0;
 
+      // Wrap nama barang jika terlalu panjang
+      const namaBarangLines = wrapText(servis.namaBarang || "", colWidths.namaBarang);
+
+      // Prepare rincian servis dan wrap jika panjang
+      const rincianServisRaw = servis.rincianServis?.trim()
+        ? `(${servis.rincianServis.trim()})`
+        : servis.jenisServis
+        ? `(${servis.jenisServis})`
+        : "";
+      const rincianServisLines = rincianServisRaw ? wrapText(rincianServisRaw, colWidths.namaBarang - 2) : [];
+
+      // Baris pertama: nama barang dengan data lengkap
       notaText += padText("", colWidths.jumlah) + " ";
-      notaText += padText(namaBarangFull, colWidths.namaBarang) + " ";
+      notaText += padText(namaBarangLines[0], colWidths.namaBarang) + " ";
       notaText += padText(servis.berat || "", colWidths.berat) + " ";
       notaText += padText(servis.karat || "", colWidths.karat) + " ";
       notaText += padText(formatCurrency(ongkos), colWidths.ongkos, "right") + " ";
       notaText += padText("", colWidths.terbilang) + "\n";
+
+      // Baris berikutnya: sisa nama barang (jika ada)
+      for (let i = 1; i < namaBarangLines.length; i++) {
+        notaText += padText("", colWidths.jumlah) + " ";
+        notaText += padText(namaBarangLines[i], colWidths.namaBarang) + " ";
+        notaText += padText("", colWidths.berat) + " ";
+        notaText += padText("", colWidths.karat) + " ";
+        notaText += padText("", colWidths.ongkos) + " ";
+        notaText += padText("", colWidths.terbilang) + "\n";
+      }
+
+      // Baris rincian servis: wrap multi-line dengan indentasi
+      rincianServisLines.forEach((line, idx) => {
+        notaText += padText("", colWidths.jumlah) + " ";
+        notaText += padText(idx === 0 ? `  ${line}` : `  ${line}`, colWidths.namaBarang) + " ";
+        notaText += padText("", colWidths.berat) + " ";
+        notaText += padText("", colWidths.karat) + " ";
+        notaText += padText("", colWidths.ongkos) + " ";
+        notaText += padText("", colWidths.terbilang) + "\n";
+      });
 
       totalOngkos += ongkos;
     }
@@ -1282,11 +1360,17 @@ function printNotaServis(servisData) {
             font-family: 'Courier New', monospace;
             font-size: 14px;
             white-space: pre;
+            position: relative;
           }
           .customer-info {
-            line-height: 1;
+            position: absolute;
+            top: 10mm;
+            right: 27mm;
+            line-height: 1.2;
+            text-align: right;
           }
           .data-items {
+            margin-top: 23mm;
             line-height: 1.7;
           }
         </style>
