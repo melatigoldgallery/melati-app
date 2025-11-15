@@ -185,6 +185,7 @@ function setupEventListeners() {
 function addDetailBarangRow() {
   const newItem = {
     id: detailBarangCounter++,
+    jumlah: 1,
     namaBarang: "",
     berat: "",
     karat: "",
@@ -210,6 +211,12 @@ function updateDetailBarangTable() {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
+      <td>
+        <input type="number" class="form-control form-control-sm" 
+               value="${item.jumlah || 1}" 
+               onchange="updateDetailBarangItem(${item.id}, 'jumlah', this.value)" 
+               placeholder="1" min="1" required />
+      </td>
       <td>
         <input type="text" class="form-control form-control-sm" 
                value="${item.namaBarang}" 
@@ -355,6 +362,7 @@ function openServisModal(index = -1) {
     if (item.detailBarang && item.detailBarang.length > 0) {
       detailBarangItems = item.detailBarang.map((detail, idx) => ({
         id: idx + 1,
+        jumlah: detail.jumlah || 1,
         namaBarang: detail.namaBarang || "",
         berat: detail.berat || "",
         karat: detail.karat || "",
@@ -368,6 +376,7 @@ function openServisModal(index = -1) {
       detailBarangItems = [
         {
           id: 1,
+          jumlah: 1,
           namaBarang: item.namaBarang || "",
           berat: item.berat || "",
           karat: item.karat || "",
@@ -441,6 +450,7 @@ async function saveServisItem() {
     noHp,
     statusPembayaran,
     detailBarang: detailBarangItems.map((item) => ({
+      jumlah: parseInt(item.jumlah) || 1,
       namaBarang: item.namaBarang.trim(),
       berat: item.berat.trim(),
       karat: item.karat.trim(),
@@ -689,6 +699,7 @@ async function handleVerifikasi() {
       if (item.detailBarang && item.detailBarang.length > 0) {
         detailBarangItems = item.detailBarang.map((detail, idx) => ({
           id: idx + 1,
+          jumlah: detail.jumlah || 1,
           namaBarang: detail.namaBarang || "",
           berat: detail.berat || "",
           karat: detail.karat || "",
@@ -702,6 +713,7 @@ async function handleVerifikasi() {
         detailBarangItems = [
           {
             id: 1,
+            jumlah: 1,
             namaBarang: item.namaBarang || "",
             berat: item.berat || "",
             karat: item.karat || "",
@@ -974,15 +986,16 @@ function generatePrintBox(item) {
           {
             namaBarang: item.namaBarang || "",
             jenisServis: item.jenisServis || "",
+            rincianServis: item.rincianServis || "",
           },
         ];
 
-  // Create combined format: "item (jenis servis)" for each line
+  // Create combined format: "item (rincian servis)" for each line
   const combinedItems = details
     .map((d) => {
       const namaBarang = d.namaBarang || "-";
-      const jenisServis = d.jenisServis || "-";
-      return `${namaBarang} (${jenisServis})`;
+      const servisInfo = d.rincianServis?.trim() || d.jenisServis || "-";
+      return `${namaBarang} (${servisInfo})`;
     })
     .join("<br>");
 
@@ -1040,6 +1053,7 @@ function getPrintStyles() {
       }
       .print-nama-brg {
         font-size: 7px;
+        font-weight: bold;
         margin: 2px 1px;
         word-wrap: break-word;
         line-height: 1.1;
@@ -1084,7 +1098,23 @@ window.printSingleItem = function (id, index) {
 
   printWindow.document.write(printContent);
   printWindow.document.close();
+
+  // Auto print 2x (double print) dengan auto-close
+  let printCount = 0;
+  const handleAfterPrint = () => {
+    printCount++;
+    if (printCount === 2) {
+      printWindow.removeEventListener("afterprint", handleAfterPrint);
+      setTimeout(() => printWindow.close(), 100);
+    }
+  };
+
+  printWindow.addEventListener("afterprint", handleAfterPrint);
+
   printWindow.print();
+  setTimeout(() => {
+    printWindow.print();
+  }, 1000);
 };
 
 // Fungsi untuk reprint nota servis individual dari riwayat
@@ -1130,6 +1160,12 @@ function printReport() {
 
   printWindow.document.write(printContent);
   printWindow.document.close();
+
+  // Auto-close setelah print selesai
+  printWindow.addEventListener("afterprint", () => {
+    setTimeout(() => printWindow.close(), 100);
+  });
+
   printWindow.print();
 }
 
@@ -1214,15 +1250,14 @@ function generateNotaText(servisData) {
   notaText += "\n\n\n";
 
   // Header tabel dengan lebar kolom sesuai spesifikasi
-  // Kolom: Jumlah(2.5cm) | Nama Barang(6.9cm) | Berat(2cm) | Karat(2cm) | Ongkos(2.9cm) | Terbilang(3cm)
-  // Estimasi: 1cm ≈ 4-5 karakter untuk font monospace 12px
+  // Kolom: Jumlah | Nama Barang | Berat | Karat | Ongkos | Terbilang
   const colWidths = {
-    jumlah: 14, // 2.5cm ≈ 10 char
-    namaBarang: 31, // 6.9cm ≈ 28 char
-    berat: 8, // 2cm ≈ 8 char
-    karat: 5, // 2cm ≈ 8 char
-    ongkos: 10, // 2.9cm ≈ 12 char
-    terbilang: 12, // 3cm ≈ 12 char
+    jumlah: 14,
+    namaBarang: 31,
+    berat: 8,
+    karat: 5,
+    ongkos: 10,
+    terbilang: 14,
   };
 
   // Header tabel
@@ -1240,44 +1275,44 @@ function generateNotaText(servisData) {
       servis.detailBarang.forEach((item) => {
         const ongkos = item.ongkos || 0;
 
-        // Wrap nama barang jika terlalu panjang
-        const namaBarangLines = wrapText(item.namaBarang, colWidths.namaBarang);
+        // Get status label
+        const statusPembayaran = servis.statusPembayaran || "nominal";
+        const statusLabel = getStatusLabel(statusPembayaran);
 
-        // Prepare rincian servis dan wrap jika panjang
-        const rincianServisRaw = item.rincianServis?.trim()
-          ? `(${item.rincianServis.trim()})`
-          : item.jenisServis
-          ? `(${item.jenisServis})`
-          : "";
-        const rincianServisLines = rincianServisRaw ? wrapText(rincianServisRaw, colWidths.namaBarang - 2) : [];
+        // Wrap nama barang dengan status dan terbilang jika terlalu panjang
+        const namaBarangWithStatus = item.namaBarang + " [" + statusLabel + "]";
+        const namaBarangLines = wrapText(namaBarangWithStatus, colWidths.namaBarang);
+        const jenisServisText = item.rincianServis?.trim() || item.jenisServis || "";
+        const terbilangLines = wrapText(jenisServisText, colWidths.terbilang);
 
-        // Baris pertama: nama barang (line 1) dengan data lengkap
-        notaText += padText("", colWidths.jumlah) + " ";
-        notaText += padText(namaBarangLines[0], colWidths.namaBarang) + " ";
-        notaText += padText(item.berat || "", colWidths.berat) + " ";
-        notaText += padText(item.karat || "", colWidths.karat) + " ";
-        notaText += padText(formatCurrency(ongkos), colWidths.ongkos, "right") + " ";
-        notaText += padText("", colWidths.terbilang) + "\n";
+        // Tentukan jumlah baris maksimal antara nama barang dan terbilang
+        const maxLines = Math.max(namaBarangLines.length, terbilangLines.length);
 
-        // Baris berikutnya: sisa nama barang (jika ada)
-        for (let i = 1; i < namaBarangLines.length; i++) {
-          notaText += padText("", colWidths.jumlah) + " ";
-          notaText += padText(namaBarangLines[i], colWidths.namaBarang) + " ";
-          notaText += padText("", colWidths.berat) + " ";
-          notaText += padText("", colWidths.karat) + " ";
-          notaText += padText("", colWidths.ongkos) + " ";
-          notaText += padText("", colWidths.terbilang) + "\n";
+        // Loop untuk setiap baris
+        for (let i = 0; i < maxLines; i++) {
+          // Jumlah hanya di baris pertama dengan suffix 'pcs'
+          if (i === 0) {
+            const jumlahText = (item.jumlah || "1") + " pcs";
+            notaText += padText(jumlahText, colWidths.jumlah, "center") + " ";
+          } else {
+            notaText += padText("", colWidths.jumlah) + " ";
+          }
+
+          notaText += padText(namaBarangLines[i] || "", colWidths.namaBarang) + " ";
+
+          // Berat, karat, dan ongkos hanya di baris pertama
+          if (i === 0) {
+            notaText += padText(item.berat || "", colWidths.berat) + " ";
+            notaText += padText(item.karat || "", colWidths.karat) + " ";
+            notaText += padText(formatCurrency(ongkos), colWidths.ongkos, "right") + " ";
+          } else {
+            notaText += padText("", colWidths.berat) + " ";
+            notaText += padText("", colWidths.karat) + " ";
+            notaText += padText("", colWidths.ongkos) + " ";
+          }
+
+          notaText += padText(terbilangLines[i] || "", colWidths.terbilang) + "\n";
         }
-
-        // Baris rincian servis: wrap multi-line dengan indentasi
-        rincianServisLines.forEach((line, idx) => {
-          notaText += padText("", colWidths.jumlah) + " ";
-          notaText += padText(idx === 0 ? `  ${line}` : `  ${line}`, colWidths.namaBarang) + " ";
-          notaText += padText("", colWidths.berat) + " ";
-          notaText += padText("", colWidths.karat) + " ";
-          notaText += padText("", colWidths.ongkos) + " ";
-          notaText += padText("", colWidths.terbilang) + "\n";
-        });
 
         totalOngkos += ongkos;
       });
@@ -1285,57 +1320,56 @@ function generateNotaText(servisData) {
       // Fallback untuk format lama
       const ongkos = servis.totalOngkos || servis.ongkos || 0;
 
-      // Wrap nama barang jika terlalu panjang
-      const namaBarangLines = wrapText(servis.namaBarang || "", colWidths.namaBarang);
+      // Get status label
+      const statusPembayaran = servis.statusPembayaran || "nominal";
+      const statusLabel = getStatusLabel(statusPembayaran);
 
-      // Prepare rincian servis dan wrap jika panjang
-      const rincianServisRaw = servis.rincianServis?.trim()
-        ? `(${servis.rincianServis.trim()})`
-        : servis.jenisServis
-        ? `(${servis.jenisServis})`
-        : "";
-      const rincianServisLines = rincianServisRaw ? wrapText(rincianServisRaw, colWidths.namaBarang - 2) : [];
+      // Wrap nama barang dengan status dan terbilang jika terlalu panjang
+      const namaBarangWithStatus = (servis.namaBarang || "") + " [" + statusLabel + "]";
+      const namaBarangLines = wrapText(namaBarangWithStatus, colWidths.namaBarang);
+      const jenisServisText = servis.rincianServis?.trim() || servis.jenisServis || "";
+      const terbilangLines = wrapText(jenisServisText, colWidths.terbilang);
 
-      // Baris pertama: nama barang dengan data lengkap
-      notaText += padText("", colWidths.jumlah) + " ";
-      notaText += padText(namaBarangLines[0], colWidths.namaBarang) + " ";
-      notaText += padText(servis.berat || "", colWidths.berat) + " ";
-      notaText += padText(servis.karat || "", colWidths.karat) + " ";
-      notaText += padText(formatCurrency(ongkos), colWidths.ongkos, "right") + " ";
-      notaText += padText("", colWidths.terbilang) + "\n";
+      // Tentukan jumlah baris maksimal antara nama barang dan terbilang
+      const maxLines = Math.max(namaBarangLines.length, terbilangLines.length);
 
-      // Baris berikutnya: sisa nama barang (jika ada)
-      for (let i = 1; i < namaBarangLines.length; i++) {
-        notaText += padText("", colWidths.jumlah) + " ";
-        notaText += padText(namaBarangLines[i], colWidths.namaBarang) + " ";
-        notaText += padText("", colWidths.berat) + " ";
-        notaText += padText("", colWidths.karat) + " ";
-        notaText += padText("", colWidths.ongkos) + " ";
-        notaText += padText("", colWidths.terbilang) + "\n";
+      // Loop untuk setiap baris
+      for (let i = 0; i < maxLines; i++) {
+        // Jumlah hanya di baris pertama (fallback format lama default 1) dengan suffix 'pcs'
+        if (i === 0) {
+          notaText += padText("1 pcs", colWidths.jumlah, "center") + " ";
+        } else {
+          notaText += padText("", colWidths.jumlah) + " ";
+        }
+
+        notaText += padText(namaBarangLines[i] || "", colWidths.namaBarang) + " ";
+
+        // Berat, karat, dan ongkos hanya di baris pertama
+        if (i === 0) {
+          notaText += padText(servis.berat || "", colWidths.berat) + " ";
+          notaText += padText(servis.karat || "", colWidths.karat) + " ";
+          notaText += padText(formatCurrency(ongkos), colWidths.ongkos, "right") + " ";
+        } else {
+          notaText += padText("", colWidths.berat) + " ";
+          notaText += padText("", colWidths.karat) + " ";
+          notaText += padText("", colWidths.ongkos) + " ";
+        }
+
+        notaText += padText(terbilangLines[i] || "", colWidths.terbilang) + "\n";
       }
-
-      // Baris rincian servis: wrap multi-line dengan indentasi
-      rincianServisLines.forEach((line, idx) => {
-        notaText += padText("", colWidths.jumlah) + " ";
-        notaText += padText(idx === 0 ? `  ${line}` : `  ${line}`, colWidths.namaBarang) + " ";
-        notaText += padText("", colWidths.berat) + " ";
-        notaText += padText("", colWidths.karat) + " ";
-        notaText += padText("", colWidths.ongkos) + " ";
-        notaText += padText("", colWidths.terbilang) + "\n";
-      });
 
       totalOngkos += ongkos;
     }
   });
 
   // Spasi sebelum footer
-  notaText += "\n\n\n\n\n\n\n\n";
+  notaText += "\n\n\n\n\n\n";
 
   // Tanda tangan section
   const salesName = servisData[0]?.namaSales || "Admin";
   const customerName = servisData[0]?.namaCustomer || "";
 
-  notaText += `                                               ${customerName}                       ${salesName}\n`;
+  notaText += `                                                 ${customerName}               ${salesName}\n`;
 
   return notaText;
 }
@@ -1359,18 +1393,19 @@ function printNotaServis(servisData) {
             padding: 5mm;
             font-family: 'Courier New', monospace;
             font-size: 14px;
+            font-weight: bold;
             white-space: pre;
             position: relative;
           }
           .customer-info {
             position: absolute;
-            top: 10mm;
-            right: 27mm;
+            top: 8mm;
+            right: 25mm;
             line-height: 1.2;
             text-align: right;
           }
           .data-items {
-            margin-top: 23mm;
+            margin-top: 21mm;
             line-height: 1.7;
           }
         </style>
@@ -1383,7 +1418,23 @@ function printNotaServis(servisData) {
   `);
 
   printWindow.document.close();
+
+  // Auto print 2x (double print) dengan auto-close
+  let printCount = 0;
+  const handleAfterPrint = () => {
+    printCount++;
+    if (printCount === 2) {
+      printWindow.removeEventListener("afterprint", handleAfterPrint);
+      setTimeout(() => printWindow.close(), 100);
+    }
+  };
+
+  printWindow.addEventListener("afterprint", handleAfterPrint);
+
   printWindow.print();
+  setTimeout(() => {
+    printWindow.print();
+  }, 1000);
 }
 
 function exportToPDF() {
