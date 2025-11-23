@@ -165,7 +165,11 @@ function setupEventListeners() {
 
   // Export PDF button
   document.getElementById("exportPdfBtn").addEventListener("click", function () {
-    exportToPDF();
+    if (filterJenisRiwayat === "servis") {
+      exportServisToPDF();
+    } else {
+      exportCustomToPDF();
+    }
   });
 
   // Print button
@@ -416,7 +420,14 @@ function updateDetailBarangCustomTable() {
 function updateDetailBarangCustomItem(id, field, value) {
   const item = detailBarangCustomItems.find((item) => item.id === id);
   if (item) {
-    item[field] = value;
+    // Trim whitespace untuk field string, parse number untuk field numerik
+    if (field === "jumlah" || field === "totalDp" || field === "ongkos") {
+      item[field] = parseInt(value) || 0;
+    } else if (typeof value === "string") {
+      item[field] = value.trim();
+    } else {
+      item[field] = value;
+    }
   }
 }
 
@@ -1325,6 +1336,7 @@ function updateRiwayatTableCustom(filteredData) {
     tbody.innerHTML = '<tr><td colspan="13" class="text-center">Belum ada data custom pada tanggal ini</td></tr>';
     document.getElementById("total-riwayat-dp").textContent = "Rp 0";
     document.getElementById("total-riwayat-ongkos-custom").textContent = "Rp 0";
+    document.getElementById("total-riwayat-nominal").textContent = "Rp 0";
     return;
   }
 
@@ -1389,34 +1401,47 @@ function updateRiwayatTableCustom(filteredData) {
     tbody.appendChild(row);
   });
 
+  const totalNominal = totalDP + totalOngkos;
   document.getElementById("total-riwayat-dp").textContent = `Rp ${totalDP.toLocaleString("id-ID")}`;
   document.getElementById("total-riwayat-ongkos-custom").textContent = `Rp ${totalOngkos.toLocaleString("id-ID")}`;
+  document.getElementById("total-riwayat-nominal").textContent = `Rp ${totalNominal.toLocaleString("id-ID")}`;
 }
 
 // Create shared function for generating print box HTML
 function generatePrintBox(item) {
   const jenisInput = item.jenisInput || "servis";
+  const namaCustomer = item.namaCustomer || "N/A";
 
   if (jenisInput === "custom") {
     // Format untuk custom
     const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
 
-    const combinedItems = details
-      .map((d) => {
-        const namaBarang = d.namaBarang || "-";
-        const berat = d.berat || "-";
-        const panjang = d.panjang || "-";
-        const kadar = d.kadar || "-";
-        const warna = d.warna || "-";
+    let combinedItems = "";
+    if (details.length > 0) {
+      combinedItems = details
+        .map((d) => {
+          const namaBarang = d.namaBarang || "-";
+          const berat = d.berat || "-";
+          const panjang = d.panjang || "-";
+          const kadar = d.kadar || "-";
+          const warna = d.warna || "-";
+          const rincianCustom = d.rincianServis?.trim() || "";
 
-        // Format: Nama Barang | Berat | Panjang | Kadar | Warna
-        return `${namaBarang}<br>B:${berat} P:${panjang}<br>K:${kadar} W:${warna}`;
-      })
-      .join("<br>");
+          // Format: Nama Barang | Berat | Panjang | Kadar | Warna | Rincian
+          let itemText = `${namaBarang}<br>B:${berat} P:${panjang}K:${kadar} W:${warna}`;
+          if (rincianCustom) {
+            itemText += `<br>${rincianCustom}`;
+          }
+          return itemText;
+        })
+        .join("<br>");
+    } else {
+      combinedItems = "Data tidak tersedia";
+    }
 
     return `
       <div class="print-service-box">
-        <div class="print-customer-name">${item.namaCustomer}</div>
+        <div class="print-customer-name">${namaCustomer}</div>
         <div class="print-nama-brg">${combinedItems}</div>
         <div class="print-status">CUSTOM</div>
       </div>
@@ -1431,30 +1456,35 @@ function generatePrintBox(item) {
         ? item.detailBarang
         : [
             {
-              namaBarang: item.namaBarang || "",
-              jenisServis: item.jenisServis || "",
+              namaBarang: item.namaBarang || "-",
+              jenisServis: item.jenisServis || "-",
               rincianServis: item.rincianServis || "",
             },
           ];
 
-    const combinedItems = details
-      .map((d) => {
-        const namaBarang = d.namaBarang || "-";
-        const jenisServis = d.jenisServis || "-";
-        const rincianServis = d.rincianServis?.trim() || "";
+    let combinedItems = "";
+    if (details.length > 0) {
+      combinedItems = details
+        .map((d) => {
+          const namaBarang = d.namaBarang || "-";
+          const jenisServis = d.jenisServis || "-";
+          const rincianServis = d.rincianServis?.trim() || "";
 
-        // Format: Nama Barang - Jenis Servis - Rincian Servis (jika ada)
-        if (rincianServis) {
-          return `${namaBarang} - ${jenisServis} - ${rincianServis}`;
-        } else {
-          return `${namaBarang} - ${jenisServis}`;
-        }
-      })
-      .join("<br>");
+          // Format: Nama Barang - Jenis Servis - Rincian Servis (jika ada)
+          if (rincianServis) {
+            return `${namaBarang} - ${jenisServis} - ${rincianServis}`;
+          } else {
+            return `${namaBarang} - ${jenisServis}`;
+          }
+        })
+        .join("<br>");
+    } else {
+      combinedItems = "Data tidak tersedia";
+    }
 
     return `
       <div class="print-service-box">
-        <div class="print-customer-name">${item.namaCustomer}</div>
+        <div class="print-customer-name">${namaCustomer}</div>
         <div class="print-nama-brg">${combinedItems}</div>
         <div class="print-status">${statusText}</div>
       </div>
@@ -1489,11 +1519,11 @@ function getPrintStyles() {
         width: 2.7cm;
         height: 2.7cm;
         border: 1px solid #000;
-        padding: 2mm;
+        padding: 1.5mm;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: space-between;
         text-align: center;
         break-inside: avoid;
         overflow: hidden;
@@ -1501,36 +1531,41 @@ function getPrintStyles() {
       .print-customer-name {
         font-size: 8px;
         font-weight: bold;
-        margin-bottom: 1px;
         word-wrap: break-word;
         line-height: 1.1;
+        margin: 0;
+        padding: 0;
       }
       .print-nama-brg {
         font-size: 7px;
         font-weight: bold;
-        margin-top: 3cm;
         word-wrap: break-word;
+        word-break: break-word;
         line-height: 1.1;
         overflow: hidden;
-        text-overflow: ellipsis;
         flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        margin: 0;
+        padding: 1px 0;
       }
       .print-status {
-        font-size: 6px;
+        font-size: 7px;
         font-weight: bold;
-        margin-top: 1px;
-        color: #666;
+        color: #333;
+        margin: 0;
+        padding: 0;
       }
     </style>
   `;
 }
 
-// Completely rewrite printSingleItem to match printReport format
 window.printSingleItem = function (id, index) {
-  // Cari item dari todayData berdasarkan id
   const item = todayData.find((item) => item.id === id);
+
   if (!item) {
-    alert("Data tidak ditemukan");
+    alert("Data tidak ditemukan. Silakan klik 'Tampilkan' terlebih dahulu.");
     return;
   }
 
@@ -1569,7 +1604,7 @@ window.printSingleItem = function (id, index) {
   printWindow.print();
   setTimeout(() => {
     printWindow.print();
-  }, 1000);
+  }, 100);
 };
 
 // Fungsi untuk reprint nota servis individual dari riwayat
@@ -1580,8 +1615,6 @@ window.printNotaServisItem = function (id, index) {
     alert("Data tidak ditemukan");
     return;
   }
-
-  // Convert single item to array format untuk printNotaServis
   printNotaServis([item]);
 };
 
@@ -1593,8 +1626,6 @@ window.printNotaCustomItem = function (id, index) {
     alert("Data tidak ditemukan");
     return;
   }
-
-  // Convert single item to array format untuk printNotaCustom
   printNotaCustom([item]);
 };
 
@@ -1884,20 +1915,23 @@ function generateNotaCustomHTML(servisData) {
     const details = servis.detailBarangCustom || [];
 
     details.forEach((item) => {
-      const namaBarangParts = [item.namaBarang];
-      if (item.panjang) namaBarangParts.push(`P: ${item.panjang}cm`);
-      if (item.kadar) namaBarangParts.push(`K: ${item.kadar}`);
-      if (item.warna) namaBarangParts.push(`W: ${item.warna}`);
+      const namaBarangParts = [item.namaBarang || "-"];
+      if (item.panjang && item.panjang.trim()) namaBarangParts.push(`P: ${item.panjang}cm`);
+      if (item.kadar && item.kadar.trim()) namaBarangParts.push(`K: ${item.kadar}`);
+      if (item.warna && item.warna.trim()) namaBarangParts.push(`W: ${item.warna}`);
       const namaBarangGabungan = namaBarangParts.join(", ");
+
+      // Tambahkan simbol ± di depan berat jika ada nilai, default "-"
+      const beratText = item.berat && item.berat.trim() ? `± ${item.berat}` : "-";
 
       tableRows += `
         <tr>
           <td style="text-align: center;">${item.jumlah || 1} pcs</td>
           <td>${namaBarangGabungan}</td>
-          <td>${item.berat || ""}</td>
-          <td style="text-align: right;">${formatCurrency(item.totalDp || 0)}</td>
+          <td>${beratText}</td>
+          <td style="text-align: right;">${formatCurrency(item.totalDP || 0)}</td>
           <td style="text-align: right;">${formatCurrency(item.ongkos || 0)}</td>
-          <td>${item.rincianServis || ""}</td>
+          <td>${item.rincianServis && item.rincianServis.trim() ? item.rincianServis : "-"}</td>
         </tr>
       `;
     });
@@ -1948,32 +1982,30 @@ function printNotaCustom(servisData) {
           }
           .customer-info {
             position: absolute;
-            top: 5mm;
-            right: 45mm;
+            top: 8mm;
+            right: 20mm;
             line-height: 1.8;
             text-align: right;
             font-size: 12px;
           }
           .nota-table {
-            margin-top: 3.6cm;
+            margin-top: 4cm;
           }
           table {
             width: 100%;
             border-collapse: collapse;
-            margin-right: 2cm;
           }
           td {
             padding: 2px 4px;
             vertical-align: top;
             font-size: 12px;
-            line-height: 1.8;
+            line-height: 2;
           }
           td:nth-child(1) {
-            width: 70px;
-            align-items: right;
+            width: 40px;
           }
           td:nth-child(2) {
-            width: 150px;
+            width: 130px;
           }
           td:nth-child(3) {
             width: 20px;
@@ -1984,7 +2016,7 @@ function printNotaCustom(servisData) {
             align-items: center;
           }
           td:nth-child(5) {
-            width: 20px;
+            width: 30px;
           }
           td:nth-child(6) {
             width: 50px;
@@ -1996,7 +2028,7 @@ function printNotaCustom(servisData) {
             font-size: 12px;
           }
           .signature-sales {
-            margin-right: 10cm;
+            margin-right: 9cm;
           }
         </style>
       </head>
@@ -2022,177 +2054,95 @@ function printNotaCustom(servisData) {
   setTimeout(() => printWindow.print(), 1000);
 }
 
-function exportToPDF() {
-  if (todayData.length === 0) {
-    alert("Tidak ada data untuk diekspor");
+function exportServisToPDF() {
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === "servis");
+
+  if (filteredData.length === 0) {
+    alert("Tidak ada data servis untuk diekspor");
     return;
   }
 
   try {
     const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
-
-    // Hitung total ongkos untuk status nominal dan custom
-    const totalOngkos = todayData.reduce((sum, item) => {
+    const totalOngkos = filteredData.reduce((sum, item) => {
       const statusPembayaran = item.statusPembayaran || "nominal";
       return statusPembayaran === "nominal" || statusPembayaran === "custom" ? sum + (item.ongkos || 0) : sum;
     }, 0);
 
+    const tableBody = [
+      [
+        { text: "No", style: "tableHeader" },
+        { text: "Sales", style: "tableHeader" },
+        { text: "Customer", style: "tableHeader" },
+        { text: "No HP", style: "tableHeader" },
+        { text: "Nama Barang", style: "tableHeader" },
+        { text: "Berat", style: "tableHeader" },
+        { text: "Karat", style: "tableHeader" },
+        { text: "Jenis Servis", style: "tableHeader" },
+        { text: "Rincian", style: "tableHeader" },
+        { text: "Ongkos", style: "tableHeader" },
+        { text: "Status", style: "tableHeader" },
+      ],
+    ];
+
+    filteredData.forEach((item, index) => {
+      const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [{}];
+      details.forEach((d, idx) => {
+        const statusPembayaran = item.statusPembayaran || "nominal";
+        let ongkosText =
+          statusPembayaran === "free"
+            ? "GRATIS"
+            : statusPembayaran === "belum_lunas"
+            ? "BELUM LUNAS"
+            : `Rp ${(d.ongkos || 0).toLocaleString("id-ID")}`;
+
+        tableBody.push([
+          { text: idx === 0 ? (index + 1).toString() : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaSales || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaCustomer || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.noHp || "" : "", style: "tableCell" },
+          { text: d.namaBarang || "-", style: "tableCell" },
+          { text: d.berat || "-", style: "tableCell" },
+          { text: d.karat || "-", style: "tableCell" },
+          { text: d.jenisServis || "-", style: "tableCell" },
+          { text: d.rincianServis || "-", style: "tableCell" },
+          { text: ongkosText, style: "tableCellRight" },
+          { text: idx === 0 ? getStatusLabel(statusPembayaran) : "", style: "tableCell" },
+        ]);
+      });
+    });
+
+    tableBody.push([
+      { text: "", colSpan: 8, style: "tableCell" },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      { text: "TOTAL:", style: "tableCellBold", alignment: "right" },
+      { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+      { text: "", style: "tableCell" },
+    ]);
+
     const docDefinition = {
       pageOrientation: "landscape",
-      pageMargins: [20, 30, 20, 30],
+      pageMargins: [15, 25, 15, 25],
       content: [
-        {
-          text: "LAPORAN INPUT SERVIS",
-          style: "header",
-          alignment: "center",
-          margin: [0, 0, 0, 8],
-        },
-        {
-          text: `Tanggal: ${tanggalRiwayat}`,
-          style: "subheader",
-          alignment: "center",
-          margin: [0, 0, 0, 8],
-        },
+        { text: "LAPORAN SERVIS", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
+        { text: "Melati Gold Shop", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
+        { text: `Tanggal: ${tanggalRiwayat}`, style: "subheader", alignment: "center", margin: [0, 0, 0, 8] },
         {
           table: {
             headerRows: 1,
-            widths: [15, 60, 50, 120, 40, 40, 140, 70, 50, 50],
-            body: [
-              [
-                { text: "No", style: "tableHeader" },
-                { text: "Nama Customer", style: "tableHeader" },
-                { text: "No HP", style: "tableHeader" },
-                { text: "Nama Barang", style: "tableHeader" },
-                { text: "Berat", style: "tableHeader" },
-                { text: "Karat", style: "tableHeader" },
-                { text: "Jenis Servis / Custom", style: "tableHeader" },
-                { text: "Ongkos / DP", style: "tableHeader" },
-                { text: "Status", style: "tableHeader" },
-                { text: "Sales", style: "tableHeader" },
-              ],
-              ...todayData.map((item, index) => {
-                const statusPembayaran = item.statusPembayaran || "nominal";
-                let ongkosText = "";
-
-                if (statusPembayaran === "free") {
-                  ongkosText = "GRATIS";
-                } else if (statusPembayaran === "belum_lunas") {
-                  ongkosText = item.ongkos > 0 ? `Rp ${(item.ongkos || 0).toLocaleString("id-ID")}` : "BELUM LUNAS";
-                } else if (statusPembayaran === "custom") {
-                  ongkosText = `DP: Rp ${(item.ongkos || 0).toLocaleString("id-ID")}`;
-                } else {
-                  ongkosText = `Rp ${(item.ongkos || 0).toLocaleString("id-ID")}`;
-                }
-
-                return [
-                  { text: (index + 1).toString(), style: "tableCell" },
-                  { text: item.namaCustomer || "", style: "tableCell" },
-                  { text: item.noHp || "", style: "tableCell" },
-                  { text: item.namaBarang || "", style: "tableCell" },
-                  { text: item.berat || "-", style: "tableCell" },
-                  { text: item.karat || "-", style: "tableCell" },
-                  { text: item.jenisServis || "", style: "tableCell" },
-                  { text: ongkosText, style: "tableCellRight" },
-                  { text: getStatusLabel(statusPembayaran), style: "tableCell" },
-                  { text: item.namaSales || "", style: "tableCell" },
-                ];
-              }),
-              // Baris total
-              [
-                { text: "", style: "tableCell" },
-                { text: "", style: "tableCell" },
-                { text: "", style: "tableCell" },
-                { text: "", style: "tableCell" },
-                { text: "", style: "tableCell" },
-                { text: "", style: "tableCell" },
-                { text: "TOTAL NOMINAL:", style: "tableCellBold", alignment: "right" },
-                { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
-                { text: "", style: "tableCell" },
-                { text: "", style: "tableCell" },
-              ],
-            ],
+            widths: [20, 50, 70, 60, 160, 35, 35, 70, 140, 50, 40],
+            body: tableBody,
           },
-          layout: {
-            hLineWidth: function (i, node) {
-              return i === 0 || i === node.table.body.length ? 2 : 1;
-            },
-            vLineWidth: function (i, node) {
-              return i === 0 || i === node.table.widths.length ? 2 : 1;
-            },
-            hLineColor: function (i, node) {
-              return i === 0 || i === node.table.body.length ? "#666666" : "#cccccc";
-            },
-            vLineColor: function (i, node) {
-              return i === 0 || i === node.table.widths.length ? "#666666" : "#cccccc";
-            },
-            paddingLeft: function (i, node) {
-              return 3;
-            },
-            paddingRight: function (i, node) {
-              return 3;
-            },
-            paddingTop: function (i, node) {
-              return 2;
-            },
-            paddingBottom: function (i, node) {
-              return 1;
-            },
-          },
-        },
-        // Tambahkan keterangan di bawah tabel
-        {
-          text: "Keterangan: Total Nominal mencakup status LUNAS dan CUSTOM",
-          style: "footnote",
-          alignment: "left",
-          margin: [0, 7, 0, 0],
+          layout: getPDFLayout(),
         },
       ],
-      styles: {
-        header: {
-          fontSize: 16,
-          bold: true,
-          color: "#2c3e50",
-        },
-        subheader: {
-          fontSize: 12,
-          bold: true,
-          color: "#34495e",
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 10,
-          color: "white",
-          fillColor: "#3498db",
-          alignment: "center",
-        },
-        tableCell: {
-          fontSize: 8,
-          margin: [0, 1, 0, 1],
-        },
-        tableCellRight: {
-          fontSize: 8,
-          alignment: "right",
-          margin: [0, 1, 0, 1],
-        },
-        tableCellBold: {
-          fontSize: 8,
-          bold: true,
-          fillColor: "#ecf0f1",
-          margin: [0, 1, 0, 1],
-        },
-        tableCellBoldRight: {
-          fontSize: 8,
-          bold: true,
-          alignment: "right",
-          fillColor: "#ecf0f1",
-          margin: [0, 1, 0, 1],
-        },
-        footnote: {
-          fontSize: 8,
-          italics: true,
-          color: "#666666",
-        },
-      },
+      styles: getPDFStyles(),
     };
 
     pdfMake.createPdf(docDefinition).download(`Laporan_Servis_${tanggalRiwayat.replace(/\//g, "-")}.pdf`);
@@ -2200,6 +2150,140 @@ function exportToPDF() {
     console.error("Error exporting PDF:", error);
     alert("Terjadi kesalahan saat mengekspor PDF");
   }
+}
+
+function exportCustomToPDF() {
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === "custom");
+
+  if (filteredData.length === 0) {
+    alert("Tidak ada data custom untuk diekspor");
+    return;
+  }
+
+  try {
+    const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
+    let totalDP = 0;
+    let totalOngkos = 0;
+
+    const tableBody = [
+      [
+        { text: "No", style: "tableHeader" },
+        { text: "Sales", style: "tableHeader" },
+        { text: "Customer", style: "tableHeader" },
+        { text: "No HP", style: "tableHeader" },
+        { text: "Nama Barang", style: "tableHeader" },
+        { text: "Berat", style: "tableHeader" },
+        { text: "Panjang", style: "tableHeader" },
+        { text: "Kadar", style: "tableHeader" },
+        { text: "Warna", style: "tableHeader" },
+        { text: "Rincian", style: "tableHeader" },
+        { text: "Total DP", style: "tableHeader" },
+        { text: "Ongkos", style: "tableHeader" },
+      ],
+    ];
+
+    filteredData.forEach((item, index) => {
+      const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [{}];
+      details.forEach((d, idx) => {
+        totalDP += d.totalDP || 0;
+        totalOngkos += d.ongkos || 0;
+
+        tableBody.push([
+          { text: idx === 0 ? (index + 1).toString() : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaSales || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaCustomer || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.noHp || "" : "", style: "tableCell" },
+          { text: d.namaBarang || "-", style: "tableCell" },
+          { text: d.berat || "-", style: "tableCell" },
+          { text: d.panjang || "-", style: "tableCell" },
+          { text: d.kadar || "-", style: "tableCell" },
+          { text: d.warna || "-", style: "tableCell" },
+          { text: d.rincianServis || "-", style: "tableCell" },
+          { text: `Rp ${(d.totalDP || 0).toLocaleString("id-ID")}`, style: "tableCellRight" },
+          { text: `Rp ${(d.ongkos || 0).toLocaleString("id-ID")}`, style: "tableCellRight" },
+        ]);
+      });
+    });
+
+    const totalNominal = totalDP + totalOngkos;
+    tableBody.push([
+      { text: "TOTAL:", colSpan: 10, style: "tableCellBold", alignment: "right" },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      { text: `Rp ${totalDP.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+      { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+    ]);
+    tableBody.push([
+      { text: "TOTAL NOMINAL:", colSpan: 11, style: "tableCellBold", alignment: "right" },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      { text: `Rp ${totalNominal.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+    ]);
+
+    const docDefinition = {
+      pageOrientation: "landscape",
+      pageMargins: [15, 25, 15, 25],
+      content: [
+        { text: "LAPORAN CUSTOM", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
+        { text: "Melati Gold Shop", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
+        { text: `Tanggal: ${tanggalRiwayat}`, style: "subheader", alignment: "center", margin: [0, 0, 0, 8] },
+        {
+          table: {
+            headerRows: 1,
+            widths: [20, 40, 70, 60, 160, 35, 35, 35, 35, 140, 50, 50],
+            body: tableBody,
+          },
+          layout: getPDFLayout(),
+        },
+      ],
+      styles: getPDFStyles(),
+    };
+
+    pdfMake.createPdf(docDefinition).download(`Laporan_Custom_${tanggalRiwayat.replace(/\//g, "-")}.pdf`);
+  } catch (error) {
+    console.error("Error exporting PDF:", error);
+    alert("Terjadi kesalahan saat mengekspor PDF");
+  }
+}
+
+function getPDFLayout() {
+  return {
+    hLineWidth: (i, node) => (i === 0 || i === node.table.body.length ? 2 : 1),
+    vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length ? 2 : 1),
+    hLineColor: (i, node) => (i === 0 || i === node.table.body.length ? "#666666" : "#cccccc"),
+    vLineColor: (i, node) => (i === 0 || i === node.table.widths.length ? "#666666" : "#cccccc"),
+    paddingLeft: () => 3,
+    paddingRight: () => 3,
+    paddingTop: () => 2,
+    paddingBottom: () => 1,
+  };
+}
+
+function getPDFStyles() {
+  return {
+    header: { fontSize: 16, bold: true, color: "#2c3e50" },
+    subheader: { fontSize: 12, bold: true, color: "#34495e" },
+    tableHeader: { bold: true, fontSize: 9, color: "white", fillColor: "#3498db", alignment: "center" },
+    tableCell: { fontSize: 8, margin: [0, 1, 0, 1] },
+    tableCellRight: { fontSize: 8, alignment: "right", margin: [0, 1, 0, 1] },
+    tableCellBold: { fontSize: 8, bold: true, fillColor: "#ecf0f1", margin: [0, 1, 0, 1] },
+    tableCellBoldRight: { fontSize: 8, bold: true, alignment: "right", fillColor: "#ecf0f1", margin: [0, 1, 0, 1] },
+  };
 }
 
 function showLoading(show) {

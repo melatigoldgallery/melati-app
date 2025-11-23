@@ -131,17 +131,92 @@
         }
       }
 
-      /* Styling untuk kolom aksi agar tidak wrap vertikal */
-      #tableRiwayatServis td:last-child,
-      #tableRiwayatServis th:last-child {
+      /* Wrapper untuk scroll horizontal tabel servis */
+      #sectionRiwayatServis .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Styling untuk tabel riwayat servis */
+      #tableRiwayatServis {
+        table-layout: auto;
+        min-width: 1600px;
+        width: 100%;
+      }
+
+      #tableRiwayatServis th,
+      #tableRiwayatServis td {
+        white-space: nowrap;
+        padding: 8px 12px;
+      }
+
+      #tableRiwayatServis th:nth-child(1),
+      #tableRiwayatServis td:nth-child(1) {
+        min-width: 50px;
+      }
+      #tableRiwayatServis th:nth-child(2),
+      #tableRiwayatServis td:nth-child(2) {
+        min-width: 100px;
+      }
+      #tableRiwayatServis th:nth-child(3),
+      #tableRiwayatServis td:nth-child(3) {
+        min-width: 80px;
+      }
+      #tableRiwayatServis th:nth-child(4),
+      #tableRiwayatServis td:nth-child(4) {
+        min-width: 150px;
+      }
+      #tableRiwayatServis th:nth-child(5),
+      #tableRiwayatServis td:nth-child(5) {
+        min-width: 100px;
+      }
+      #tableRiwayatServis th:nth-child(6),
+      #tableRiwayatServis td:nth-child(6) {
+        min-width: 250px;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+      #tableRiwayatServis th:nth-child(7),
+      #tableRiwayatServis td:nth-child(7) {
+        min-width: 70px;
+        white-space: normal;
+      }
+      #tableRiwayatServis th:nth-child(8),
+      #tableRiwayatServis td:nth-child(8) {
+        min-width: 70px;
+        white-space: normal;
+      }
+      #tableRiwayatServis th:nth-child(9),
+      #tableRiwayatServis td:nth-child(9) {
+        min-width: 120px;
+        white-space: normal;
+      }
+      #tableRiwayatServis th:nth-child(10),
+      #tableRiwayatServis td:nth-child(10) {
+        min-width: 250px;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+      #tableRiwayatServis th:nth-child(11),
+      #tableRiwayatServis td:nth-child(11) {
+        min-width: 100px;
+        white-space: normal;
+      }
+      #tableRiwayatServis th:nth-child(12),
+      #tableRiwayatServis td:nth-child(12) {
+        min-width: 150px;
         white-space: nowrap !important;
-        min-width: 140px;
       }
 
       #tableRiwayatServis .btn {
         margin: 1px;
         font-size: 11px;
         padding: 2px 6px;
+      }
+
+      #tableRiwayatServis .multi-col div {
+        padding: 2px 0;
+        word-wrap: break-word;
       }
 
       /* Responsive untuk tabel riwayat */
@@ -155,7 +230,7 @@
       /* Styling khusus untuk tabel riwayat custom */
       #tableRiwayatCustom {
         table-layout: auto;
-        min-width: 1400px;
+        min-width: 1700px;
         width: 100%;
       }
 
@@ -192,7 +267,7 @@
 
       #tableRiwayatCustom th:nth-child(6), /* Nama Barang */
       #tableRiwayatCustom td:nth-child(6) {
-        min-width: 200px;
+        min-width: 250px;
         white-space: normal;
       }
 
@@ -222,7 +297,7 @@
 
       #tableRiwayatCustom th:nth-child(11), /* Rincian Custom */
       #tableRiwayatCustom td:nth-child(11) {
-        min-width: 180px;
+        min-width: 250px;
         white-space: normal;
         word-wrap: break-word;
       }
@@ -706,7 +781,8 @@
                 </div>
 
                 <!-- Table riwayat servis -->
-                <div id="sectionRiwayatServis">sponsive">
+                <div id="sectionRiwayatServis">
+                  <div class="table-responsive">
                     <table class="table table-bordered table-hover" id="tableRiwayatServis">
                       <thead class="table-light">
                         <tr>
@@ -726,7 +802,9 @@
                       </thead>
                       <tbody>
                         <tr>
-                          <td colspan="12" class="text-center">Pilih tanggal dan klik "Tampilkan" untuk melihat data servis</td>
+                          <td colspan="12" class="text-center">
+                            Pilih tanggal dan klik "Tampilkan" untuk melihat data servis
+                          </td>
                         </tr>
                       </tbody>
                       <tfoot>
@@ -741,7 +819,7 @@
                 </div>
 
                 <!-- Table riwayat custom -->
-                <div id="sectionRiwayatCustom" style="display: none;">
+                <div id="sectionRiwayatCustom" style="display: none">
                   <div class="table-responsive">
                     <table class="table table-bordered table-hover" id="tableRiwayatCustom">
                       <thead class="table-light">
@@ -764,19 +842,22 @@
                       </thead>
                       <tbody>
                         <tr>
-                          <td colspan="14" class="text-center">Pilih tanggal dan klik "Tampilkan" untuk melihat data custom</td>
+                          <td colspan="14" class="text-center">
+                            Pilih tanggal dan klik "Tampilkan" untuk melihat data custom
+                          </td>
                         </tr>
                       </tbody>
                       <tfoot>
                         <tr class="table-info">
-                          <th colspan="11" class="text-end">Total DP:</th>
+                          <th colspan="11" class="text-end">Total:</th>
                           <th id="total-riwayat-dp">Rp 0</th>
-                          <th colspan="2"></th>
+                          <th id="total-riwayat-ongkos-custom">Rp 0</th>
+                          <th></th>
                         </tr>
                         <tr class="table-info">
-                          <th colspan="11" class="text-end">Total Ongkos:</th>
-                          <th id="total-riwayat-ongkos-custom">Rp 0</th>
-                          <th colspan="2"></th>
+                          <th colspan="11" class="text-end">Total Nominal:</th>
+                          <th id="total-riwayat-nominal">Rp 0</th>
+                          <th></th>
                         </tr>
                       </tfoot>
                     </table>
