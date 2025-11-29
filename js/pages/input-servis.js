@@ -1842,10 +1842,10 @@ function printNotaServis(servisData) {
             line-height: 1.8;
           }
           td:nth-child(1) {
-            width: 90px;
+            width: 80px;
           }
           td:nth-child(2) {
-            width: 200px;
+            width: 190px;
           }
           td:nth-child(3) {
             width: 40px;
