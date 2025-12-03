@@ -327,7 +327,7 @@ function updateDetailBarangItem(id, field, value) {
   const item = detailBarangItems.find((item) => item.id === id);
   if (item) {
     item[field] = value;
-    updateDetailBarangTable();
+    // Tidak perlu update table setiap kali perubahan untuk menjaga focus saat Tab
   }
 }
 
@@ -1516,8 +1516,8 @@ function getPrintStyles() {
         gap: 3mm;
       }
       .print-service-box {
-        width: 2.7cm;
-        height: 2.7cm;
+        width: 3cm;
+        height: 3cm;
         border: 1px solid #000;
         padding: 1.5mm;
         box-sizing: border-box;
@@ -1860,17 +1860,19 @@ function printNotaServis(servisData) {
             width: 100px;
           }
           .signature-section {
-            margin-top: 3.5cm;
-            margin-left: 3cm;
+            position: absolute;
+            top: 10.5cm;
+            left: 11.5cm;
+            right: 3cm;
             display: flex;
             justify-content: space-between;
             font-size: 12px;
           }
           .signature-customer {
-            margin-left: 300px;
+            text-align: left;
           }
           .signature-sales {
-            margin-right: 100px;
+            text-align: right;
           }
         </style>
       </head>
@@ -1911,6 +1913,9 @@ function generateNotaCustomHTML(servisData) {
   const salesName = firstCustomer.namaSales || "Admin";
 
   let tableRows = "";
+  let totalDP = 0;
+  let totalOngkos = 0;
+
   servisData.forEach((servis) => {
     const details = servis.detailBarangCustom || [];
 
@@ -1934,8 +1939,27 @@ function generateNotaCustomHTML(servisData) {
           <td>${item.rincianServis && item.rincianServis.trim() ? item.rincianServis : "-"}</td>
         </tr>
       `;
+
+      // Akumulasi total
+      totalDP += item.totalDP || 0;
+      totalOngkos += item.ongkos || 0;
     });
   });
+
+  // Hitung grand total (DP + Ongkos)
+  const grandTotal = totalDP + totalOngkos;
+
+  // Tambahkan baris total
+  tableRows += `
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td style="text-align: right; font-weight: bold;">BAYAR AWAL</td>
+      <td style="text-align: right; font-weight: bold;">${formatCurrency(grandTotal)}</td>
+      <td></td>
+    </tr>
+  `;
 
   return `
     <div class="customer-info">
@@ -1952,8 +1976,16 @@ function generateNotaCustomHTML(servisData) {
       </table>
     </div>
     
+    <div class="total-dp-info">
+      ${formatCurrency(totalDP)} (DP)
+    </div>
+    
+    <div class="note-info">
+      Note : Ongkos tidak termasuk hitungan pelunasan
+    </div>
+    
     <div class="signature-section">
-      <div class="signature-sales">${salesName}</div>
+      <div class="signature-sales">Sales: ${salesName}</div>
     </div>
   `;
 }
@@ -2021,14 +2053,33 @@ function printNotaCustom(servisData) {
           td:nth-child(6) {
             width: 50px;
           }
+          .total-dp-info {
+            position: absolute;
+            top: 9.5cm;
+            right: 25mm;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: right;
+            line-height: 2;
+          }
+          .note-info {
+            position: absolute;
+            top: 11.6cm;
+            right: 10mm;
+            font-size: 10px;
+            font-weight: bold;
+            font-style: italic;
+            text-align: right;
+            color: #333;
+          }
           .signature-section {
-            margin-top: 3cm;
-            display: flex;
-            justify-content: flex-end;
+            position: absolute;
+            top: 11.6cm;
+            left: 8mm;
             font-size: 12px;
           }
           .signature-sales {
-            margin-right: 9cm;
+            text-align: left;
           }
         </style>
       </head>
