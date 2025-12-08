@@ -702,10 +702,21 @@ async function saveServisItem() {
       // Ambil tanggal dari field edit jika sedang edit riwayat
       const tanggalEdit = document.getElementById("tanggalEdit").value;
       if (tanggalEdit) {
-        // Convert date format from dd/mm/yyyy to yyyy-mm-dd
+        // Get original item to preserve timestamp
+        const originalItem = todayData.find((item) => item.id === editingRiwayatId);
+        const originalDate = originalItem ? new Date(originalItem.tanggal) : new Date();
+
+        // Parse new date but keep original time
         const [day, month, year] = tanggalEdit.split("/");
-        const formattedDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-        servisItem.tanggal = formattedDate;
+        const updatedDate = new Date(
+          year,
+          month - 1,
+          day,
+          originalDate.getHours(),
+          originalDate.getMinutes(),
+          originalDate.getSeconds()
+        );
+        servisItem.tanggal = updatedDate.toISOString();
       }
 
       const { updateServisData } = await import("../services/servis-service.js");
@@ -1048,10 +1059,14 @@ async function handleVerifikasi() {
         }
       }
 
-      // Tampilkan dan isi field tanggal edit
+      // Tampilkan dan isi field tanggal edit (with time info)
       document.getElementById("tanggalEditRow").style.display = "block";
-      const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
+      const tanggalObj = new Date(item.tanggal);
+      const tanggalFormatted = tanggalObj.toLocaleDateString("id-ID");
+      const jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       document.getElementById("tanggalEdit").value = tanggalFormatted;
+      // Store time info for display (optional: could show in label)
+      document.getElementById("tanggalEdit").title = `Waktu input: ${jamFormatted}`;
 
       handleStatusPembayaranChange();
       document.getElementById("modalInputServisLabel").textContent =
@@ -1120,9 +1135,11 @@ async function saveAllServisData() {
     return;
   }
 
-  // Convert date format from dd/mm/yyyy to yyyy-mm-dd
+  // Convert date format from dd/mm/yyyy to yyyy-mm-dd with current time
   const [day, month, year] = tanggal.split("/");
-  const formattedDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  const now = new Date();
+  const tanggalWithTime = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
+  const formattedDate = tanggalWithTime.toISOString();
 
   try {
     showLoading(true);
@@ -1256,14 +1273,29 @@ function updateRiwayatTableServis(filteredData) {
   let totalOngkos = 0;
 
   if (filteredData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="12" class="text-center">Belum ada data servis pada tanggal ini</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="text-center">Belum ada data servis pada tanggal ini</td></tr>';
     document.getElementById("total-riwayat-ongkos").textContent = "Rp 0";
     return;
   }
 
   filteredData.forEach((item, index) => {
     const row = document.createElement("tr");
-    const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
+    const tanggalObj = new Date(item.tanggal);
+    const tanggalFormatted = tanggalObj.toLocaleDateString("id-ID");
+
+    // Use createdAt for accurate time, fallback to tanggal for old data
+    let jamFormatted;
+    if (item.createdAt && item.createdAt.toDate) {
+      // Firestore Timestamp object
+      jamFormatted = item.createdAt.toDate().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } else if (item.createdAt) {
+      // Plain date object or string
+      jamFormatted = new Date(item.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } else {
+      // Fallback to tanggal for old data
+      jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    }
+
     const statusPembayaran = item.statusPembayaran || "nominal";
 
     // Hitung total untuk status nominal dan custom
@@ -1284,6 +1316,7 @@ function updateRiwayatTableServis(filteredData) {
     row.innerHTML = `
       <td>${index + 1}</td>
       <td>${tanggalFormatted}</td>
+      <td>${jamFormatted}</td>
       <td>${item.namaSales}</td>
       <td>${item.namaCustomer}</td>
       <td>${item.noHp}</td>
@@ -1333,7 +1366,7 @@ function updateRiwayatTableCustom(filteredData) {
   let totalOngkos = 0;
 
   if (filteredData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" class="text-center">Belum ada data custom pada tanggal ini</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="text-center">Belum ada data custom pada tanggal ini</td></tr>';
     document.getElementById("total-riwayat-dp").textContent = "Rp 0";
     document.getElementById("total-riwayat-ongkos-custom").textContent = "Rp 0";
     document.getElementById("total-riwayat-nominal").textContent = "Rp 0";
@@ -1342,7 +1375,22 @@ function updateRiwayatTableCustom(filteredData) {
 
   filteredData.forEach((item, index) => {
     const row = document.createElement("tr");
-    const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
+    const tanggalObj = new Date(item.tanggal);
+    const tanggalFormatted = tanggalObj.toLocaleDateString("id-ID");
+
+    // Use createdAt for accurate time, fallback to tanggal for old data
+    let jamFormatted;
+    if (item.createdAt && item.createdAt.toDate) {
+      // Firestore Timestamp object
+      jamFormatted = item.createdAt.toDate().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } else if (item.createdAt) {
+      // Plain date object or string
+      jamFormatted = new Date(item.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } else {
+      // Fallback to tanggal for old data
+      jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    }
+
     const statusPembayaran = item.statusPembayaran || "nominal";
 
     const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
@@ -1364,6 +1412,7 @@ function updateRiwayatTableCustom(filteredData) {
     row.innerHTML = `
       <td>${index + 1}</td>
       <td>${tanggalFormatted}</td>
+      <td>${jamFormatted}</td>
       <td>${item.namaSales}</td>
       <td>${item.namaCustomer}</td>
       <td>${item.noHp}</td>

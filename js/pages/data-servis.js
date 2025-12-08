@@ -609,6 +609,17 @@ function setupEventListeners() {
     });
   }
 
+  // Jenis Data filter (NEW)
+  const jenisDataFilter = document.getElementById("jenisDataFilter");
+  if (jenisDataFilter) {
+    jenisDataFilter.addEventListener("change", function () {
+      // Apply filter when jenis data changes
+      if (isDataLoaded) {
+        applyFilters();
+      }
+    });
+  }
+
   // Status filters
   const statusServisFilter = document.getElementById("statusServisFilter");
   const statusPengambilanFilter = document.getElementById("statusPengambilanFilter");
@@ -755,29 +766,226 @@ function resetFilters() {
   if (searchInput) searchInput.value = "";
 }
 
+// NEW: Expand servis data untuk multi-row display
+function expandServisData(data, jenisData) {
+  let expanded = [];
+
+  console.log(`Expanding data for jenisData: ${jenisData}, total items: ${data.length}`);
+
+  data.forEach((item) => {
+    if (jenisData === "servis") {
+      // Process detailBarang
+      if (item.detailBarang && item.detailBarang.length > 0) {
+        item.detailBarang.forEach((detail) => {
+          expanded.push({
+            ...item,
+            _jenisData: "servis",
+            _originalId: item.id,
+            sales: item.sales || item.namaSales || "-",
+            namaBarang: detail.namaBarang || item.namaBarang || "-",
+            berat: detail.berat || "-",
+            kadar: detail.karat || "-",
+            rincianServis: detail.rincianServis || detail.jenisServis || "-",
+          });
+        });
+      } else {
+        // Fallback untuk data lama tanpa detailBarang
+        expanded.push({
+          ...item,
+          _jenisData: "servis",
+          _originalId: item.id,
+          sales: item.sales || item.namaSales || "-",
+          namaBarang: item.namaBarang || "-",
+          berat: item.berat || "-",
+          kadar: item.karat || "-",
+          rincianServis: item.rincianServis || item.jenisServis || "-",
+        });
+      }
+    } else if (jenisData === "custom") {
+      // Process detailBarangCustom
+      if (item.detailBarangCustom && item.detailBarangCustom.length > 0) {
+        console.log(`\n=== Processing custom item ${item.id} ===`);
+        console.log("Raw detailBarangCustom array:", JSON.stringify(item.detailBarangCustom, null, 2));
+
+        item.detailBarangCustom.forEach((detail, idx) => {
+          console.log(`\n--- Detail item ${idx} ---`);
+          console.log("Raw detail object:", detail);
+          console.log("Field existence check:", {
+            "detail.berat exists": "berat" in detail,
+            "detail.panjang exists": "panjang" in detail,
+            "detail.kadar exists": "kadar" in detail,
+            "detail.warna exists": "warna" in detail,
+            "detail.rincianServis exists": "rincianServis" in detail,
+          });
+          console.log("Field values:", {
+            "detail.berat": detail.berat,
+            "detail.panjang": detail.panjang,
+            "detail.kadar": detail.kadar,
+            "detail.warna": detail.warna,
+            "detail.rincianServis": detail.rincianServis,
+          });
+          console.log("Field types:", {
+            "typeof berat": typeof detail.berat,
+            "typeof panjang": typeof detail.panjang,
+            "typeof kadar": typeof detail.kadar,
+            "typeof warna": typeof detail.warna,
+            "typeof rincianServis": typeof detail.rincianServis,
+          });
+
+          const expandedItem = {
+            ...item,
+            _jenisData: "custom",
+            _originalId: item.id,
+            sales: item.sales || item.namaSales || "-",
+            namaBarang: detail.namaBarang || item.namaBarang || "-",
+            berat: detail.berat || "-",
+            panjang: detail.panjang || "-",
+            kadar: detail.kadar || "-",
+            warna: detail.warna || "-",
+            rincianServis: detail.rincianServis || "-",
+          };
+
+          console.log("Expanded item fields after assignment:", {
+            berat: expandedItem.berat,
+            panjang: expandedItem.panjang,
+            kadar: expandedItem.kadar,
+            warna: expandedItem.warna,
+            rincianServis: expandedItem.rincianServis,
+          });
+
+          expanded.push(expandedItem);
+        });
+        console.log(`=== End processing custom item ${item.id} ===\n`);
+      } else {
+        console.log(`No detailBarangCustom for item ${item.id}, using fallback`);
+        // Fallback untuk data lama tanpa detailBarangCustom
+        expanded.push({
+          ...item,
+          _jenisData: "custom",
+          _originalId: item.id,
+          sales: item.sales || item.namaSales || "-",
+          namaBarang: item.namaBarang || "-",
+          berat: item.berat || "-",
+          panjang: item.panjang || "-",
+          kadar: item.kadar || "-",
+          warna: item.warna || "-",
+          rincianServis: item.rincianServis || "-",
+        });
+      }
+    }
+  });
+
+  console.log(`Total expanded items: ${expanded.length}`);
+  return expanded;
+}
+
+// NEW: Update table headers based on jenis data
+function updateTableHeaders(jenisData) {
+  const thead = document.getElementById("tableHeaders");
+  const tableTitle = document.getElementById("tableTitle");
+
+  // Update title
+  if (tableTitle) {
+    tableTitle.textContent = jenisData === "servis" ? "Data Servis" : "Data Custom";
+  }
+
+  let headers = `
+    <tr>
+      <th>No</th>
+      <th>Tanggal</th>
+      <th>Sales</th>
+      <th>Nama Customer</th>
+      <th>No HP</th>
+      <th>Nama Barang</th>
+  `;
+
+  if (jenisData === "servis") {
+    headers += `
+      <th>Berat</th>
+      <th>Kadar</th>
+      <th>Rincian Servis</th>
+    `;
+  } else if (jenisData === "custom") {
+    headers += `
+      <th>Berat</th>
+      <th>Panjang</th>
+      <th>Kadar</th>
+      <th>Warna</th>
+      <th>Rincian Custom</th>
+    `;
+  }
+
+  headers += `
+      <th>Status Servis</th>
+      <th>Status Pengambilan</th>
+      <th>WhatsApp</th>
+      <th>Handle Pengambilan</th>
+      <th>Waktu Pengambilan</th>
+      <th>Aksi</th>
+    </tr>
+  `;
+
+  thead.innerHTML = headers;
+}
+
 function applyFilters() {
   const searchTerm = document.getElementById("searchInputTable")?.value.trim().toLowerCase() || "";
   const statusServisFilter = document.getElementById("statusServisFilter")?.value || "";
   const statusPengambilanFilter = document.getElementById("statusPengambilanFilter")?.value || "";
+  const jenisDataFilter = document.getElementById("jenisDataFilter")?.value || "servis";
 
-  filteredData = currentData.filter((item) => {
-    const matchesSearch =
-      !searchTerm ||
-      item.namaCustomer?.toLowerCase().includes(searchTerm) ||
-      item.noHp?.includes(searchTerm) ||
-      item.namaBarang?.toLowerCase().includes(searchTerm);
+  console.log(`\n=== APPLY FILTERS ===`);
+  console.log(`Filter selected: ${jenisDataFilter}`);
+  console.log(`Total data before filter: ${currentData.length}`);
 
+  // First, filter by status AND jenisInput
+  let statusFiltered = currentData.filter((item) => {
     const matchesStatusServis = !statusServisFilter || item.statusServis === statusServisFilter;
     const matchesStatusPengambilan = !statusPengambilanFilter || item.statusPengambilan === statusPengambilanFilter;
 
-    return matchesSearch && matchesStatusServis && matchesStatusPengambilan;
+    // Filter by jenisInput - CRITICAL FIX
+    const matchesJenisInput = (item.jenisInput || "servis") === jenisDataFilter;
+
+    return matchesStatusServis && matchesStatusPengambilan && matchesJenisInput;
   });
 
-  // PERBAIKAN: Langsung display tanpa delay
-  displayData();
+  console.log(`Data after jenisInput filter (${jenisDataFilter}): ${statusFiltered.length}`);
+  console.log(
+    `Sample filtered items:`,
+    statusFiltered.slice(0, 2).map((i) => ({
+      id: i.id,
+      jenisInput: i.jenisInput,
+      hasDetailBarangCustom: !!i.detailBarangCustom,
+      hasDetailBarang: !!i.detailBarang,
+    }))
+  );
+
+  // Expand data based on jenis
+  const expandedData = expandServisData(statusFiltered, jenisDataFilter);
+
+  // Apply search filter on expanded data
+  filteredData = expandedData.filter((item) => {
+    if (!searchTerm) return true;
+
+    return (
+      item.namaCustomer?.toLowerCase().includes(searchTerm) ||
+      item.noHp?.includes(searchTerm) ||
+      item.namaBarang?.toLowerCase().includes(searchTerm) ||
+      item.sales?.toLowerCase().includes(searchTerm) ||
+      item.rincianServis?.toLowerCase().includes(searchTerm) ||
+      item.warna?.toLowerCase().includes(searchTerm) ||
+      item.kadar?.includes(searchTerm) ||
+      item.berat?.includes(searchTerm) ||
+      item.panjang?.includes(searchTerm)
+    );
+  });
+
+  // Update headers and display
+  updateTableHeaders(jenisDataFilter);
+  displayData(jenisDataFilter);
 }
 
-function displayData() {
+function displayData(jenisData = "servis") {
   const tbody = document.getElementById("dataServisList");
   const tableContainer = document.getElementById("tableContainer");
   const noDataMessage = document.getElementById("noDataMessage");
@@ -809,6 +1017,8 @@ function displayData() {
 
   filteredData.forEach((item, index) => {
     const row = document.createElement("tr");
+    row.setAttribute("data-jenis", item._jenisData || jenisData);
+
     const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
 
     // Status servis badge
@@ -890,24 +1100,95 @@ function displayData() {
       }
     }
 
+    // Dynamic columns based on jenisData
+    let specificColumns = "";
+
+    if (jenisData === "servis") {
+      // Ensure values are not undefined
+      const beratVal = item.berat !== undefined && item.berat !== null ? item.berat : "-";
+      const kadarVal = item.kadar !== undefined && item.kadar !== null ? item.kadar : "-";
+      const rincianVal = item.rincianServis !== undefined && item.rincianServis !== null ? item.rincianServis : "-";
+
+      specificColumns = `
+        <td style="border-right: 2px solid #dee2e6;">${beratVal}</td>
+        <td style="border-right: 2px solid #dee2e6;">${kadarVal}</td>
+        <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">
+          ${rincianVal}
+        </td>
+      `;
+    } else if (jenisData === "custom") {
+      // Debug log untuk custom columns - log semua rows untuk debugging
+      console.log(`\n>>> Rendering custom row ${index} <<<`);
+      console.log("Raw item object:", item);
+      console.log("Item fields direct access:", {
+        "item.berat": item.berat,
+        "item.panjang": item.panjang,
+        "item.kadar": item.kadar,
+        "item.warna": item.warna,
+        "item.rincianServis": item.rincianServis,
+      });
+      console.log("Field types:", {
+        "typeof item.berat": typeof item.berat,
+        "typeof item.panjang": typeof item.panjang,
+        "typeof item.kadar": typeof item.kadar,
+        "typeof item.warna": typeof item.warna,
+        "typeof item.rincianServis": typeof item.rincianServis,
+      });
+      console.log("Field truthiness:", {
+        "item.berat is truthy": !!item.berat,
+        "item.panjang is truthy": !!item.panjang,
+        "item.kadar is truthy": !!item.kadar,
+        "item.warna is truthy": !!item.warna,
+        "item.rincianServis is truthy": !!item.rincianServis,
+      });
+
+      // Ensure values are not undefined
+      const beratVal = item.berat !== undefined && item.berat !== null ? item.berat : "-";
+      const panjangVal = item.panjang !== undefined && item.panjang !== null ? item.panjang : "-";
+      const kadarVal = item.kadar !== undefined && item.kadar !== null ? item.kadar : "-";
+      const warnaVal = item.warna !== undefined && item.warna !== null ? item.warna : "-";
+      const rincianVal = item.rincianServis !== undefined && item.rincianServis !== null ? item.rincianServis : "-";
+
+      console.log("Final display values:", {
+        beratVal,
+        panjangVal,
+        kadarVal,
+        warnaVal,
+        rincianVal,
+      });
+      console.log(">>> End rendering row " + index + " <<<\n");
+
+      specificColumns = `
+        <td style="border-right: 2px solid #dee2e6;">${beratVal}</td>
+        <td style="border-right: 2px solid #dee2e6;">${panjangVal}</td>
+        <td style="border-right: 2px solid #dee2e6;">${kadarVal}</td>
+        <td style="border-right: 2px solid #dee2e6;">${warnaVal}</td>
+        <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">
+          ${rincianVal}
+        </td>
+      `;
+    }
+
+    // Use _originalId for modal, fallback to id
+    const itemId = item._originalId || item.id;
+
     row.innerHTML = `
       <td style="border-right: 2px solid #dee2e6;">${index + 1}</td>
       <td style="border-right: 2px solid #dee2e6;">${tanggalFormatted}</td>
+      <td style="border-right: 2px solid #dee2e6;">${item.sales}</td>
       <td style="border-right: 2px solid #dee2e6;">${item.namaCustomer}</td>
       <td style="border-right: 2px solid #dee2e6;">${item.noHp}</td>
-      <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">${
-        item.namaBarang
-      }</td>
-      <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">${
-        item.jenisServis
-      }</td>
+      <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">
+        ${item.namaBarang}
+      </td>
+      ${specificColumns}
       <td style="border-right: 2px solid #dee2e6;">${statusServisContent}</td>
       <td style="border-right: 2px solid #dee2e6;">${statusPengambilanBadge}</td>
       <td style="border-right: 2px solid #dee2e6;" class="status-cell">${whatsappContent}</td>
       <td style="border-right: 2px solid #dee2e6;">${item.stafHandle || "-"}</td>
       <td style="border-right: 2px solid #dee2e6;"><small>${waktuPengambilan}</small></td>
       <td>
-        <button class="btn btn-sm btn-primary" onclick="openUpdateModal('${item.id}', '${item.statusServis}', '${
+        <button class="btn btn-sm btn-primary" onclick="openUpdateModal('${itemId}', '${item.statusServis}', '${
       item.statusPengambilan
     }', '${item.stafHandle || ""}', '${waktuForModal}')">
           <i class="fas fa-edit"></i>
@@ -1011,7 +1292,7 @@ async function saveStatusUpdate() {
     try {
       // 1. Update ke Firestore
       await updateServisStatus(servisId, statusServis, statusPengambilan, stafHandle, waktuPengambilan);
-      
+
       // 2. PERBAIKAN SEDERHANA: Update data lokal langsung
       const updateData = {
         statusServis,
@@ -1021,13 +1302,13 @@ async function saveStatusUpdate() {
       };
 
       // Update currentData
-      const currentIndex = currentData.findIndex(item => item.id === servisId);
+      const currentIndex = currentData.findIndex((item) => item.id === servisId);
       if (currentIndex !== -1) {
         currentData[currentIndex] = { ...currentData[currentIndex], ...updateData };
       }
 
       // Update filteredData
-      const filteredIndex = filteredData.findIndex(item => item.id === servisId);
+      const filteredIndex = filteredData.findIndex((item) => item.id === servisId);
       if (filteredIndex !== -1) {
         filteredData[filteredIndex] = { ...filteredData[filteredIndex], ...updateData };
       }
@@ -1039,8 +1320,10 @@ async function saveStatusUpdate() {
         setCachedData(cacheKey, currentData);
       }
 
-      // 4. PERBAIKAN: Langsung tampilkan ulang data tanpa filter ulang
-      displayData();
+      // 4. PERBAIKAN: Re-apply filters untuk update display dengan jenisData yang benar
+      const jenisDataFilter = document.getElementById("jenisDataFilter");
+      const currentJenisData = jenisDataFilter ? jenisDataFilter.value : "servis";
+      applyFilters();
 
       // 5. Tutup modal
       const modal = bootstrap.Modal.getInstance(document.getElementById("updateStatusModal"));
@@ -1062,14 +1345,12 @@ async function saveStatusUpdate() {
       } else {
         showAlert("success", "Status berhasil diperbarui dan disimpan");
       }
-
     } catch (updateError) {
       console.error("Error during update process:", updateError);
       throw updateError;
     }
 
     showLoading(false);
-
   } catch (error) {
     console.error("Error updating status:", error);
     showAlert("danger", "Terjadi kesalahan saat memperbarui status: " + error.message);

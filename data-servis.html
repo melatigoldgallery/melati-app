@@ -456,7 +456,14 @@
                     </select>
                   </div>
                   <div class="col-md-2">
-                    <label for="statusServisFilter" class="form-label">Status Servis</label>
+                    <label for="jenisDataFilter" class="form-label">Jenis Data</label>
+                    <select id="jenisDataFilter" class="form-select">
+                      <option value="servis">Servis</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label for="statusServisFilter" class="form-label">Status Pengerjaan</label>
                     <select id="statusServisFilter" class="form-select">
                       <option value="Belum Selesai">Belum Selesai</option>
                       <option value="Sudah Selesai">Sudah Selesai</option>
@@ -484,7 +491,7 @@
               <div class="card-header">
                 <h2>
                   <i class="fas fa-list"></i>
-                  Data Servis
+                  <span id="tableTitle">Data Servis</span>
                   <span id="cacheIndicator" class="badge bg-info ms-2" style="display: none">
                     <i class="fas fa-database me-1"></i>
                     Cache
@@ -503,21 +510,8 @@
               <div class="card-body">
                 <div class="table-container">
                   <table class="table table-hover" id="dataServisTable">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Tanggal</th>
-                        <th>Nama Customer</th>
-                        <th>No HP</th>
-                        <th>Nama Barang</th>
-                        <th>Jenis Servis</th>
-                        <th>Status Servis</th>
-                        <th>Status Pengambilan</th>
-                        <th>WhatsApp</th>
-                        <th>Handle Pengambilan</th>
-                        <th>Waktu Pengambilan</th>
-                        <th>Aksi</th>
-                      </tr>
+                    <thead id="tableHeaders">
+                      <!-- Dynamic headers will be inserted here -->
                     </thead>
                     <tbody id="dataServisList"></tbody>
                   </table>

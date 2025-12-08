@@ -69,18 +69,18 @@ function broadcastDataChange(action, data) {
       action, // 'add', 'update', 'delete'
       data,
       timestamp: Date.now(),
-      source: 'servis-service'
+      source: "servis-service",
     };
-    
+
     // Broadcast ke localStorage untuk cross-tab communication
-    localStorage.setItem('servisDataChange', JSON.stringify(event));
-    
+    localStorage.setItem("servisDataChange", JSON.stringify(event));
+
     // Trigger custom event untuk same-tab communication
-    window.dispatchEvent(new CustomEvent('servisDataChanged', { detail: event }));
-    
+    window.dispatchEvent(new CustomEvent("servisDataChanged", { detail: event }));
+
     console.log(`Broadcasted ${action} event:`, data);
   } catch (error) {
-    console.error('Error broadcasting data change:', error);
+    console.error("Error broadcasting data change:", error);
   }
 }
 
@@ -161,17 +161,17 @@ export async function updateServisData(servisId, updateData) {
     const servisRef = doc(db, SERVIS_COLLECTION, servisId);
     const dataToUpdate = {
       ...updateData,
-      updatedAt: Timestamp.now()
+      updatedAt: Timestamp.now(),
     };
-    
+
     await updateDoc(servisRef, dataToUpdate);
-    
+
     // Broadcast update event
-    broadcastDataChange('update', { id: servisId, ...dataToUpdate });
-    
+    broadcastDataChange("update", { id: servisId, ...dataToUpdate });
+
     return true;
   } catch (error) {
-    console.error('Error updating servis data:', error);
+    console.error("Error updating servis data:", error);
     throw error;
   }
 }
@@ -194,17 +194,16 @@ export async function deleteServisData(servisId) {
   try {
     const servisRef = doc(db, SERVIS_COLLECTION, servisId);
     await deleteDoc(servisRef);
-    
+
     // Broadcast delete event
-    broadcastDataChange('delete', { id: servisId });
-    
+    broadcastDataChange("delete", { id: servisId });
+
     return true;
   } catch (error) {
-    console.error('Error deleting servis data:', error);
+    console.error("Error deleting servis data:", error);
     throw error;
   }
 }
-
 
 // Fungsi untuk update cache setelah delete
 function updateCacheAfterDelete(docId) {
@@ -233,15 +232,15 @@ export async function saveServisData(servisData) {
     });
 
     // Update cache secara spesifik
-     const newData = {
+    const newData = {
       id: docRef.id,
       ...servisData,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
-      statusServis: 'Belum Selesai',
-      statusPengambilan: 'Belum Diambil',
+      statusServis: "Belum Selesai",
+      statusPengambilan: "Belum Diambil",
       stafHandle: null,
-      waktuPengambilan: null
+      waktuPengambilan: null,
     };
 
     updateCacheAfterAdd(newData);
@@ -280,7 +279,17 @@ export async function getServisByDate(date) {
       }
     }
 
-    const q = query(collection(db, SERVIS_COLLECTION), where("tanggal", "==", date), orderBy("createdAt", "desc"));
+    // Create date range to support both ISO string and date string formats
+    const startDate = `${date}T00:00:00`;
+    const endDate = `${date}T23:59:59`;
+
+    const q = query(
+      collection(db, SERVIS_COLLECTION),
+      where("tanggal", ">=", date),
+      where("tanggal", "<=", endDate),
+      orderBy("tanggal", "asc"),
+      orderBy("createdAt", "desc")
+    );
 
     const querySnapshot = await getDocs(q);
     const servisData = [];
@@ -403,32 +412,38 @@ export async function searchServis(searchTerm, date = null) {
 }
 
 // Fungsi untuk update status servis
-export async function updateServisStatus(servisId, statusServis, statusPengambilan, stafHandle = null, waktuPengambilan = null) {
+export async function updateServisStatus(
+  servisId,
+  statusServis,
+  statusPengambilan,
+  stafHandle = null,
+  waktuPengambilan = null
+) {
   try {
     const servisRef = doc(db, SERVIS_COLLECTION, servisId);
-    
+
     const updateData = {
       statusServis,
       statusPengambilan,
-      updatedAt: Timestamp.now()
+      updatedAt: Timestamp.now(),
     };
-    
-    if (statusPengambilan === 'Sudah Diambil' && stafHandle && waktuPengambilan) {
+
+    if (statusPengambilan === "Sudah Diambil" && stafHandle && waktuPengambilan) {
       updateData.stafHandle = stafHandle;
       updateData.waktuPengambilan = Timestamp.fromDate(new Date(waktuPengambilan));
-    } else if (statusPengambilan === 'Belum Diambil') {
+    } else if (statusPengambilan === "Belum Diambil") {
       updateData.stafHandle = null;
       updateData.waktuPengambilan = null;
     }
-    
+
     await updateDoc(servisRef, updateData);
-    
+
     // Broadcast status update event
-    broadcastDataChange('update', { id: servisId, ...updateData });
-    
+    broadcastDataChange("update", { id: servisId, ...updateData });
+
     return true;
   } catch (error) {
-    console.error('Error updating servis status:', error);
+    console.error("Error updating servis status:", error);
     throw error;
   }
 }
