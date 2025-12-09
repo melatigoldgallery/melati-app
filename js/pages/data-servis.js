@@ -766,6 +766,23 @@ function resetFilters() {
   if (searchInput) searchInput.value = "";
 }
 
+// Format status pembayaran dengan badge
+function formatStatusPembayaranBadge(statusPembayaran) {
+  if (!statusPembayaran) {
+    return '<span class="badge bg-secondary">Tidak Diketahui</span>';
+  }
+
+  const statusMap = {
+    nominal: { label: "Lunas", class: "status-pembayaran-lunas" },
+    belum_lunas: { label: "Belum Lunas", class: "status-pembayaran-belum-lunas" },
+    free: { label: "Free", class: "status-pembayaran-free" },
+    custom: { label: "Custom", class: "status-pembayaran-custom" },
+  };
+
+  const status = statusMap[statusPembayaran] || { label: statusPembayaran, class: "bg-secondary" };
+  return `<span class="badge ${status.class}">${status.label}</span>`;
+}
+
 // NEW: Expand servis data untuk multi-row display
 function expandServisData(data, jenisData) {
   let expanded = [];
@@ -904,6 +921,7 @@ function updateTableHeaders(jenisData) {
       <th>Berat</th>
       <th>Kadar</th>
       <th>Rincian Servis</th>
+      <th>Status Pembayaran</th>
     `;
   } else if (jenisData === "custom") {
     headers += `
@@ -912,6 +930,7 @@ function updateTableHeaders(jenisData) {
       <th>Kadar</th>
       <th>Warna</th>
       <th>Rincian Custom</th>
+      <th>Status Pembayaran</th>
     `;
   }
 
@@ -1109,12 +1128,15 @@ function displayData(jenisData = "servis") {
       const kadarVal = item.kadar !== undefined && item.kadar !== null ? item.kadar : "-";
       const rincianVal = item.rincianServis !== undefined && item.rincianServis !== null ? item.rincianServis : "-";
 
+      const statusPembayaranBadge = formatStatusPembayaranBadge(item.statusPembayaran);
+
       specificColumns = `
         <td style="border-right: 2px solid #dee2e6;">${beratVal}</td>
         <td style="border-right: 2px solid #dee2e6;">${kadarVal}</td>
         <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">
           ${rincianVal}
         </td>
+        <td style="border-right: 2px solid #dee2e6; text-align: center;">${statusPembayaranBadge}</td>
       `;
     } else if (jenisData === "custom") {
       // Debug log untuk custom columns - log semua rows untuk debugging
@@ -1158,6 +1180,8 @@ function displayData(jenisData = "servis") {
       });
       console.log(">>> End rendering row " + index + " <<<\n");
 
+      const statusPembayaranBadge = formatStatusPembayaranBadge(item.statusPembayaran);
+
       specificColumns = `
         <td style="border-right: 2px solid #dee2e6;">${beratVal}</td>
         <td style="border-right: 2px solid #dee2e6;">${panjangVal}</td>
@@ -1166,6 +1190,7 @@ function displayData(jenisData = "servis") {
         <td style="border-right: 2px solid #dee2e6; min-width: 200px; max-width: 250px; word-wrap: break-word;">
           ${rincianVal}
         </td>
+        <td style="border-right: 2px solid #dee2e6; text-align: center;">${statusPembayaranBadge}</td>
       `;
     }
 

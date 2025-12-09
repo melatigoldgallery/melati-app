@@ -64,19 +64,25 @@
         min-width: 180px;
       }
 
-      /* CSS Table Container - sama persis seperti laporan-izin.html */
-      #dataServisTable td:nth-child(5) {
-        white-space: normal !important;
-        word-break: break-word;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        hyphens: auto;
-        max-width: 300px;
-        min-width: 200px;
-        line-height: 1.4;
-        padding: 8px 12px;
+      /* Status Pembayaran Badge */
+      .status-pembayaran-lunas {
+        background-color: #28a745;
+        color: white;
+      }
+      .status-pembayaran-belum-lunas {
+        background-color: #ffc107;
+        color: #212529;
+      }
+      .status-pembayaran-free {
+        background-color: #17a2b8;
+        color: white;
+      }
+      .status-pembayaran-custom {
+        background-color: #6f42c1;
+        color: white;
       }
 
+      /* CSS Table Container */
       .main-content {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -85,14 +91,16 @@
       }
 
       #dataServisTable {
-        min-width: 1500px;
+        min-width: 2000px;
         margin-bottom: 0;
       }
 
+      /* Common columns (1-6) untuk SERVIS dan CUSTOM */
       #dataServisTable th:nth-child(1),
       #dataServisTable td:nth-child(1) {
-        width: 50px;
-        min-width: 50px;
+        width: 40px;
+        min-width: 40px;
+        text-align: center;
       }
 
       #dataServisTable th:nth-child(2),
@@ -103,58 +111,131 @@
 
       #dataServisTable th:nth-child(3),
       #dataServisTable td:nth-child(3) {
-        width: 150px;
-        min-width: 150px;
+        width: 100px;
+        min-width: 100px;
       }
 
       #dataServisTable th:nth-child(4),
       #dataServisTable td:nth-child(4) {
+        width: 140px;
+        min-width: 140px;
+      }
+
+      #dataServisTable th:nth-child(5),
+      #dataServisTable td:nth-child(5) {
         width: 120px;
         min-width: 120px;
+        white-space: normal !important;
+        word-break: break-word;
       }
 
       #dataServisTable th:nth-child(6),
       #dataServisTable td:nth-child(6) {
-        width: 150px;
-        min-width: 150px;
+        width: 200px;
+        min-width: 200px;
       }
 
-      #dataServisTable th:nth-child(7),
-      #dataServisTable td:nth-child(7) {
+      /* === SERVIS (16 kolom) === */
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(7) {
+        width: 70px;
+        min-width: 70px;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(8) {
+        width: 70px;
+        min-width: 70px;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(9) {
+        width: 200px;
+        min-width: 200px;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(10) {
         width: 120px;
         min-width: 120px;
+        text-align: center;
       }
-
-      #dataServisTable th:nth-child(8),
-      #dataServisTable td:nth-child(8) {
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(11) {
+        width: 120px;
+        min-width: 120px;
+        text-align: center;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(12) {
         width: 130px;
         min-width: 130px;
+        text-align: center;
       }
-
-      #dataServisTable th:nth-child(9),
-      #dataServisTable td:nth-child(9) {
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(13) {
+        width: 140px;
+        min-width: 140px;
+        text-align: center;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(14) {
+        width: 140px;
+        min-width: 140px;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(15) {
         width: 150px;
         min-width: 150px;
+      }
+      #dataServisTable tr[data-jenis="servis"] td:nth-child(16) {
+        width: 80px;
+        min-width: 80px;
         text-align: center;
       }
 
-      /* Update kolom yang bergeser */
-      #dataServisTable th:nth-child(10),
-      #dataServisTable td:nth-child(10) {
+      /* === CUSTOM (18 kolom) === */
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(7) {
+        width: 70px;
+        min-width: 70px;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(8) {
+        width: 70px;
+        min-width: 70px;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(9) {
+        width: 70px;
+        min-width: 70px;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(10) {
+        width: 90px;
+        min-width: 90px;
+        text-align: center;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(11) {
+        width: 200px;
+        min-width: 200px;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(12) {
         width: 120px;
         min-width: 120px;
+        text-align: center;
       }
-
-      #dataServisTable th:nth-child(11),
-      #dataServisTable td:nth-child(11) {
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(13) {
+        width: 120px;
+        min-width: 120px;
+        text-align: center;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(14) {
         width: 130px;
         min-width: 130px;
+        text-align: center;
       }
-
-      #dataServisTable th:nth-child(12),
-      #dataServisTable td:nth-child(12) {
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(15) {
+        width: 140px;
+        min-width: 140px;
+        text-align: center;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(16) {
+        width: 140px;
+        min-width: 140px;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(17) {
+        width: 150px;
+        min-width: 150px;
+      }
+      #dataServisTable tr[data-jenis="custom"] td:nth-child(18) {
         width: 80px;
         min-width: 80px;
+        text-align: center;
       }
 
       #dataServisTable thead th {
@@ -182,195 +263,10 @@
     <div class="app-container">
       <!-- Sidebar -->
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <img src="img/Melati.jfif" alt="Logo" class="logo" />
-          <h1 class="brand-name">Melati Gold Shop</h1>
-        </div>
-        <div class="sidebar-menu">
-          <ul class="nav flex-column" id="sidebarAccordion">
-            <li class="nav-item">
-              <a class="nav-link" href="dashboard.html">
-                <i class="fas fa-tachometer-alt"></i>
-                <span class="menu-text">Dashboard</span>
-              </a>
-            </li>
-            <!-- Antrian dropdown menu -->
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#antrianSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ticket-alt"></i>
-                <span class="menu-text">Antrian</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="antrianSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="admin.html">
-                      <i class="fas fa-user-cog"></i>
-                      <span class="menu-text">Admin Antrian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Antrian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="analisis.html">
-                      <i class="fas fa-chart-bar"></i>
-                      <span class="menu-text">Laporan Antrian</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <!-- Absensi dropdown menu -->
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#absensiSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-clipboard-check"></i>
-                <span class="menu-text">Absensi</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="absensiSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="sistemAbsensi.html">
-                      <i class="fas fa-user-check"></i>
-                      <span class="menu-text">Kehadiran</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="pengajuan-izin.html">
-                      <i class="fas fa-calendar-plus"></i>
-                      <span class="menu-text">Pengajuan Izin</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporan-kehadiran.html">
-                      <i class="fas fa-file-alt"></i>
-                      <span class="menu-text">Laporan Kehadiran</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporan-izin.html">
-                      <i class="fas fa-file-medical"></i>
-                      <span class="menu-text">Laporan Izin</span>
-                    </a>
-                  </li>
-                  <!-- Ganti seluruh bagian dropdown Supervisor di dalam menu Absensi -->
-                  <li class="nav-item">
-                    <a
-                      class="nav-link collapsed supervisor-toggle"
-                      href="#"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#supervisorSubmenu"
-                      aria-expanded="false"
-                    >
-                      <i class="fas fa-user-tie"></i>
-                      <span class="menu-text">Supervisor</span>
-                      <i class="fas fa-chevron-down submenu-icon"></i>
-                    </a>
-                    <!-- Penting: Hapus data-bs-parent agar tidak tertutup otomatis -->
-                    <div class="collapse supervisor-menu" id="supervisorSubmenu">
-                      <ul class="nav flex-column ms-3">
-                        <li class="nav-item">
-                          <a class="nav-link" href="supervisor.html">
-                            <i class="fas fa-desktop"></i>
-                            <span class="menu-text">Status Pengajuan Izin</span>
-                          </a>
-                        </li>
-                        <li class="nav-item">
-                          <a class="nav-link" href="tambah-pengguna.html">
-                            <i class="fas fa-user-cog"></i>
-                            <span class="menu-text">Tambah Pengguna</span>
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#servisSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-tools"></i>
-                <span class="menu-text">Servis</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="servisSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link active" href="input-servis.html">
-                      <i class="fas fa-plus-circle"></i>
-                      <span class="menu-text">Input Servis</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="data-servis.html">
-                      <i class="fas fa-database"></i>
-                      <span class="menu-text">Data Servis</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporan-servis.html">
-                      <i class="fas fa-chart-line"></i>
-                      <span class="menu-text">Laporan Servis</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#promosiSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ad"></i>
-                <span class="menu-text">Promosi</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="promosiSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi.html">
-                      <i class="fas fa-cog"></i>
-                      <span class="menu-text">Setting Promosi</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi-display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Promosi</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-          </ul>
-        </div>
-        <div class="sidebar-footer">
-          <p>© 2025 Melati Gold Shop</p>
+        <div class="text-center p-3">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
         </div>
       </aside>
 
@@ -583,7 +479,7 @@
         </div>
       </div>
     </div>
-
+    <script src="js/sidebar-loader.js"></script>
     <script type="module" src="js/melati.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/pages/data-servis.js"></script>
