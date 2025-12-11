@@ -116,14 +116,10 @@
 
       /* Tabel dengan min-width untuk horizontal scroll */
       #tableRiwayatServis {
-        min-width: 1600px;
+        min-width: 1800px;
       }
       #tableRiwayatCustom {
-        min-width: 1700px;
-      }
-      #tableInputServis,
-      #tableInputCustom {
-        min-width: 1200px;
+        min-width: 1800px;
       }
 
       /* Sticky header untuk semua tabel */
@@ -143,7 +139,8 @@
       #tableRiwayatServis td,
       #tableRiwayatCustom th,
       #tableRiwayatCustom td {
-        white-space: nowrap;
+        word-wrap: break-word;
+        word-break: break-word;
         padding: 8px 12px;
       }
 
@@ -441,15 +438,15 @@
                         <tr>
                           <th style="width: 2%">No</th>
                           <th style="width: 6%">Tanggal</th>
-                          <th style="width: 3%">Jam</th>
+                          <th style="width: 4%">Jam</th>
                           <th style="width: 6%">Sales</th>
                           <th style="width: 8%">Nama Customer</th>
-                          <th style="width: 7%">No HP</th>
-                          <th style="width: 10%">Nama Barang</th>
-                          <th style="width: 6%">Berat</th>
-                          <th style="width: 6%">Karat</th>
+                          <th style="width: 8%">No HP</th>
+                          <th style="width: 15%">Nama Barang</th>
+                          <th style="width: 4%">Berat</th>
+                          <th style="width: 4%">Karat</th>
                           <th style="width: 6%">Jenis Servis</th>
-                          <th style="width: 11%">Rincian Servis</th>
+                          <th style="width: 15%">Rincian Servis</th>
                           <th style="width: 6%">Ongkos</th>
                           <th style="width: 10%">Aksi</th>
                         </tr>
@@ -484,15 +481,15 @@
                           <th style="width: 5%">Sales</th>
                           <th style="width: 8%">Nama Customer</th>
                           <th style="width: 6%">No HP</th>
-                          <th style="width: 8%">Nama Barang</th>
+                          <th style="width: 15%">Nama Barang</th>
                           <th style="width: 4%">Berat</th>
                           <th style="width: 4%">Panjang</th>
                           <th style="width: 4%">Kadar</th>
                           <th style="width: 4%">Warna</th>
-                          <th style="width: 14%">Rincian Custom</th>
-                          <th style="width: 10%">Total DP</th>
-                          <th style="width: 10%">Ongkos</th>
-                          <th style="width: 10%">Aksi</th>
+                          <th style="width: 15%">Rincian Custom</th>
+                          <th style="width: 6%">Total DP</th>
+                          <th style="width: 6%">Ongkos</th>
+                          <th style="width: 8%">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -616,8 +613,8 @@
                 <div class="card-header">
                   <div class="d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">Detail Barang Servis</h6>
-                    <button type="button" class="btn btn-sm btn-success" id="btnTambahBarang">
-                      <i class="fas fa-plus me-1"></i>
+                    <button type="button" class="btn btn-sm btn-success mx-3" id="btnTambahBarang">
+                      <i class="fas fa-plus me-2"></i>
                       Tambah
                     </button>
                   </div>

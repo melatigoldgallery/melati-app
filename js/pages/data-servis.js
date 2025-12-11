@@ -921,7 +921,7 @@ function updateTableHeaders(jenisData) {
       <th>Berat</th>
       <th>Kadar</th>
       <th>Rincian Servis</th>
-      <th>Status Pembayaran</th>
+      <th>Pembayaran</th>
     `;
   } else if (jenisData === "custom") {
     headers += `
@@ -930,7 +930,7 @@ function updateTableHeaders(jenisData) {
       <th>Kadar</th>
       <th>Warna</th>
       <th>Rincian Custom</th>
-      <th>Status Pembayaran</th>
+      <th>Pembayaran</th>
     `;
   }
 
@@ -1045,7 +1045,7 @@ function displayData(jenisData = "servis") {
     if (item.statusServis === "Sudah Selesai") {
       statusServisContent = '<span class="badge bg-success">Sudah Selesai</span>';
     } else {
-      statusServisContent = '<span class="badge bg-warning">Belum Selesai</span>';
+      statusServisContent = '<span class="badge bg-warning text-dark">Belum Selesai</span>';
     }
 
     // WhatsApp content

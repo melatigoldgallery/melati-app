@@ -1565,8 +1565,8 @@ function getPrintStyles() {
         gap: 3mm;
       }
       .print-service-box {
-        width: 3cm;
-        height: 3cm;
+        width: 3.2cm;
+        height: 3.2cm;
         border: 1px solid #000;
         padding: 1.5mm;
         box-sizing: border-box;
@@ -2179,7 +2179,7 @@ function exportServisToPDF() {
         { text: "Berat", style: "tableHeader" },
         { text: "Karat", style: "tableHeader" },
         { text: "Jenis Servis", style: "tableHeader" },
-        { text: "Rincian", style: "tableHeader" },
+        { text: "Rincian Servis", style: "tableHeader" },
         { text: "Ongkos", style: "tableHeader" },
         { text: "Status", style: "tableHeader" },
       ],
@@ -2230,8 +2230,7 @@ function exportServisToPDF() {
       pageOrientation: "landscape",
       pageMargins: [15, 25, 15, 25],
       content: [
-        { text: "LAPORAN SERVIS", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
-        { text: "Melati Gold Shop", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
+        { text: "LAPORAN SERVIS MELATI GOLD SHOP", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
         { text: `Tanggal: ${tanggalRiwayat}`, style: "subheader", alignment: "center", margin: [0, 0, 0, 8] },
         {
           table: {
@@ -2276,7 +2275,7 @@ function exportCustomToPDF() {
         { text: "Panjang", style: "tableHeader" },
         { text: "Kadar", style: "tableHeader" },
         { text: "Warna", style: "tableHeader" },
-        { text: "Rincian", style: "tableHeader" },
+        { text: "Rincian Custom", style: "tableHeader" },
         { text: "Total DP", style: "tableHeader" },
         { text: "Ongkos", style: "tableHeader" },
       ],
@@ -2339,8 +2338,7 @@ function exportCustomToPDF() {
       pageOrientation: "landscape",
       pageMargins: [15, 25, 15, 25],
       content: [
-        { text: "LAPORAN CUSTOM", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
-        { text: "Melati Gold Shop", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
+        { text: "LAPORAN CUSTOM MELATI GOLD SHOP", style: "header", alignment: "center", margin: [0, 0, 0, 5] },
         { text: `Tanggal: ${tanggalRiwayat}`, style: "subheader", alignment: "center", margin: [0, 0, 0, 8] },
         {
           table: {
