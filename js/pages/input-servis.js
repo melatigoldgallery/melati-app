@@ -1844,6 +1844,10 @@ function generateNotaHTML(servisData) {
       <div class="signature-customer">${customerName}</div>
       <div class="signature-sales">${salesName}</div>
     </div>
+    
+    <div class="nota-catatan">
+      Catatan : Penurunan berat pasca pencucian/servis dapat terjadi karena pembersihan kotoran yang menempel
+    </div>
   `;
 }
 
@@ -1922,6 +1926,16 @@ function printNotaServis(servisData) {
           }
           .signature-sales {
             text-align: right;
+          }
+          .nota-catatan {
+            position: absolute;
+            top: 12cm;
+            left: 1cm;
+            font-size: 10px;
+            font-weight: normal;
+            line-height: 1.3;
+            max-width: 18cm;
+            font-weight: bold;
           }
         </style>
       </head>
