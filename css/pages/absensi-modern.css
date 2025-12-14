@@ -1727,3 +1727,60 @@ tr:has(.badge.bg-info) {
 .app-container.sidebar-active .sidebar-overlay {
   display: block;
 }
+
+.btn-success {
+  background: linear-gradient(135deg, #24973f 0%, #075840 100%);
+  color: white;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #3fbe5d 0%, #075840 100%);
+}
+
+.btn-primary, .bg-primary {
+  background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #3f37c9 0%, #3730a3 100%);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #ffc107 0%, #f8961e 100%);
+  color: black;
+  border: none;
+}
+
+.btn-warning:hover {
+  background: linear-gradient(135deg, #f8961e 0%, #e68a00 100%);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #f94144 0%, #d62828 100%);
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #d62828 0%, #c21616 100%);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  color: white;
+  border: none;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+}
+
+.btn-info {
+  background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);
+}
+
+.btn-info:hover {
+  background: linear-gradient(135deg, #5ddaf3 0%, #0aa2c0 100%);
+}

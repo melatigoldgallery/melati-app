@@ -18,6 +18,52 @@ let detailBarangCustomItems = [];
 let detailBarangCustomCounter = 1;
 let modalClosedBySave = false;
 
+// SweetAlert Helper Functions
+function showSuccessToast(message, timer = 2000) {
+  Swal.fire({
+    toast: true,
+    position: "top-end",
+    icon: "success",
+    title: message,
+    showConfirmButton: false,
+    timer: timer,
+    timerProgressBar: true,
+  });
+}
+
+function showErrorAlert(title, message) {
+  Swal.fire({
+    icon: "error",
+    title: title,
+    text: message,
+    confirmButtonColor: "#d33",
+  });
+}
+
+function showSuccessAlert(title, message) {
+  Swal.fire({
+    icon: "success",
+    title: title,
+    text: message,
+    confirmButtonColor: "#28a745",
+    timer: 3000,
+    timerProgressBar: true,
+  });
+}
+
+async function showConfirmDialog(title, message, confirmText = "Ya, Hapus!") {
+  return await Swal.fire({
+    title: title,
+    text: message,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#6c757d",
+    confirmButtonText: confirmText,
+    cancelButtonText: "Batal",
+  });
+}
+
 // Initialize page
 document.addEventListener("DOMContentLoaded", function () {
   initializePage();
@@ -729,11 +775,17 @@ async function saveServisItem() {
         updateRiwayatTable();
       }
 
-      alert("Data berhasil diupdate");
+      showSuccessAlert("Berhasil!", "Data riwayat berhasil diupdate");
       editingRiwayatId = null;
+
+      // Close modal and stop execution
+      modalClosedBySave = true;
+      const modal = bootstrap.Modal.getInstance(document.getElementById("modalInputServis"));
+      modal.hide();
+      return;
     } catch (error) {
       console.error("Error updating data:", error);
-      alert("Terjadi kesalahan saat mengupdate data");
+      showErrorAlert("Error!", "Terjadi kesalahan saat mengupdate data: " + error.message);
       return;
     }
   }
@@ -774,6 +826,14 @@ async function saveServisItem() {
   // Close modal
   const modal = bootstrap.Modal.getInstance(document.getElementById("modalInputServis"));
   modal.hide();
+
+  // Show success notification
+  if (!editingRiwayatId) {
+    const actionText = editingIndex >= 0 ? "diupdate" : "ditambahkan";
+    setTimeout(() => {
+      showSuccessToast(`Item berhasil ${actionText} ke daftar!`);
+    }, 300);
+  }
 }
 
 function updateServisTableServis() {
@@ -928,10 +988,17 @@ window.editServisItem = function (index) {
   openServisModal(index);
 };
 
-window.deleteServisItem = function (index) {
-  if (confirm("Apakah Anda yakin ingin menghapus item ini?")) {
+window.deleteServisItem = async function (index) {
+  const result = await showConfirmDialog(
+    "Hapus Item?",
+    "Item ini akan dihapus dari daftar (belum tersimpan ke database)",
+    "Ya, Hapus!"
+  );
+
+  if (result.isConfirmed) {
     servisItemsServis.splice(index, 1);
     updateServisTableServis();
+    showSuccessToast("Item berhasil dihapus dari daftar!");
   }
 };
 
@@ -940,10 +1007,17 @@ window.editCustomItem = function (index) {
   openServisModal(index);
 };
 
-window.deleteCustomItem = function (index) {
-  if (confirm("Apakah Anda yakin ingin menghapus item ini?")) {
+window.deleteCustomItem = async function (index) {
+  const result = await showConfirmDialog(
+    "Hapus Item?",
+    "Item ini akan dihapus dari daftar (belum tersimpan ke database)",
+    "Ya, Hapus!"
+  );
+
+  if (result.isConfirmed) {
     servisItemsCustom.splice(index, 1);
     updateServisTableCustom();
+    showSuccessToast("Item berhasil dihapus dari daftar!");
   }
 };
 
@@ -965,7 +1039,16 @@ window.editRiwayatItem = function (id, index) {
   );
 };
 
-window.deleteRiwayatItem = function (id, index) {
+window.deleteRiwayatItem = async function (id, index) {
+  // Confirm first with SweetAlert
+  const result = await showConfirmDialog(
+    "Hapus Data Riwayat?",
+    "Data ini akan dihapus permanen dari database. Anda perlu memasukkan kode verifikasi.",
+    "Lanjutkan"
+  );
+
+  if (!result.isConfirmed) return;
+
   // Cari item dari todayData berdasarkan id
   const actualIndex = todayData.findIndex((item) => item.id === id);
   verifikasiAction = "delete";
@@ -987,7 +1070,7 @@ async function handleVerifikasi() {
   const kode = document.getElementById("kodeVerifikasi").value;
 
   if (kode !== "smlt116") {
-    alert("Kode verifikasi salah!");
+    showErrorAlert("Verifikasi Gagal!", "Kode verifikasi yang Anda masukkan salah");
     document.getElementById("kodeVerifikasi").focus();
     return;
   }
@@ -1104,11 +1187,18 @@ async function handleVerifikasi() {
       todayData = todayData.filter((item) => item.id !== verifikasiData.id);
       updateRiwayatTable();
 
-      showDeleteSuccessModal();
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil Dihapus!",
+        text: "Data riwayat telah dihapus dari sistem",
+        confirmButtonColor: "#28a745",
+        timer: 3000,
+        timerProgressBar: true,
+      });
     }
   } catch (error) {
     console.error("Error:", error);
-    alert("Terjadi kesalahan: " + error.message);
+    showErrorAlert("Error!", "Terjadi kesalahan: " + error.message);
   }
 
   const modal = bootstrap.Modal.getInstance(document.getElementById("verifikasiModal"));
@@ -2012,18 +2102,6 @@ function generateNotaCustomHTML(servisData) {
   // Hitung grand total (DP + Ongkos)
   const grandTotal = totalDP + totalOngkos;
 
-  // Tambahkan baris total
-  tableRows += `
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td style="text-align: right; font-weight: bold;">BAYAR AWAL</td>
-      <td style="text-align: right; font-weight: bold;">${formatCurrency(grandTotal)}</td>
-      <td></td>
-    </tr>
-  `;
-
   return `
     <div class="customer-info">
       <div>${formattedDate}</div>
@@ -2037,6 +2115,11 @@ function generateNotaCustomHTML(servisData) {
           ${tableRows}
         </tbody>
       </table>
+    </div>
+    
+    <div class="bayar-awal-section">
+      <span class="bayar-awal-label">BAYAR AWAL</span>
+      <span class="bayar-awal-value">${formatCurrency(grandTotal)}</span>
     </div>
     
     <div class="total-dp-info">
@@ -2116,10 +2199,26 @@ function printNotaCustom(servisData) {
           td:nth-child(6) {
             width: 50px;
           }
+          .bayar-awal-section {
+            position: absolute;
+            top: 6cm;
+            right: 35mm;
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            font-weight: bold;
+          }
+          .bayar-awal-label {
+            text-align: right;
+          }
+          .bayar-awal-value {
+            text-align: right;
+            min-width: 80px;
+          }
           .total-dp-info {
             position: absolute;
             top: 9.5cm;
-            right: 25mm;
+            right: 20mm;
             font-size: 12px;
             font-weight: bold;
             text-align: right;
