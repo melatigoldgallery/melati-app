@@ -41,36 +41,20 @@
         position: absolute;
         right: 10px;
       }
+
       .success-icon,
       .error-icon {
         animation: bounceIn 1s;
       }
 
       @keyframes bounceIn {
-        0%,
-        20%,
-        40%,
-        60%,
-        80%,
-        100% {
-          transition-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
-        }
         0% {
           opacity: 0;
           transform: scale3d(0.3, 0.3, 0.3);
         }
-        20% {
-          transform: scale3d(1.1, 1.1, 1.1);
-        }
-        40% {
-          transform: scale3d(0.9, 0.9, 0.9);
-        }
-        60% {
+        50% {
           opacity: 1;
-          transform: scale3d(1.03, 1.03, 1.03);
-        }
-        80% {
-          transform: scale3d(0.97, 0.97, 0.97);
+          transform: scale3d(1.05, 1.05, 1.05);
         }
         100% {
           opacity: 1;
@@ -98,16 +82,15 @@
         border-bottom: none;
       }
 
+      /* Status styling */
       .status-nominal {
         background-color: #d4edda !important;
         color: #155724 !important;
       }
-
       .status-free {
         background-color: #cce7ff !important;
         color: #004085 !important;
       }
-
       .status-belum-lunas {
         background-color: #fff3cd !important;
         color: #856404 !important;
@@ -123,7 +106,95 @@
         font-size: 0.75em;
       }
 
-      /* Responsive button styling */
+      /* ===== TABLE CONTAINER - SCROLL ONLY IN TABLE ===== */
+      .table-container {
+        max-height: 500px;
+        overflow: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+      }
+
+      /* Tabel dengan min-width untuk horizontal scroll */
+      #tableRiwayatServis {
+        min-width: 1800px;
+      }
+      #tableRiwayatCustom {
+        min-width: 1800px;
+      }
+
+      /* Sticky header untuk semua tabel */
+      #tableRiwayatServis thead th,
+      #tableRiwayatCustom thead th,
+      #tableInputServis thead th,
+      #tableInputCustom thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        border-bottom: 2px solid #dee2e6;
+      }
+
+      /* Styling tabel - cell padding */
+      #tableRiwayatServis th,
+      #tableRiwayatServis td,
+      #tableRiwayatCustom th,
+      #tableRiwayatCustom td {
+        word-wrap: break-word;
+        word-break: break-word;
+        padding: 8px 12px;
+      }
+
+      /* Button dalam tabel */
+      #tableRiwayatServis .btn,
+      #tableRiwayatCustom .btn {
+        margin: 1px;
+        font-size: 11px;
+        padding: 2px 6px;
+      }
+
+      /* Card header flex layout */
+      .card-header .d-flex {
+        min-height: 40px;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+      }
+
+      /* ===== MODAL TABLE STYLING ===== */
+      #sectionServis .table-responsive,
+      #sectionCustom .table-responsive {
+        max-height: 300px;
+        overflow: auto;
+      }
+
+      #tableDetailBarang,
+      #tableDetailBarangCustom {
+        min-width: 1400px;
+      }
+
+      #tableDetailBarang input,
+      #tableDetailBarang select,
+      #tableDetailBarangCustom input,
+      #tableDetailBarangCustom select {
+        min-width: 100px;
+        width: 100%;
+      }
+
+      #tableDetailBarang td,
+      #tableDetailBarangCustom td {
+        vertical-align: middle;
+        padding: 6px;
+      }
+
+      /* Responsive */
+      @media (max-width: 992px) {
+        #tableRiwayatServis .btn,
+        #tableRiwayatCustom .btn {
+          font-size: 9px;
+          padding: 1px 4px;
+        }
+      }
+
       @media (max-width: 768px) {
         .btn-sm {
           font-size: 10px !important;
@@ -137,195 +208,10 @@
     <div class="app-container">
       <!-- Sidebar -->
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <img src="img/Melati.jfif" alt="Logo" class="logo" />
-          <h1 class="brand-name">Melati Gold Shop</h1>
-        </div>
-        <div class="sidebar-menu">
-          <ul class="nav flex-column" id="sidebarAccordion">
-            <li class="nav-item">
-              <a class="nav-link" href="dashboard.html">
-                <i class="fas fa-tachometer-alt"></i>
-                <span class="menu-text">Dashboard</span>
-              </a>
-            </li>
-            <!-- Antrian dropdown menu -->
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#antrianSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ticket-alt"></i>
-                <span class="menu-text">Antrian</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="antrianSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="admin.html">
-                      <i class="fas fa-user-cog"></i>
-                      <span class="menu-text">Admin Antrian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Antrian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="analisis.html">
-                      <i class="fas fa-chart-bar"></i>
-                      <span class="menu-text">Laporan Antrian</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <!-- Absensi dropdown menu -->
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#absensiSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-clipboard-check"></i>
-                <span class="menu-text">Absensi</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="absensiSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="sistemAbsensi.html">
-                      <i class="fas fa-user-check"></i>
-                      <span class="menu-text">Kehadiran</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="pengajuan-izin.html">
-                      <i class="fas fa-calendar-plus"></i>
-                      <span class="menu-text">Pengajuan Izin</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporan-kehadiran.html">
-                      <i class="fas fa-file-alt"></i>
-                      <span class="menu-text">Laporan Kehadiran</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporan-izin.html">
-                      <i class="fas fa-file-medical"></i>
-                      <span class="menu-text">Laporan Izin</span>
-                    </a>
-                  </li>
-                  <!-- Ganti seluruh bagian dropdown Supervisor di dalam menu Absensi -->
-                  <li class="nav-item">
-                    <a
-                      class="nav-link collapsed supervisor-toggle"
-                      href="#"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#supervisorSubmenu"
-                      aria-expanded="false"
-                    >
-                      <i class="fas fa-user-tie"></i>
-                      <span class="menu-text">Supervisor</span>
-                      <i class="fas fa-chevron-down submenu-icon"></i>
-                    </a>
-                    <!-- Penting: Hapus data-bs-parent agar tidak tertutup otomatis -->
-                    <div class="collapse supervisor-menu" id="supervisorSubmenu">
-                      <ul class="nav flex-column ms-3">
-                        <li class="nav-item">
-                          <a class="nav-link" href="supervisor.html">
-                            <i class="fas fa-desktop"></i>
-                            <span class="menu-text">Status Pengajuan Izin</span>
-                          </a>
-                        </li>
-                        <li class="nav-item">
-                          <a class="nav-link" href="tambah-pengguna.html">
-                            <i class="fas fa-user-cog"></i>
-                            <span class="menu-text">Tambah Pengguna</span>
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#servisSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-tools"></i>
-                <span class="menu-text">Servis</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="servisSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link active" href="input-servis.html">
-                      <i class="fas fa-plus-circle"></i>
-                      <span class="menu-text">Input Servis</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="data-servis.html">
-                      <i class="fas fa-database"></i>
-                      <span class="menu-text">Data Servis</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporan-servis.html">
-                      <i class="fas fa-chart-line"></i>
-                      <span class="menu-text">Laporan Servis</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#promosiSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ad"></i>
-                <span class="menu-text">Promosi</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="promosiSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi.html">
-                      <i class="fas fa-cog"></i>
-                      <span class="menu-text">Setting Promosi</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi-display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Promosi</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-          </ul>
-        </div>
-        <div class="sidebar-footer">
-          <p>© 2025 Melati Gold Shop</p>
+        <div class="text-center p-3">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
         </div>
       </aside>
 
@@ -363,12 +249,12 @@
         <!-- Page Content -->
         <div class="page-content">
           <div class="page-header">
-            <h1>Input Servis</h1>
+            <h1>Input Servis & Custom</h1>
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="dashboard.html">Home</a></li>
                 <li class="breadcrumb-item">Servis</li>
-                <li class="breadcrumb-item active" aria-current="page">Input Servis</li>
+                <li class="breadcrumb-item active" aria-current="page">Input Data</li>
               </ol>
             </nav>
           </div>
@@ -379,12 +265,12 @@
               <div class="card-header">
                 <h2>
                   <i class="fas fa-plus-circle"></i>
-                  Input Data Servis
+                  Input Data
                 </h2>
               </div>
               <div class="card-body">
                 <form class="row g-3 d-flex align-items-end">
-                  <div class="col-md-3">
+                  <div class="col-md-2">
                     <label for="tanggal" class="form-label">Tanggal</label>
                     <div class="input-group">
                       <input type="text" class="form-control" id="tanggal" placeholder="Masukkan tanggal" />
@@ -400,41 +286,97 @@
                     </button>
                   </div>
                 </form>
-                <div class="table-responsive mt-5">
-                  <table class="table table-hover" id="tableInputServis">
-                    <thead class="table-light">
-                      <tr>
-                        <th>No</th>
-                        <th style="width: 18%">Nama Customer</th>
-                        <th style="width: 12%">No HP</th>
-                        <th style="width: 18%">Nama Barang</th>
-                        <th style="width: 15%">Jenis Servis / Custom</th>
-                        <th style="width: 12%">Ongkos / DP</th>
-                        <th style="width: 10%">Status</th>
-                        <th>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Baris akan ditambahkan oleh JavaScript -->
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <th colspan="5" class="text-end">Total Ongkos:</th>
-                        <th id="total-ongkos">Rp 0</th>
-                        <th colspan="2"></th>
-                      </tr>
-                    </tfoot>
-                  </table>
+
+                <!-- Section for Servis Input -->
+                <div id="sectionInputServis">
+                  <div class="table-container mt-5">
+                    <table class="table table-hover" id="tableInputServis">
+                      <thead class="table-light">
+                        <tr>
+                          <th>No</th>
+                          <th style="width: 15%">Nama Customer</th>
+                          <th style="width: 10%">No HP</th>
+                          <th style="width: 12%">Nama Barang</th>
+                          <th style="width: 8%">Berat</th>
+                          <th style="width: 8%">Karat</th>
+                          <th style="width: 12%">Jenis Servis</th>
+                          <th style="width: 18%">Rincian Servis</th>
+                          <th style="width: 10%">Ongkos</th>
+                          <th style="width: 8%">Status</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <!-- Baris akan ditambahkan oleh JavaScript -->
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <th colspan="8" class="text-end">Total Ongkos:</th>
+                          <th id="total-ongkos">Rp 0</th>
+                          <th colspan="2"></th>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div class="card-footer">
+                    <button class="btn btn-success" id="btnSimpanData">
+                      <i class="fas fa-save me-2"></i>
+                      Simpan
+                    </button>
+                    <button class="btn btn-danger" id="btnBatal">
+                      <i class="fas fa-times me-2"></i>
+                      Batal
+                    </button>
+                  </div>
                 </div>
-                <div class="card-footer">
-                  <button class="btn btn-success" id="btnSimpanData">
-                    <i class="fas fa-save me-2"></i>
-                    Simpan
-                  </button>
-                  <button class="btn btn-danger" id="btnBatal">
-                    <i class="fas fa-times me-2"></i>
-                    Batal
-                  </button>
+
+                <!-- Section for Custom Input -->
+                <div id="sectionInputCustom" style="display: none">
+                  <div class="table-container mt-5">
+                    <table class="table table-hover" id="tableInputCustom">
+                      <thead class="table-light">
+                        <tr>
+                          <th>No</th>
+                          <th style="width: 12%">Nama Customer</th>
+                          <th style="width: 10%">No HP</th>
+                          <th style="width: 10%">Nama Barang</th>
+                          <th style="width: 7%">Berat</th>
+                          <th style="width: 7%">Panjang</th>
+                          <th style="width: 7%">Kadar</th>
+                          <th style="width: 7%">Warna</th>
+                          <th style="width: 8%">Total DP</th>
+                          <th style="width: 8%">Ongkos</th>
+                          <th style="width: 8%">Status</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <!-- Baris akan ditambahkan oleh JavaScript -->
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <th colspan="8" class="text-end">Total DP:</th>
+                          <th id="total-dp-custom">Rp 0</th>
+                          <th colspan="3"></th>
+                        </tr>
+                        <tr>
+                          <th colspan="8" class="text-end">Total Ongkos:</th>
+                          <th id="total-ongkos-custom">Rp 0</th>
+                          <th colspan="3"></th>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div class="card-footer">
+                    <button class="btn btn-success" id="btnSimpanDataCustom">
+                      <i class="fas fa-save me-2"></i>
+                      Simpan
+                    </button>
+                    <button class="btn btn-danger" id="btnBatalCustom">
+                      <i class="fas fa-times me-2"></i>
+                      Batal
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -444,13 +386,13 @@
               <div class="card-header">
                 <h2>
                   <i class="fas fa-history"></i>
-                  Riwayat Input Servis
+                  Riwayat Input
                 </h2>
               </div>
               <div class="card-body">
                 <!-- Section untuk pilih tanggal -->
                 <div class="row mb-3">
-                  <div class="col-md-3">
+                  <div class="col-md-2">
                     <label for="tanggalRiwayat" class="form-label">Pilih Tanggal:</label>
                     <div class="input-group">
                       <input type="text" class="form-control" id="tanggalRiwayat" placeholder="Pilih tanggal" />
@@ -463,7 +405,14 @@
                       </span>
                     </div>
                   </div>
-                  <div class="col-md-8 d-flex align-items-end">
+                  <div class="col-md-1">
+                    <label for="filterJenisRiwayat" class="form-label">Jenis Data:</label>
+                    <select class="form-select" id="filterJenisRiwayat">
+                      <option value="servis" selected>Servis</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3 d-flex align-items-end justify-content-start">
                     <button id="tampilkanBtn" class="btn btn-primary me-2">
                       <i class="fas fa-search me-2"></i>
                       Tampilkan
@@ -481,35 +430,90 @@
                   </div>
                 </div>
 
-                <!-- Table riwayat -->
-                <div class="table-responsive">
-                  <table class="table table-hover" id="tableRiwayatServis">
-                    <thead class="table-light">
-                      <tr>
-                        <th style="width: 5%">No</th>
-                        <th style="width: 10%">Tanggal</th>
-                        <th style="width: 15%">Nama Customer</th>
-                        <th style="width: 10%">No HP</th>
-                        <th style="width: 15%">Nama Barang</th>
-                        <th style="width: 15%">Jenis Servis / Custom</th>
-                        <th style="width: 12%">Ongkos / DP</th>
-                        <th style="width: 8%">Sales</th>
-                        <th style="width: 10%">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colspan="9" class="text-center">Pilih tanggal dan klik "Tampilkan" untuk melihat data</td>
-                      </tr>
-                    </tbody>
-                    <tfoot>
-                      <tr class="table-info">
-                        <th colspan="6" class="text-end">Total Nominal (Lunas + Custom):</th>
-                        <th id="total-riwayat-ongkos">Rp 0</th>
-                        <th colspan="2"></th>
-                      </tr>
-                    </tfoot>
-                  </table>
+                <!-- Table riwayat servis -->
+                <div id="sectionRiwayatServis">
+                  <div class="table-container">
+                    <table class="table table-bordered table-hover" id="tableRiwayatServis">
+                      <thead class="table-light">
+                        <tr>
+                          <th style="width: 2%">No</th>
+                          <th style="width: 6%">Tanggal</th>
+                          <th style="width: 4%">Jam</th>
+                          <th style="width: 6%">Sales</th>
+                          <th style="width: 8%">Nama Customer</th>
+                          <th style="width: 8%">No HP</th>
+                          <th style="width: 15%">Nama Barang</th>
+                          <th style="width: 4%">Berat</th>
+                          <th style="width: 4%">Karat</th>
+                          <th style="width: 6%">Jenis Servis</th>
+                          <th style="width: 15%">Rincian Servis</th>
+                          <th style="width: 6%">Ongkos</th>
+                          <th style="width: 10%">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td colspan="13" class="text-center">
+                            Pilih tanggal dan klik "Tampilkan" untuk melihat data servis
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="table-info">
+                          <th colspan="11" class="text-end">Total Ongkos:</th>
+                          <th id="total-riwayat-ongkos">Rp 0</th>
+                          <th></th>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Table riwayat custom -->
+                <div id="sectionRiwayatCustom" style="display: none">
+                  <div class="table-container">
+                    <table class="table table-bordered table-hover" id="tableRiwayatCustom">
+                      <thead class="table-light">
+                        <tr>
+                          <th style="width: 3%">No</th>
+                          <th style="width: 6%">Tanggal</th>
+                          <th style="width: 4%">Jam</th>
+                          <th style="width: 5%">Sales</th>
+                          <th style="width: 8%">Nama Customer</th>
+                          <th style="width: 7%">No HP</th>
+                          <th style="width: 15%">Nama Barang</th>
+                          <th style="width: 4%">Berat</th>
+                          <th style="width: 4%">Panjang</th>
+                          <th style="width: 4%">Kadar</th>
+                          <th style="width: 4%">Warna</th>
+                          <th style="width: 15%">Rincian Custom</th>
+                          <th style="width: 6%">Total DP</th>
+                          <th style="width: 6%">Ongkos</th>
+                          <th style="width: 8%">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td colspan="15" class="text-center">
+                            Pilih tanggal dan klik "Tampilkan" untuk melihat data custom
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="table-info">
+                          <th colspan="12" class="text-end">Total:</th>
+                          <th id="total-riwayat-dp">Rp 0</th>
+                          <th id="total-riwayat-ongkos-custom">Rp 0</th>
+                          <th></th>
+                        </tr>
+                        <tr class="table-info">
+                          <th colspan="12" class="text-end">Total Nominal:</th>
+                          <th id="total-riwayat-nominal">Rp 0</th>
+                          <th colspan="2"></th>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -526,15 +530,14 @@
       aria-labelledby="modalInputServisLabel"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog modal-xl">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="modalInputServisLabel">Input Data Servis</h5>
+            <h5 class="modal-title" id="modalInputServisLabel">Input Data</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <form id="formInputServis">
-              <!-- Tambahkan field tanggal untuk edit riwayat -->
               <div class="row mb-3" id="tanggalEditRow" style="display: none">
                 <div class="col-md-4">
                   <label for="tanggalEdit" class="form-label">Tanggal</label>
@@ -546,63 +549,133 @@
                   </div>
                 </div>
               </div>
-              <div class="row mb-3">
-                <div class="col-md-4">
-                  <label for="namaSales" class="form-label">Nama Sales</label>
-                  <input type="text" class="form-control" id="namaSales" placeholder="Masukkan nama sales" required />
+
+              <!-- Section Data Customer -->
+              <div class="card mb-4">
+                <div class="card-header">
+                  <h6 class="mb-0">Data Customer</h6>
                 </div>
-                <div class="col-md-4">
-                  <label for="namaCustomer" class="form-label">Nama Customer</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="namaCustomer"
-                    placeholder="Masukkan nama customer"
-                    required
-                  />
-                </div>
-                <div class="col-md-4">
-                  <label for="noHp" class="form-label">No HP</label>
-                  <input type="tel" class="form-control" id="noHp" placeholder="Masukkan nomor HP" required />
+                <div class="card-body">
+                  <div class="row mb-3">
+                    <div class="col-md-2">
+                      <label for="namaSales" class="form-label">Nama Sales</label>
+                      <input type="text" class="form-control" id="namaSales" placeholder="Input nama sales" required />
+                    </div>
+                    <div class="col-md-3">
+                      <label for="namaCustomer" class="form-label">Nama Customer</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="namaCustomer"
+                        placeholder="Input nama customer"
+                        required
+                      />
+                    </div>
+                    <div class="col-md-2">
+                      <label for="noHp" class="form-label">No HP</label>
+                      <input type="tel" class="form-control" id="noHp" placeholder="Input nomor HP" required />
+                    </div>
+                    <div class="col-md-2">
+                      <label for="statusPembayaran" class="form-label">Status Pembayaran</label>
+                      <select class="form-control" id="statusPembayaran" required>
+                        <option value="">Pilih Status</option>
+                        <option value="nominal">Lunas</option>
+                        <option value="belum_lunas">Belum Lunas</option>
+                        <option value="free">Free</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label for="jenisInput" class="form-label">Jenis Input</label>
+                      <select class="form-control" id="jenisInput" required>
+                        <option value="servis">Servis</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                    </div>
+                    <!-- Field ongkos dipindahkan ke detail barang -->
+                    <div class="col-md-1" id="ongkosField" style="display: none">
+                      <label for="ongkos" class="form-label" id="ongkosLabel">Total Ongkos / DP</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="ongkos"
+                        placeholder="Masukkan total ongkos"
+                        min="0"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="row mb-3">
-                <div class="col-md-4">
-                  <label for="namaBarang" class="form-label">Nama Barang</label>
-                  <input type="text" class="form-control" id="namaBarang" placeholder="Masukkan nama barang" required />
+
+              <!-- Section Detail Barang Servis -->
+              <div class="card" id="sectionServis">
+                <div class="card-header">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Detail Barang Servis</h6>
+                    <button type="button" class="btn btn-sm btn-success mx-3" id="btnTambahBarang">
+                      <i class="fas fa-plus me-2"></i>
+                      Tambah
+                    </button>
+                  </div>
                 </div>
-                <div class="col-md-4">
-                  <label for="jenisServis" class="form-label">Jenis Servis / Custom</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="jenisServis"
-                    placeholder="Masukkan jenis servis"
-                    required
-                  />
-                </div>
-                <div class="col-md-4">
-                  <label for="statusPembayaran" class="form-label">Status Pembayaran</label>
-                  <select class="form-control" id="statusPembayaran" required>
-                    <option value="">Pilih Status</option>
-                    <option value="nominal">Lunas</option>
-                    <option value="belum_lunas">Belum Lunas</option>
-                    <option value="free">Free</option>
-                    <option value="custom">Custom</option>
-                  </select>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="table table-bordered" id="tableDetailBarang">
+                      <thead class="table-light">
+                        <tr>
+                          <th width="4%">No</th>
+                          <th width="4%">Jumlah</th>
+                          <th width="31%">Nama Barang</th>
+                          <th width="4%">Berat</th>
+                          <th width="4%">Karat</th>
+                          <th width="8%">Jenis Servis</th>
+                          <th width="30%">Rincian Servis</th>
+                          <th width="10%">Ongkos</th>
+                          <th width="5%">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="detailBarangBody">
+                        <!-- Rows akan ditambahkan dinamis -->
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-              <div class="row mb-3">
-                <div class="col-md-4">
-                  <label for="ongkos" class="form-label" id="ongkosLabel">Ongkos / DP</label>
-                  <input
-                    type="number"
-                    class="form-control"
-                    id="ongkos"
-                    placeholder="Masukkan ongkos"
-                    min="0"
-                    required
-                  />
+
+              <!-- Section Detail Barang Custom -->
+              <div class="card" id="sectionCustom" style="display: none">
+                <div class="card-header">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Detail Barang Custom</h6>
+                    <button type="button" class="btn btn-sm btn-success" id="btnTambahBarangCustom">
+                      <i class="fas fa-plus me-1"></i>
+                      Tambah
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="table table-bordered" id="tableDetailBarangCustom">
+                      <thead class="table-light">
+                        <tr>
+                          <th width="3%">No</th>
+                          <th width="3%">Jumlah</th>
+                          <th width="29%">Nama Barang</th>
+                          <th width="3%">Berat</th>
+                          <th width="3%">Panjang</th>
+                          <th width="3%">Kadar</th>
+                          <th width="3%">Warna</th>
+                          <th width="10%">Total DP</th>
+                          <th width="9%">Ongkos</th>
+                          <th width="29%">Rincian Custom</th>
+                          <th width="5%">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="detailBarangCustomBody">
+                        <!-- Rows akan ditambahkan dinamis -->
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </form>
@@ -734,7 +807,7 @@
       </div>
     </div>
 
-    <!-- Scripts -->
+    <script src="js/sidebar-loader.js"></script>
     <script type="module" src="js/melati.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/pages/input-servis.js"></script>
