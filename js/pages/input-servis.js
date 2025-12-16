@@ -1662,7 +1662,7 @@ function getPrintStyles() {
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: flex-end;
         text-align: center;
         break-inside: avoid;
         overflow: hidden;
@@ -1676,23 +1676,19 @@ function getPrintStyles() {
         padding: 0;
       }
       .print-nama-brg {
-        font-size: 7px;
+        font-size: 8px;
         font-weight: bold;
         word-wrap: break-word;
         word-break: break-word;
         line-height: 1.1;
         overflow: hidden;
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
         margin: 0;
-        padding: 1px 0;
+        padding: 0;
       }
       .print-status {
         font-size: 7px;
         font-weight: bold;
-        color: #333;
+        color: #202020ff;
         margin: 0;
         padding: 0;
       }
