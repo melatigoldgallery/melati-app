@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-storage.js";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -24,6 +25,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 // Auth service untuk digunakan di seluruh aplikasi
 export const authService = {
@@ -112,4 +114,4 @@ export const authService = {
 };
 
 export default app;
-export { db, rtdb, auth };
+export { db, rtdb, auth, storage };

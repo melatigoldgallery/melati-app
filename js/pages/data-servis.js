@@ -1,4 +1,5 @@
 import { getServisByMonth, updateServisStatus, smartServisCache } from "../services/servis-service.js";
+import { uploadBuktiPengambilan, validateImageFile, compressImage } from "../services/storage-service.js";
 
 // Global variables
 let currentData = [];
@@ -690,6 +691,7 @@ function setupModalEventListeners() {
     statusPengambilanSelect.addEventListener("change", function () {
       const pengambilanForm = document.getElementById("pengambilanForm");
       const waktuPengambilan = document.getElementById("waktuPengambilan");
+      const buktiPengambilan = document.getElementById("buktiPengambilan");
 
       if (this.value === "Sudah Diambil") {
         pengambilanForm.style.display = "block";
@@ -697,12 +699,63 @@ function setupModalEventListeners() {
         const now = new Date();
         const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
         waktuPengambilan.value = localDateTime;
+        // Set required pada bukti pengambilan
+        if (buktiPengambilan) buktiPengambilan.required = true;
       } else {
         pengambilanForm.style.display = "none";
         document.getElementById("stafHandle").value = "";
         waktuPengambilan.value = "";
+        if (buktiPengambilan) {
+          buktiPengambilan.required = false;
+          buktiPengambilan.value = "";
+        }
+        // Reset preview
+        document.getElementById("imagePreview").style.display = "none";
+        document.getElementById("previewImg").src = "";
       }
     });
+  }
+
+  // Handle image preview
+  const buktiPengambilanInput = document.getElementById("buktiPengambilan");
+  if (buktiPengambilanInput) {
+    buktiPengambilanInput.addEventListener("change", handleImagePreview);
+  }
+
+  const removeImageBtn = document.getElementById("removeImageBtn");
+  if (removeImageBtn) {
+    removeImageBtn.addEventListener("click", function () {
+      const buktiInput = document.getElementById("buktiPengambilan");
+      buktiInput.value = "";
+      document.getElementById("imagePreview").style.display = "none";
+      document.getElementById("previewImg").src = "";
+    });
+  }
+}
+
+// Handle image preview
+function handleImagePreview(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Validate file
+  try {
+    validateImageFile(file);
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      document.getElementById("previewImg").src = event.target.result;
+      document.getElementById("imagePreview").style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  } catch (error) {
+    Swal.fire({
+      icon: "error",
+      title: "File Tidak Valid",
+      text: error.message,
+    });
+    e.target.value = "";
   }
 }
 
@@ -940,6 +993,7 @@ function updateTableHeaders(jenisData) {
       <th>WhatsApp</th>
       <th>Handle Pengambilan</th>
       <th>Waktu Pengambilan</th>
+      <th>Bukti Pengambilan</th>
       <th>Aksi</th>
     </tr>
   `;
@@ -1212,6 +1266,15 @@ function displayData(jenisData = "servis") {
       <td style="border-right: 2px solid #dee2e6;" class="status-cell">${whatsappContent}</td>
       <td style="border-right: 2px solid #dee2e6;">${item.stafHandle || "-"}</td>
       <td style="border-right: 2px solid #dee2e6;"><small>${waktuPengambilan}</small></td>
+      <td style="border-right: 2px solid #dee2e6; text-align: center;">
+        ${
+          item.buktiPengambilanUrl
+            ? `<button class="btn btn-sm btn-info" onclick="viewPhoto('${item.buktiPengambilanUrl}')" title="Lihat Foto">
+            <i class="fas fa-image"></i>
+          </button>`
+            : "-"
+        }
+      </td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="openUpdateModal('${itemId}', '${item.statusServis}', '${
       item.statusPengambilan
@@ -1299,24 +1362,81 @@ async function saveStatusUpdate() {
 
     let stafHandle = null;
     let waktuPengambilan = null;
+    let buktiPengambilanUrl = null;
+    let buktiPengambilanPath = null;
 
     if (statusPengambilan === "Sudah Diambil") {
       stafHandle = document.getElementById("stafHandle").value.trim();
       const waktuInput = document.getElementById("waktuPengambilan").value;
+      const buktiInput = document.getElementById("buktiPengambilan");
+      const fileInput = buktiInput?.files[0];
 
       if (!stafHandle) {
-        showAlert("warning", "Nama staf handle harus diisi");
+        Swal.fire({
+          icon: "warning",
+          title: "Data Belum Lengkap",
+          text: "Nama staf handle harus diisi",
+        });
+        return;
+      }
+
+      if (!fileInput) {
+        Swal.fire({
+          icon: "warning",
+          title: "Foto Wajib Diisi",
+          text: "Bukti pengambilan (foto) harus diupload saat status Sudah Diambil",
+        });
         return;
       }
 
       waktuPengambilan = waktuInput;
+
+      // Validate & compress image
+      try {
+        validateImageFile(fileInput);
+        showLoading(true);
+
+        Swal.fire({
+          title: "Mengupload Foto...",
+          html: "Mohon tunggu, sedang mengkompres dan mengupload foto",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        // Compress and upload
+        const compressedFile = await compressImage(fileInput);
+        const uploadResult = await uploadBuktiPengambilan(compressedFile, servisId);
+
+        buktiPengambilanUrl = uploadResult.url;
+        buktiPengambilanPath = uploadResult.path;
+
+        Swal.close();
+      } catch (error) {
+        showLoading(false);
+        Swal.fire({
+          icon: "error",
+          title: "Upload Gagal",
+          text: error.message,
+        });
+        return;
+      }
     }
 
     showLoading(true);
 
     try {
       // 1. Update ke Firestore
-      await updateServisStatus(servisId, statusServis, statusPengambilan, stafHandle, waktuPengambilan);
+      await updateServisStatus(
+        servisId,
+        statusServis,
+        statusPengambilan,
+        stafHandle,
+        waktuPengambilan,
+        buktiPengambilanUrl,
+        buktiPengambilanPath
+      );
 
       // 2. PERBAIKAN SEDERHANA: Update data lokal langsung
       const updateData = {
@@ -1324,6 +1444,8 @@ async function saveStatusUpdate() {
         statusPengambilan,
         stafHandle,
         waktuPengambilan: waktuPengambilan ? new Date(waktuPengambilan).toISOString() : null,
+        buktiPengambilanUrl,
+        buktiPengambilanPath,
       };
 
       // Update currentData
@@ -1366,9 +1488,19 @@ async function saveStatusUpdate() {
 
       // 7. Show success message
       if (statusServis === "Sudah Selesai") {
-        showAlert("success", "Status berhasil diperbarui! Sekarang Anda dapat menghubungi customer via WhatsApp.");
+        Swal.fire({
+          icon: "success",
+          title: "Status Berhasil Diperbarui",
+          text: "Sekarang Anda dapat menghubungi customer via WhatsApp.",
+          timer: 2000,
+        });
       } else {
-        showAlert("success", "Status berhasil diperbarui dan disimpan");
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: "Status berhasil diperbarui dan disimpan",
+          timer: 2000,
+        });
       }
     } catch (updateError) {
       console.error("Error during update process:", updateError);
@@ -1803,6 +1935,16 @@ if (typeof window !== "undefined" && window.location.hostname === "localhost") {
     console.log("All servis cache cleared");
   };
 }
+
+// View photo in modal
+window.viewPhoto = function (photoUrl) {
+  const modalPhotoImg = document.getElementById("modalPhotoImg");
+  if (modalPhotoImg) {
+    modalPhotoImg.src = photoUrl;
+    const modal = new bootstrap.Modal(document.getElementById("viewPhotoModal"));
+    modal.show();
+  }
+};
 
 // Export functions yang mungkin diperlukan
 export { loadServisDataEnhanced as loadServisData, syncDataIfNeeded, getCachedData, setCachedData, clearCacheKey };

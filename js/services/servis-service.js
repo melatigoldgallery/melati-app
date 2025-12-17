@@ -417,7 +417,9 @@ export async function updateServisStatus(
   statusServis,
   statusPengambilan,
   stafHandle = null,
-  waktuPengambilan = null
+  waktuPengambilan = null,
+  buktiPengambilanUrl = null,
+  buktiPengambilanPath = null
 ) {
   try {
     const servisRef = doc(db, SERVIS_COLLECTION, servisId);
@@ -431,9 +433,19 @@ export async function updateServisStatus(
     if (statusPengambilan === "Sudah Diambil" && stafHandle && waktuPengambilan) {
       updateData.stafHandle = stafHandle;
       updateData.waktuPengambilan = Timestamp.fromDate(new Date(waktuPengambilan));
+
+      // Add photo URL and path if provided
+      if (buktiPengambilanUrl) {
+        updateData.buktiPengambilanUrl = buktiPengambilanUrl;
+      }
+      if (buktiPengambilanPath) {
+        updateData.buktiPengambilanPath = buktiPengambilanPath;
+      }
     } else if (statusPengambilan === "Belum Diambil") {
       updateData.stafHandle = null;
       updateData.waktuPengambilan = null;
+      updateData.buktiPengambilanUrl = null;
+      updateData.buktiPengambilanPath = null;
     }
 
     await updateDoc(servisRef, updateData);
