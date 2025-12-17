@@ -2198,9 +2198,9 @@ function printNotaCustom(servisData) {
           .bayar-awal-section {
             position: absolute;
             top: 6cm;
-            right: 35mm;
+            right: 40mm;
             display: flex;
-            gap: 15px;
+            gap: 10px;
             font-size: 12px;
             font-weight: bold;
           }
@@ -2222,7 +2222,7 @@ function printNotaCustom(servisData) {
           }
           .note-info {
             position: absolute;
-            top: 11.6cm;
+            top: 11.1cm;
             right: 10mm;
             font-size: 10px;
             font-weight: bold;
@@ -2232,7 +2232,7 @@ function printNotaCustom(servisData) {
           }
           .signature-section {
             position: absolute;
-            top: 11.6cm;
+            top: 11.1cm;
             left: 8mm;
             font-size: 12px;
           }
