@@ -975,8 +975,8 @@ tr:has(.badge.bg-info) {
   box-shadow: var(--box-shadow);
 }
 
-.modal-header {
-  background-color: var(--primary-color);
+.modal-header {  
+  background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
   color: white;
   border-bottom: none;
   border-top-left-radius: var(--border-radius);
@@ -1288,7 +1288,7 @@ tr:has(.badge.bg-info) {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
   color: white;
   display: flex;
   align-items: center;

@@ -119,7 +119,7 @@
         min-width: 1800px;
       }
       #tableRiwayatCustom {
-        min-width: 1800px;
+        min-width: 2200px;
       }
 
       /* Sticky header untuk semua tabel */
@@ -341,7 +341,7 @@
                           <th style="width: 10%">No HP</th>
                           <th style="width: 10%">Nama Barang</th>
                           <th style="width: 7%">Berat</th>
-                          <th style="width: 7%">Panjang</th>
+                          <th style="width: 7%">Panjang/Size</th>
                           <th style="width: 7%">Kadar</th>
                           <th style="width: 7%">Warna</th>
                           <th style="width: 8%">Total DP</th>
@@ -446,14 +446,15 @@
                           <th style="width: 4%">Berat</th>
                           <th style="width: 4%">Karat</th>
                           <th style="width: 8%">Jenis Servis</th>
-                          <th style="width: 15%">Rincian Servis</th>
+                          <th style="width: 14%">Rincian Servis</th>
                           <th style="width: 6%">Ongkos</th>
-                          <th style="width: 10%">Aksi</th>
+                          <th style="width: 6%">Status</th>
+                          <th style="width: 8%">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td colspan="13" class="text-center">
+                          <td colspan="14" class="text-center">
                             Pilih tanggal dan klik "Tampilkan" untuk melihat data servis
                           </td>
                         </tr>
@@ -462,7 +463,7 @@
                         <tr class="table-info">
                           <th colspan="11" class="text-end">Total Ongkos:</th>
                           <th id="total-riwayat-ongkos">Rp 0</th>
-                          <th></th>
+                          <th colspan="2"></th>
                         </tr>
                       </tfoot>
                     </table>
@@ -480,21 +481,22 @@
                           <th style="width: 4%">Jam</th>
                           <th style="width: 5%">Sales</th>
                           <th style="width: 8%">Nama Customer</th>
-                          <th style="width: 8%">No HP</th>
+                          <th style="width: 7%">No HP</th>
                           <th style="width: 14%">Nama Barang</th>
                           <th style="width: 4%">Berat</th>
-                          <th style="width: 4%">Panjang</th>
+                          <th style="width: 4%">Panjang/Size</th>
                           <th style="width: 4%">Kadar</th>
                           <th style="width: 7%">Warna</th>
-                          <th style="width: 12%">Rincian Custom</th>
+                          <th style="width: 11%">Rincian Custom</th>
                           <th style="width: 6%">Total DP</th>
                           <th style="width: 6%">Ongkos</th>
-                          <th style="width: 9%">Aksi</th>
+                          <th style="width: 4%">Status</th>
+                          <th style="width: 10%">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td colspan="15" class="text-center">
+                          <td colspan="16" class="text-center">
                             Pilih tanggal dan klik "Tampilkan" untuk melihat data custom
                           </td>
                         </tr>
@@ -504,12 +506,12 @@
                           <th colspan="12" class="text-end">Total:</th>
                           <th id="total-riwayat-dp">Rp 0</th>
                           <th id="total-riwayat-ongkos-custom">Rp 0</th>
-                          <th></th>
+                          <th colspan="2"></th>
                         </tr>
                         <tr class="table-info">
                           <th colspan="12" class="text-end">Total Nominal:</th>
                           <th id="total-riwayat-nominal">Rp 0</th>
-                          <th colspan="2"></th>
+                          <th colspan="3"></th>
                         </tr>
                       </tfoot>
                     </table>
@@ -532,7 +534,7 @@
     >
       <div class="modal-dialog modal-xl">
         <div class="modal-content">
-          <div class="modal-header">
+          <div class="modal-header py-2">
             <h5 class="modal-title" id="modalInputServisLabel">Input Data</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
@@ -576,16 +578,6 @@
                       <input type="tel" class="form-control" id="noHp" placeholder="Input nomor HP" required />
                     </div>
                     <div class="col-md-2">
-                      <label for="statusPembayaran" class="form-label">Status Pembayaran</label>
-                      <select class="form-control" id="statusPembayaran" required>
-                        <option value="">Pilih Status</option>
-                        <option value="nominal">Lunas</option>
-                        <option value="belum_lunas">Belum Lunas</option>
-                        <option value="free">Free</option>
-                        <option value="custom">Custom</option>
-                      </select>
-                    </div>
-                    <div class="col-md-2">
                       <label for="jenisInput" class="form-label">Jenis Input</label>
                       <select class="form-control" id="jenisInput" required>
                         <option value="servis">Servis</option>
@@ -623,14 +615,15 @@
                     <table class="table table-bordered" id="tableDetailBarang">
                       <thead class="table-light">
                         <tr>
-                          <th width="4%">No</th>
-                          <th width="4%">Jumlah</th>
-                          <th width="31%">Nama Barang</th>
+                          <th width="3%">No</th>
+                          <th width="3%">Jumlah</th>
+                          <th width="28%">Nama Barang</th>
                           <th width="4%">Berat</th>
                           <th width="4%">Karat</th>
                           <th width="8%">Jenis Servis</th>
-                          <th width="30%">Rincian Servis</th>
-                          <th width="10%">Ongkos</th>
+                          <th width="28%">Rincian Servis</th>
+                          <th width="8%">Ongkos</th>
+                          <th width="9%">Status</th>
                           <th width="5%">Aksi</th>
                         </tr>
                       </thead>
@@ -647,7 +640,7 @@
                 <div class="card-header">
                   <div class="d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">Detail Barang Custom</h6>
-                    <button type="button" class="btn btn-sm btn-success" id="btnTambahBarangCustom">
+                    <button type="button" class="btn btn-sm btn-success mx-3" id="btnTambahBarangCustom">
                       <i class="fas fa-plus me-1"></i>
                       Tambah
                     </button>
@@ -660,14 +653,15 @@
                         <tr>
                           <th width="3%">No</th>
                           <th width="3%">Jumlah</th>
-                          <th width="29%">Nama Barang</th>
+                          <th width="25%">Nama Barang</th>
                           <th width="3%">Berat</th>
-                          <th width="3%">Panjang</th>
+                          <th width="3%">Panjang/Size</th>
                           <th width="3%">Kadar</th>
                           <th width="3%">Warna</th>
-                          <th width="10%">Total DP</th>
-                          <th width="9%">Ongkos</th>
-                          <th width="29%">Rincian Custom</th>
+                          <th width="8%">Total DP</th>
+                          <th width="8%">Ongkos</th>
+                          <th width="8%">Status</th>
+                          <th width="28%">Rincian Custom</th>
                           <th width="5%">Aksi</th>
                         </tr>
                       </thead>
@@ -682,7 +676,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-primary" id="btnSimpanServis">Simpan</button>
+            <button type="button" class="btn btn-primary" id="btnSimpanServis">Lanjutkan</button>
           </div>
         </div>
       </div>

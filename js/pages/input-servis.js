@@ -173,11 +173,6 @@ function setupEventListeners() {
     handleJenisInputChange();
   });
 
-  // Status pembayaran change handler
-  document.getElementById("statusPembayaran").addEventListener("change", function () {
-    handleStatusPembayaranChange();
-  });
-
   // Simpan data button
   document.getElementById("btnSimpanData").addEventListener("click", function () {
     saveAllServisData();
@@ -226,11 +221,6 @@ function setupEventListeners() {
   // Verifikasi button
   document.getElementById("btnVerifikasi").addEventListener("click", function () {
     handleVerifikasi();
-  });
-
-  // Status pembayaran change handler
-  document.getElementById("statusPembayaran").addEventListener("change", function () {
-    handleStatusPembayaranChange();
   });
 
   // Modal hidden events
@@ -284,6 +274,7 @@ function addDetailBarangRow() {
     jenisServis: "",
     rincianServis: "",
     ongkos: 0,
+    statusPembayaran: "nominal",
   };
 
   detailBarangItems.push(newItem);
@@ -300,6 +291,7 @@ function updateDetailBarangTable() {
   tbody.innerHTML = "";
 
   detailBarangItems.forEach((item, index) => {
+    const statusPembayaran = item.statusPembayaran || "nominal";
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -334,11 +326,12 @@ function updateDetailBarangTable() {
           <option value="GRAFIR" ${item.jenisServis === "GRAFIR" ? "selected" : ""}>GRAFIR</option>
           <option value="PATRI" ${item.jenisServis === "PATRI" ? "selected" : ""}>PATRI</option>
           <option value="CUCI" ${item.jenisServis === "CUCI" ? "selected" : ""}>CUCI</option>
+          <option value="PASANG BATU" ${item.jenisServis === "PASANG BATU" ? "selected" : ""}>PASANG BATU</option>
+          <option value="TAMBAH RING" ${item.jenisServis === "TAMBAH RING" ? "selected" : ""}>TAMBAH RING</option>          
           <option value="CHROME GOLD" ${item.jenisServis === "CHROME GOLD" ? "selected" : ""}>CHROME GOLD 22K</option>
           <option value="CHROME SELEB" ${item.jenisServis === "CHROME SELEB" ? "selected" : ""}>CHROME SELEB</option>
           <option value="CHROME PUTIH" ${item.jenisServis === "CHROME PUTIH" ? "selected" : ""}>CHROME PUTIH</option>
           <option value="CHROME ROSE" ${item.jenisServis === "CHROME ROSE" ? "selected" : ""}>CHROME ROSE</option>
-          <option value="CUSTOM" ${item.jenisServis === "CUSTOM" ? "selected" : ""}>CUSTOM</option>
         </select>
       </td>
       <td>
@@ -353,6 +346,14 @@ function updateDetailBarangTable() {
                onchange="updateDetailBarangItem(${item.id}, 'ongkos', this.value)" 
                placeholder="Ongkos" 
                min="0" />
+      </td>
+      <td>
+        <select class="form-select form-select-sm" 
+                onchange="updateDetailBarangItem(${item.id}, 'statusPembayaran', this.value)">
+          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>Lunas</option>
+          <option value="belum_lunas" ${statusPembayaran === "belum_lunas" ? "selected" : ""}>Belum Lunas</option>
+          <option value="free" ${statusPembayaran === "free" ? "selected" : ""}>Free</option>
+        </select>
       </td>
       <td>
         <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailBarangRow(${item.id})" title="Hapus">
@@ -402,6 +403,7 @@ function addDetailBarangCustomRow() {
     totalDp: 0,
     ongkos: 0,
     rincianServis: "",
+    statusPembayaran: "nominal",
   };
   detailBarangCustomItems.push(newItem);
   updateDetailBarangCustomTable();
@@ -417,6 +419,7 @@ function updateDetailBarangCustomTable() {
   tbody.innerHTML = "";
 
   detailBarangCustomItems.forEach((item, index) => {
+    const statusPembayaran = item.statusPembayaran || "nominal";
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -448,6 +451,13 @@ function updateDetailBarangCustomTable() {
       <td><input type="number" class="form-control form-control-sm" value="${
         item.ongkos || 0
       }" onchange="updateDetailBarangCustomItem(${item.id}, 'ongkos', this.value)" placeholder="Ongkos" min="0" /></td>
+      <td>
+        <select class="form-select form-select-sm" 
+                onchange="updateDetailBarangCustomItem(${item.id}, 'statusPembayaran', this.value)">
+          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>Lunas</option>
+          <option value="custom" ${statusPembayaran === "custom" ? "selected" : ""}>Custom</option>
+        </select>
+      </td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.rincianServis
       }" onchange="updateDetailBarangCustomItem(${item.id}, 'rincianServis', this.value)" placeholder="Rincian" /></td>
@@ -490,8 +500,6 @@ function validateDetailBarang() {
     }
   }
 
-  const statusPembayaran = document.getElementById("statusPembayaran").value;
-
   if (jenisInput === "servis") {
     for (let i = 0; i < detailBarangItems.length; i++) {
       const item = detailBarangItems[i];
@@ -499,14 +507,24 @@ function validateDetailBarang() {
         showErrorModal("Validasi Error", `Nama barang dan jenis servis pada baris ${i + 1} harus diisi!`);
         return false;
       }
-      if (
-        (statusPembayaran === "nominal" || statusPembayaran === "custom") &&
+
+      // Validasi status pembayaran per item
+      const itemStatus = item.statusPembayaran || "nominal";
+      if (!item.statusPembayaran) {
+        showErrorModal("Validasi Error", `Status pembayaran pada baris ${i + 1} harus dipilih!`);
+        return false;
+      }
+
+      // Auto-set ongkos ke 0 jika status free
+      if (itemStatus === "free") {
+        item.ongkos = 0;
+      } else if (
+        (itemStatus === "nominal" || itemStatus === "belum_lunas") &&
         (!item.ongkos || parseInt(item.ongkos) <= 0)
       ) {
-        const labelText = statusPembayaran === "custom" ? "DP" : "Ongkos";
         showErrorModal(
           "Validasi Error",
-          `${labelText} pada baris ${i + 1} harus diisi untuk status ${statusPembayaran}!`
+          `Ongkos pada baris ${i + 1} harus diisi untuk status ${getStatusLabel(itemStatus)}!`
         );
         return false;
       }
@@ -516,6 +534,12 @@ function validateDetailBarang() {
       const item = detailBarangCustomItems[i];
       if (!item.namaBarang.trim()) {
         showErrorModal("Validasi Error", `Nama barang pada baris ${i + 1} harus diisi!`);
+        return false;
+      }
+
+      // Validasi status pembayaran per item
+      if (!item.statusPembayaran) {
+        showErrorModal("Validasi Error", `Status pembayaran pada baris ${i + 1} harus dipilih!`);
         return false;
       }
     }
@@ -551,20 +575,8 @@ function handleJenisInputChange() {
 }
 
 function handleStatusPembayaranChange() {
-  const statusPembayaran = document.getElementById("statusPembayaran").value;
-
-  // Set semua ongkos item ke 0 jika status free
-  if (statusPembayaran === "free") {
-    detailBarangItems.forEach((item) => {
-      item.ongkos = 0;
-    });
-    updateDetailBarangTable();
-    detailBarangCustomItems.forEach((item) => {
-      item.ongkos = 0;
-      item.totalDp = 0;
-    });
-    updateDetailBarangCustomTable();
-  }
+  // Status pembayaran sekarang per item, function ini tidak diperlukan lagi
+  // Kept for backward compatibility but does nothing
 }
 
 function openServisModal(index = -1) {
@@ -578,16 +590,11 @@ function openServisModal(index = -1) {
     document.getElementById("namaSales").value = item.namaSales || "";
     document.getElementById("namaCustomer").value = item.namaCustomer;
     document.getElementById("noHp").value = item.noHp;
-    document.getElementById("statusPembayaran").value = item.statusPembayaran || "nominal";
-    document.getElementById("ongkos").value = item.totalOngkos || item.ongkos || 0;
 
     // Set jenis input
     jenisInput = item.jenisInput || "servis";
     document.getElementById("jenisInput").value = jenisInput;
     handleJenisInputChange();
-
-    // Trigger status change untuk set proper state
-    handleStatusPembayaranChange();
 
     // Load detail barang
     if (jenisInput === "servis" && item.detailBarang && item.detailBarang.length > 0) {
@@ -600,6 +607,7 @@ function openServisModal(index = -1) {
         jenisServis: detail.jenisServis || "",
         rincianServis: detail.rincianServis || "",
         ongkos: detail.ongkos || 0,
+        statusPembayaran: detail.statusPembayaran || "nominal",
       }));
       detailBarangCounter = detailBarangItems.length + 1;
     } else {
@@ -614,6 +622,7 @@ function openServisModal(index = -1) {
           jenisServis: item.jenisServis || "",
           rincianServis: "",
           ongkos: item.ongkos || 0,
+          statusPembayaran: item.statusPembayaran || "nominal",
         },
       ];
       detailBarangCounter = 2;
@@ -633,6 +642,7 @@ function openServisModal(index = -1) {
         totalDp: detail.totalDp || 0,
         ongkos: detail.ongkos || 0,
         rincianServis: detail.rincianServis || "",
+        statusPembayaran: detail.statusPembayaran || "nominal",
       }));
       detailBarangCustomCounter = detailBarangCustomItems.length + 1;
       updateDetailBarangCustomTable();
@@ -684,15 +694,14 @@ async function saveServisItem() {
   const namaSales = document.getElementById("namaSales").value.trim();
   const namaCustomer = document.getElementById("namaCustomer").value.trim();
   const noHp = document.getElementById("noHp").value.trim();
-  const statusPembayaran = document.getElementById("statusPembayaran").value;
 
   // Validation
-  if (!namaSales || !namaCustomer || !noHp || !statusPembayaran) {
+  if (!namaSales || !namaCustomer || !noHp) {
     showErrorModal("Validasi Error", "Data customer harus diisi dengan benar!");
     return;
   }
 
-  // Validate detail barang (include ongkos validation)
+  // Validate detail barang (include status pembayaran per item validation)
   if (!validateDetailBarang()) {
     return;
   }
@@ -701,7 +710,6 @@ async function saveServisItem() {
     namaSales,
     namaCustomer,
     noHp,
-    statusPembayaran,
     jenisInput: jenisInput,
   };
 
@@ -715,13 +723,14 @@ async function saveServisItem() {
       jenisServis: item.jenisServis.trim(),
       rincianServis: item.rincianServis.trim(),
       ongkos: parseInt(item.ongkos) || 0,
+      statusPembayaran: item.statusPembayaran || "nominal",
     }));
-    servisItem.totalOngkos = statusPembayaran === "free" ? 0 : totalOngkos;
+    servisItem.totalOngkos = totalOngkos;
     servisItem.namaBarang = detailBarangItems[0]?.namaBarang || "";
     servisItem.berat = detailBarangItems[0]?.berat || "";
     servisItem.karat = detailBarangItems[0]?.karat || "";
     servisItem.jenisServis = detailBarangItems[0]?.jenisServis || "";
-    servisItem.ongkos = statusPembayaran === "free" ? 0 : totalOngkos;
+    servisItem.ongkos = totalOngkos;
   } else {
     const totalDp = detailBarangCustomItems.reduce((sum, item) => sum + (parseInt(item.totalDp) || 0), 0);
     const totalOngkos = detailBarangCustomItems.reduce((sum, item) => sum + (parseInt(item.ongkos) || 0), 0);
@@ -734,6 +743,7 @@ async function saveServisItem() {
       warna: item.warna.trim(),
       totalDP: parseInt(item.totalDp) || 0,
       ongkos: parseInt(item.ongkos) || 0,
+      statusPembayaran: item.statusPembayaran || "nominal",
       rincianServis: item.rincianServis.trim(),
     }));
     servisItem.totalDP = statusPembayaran === "free" ? 0 : totalDp;
@@ -844,11 +854,8 @@ function updateServisTableServis() {
 
   servisItemsServis.forEach((item, index) => {
     const row = document.createElement("tr");
-    const statusPembayaran = item.statusPembayaran || "nominal";
 
-    if (statusPembayaran === "nominal" || statusPembayaran === "custom") {
-      totalOngkos += item.totalOngkos || item.ongkos || 0;
-    }
+    totalOngkos += item.totalOngkos || item.ongkos || 0;
 
     const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [];
 
@@ -858,6 +865,14 @@ function updateServisTableServis() {
     const jenisHtml = details.map((d) => `<div>${d.jenisServis || "-"}</div>`).join("");
     const rincianHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
     const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
+
+    // Status per item
+    const statusHtml = details
+      .map((d) => {
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
+      })
+      .join("");
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -869,11 +884,7 @@ function updateServisTableServis() {
       <td class="multi-col">${jenisHtml}</td>
       <td class="multi-col">${rincianHtml}</td>
       <td class="multi-col">${ongkosHtml}</td>
-      <td>
-        <span class="badge bg-${getStatusBadgeColor(statusPembayaran)}">
-          ${getStatusLabel(statusPembayaran)}
-        </span>
-      </td>
+      <td class="multi-col">${statusHtml}</td>
       <td>
         <button class="btn btn-sm btn-warning me-1" onclick="editServisItem(${index})">
           <i class="fas fa-edit"></i>
@@ -898,7 +909,6 @@ function updateServisTableCustom() {
 
   servisItemsCustom.forEach((item, index) => {
     const row = document.createElement("tr");
-    const statusPembayaran = item.statusPembayaran || "nominal";
 
     const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
 
@@ -909,6 +919,14 @@ function updateServisTableCustom() {
     const warnaHtml = details.map((d) => `<div>${d.warna || "-"}</div>`).join("");
     const totalDPHtml = details.map((d) => `<div>Rp ${(d.totalDP || 0).toLocaleString("id-ID")}</div>`).join("");
     const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
+
+    // Status per item
+    const statusHtml = details
+      .map((d) => {
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
+      })
+      .join("");
 
     details.forEach((d) => {
       totalDP += d.totalDP || 0;
@@ -926,11 +944,7 @@ function updateServisTableCustom() {
       <td class="multi-col">${warnaHtml}</td>
       <td class="multi-col">${totalDPHtml}</td>
       <td class="multi-col">${ongkosHtml}</td>
-      <td>
-        <span class="badge bg-${getStatusBadgeColor(statusPembayaran)}">
-          ${getStatusLabel(statusPembayaran)}
-        </span>
-      </td>
+      <td class="multi-col">${statusHtml}</td>
       <td>
         <button class="btn btn-sm btn-warning me-1" onclick="editCustomItem(${index})">
           <i class="fas fa-edit"></i>
@@ -975,7 +989,7 @@ function getStatusLabel(status) {
 function getStatusBadgeColor(status) {
   const colors = {
     nominal: "success",
-    free: "info",
+    free: "primary",
     belum_lunas: "warning",
     custom: "secondary",
   };
@@ -1089,8 +1103,6 @@ async function handleVerifikasi() {
       document.getElementById("namaSales").value = item.namaSales;
       document.getElementById("namaCustomer").value = item.namaCustomer;
       document.getElementById("noHp").value = item.noHp;
-      document.getElementById("statusPembayaran").value = item.statusPembayaran || "nominal";
-      document.getElementById("ongkos").value = item.ongkos;
 
       // Load detail barang berdasarkan jenis input
       if (jenisInput === "servis") {
@@ -1105,6 +1117,7 @@ async function handleVerifikasi() {
             jenisServis: detail.jenisServis || "",
             rincianServis: detail.rincianServis || "",
             ongkos: detail.ongkos || 0,
+            statusPembayaran: detail.statusPembayaran || "nominal",
           }));
           detailBarangCounter = detailBarangItems.length + 1;
         } else {
@@ -1119,6 +1132,7 @@ async function handleVerifikasi() {
               jenisServis: item.jenisServis || "",
               rincianServis: "",
               ongkos: item.ongkos || 0,
+              statusPembayaran: item.statusPembayaran || "nominal",
             },
           ];
           detailBarangCounter = 2;
@@ -1137,6 +1151,7 @@ async function handleVerifikasi() {
             totalDp: detail.totalDP || detail.totalDp || 0,
             ongkos: detail.ongkos || 0,
             rincianServis: detail.rincianServis || "",
+            statusPembayaran: detail.statusPembayaran || "nominal",
           }));
           detailBarangCustomCounter = detailBarangCustomItems.length + 1;
         }
@@ -1363,7 +1378,7 @@ function updateRiwayatTableServis(filteredData) {
   let totalOngkos = 0;
 
   if (filteredData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" class="text-center">Belum ada data servis pada tanggal ini</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="text-center">Belum ada data servis pada tanggal ini</td></tr>';
     document.getElementById("total-riwayat-ongkos").textContent = "Rp 0";
     return;
   }
@@ -1386,12 +1401,8 @@ function updateRiwayatTableServis(filteredData) {
       jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     }
 
-    const statusPembayaran = item.statusPembayaran || "nominal";
-
-    // Hitung total untuk status nominal dan custom
-    if (statusPembayaran === "nominal" || statusPembayaran === "custom") {
-      totalOngkos += item.ongkos || 0;
-    }
+    // Hitung total ongkos dari semua items
+    totalOngkos += item.ongkos || 0;
 
     // Prepare details
     const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [];
@@ -1402,6 +1413,14 @@ function updateRiwayatTableServis(filteredData) {
     const jenisHtml = details.map((d) => `<div>${d.jenisServis || "-"}</div>`).join("");
     const rincianHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
     const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
+
+    // Status per item
+    const statusHtml = details
+      .map((d) => {
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
+      })
+      .join("");
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -1416,6 +1435,7 @@ function updateRiwayatTableServis(filteredData) {
       <td class="multi-col">${jenisHtml}</td>
       <td class="multi-col">${rincianHtml}</td>
       <td class="multi-col">${ongkosHtml}</td>
+      <td class="multi-col">${statusHtml}</td>
       <td>
         <button class="btn btn-sm btn-warning me-1 mb-1" style="font-size: 12px; padding: 2px 5px;" onclick="editRiwayatItem('${
           item.id
@@ -1456,7 +1476,7 @@ function updateRiwayatTableCustom(filteredData) {
   let totalOngkos = 0;
 
   if (filteredData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="15" class="text-center">Belum ada data custom pada tanggal ini</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center">Belum ada data custom pada tanggal ini</td></tr>';
     document.getElementById("total-riwayat-dp").textContent = "Rp 0";
     document.getElementById("total-riwayat-ongkos-custom").textContent = "Rp 0";
     document.getElementById("total-riwayat-nominal").textContent = "Rp 0";
@@ -1481,8 +1501,6 @@ function updateRiwayatTableCustom(filteredData) {
       jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     }
 
-    const statusPembayaran = item.statusPembayaran || "nominal";
-
     const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
 
     const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || "-"}</div>`).join("");
@@ -1493,6 +1511,14 @@ function updateRiwayatTableCustom(filteredData) {
     const rincianCustomHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
     const totalDPHtml = details.map((d) => `<div>Rp ${(d.totalDP || 0).toLocaleString("id-ID")}</div>`).join("");
     const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
+
+    // Status per item
+    const statusHtml = details
+      .map((d) => {
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
+      })
+      .join("");
 
     details.forEach((d) => {
       totalDP += d.totalDP || 0;
@@ -1514,6 +1540,7 @@ function updateRiwayatTableCustom(filteredData) {
       <td class="multi-col">${rincianCustomHtml}</td>
       <td class="multi-col">${totalDPHtml}</td>
       <td class="multi-col">${ongkosHtml}</td>
+      <td class="multi-col">${statusHtml}</td>
       <td>
         <button class="btn btn-sm btn-warning me-1 mb-1" style="font-size: 12px; padding: 2px 5px;" onclick="editRiwayatItem('${
           item.id
@@ -2078,10 +2105,14 @@ function generateNotaCustomHTML(servisData) {
       // Tambahkan simbol ± di depan berat jika ada nilai, default "-"
       const beratText = item.berat && item.berat.trim() ? `± ${item.berat}` : "-";
 
+      // Get status pembayaran
+      const status = item.statusPembayaran || "nominal";
+      const statusText = status === "custom" ? "CUSTOM" : "LUNAS";
+
       tableRows += `
         <tr>
           <td style="text-align: center;">${item.jumlah || 1} pcs</td>
-          <td>${namaBarangGabungan}</td>
+          <td>${namaBarangGabungan}<br><span style="font-size: 10px; font-style: italic;">(${statusText})</span></td>
           <td>${beratText}</td>
           <td style="text-align: right;">${formatCurrency(item.totalDP || 0)}</td>
           <td style="text-align: right;">${formatCurrency(item.ongkos || 0)}</td>
@@ -2509,19 +2540,60 @@ function showSuccessModal(title, message, items = []) {
   if (items.length > 0) {
     content += '<div class="item-list">';
     items.forEach((item, index) => {
-      const statusPembayaran = item.statusPembayaran || "nominal";
-      let ongkosText = getOngkosDisplay(item);
+      content += `<div class="item mb-3">`;
+      content += `<strong>${index + 1}. ${item.namaCustomer}</strong> (${item.noHp})<br>`;
 
-      content += `
-        <div class="item">
-          <strong>${index + 1}. ${item.namaCustomer}</strong><br>
-          Barang: ${item.namaBarang} - ${item.jenisServis}<br>
-          Ongkos: ${ongkosText}
-          <span class="badge bg-${getStatusBadgeColor(statusPembayaran)} ms-2">
-            ${getStatusLabel(statusPembayaran)}
-          </span>
-        </div>
-      `;
+      // Cek apakah ini servis atau custom
+      if (item.jenisInput === "servis" && item.detailBarang && item.detailBarang.length > 0) {
+        // Tampilkan semua detail barang servis
+        item.detailBarang.forEach((detail, detailIndex) => {
+          const status = detail.statusPembayaran || "nominal";
+          const ongkos = detail.ongkos || 0;
+          content += `
+            <div class="ms-3 mt-1">
+              ${item.detailBarang.length > 1 ? `${detailIndex + 1}. ` : ""}
+              ${detail.namaBarang} - ${detail.jenisServis}
+              ${detail.berat ? `(${detail.berat}, ${detail.karat})` : ""}
+              | Rp ${ongkos.toLocaleString("id-ID")}
+              <span class="badge bg-${getStatusBadgeColor(status)} ms-1">
+                ${getStatusLabel(status)}
+              </span>
+            </div>
+          `;
+        });
+      } else if (item.jenisInput === "custom" && item.detailBarangCustom && item.detailBarangCustom.length > 0) {
+        // Tampilkan semua detail barang custom
+        item.detailBarangCustom.forEach((detail, detailIndex) => {
+          const status = detail.statusPembayaran || "nominal";
+          const ongkos = detail.ongkos || 0;
+          const totalDP = detail.totalDP || 0;
+          content += `
+            <div class="ms-3 mt-1">
+              ${item.detailBarangCustom.length > 1 ? `${detailIndex + 1}. ` : ""}
+              ${detail.namaBarang}
+              ${detail.berat ? `(${detail.berat}, ${detail.kadar})` : ""}
+              | DP: Rp ${totalDP.toLocaleString("id-ID")} | Ongkos: Rp ${ongkos.toLocaleString("id-ID")}
+              <span class="badge bg-${getStatusBadgeColor(status)} ms-1">
+                ${getStatusLabel(status)}
+              </span>
+            </div>
+          `;
+        });
+      } else {
+        // Fallback untuk format lama (backward compatibility)
+        const statusPembayaran = item.statusPembayaran || "nominal";
+        let ongkosText = getOngkosDisplay(item);
+        content += `
+          <div class="ms-3 mt-1">
+            Barang: ${item.namaBarang} - ${item.jenisServis || ""}<br>
+            Ongkos: ${ongkosText}
+            <span class="badge bg-${getStatusBadgeColor(statusPembayaran)} ms-2">
+              ${getStatusLabel(statusPembayaran)}
+            </span>
+          </div>
+        `;
+      }
+      content += `</div>`;
     });
     content += "</div>";
   }

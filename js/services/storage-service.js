@@ -116,6 +116,34 @@ export async function deleteBuktiPengambilan(storagePath) {
 }
 
 /**
+ * Delete multiple bukti pengambilan dari Firebase Storage
+ * @param {string[]} storagePaths - Array of storage paths to delete
+ * @returns {Promise<Object>} - Result with success count and failed items
+ */
+export async function deleteMultipleBuktiPengambilan(storagePaths) {
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  for (const path of storagePaths) {
+    if (!path) continue;
+
+    try {
+      await deleteBuktiPengambilan(path);
+      results.success++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ path, error: error.message });
+      console.warn(`Failed to delete ${path}:`, error.message);
+    }
+  }
+
+  return results;
+}
+
+/**
  * Format file size ke readable format
  * @param {number} bytes - File size in bytes
  * @returns {string} - Formatted size (e.g., "245 KB")

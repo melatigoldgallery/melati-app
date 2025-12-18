@@ -979,7 +979,7 @@ function updateTableHeaders(jenisData) {
   } else if (jenisData === "custom") {
     headers += `
       <th>Berat</th>
-      <th>Panjang</th>
+      <th>Panjang/Size</th>
       <th>Kadar</th>
       <th>Warna</th>
       <th>Rincian Custom</th>
