@@ -85,8 +85,6 @@ export const authService = {
         unsubscribe();
 
         if (user) {
-          // User sudah login di Firebase Auth
-          console.log("Firebase Auth user found:", user.email);
           resolve(user);
         } else {
           // Cek sessionStorage sebagai fallback untuk kompatibilitas

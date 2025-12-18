@@ -1,22 +1,46 @@
 {
-    "indexes": [
-      {
-        "collectionGroup": "attendance",
-        "queryScope": "COLLECTION",
-        "fields": [
-          { "fieldPath": "date", "order": "ASCENDING" },
-          { "fieldPath": "timeIn", "order": "DESCENDING" }
-        ]
-      },
-      {
-        "collectionGroup": "leaveRequests",
-        "queryScope": "COLLECTION",
-        "fields": [
-          { "fieldPath": "status", "order": "ASCENDING" },
-          { "fieldPath": "submitDate", "order": "DESCENDING" }
-        ]
-      }
-    ],
-    "fieldOverrides": []
-  }
-  
+  "indexes": [
+    {
+      "collectionGroup": "attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "timeIn", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leaveRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "submitDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "servis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tanggal", "order": "ASCENDING" },
+        { "fieldPath": "statusServis", "order": "ASCENDING" },
+        { "fieldPath": "statusPengambilan", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "servis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tanggal", "order": "DESCENDING" },
+        { "fieldPath": "statusServis", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "servis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tanggal", "order": "DESCENDING" },
+        { "fieldPath": "statusPengambilan", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

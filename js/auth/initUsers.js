@@ -26,12 +26,12 @@ async function createFirebaseAuthUser(email, password, role) {
     // Buat user di Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    
+
     // Set displayName sebagai role
     await updateProfile(user, {
       displayName: role
     });
-    
+
     console.log(`User ${email} created in Firebase Auth with role ${role}`);
     return true;
   } catch (error) {
@@ -47,31 +47,29 @@ async function createFirebaseAuthUser(email, password, role) {
 
 export async function initializeUsers() {
   try {
-    console.log("Initializing users...");
     const db = getDatabase();
     const usersRef = ref(db, 'authorized_users');
-    
+
     // Check if users already exist in Realtime Database
     let snapshot;
     try {
       snapshot = await get(usersRef);
-      console.log("Database read result:", snapshot.exists() ? "Users exist" : "No users found");
     } catch (dbError) {
       console.error("Error reading from database:", dbError);
       // Jika tidak bisa membaca dari database, anggap tidak ada data
       snapshot = { exists: () => false };
     }
-    
+
     if (!snapshot.exists()) {
       console.log("Attempting to create users in database...");
-      
+
       try {
         // Coba tulis ke database
         await set(usersRef, authorizedUsers);
         console.log("Users successfully written to database");
       } catch (writeError) {
         console.error("Error writing to database:", writeError);
-        
+
         // Jika tidak bisa menulis ke database, buat user di Firebase Auth saja
         console.log("Creating users in Firebase Auth only...");
         for (const [username, userData] of Object.entries(authorizedUsers)) {
@@ -79,7 +77,7 @@ export async function initializeUsers() {
         }
       }
     }
-    
+
     return true;
   } catch (error) {
     console.error("Error in initializeUsers:", error);
@@ -90,17 +88,17 @@ export async function initializeUsers() {
 export async function loginUser(username, password) {
   try {
     console.log(`Attempting to login user: ${username}`);
-    
+
     // Cek apakah username ada di daftar hardcoded
     if (authorizedUsers[username]) {
       const userData = authorizedUsers[username];
       console.log(`User ${username} found in hardcoded list, attempting Firebase Auth login`);
-      
+
       try {
         // Login langsung dengan Firebase Auth
         const auth = getAuth();
         await signInWithEmailAndPassword(auth, userData.email, password);
-        
+
         console.log(`User ${username} successfully authenticated`);
         return {
           success: true,
@@ -115,19 +113,19 @@ export async function loginUser(username, password) {
         };
       }
     }
-    
+
     // Jika tidak ada di hardcoded list, coba cari di database
     try {
       const db = getDatabase();
       const usersRef = ref(db, 'authorized_users');
       const snapshot = await get(usersRef);
-      
+
       if (snapshot.exists()) {
         const users = snapshot.val();
-        
+
         if (users[username] && users[username].password === password) {
           console.log(`User ${username} found in database and password matches`);
-          
+
           // Coba login dengan Firebase Auth juga
           try {
             const auth = getAuth();
@@ -136,7 +134,7 @@ export async function loginUser(username, password) {
             console.warn(`Firebase Auth login failed but database auth succeeded:`, authError);
             // Lanjutkan meskipun Firebase Auth gagal
           }
-          
+
           return {
             success: true,
             role: users[username].role,
@@ -148,13 +146,13 @@ export async function loginUser(username, password) {
       console.error("Error reading from database during login:", dbError);
       // Lanjutkan dengan mencoba metode lain
     }
-    
+
     console.log(`Login failed for user ${username}`);
     return {
       success: false,
       message: 'Username atau password salah'
     };
-    
+
   } catch (error) {
     console.error('Login error:', error);
     return {
