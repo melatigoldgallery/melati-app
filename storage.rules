@@ -3,21 +3,21 @@ rules_version = '2';
 // Firebase Storage Security Rules for Bukti Pengambilan
 service firebase.storage {
   match /b/{bucket}/o {
-    
+
     // Rules for bukti-pengambilan folder
     match /bukti-pengambilan/{year}/{month}/{fileName} {
-      // Allow public read for export functionality
-      allow read: if true;
-      
+      // Allow authenticated users to read (more secure than public read)
+      allow read: if request.auth != null;
+
       // Allow authenticated users to write (upload)
       allow write: if request.auth != null
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*'); // Images only
-      
+
       // Allow authenticated users to delete
       allow delete: if request.auth != null;
     }
-    
+
     // Deny all other paths by default
     match /{allPaths=**} {
       allow read, write: if false;

@@ -217,7 +217,7 @@ body {
 
   /* Perbaikan: Menggunakan selector atribut untuk menu Buyback dan Antrian */
   .sidebar-menu .nav-item a[data-bs-target="#servisSubmenu"], /* Buyback */
-.sidebar-menu .nav-item a[data-bs-target="#antrianSubmenu"], /* Antrian */ 
+.sidebar-menu .nav-item a[data-bs-target="#antrianSubmenu"], /* Antrian */
 .sidebar-menu .nav-item a[data-bs-target="#promosiSubmenu"] {
     /* Penerimaan */
     display: none;
@@ -457,7 +457,7 @@ body {
   #summaryCards .stat-card-icon {
     width: 40px;
     height: 40px;
-    font-size: 1.2rem;
+    font-size: 1rem;
     margin-right: 10px;
   }
 
@@ -975,7 +975,7 @@ tr:has(.badge.bg-info) {
   box-shadow: var(--box-shadow);
 }
 
-.modal-header {  
+.modal-header {
   background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
   color: white;
   border-bottom: none;
@@ -1354,7 +1354,7 @@ tr:has(.badge.bg-info) {
 .stat-card {
   background-color: white;
   border-radius: var(--border-radius);
-  padding: 20px;
+  padding: 10px;
   display: flex;
   align-items: center;
   box-shadow: var(--box-shadow);
@@ -1369,15 +1369,15 @@ tr:has(.badge.bg-info) {
 
 .stat-card-icon,
 .summary-icon {
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 15px;
-  font-size: 1.5rem;
+  font-size: 1rem;
   color: white;
+  margin-right: 10px;
 }
 
 .stat-card-info h3,
