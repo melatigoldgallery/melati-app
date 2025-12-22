@@ -1747,7 +1747,7 @@ tr:has(.badge.bg-info) {
   background: linear-gradient(135deg, #3f37c9 0%, #3730a3 100%);
 }
 
-.btn-warning {
+.btn-warning, .bg-warning {
   background: linear-gradient(135deg, #ffc107 0%, #f8961e 100%);
   color: black;
   border: none;
