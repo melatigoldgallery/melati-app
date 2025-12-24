@@ -12,11 +12,17 @@
     <!-- jQuery first -->
     <script src="js/jquery-3.6.3.min.js"></script>
     <!-- Bootstrap CSS and JS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon sederhana -->
@@ -47,7 +53,7 @@
       }
 
       .stat-card::before {
-        content: "";
+        content: '';
         position: absolute;
         top: 0;
         left: 0;
@@ -94,7 +100,7 @@
       }
 
       .stat-card-icon::before {
-        content: "";
+        content: '';
         position: absolute;
         top: 0;
         left: 0;
@@ -434,7 +440,10 @@
                     </div>
                     <div class="col-lg-3 col-md-6">
                       <div class="quick-access-item">
-                        <a href="sistemAbsensi.html" class="btn btn-warning w-100 py-3 quick-btn border-0">
+                        <a
+                          href="sistemAbsensi.html"
+                          class="btn btn-warning w-100 py-3 quick-btn border-0"
+                        >
                           <div class="quick-btn-content text-dark">
                             <i class="fas fa-user-check quick-btn-icon"></i>
                             <span class="quick-btn-text">Absensi</span>
@@ -535,8 +544,8 @@
                       Tentang Aplikasi
                     </h2>
                     <p class="card-text">
-                      Sistem Absensi Melati Gold Shop bertujuan untuk memudahkan pencatatan kehadiran, keterlambatan,
-                      dan pengajuan izin karyawan.
+                      Sistem Absensi Melati Gold Shop bertujuan untuk memudahkan pencatatan
+                      kehadiran, keterlambatan, dan pengajuan izin karyawan.
                     </p>
                   </div>
                 </div>
@@ -573,7 +582,9 @@
                           <i class="fas fa-calendar-plus"></i>
                         </div>
                         <h3 class="feature-title">Pengajuan Izin</h3>
-                        <p class="feature-text">Ajukan izin libur atau izin pulang lebih awal melalui aplikasi.</p>
+                        <p class="feature-text">
+                          Ajukan izin libur atau izin pulang lebih awal melalui aplikasi.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -587,17 +598,25 @@
                 </a>
               </div>
 
+              <div class="app-intro-header text-center">
+                <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="app-logo mb-3" />
+                <h1 class="app-title">Sistem Custom dan Servis</h1>
+                <p class="app-subtitle">Melati Gold Shop</p>
+              </div>
+
               <!-- Featured Card: Update Foto Pengambilan Barang -->
-              <div class="featured-card mt-5">
+              <div class="featured-card mt-1">
                 <div class="card shadow-sm border-warning">
                   <div class="card-header bg-warning text-dark">
-                    <h3 class="card-title mb-0">
-                      <i class="fas fa-camera me-2"></i>
+                    <i class="fas fa-camera me-2 fa-2x"></i>
+                    <h3 class="card-title mb-0 text-center mt-3">
                       Upload Foto Pengambilan Barang Servis
                     </h3>
                   </div>
                   <div class="card-body">
-                    <p class="card-text mb-3">Upload foto pengambilan barang servis customer dengan mudah.</p>
+                    <p class="card-text mb-3">
+                      Upload foto pengambilan barang servis dan custom dengan mudah.
+                    </p>
                     <div class="feature-list">
                       <div class="feature-item d-flex align-items-start mb-2">
                         <i class="fas fa-check-circle text-success me-2 mt-1"></i>
@@ -616,7 +635,7 @@
                 </div>
               </div>
 
-              <div class="app-action mt-4 mb-3 text-center">
+              <div class="app-servis mt-4 mb-3 text-center">
                 <a href="data-servis.html" class="btn btn-warning btn-lg">
                   <i class="fas fa-sign-in-alt me-2"></i>
                   Data Servis
@@ -635,16 +654,16 @@
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/menuControl.js"></script>
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
+      document.addEventListener('DOMContentLoaded', function () {
         // Cek role user
-        const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
-        const isAdmin = currentUser.username === "adminmelati" || currentUser.role === "admin";
+        const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || '{}')
+        const isAdmin = currentUser.username === 'adminmelati' || currentUser.role === 'admin'
 
         if (!isAdmin) {
-          console.log("Non-admin user detected, hiding supervisor menu");
+          console.log('Non-admin user detected, hiding supervisor menu')
 
           // Tambahkan style untuk menyembunyikan menu supervisor
-          const style = document.createElement("style");
+          const style = document.createElement('style')
           style.textContent = `
         .supervisor-toggle, .supervisor-menu, #supervisorSubmenu {
           display: none !important;
@@ -652,22 +671,69 @@
           height: 0 !important;
           overflow: hidden !important;
         }
-      `;
-          document.head.appendChild(style);
+      `
+          document.head.appendChild(style)
 
           // Hapus elemen dari DOM
           setTimeout(function () {
             const supervisorElements = document.querySelectorAll(
-              ".supervisor-toggle, .supervisor-menu, #supervisorSubmenu"
-            );
+              '.supervisor-toggle, .supervisor-menu, #supervisorSubmenu'
+            )
             supervisorElements.forEach((element) => {
               if (element.parentNode) {
-                element.parentNode.removeChild(element);
+                element.parentNode.removeChild(element)
               }
-            });
-          }, 100);
+            })
+          }, 100)
         }
-      });
+
+        // Logic untuk Admin Custom - Hide Sistem Absensi di Mobile View & Show Only Servis Menu
+        if (currentUser.role === 'admin_custom' || currentUser.username === 'admin') {
+          console.log('Admin Custom detected, configuring mobile view')
+
+          // Tambahkan style untuk menyembunyikan section Sistem Absensi di mobile
+          const mobileStyle = document.createElement('style')
+          mobileStyle.textContent = `
+            /* Hide Sistem Absensi section untuk admin custom di mobile */
+            .dashboard-mobile-content .app-intro-header:first-child,
+            .dashboard-mobile-content .app-intro-card,
+            .dashboard-mobile-content .app-features,
+            .dashboard-mobile-content .app-action {
+              display: none !important;
+            }
+
+            /* Show Sistem Custom dan Servis section tetap visible */
+            .dashboard-mobile-content .app-intro-header:nth-of-type(2),
+            .dashboard-mobile-content .featured-card,
+            .dashboard-mobile-content .app-action:last-of-type,
+            .dashboard-mobile-content .app-version {
+              display: block !important;
+            }
+
+            /* MOBILE ONLY: Hide menu selain Servis di sidebar untuk admin custom */
+            @media (max-width: 768px) {
+              .sidebar-menu .nav-item:has(a[href="dashboard.html"]),
+              .sidebar-menu .nav-item:has(a[data-bs-target="#antrianSubmenu"]),
+              .sidebar-menu .nav-item:has(a[data-bs-target="#absensiSubmenu"]),
+              .sidebar-menu .nav-item:has(a[data-bs-target="#promosiSubmenu"]) {
+                display: none !important;
+              }
+
+              /* Auto expand Servis menu */
+              #servisSubmenu {
+                display: block !important;
+              }
+
+              .sidebar-menu .nav-item:has(a[data-bs-target="#servisSubmenu"]) .nav-link {
+                background-color: rgba(67, 97, 238, 0.1);
+              }
+            }
+          `
+          document.head.appendChild(mobileStyle)
+
+          console.log('Admin Custom: Mobile dashboard & sidebar configured')
+        }
+      })
     </script>
   </body>
 </html>
