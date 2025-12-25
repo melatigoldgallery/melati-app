@@ -325,6 +325,7 @@ function updateDetailBarangTable() {
           <option value="">Pilih Jenis</option>
           <option value="GRAFIR" ${item.jenisServis === 'GRAFIR' ? 'selected' : ''}>GRAFIR</option>
           <option value="PATRI" ${item.jenisServis === 'PATRI' ? 'selected' : ''}>PATRI</option>
+          <option value="LASER" ${item.jenisServis === 'LASER' ? 'selected' : ''}>LASER</option>
           <option value="CUCI" ${item.jenisServis === 'CUCI' ? 'selected' : ''}>CUCI</option>
           <option value="PASANG BATU" ${
             item.jenisServis === 'PASANG BATU' ? 'selected' : ''
