@@ -2,6 +2,9 @@ import {
   getServisByMonth,
   updateServisStatus,
   smartServisCache,
+  subscribeToMonthUpdates,
+  unsubscribeFromUpdates,
+  cancelOngoingFetch,
 } from '../services/servis-service.js'
 import {
   uploadBuktiPengambilan,
@@ -15,6 +18,8 @@ let filteredData = []
 let isDataLoaded = false
 let lastDataCheck = 0
 let cacheVersion = Date.now()
+let isLoading = false // FASE 1: Track loading state
+let activeRealtimeListener = null // FASE 2: Track real-time listener
 
 // Pagination variables
 let currentPage = 1
@@ -259,26 +264,37 @@ function updateCacheTimestamp(cacheKey, timestamp = Date.now()) {
 // Perbaiki fungsi untuk selective cache update
 function updateCacheSelectively(action, data) {
   try {
-    if (!currentMonthYear) return
+    // PERBAIKAN: Handle case ketika currentMonthYear belum di-set
+    let month, year
+    if (currentMonthYear) {
+      month = currentMonthYear.month
+      year = currentMonthYear.year
+    } else {
+      // Fallback ke bulan/tahun dari data
+      const dataDate = new Date(data.tanggal)
+      month = dataDate.getMonth() + 1
+      year = dataDate.getFullYear()
+    }
 
-    const { month, year } = currentMonthYear
     const cacheKey = `month_${month}_${year}`
 
-    // Get current cached data
-    const cached = localCache.get(cacheKey)
-    if (!cached) return
-
-    let updatedData = [...cached.data]
+    // Get current cached data atau buat baru
+    let cached = localCache.get(cacheKey)
+    let updatedData = cached ? [...cached.data] : []
     let dataChanged = false
 
     switch (action) {
       case 'add':
         // Check if data belongs to current month/year
-        const dataDate = new Date(data.tanggal)
-        if (dataDate.getMonth() + 1 === month && dataDate.getFullYear() === year) {
-          updatedData.push(data)
-          dataChanged = true
-          console.log('Added new data to cache:', data.id)
+        const addDataDate = new Date(data.tanggal)
+        if (addDataDate.getMonth() + 1 === month && addDataDate.getFullYear() === year) {
+          // PERBAIKAN: Cek duplikat sebelum tambah
+          const exists = updatedData.find((item) => item.id === data.id)
+          if (!exists) {
+            updatedData.unshift(data) // Tambah di awal (data terbaru di atas)
+            dataChanged = true
+            console.log('✅ Added new data to localCache:', data.id)
+          }
         }
         break
 
@@ -372,7 +388,33 @@ function setupDataChangeListeners() {
   // Listen untuk same-tab events
   window.addEventListener('servisDataChanged', function (e) {
     if (e.detail) {
-      console.log('Received same-tab data change:', e.detail)
+      console.log('📡 Received same-tab data change:', e.detail)
+
+      // PERBAIKAN: Update cache dan UI langsung
+      updateCacheSelectively(e.detail.action, e.detail.data)
+
+      // Jika sedang menampilkan data, update currentData juga
+      if (isDataLoaded && e.detail.action === 'add') {
+        const addedData = e.detail.data
+        const addDate = new Date(addedData.tanggal)
+        const addMonth = addDate.getMonth() + 1
+        const addYear = addDate.getFullYear()
+
+        // Cek apakah data baru masuk ke filter bulan yang sedang ditampilkan
+        if (
+          currentMonthYear &&
+          addMonth === currentMonthYear.month &&
+          addYear === currentMonthYear.year
+        ) {
+          // Cek duplikat di currentData
+          const exists = currentData.find((item) => item.id === addedData.id)
+          if (!exists) {
+            currentData.unshift(addedData)
+            applyFilters()
+            showAlert('success', `Data baru ditambahkan: ${addedData.namaCustomer || 'Customer'}`)
+          }
+        }
+      }
       updateCacheSelectively(e.detail.action, e.detail.data)
     }
   })
@@ -777,7 +819,14 @@ function handleImagePreview(e) {
 }
 
 async function loadServisData() {
+  // FASE 1: Prevent multiple simultaneous loads
+  if (isLoading) {
+    console.log('⏳ Load already in progress, skipping...')
+    return
+  }
+
   try {
+    isLoading = true
     showLoading(true)
 
     const month = parseInt(document.getElementById('monthSelector').value)
@@ -787,24 +836,65 @@ async function loadServisData() {
     // PERBAIKAN: Set current month/year untuk tracking
     currentMonthYear = { month, year }
 
-    // Check if cache should be updated
-    const shouldUpdate = shouldUpdateCache(cacheKey)
+    // PERBAIKAN: Cek apakah ada data baru dari input-servis
+    const hasNewData = localStorage.getItem('newServisDataAdded') === 'true'
+    const lastAddedId = localStorage.getItem('lastAddedServisId')
 
-    // Check local cache first
-    const cachedData = getCachedData(cacheKey)
+    // Check if cache should be updated
+    const shouldUpdate = shouldUpdateCache(cacheKey) || hasNewData
+
+    // Check local cache first - prioritaskan smartServisCache yang sudah di-update
+    const smartCacheKey = `servis_${month}_${year}_all`
+    let cachedData = getCachedData(cacheKey)
+
+    // PERBAIKAN: Jika ada data baru, coba ambil dari smartServisCache yang sudah updated
+    if (hasNewData) {
+      const smartCached = smartServisCache.get(smartCacheKey)
+      if (smartCached) {
+        cachedData = smartCached
+        // Sync ke localCache
+        setCachedData(cacheKey, cachedData)
+        console.log('📦 Using updated smartCache with new data')
+      }
+      // Clear flag setelah digunakan
+      localStorage.removeItem('newServisDataAdded')
+      localStorage.removeItem('lastAddedServisId')
+    }
 
     if (cachedData && !shouldUpdate) {
       console.log(`Using cached data for ${month}/${year}`)
       currentData = cachedData
       showCacheIndicator(true)
+    } else if (cachedData && hasNewData) {
+      // PERBAIKAN: Jika ada data baru dan cache sudah di-update, gunakan cache
+      console.log(`Using updated cache with new data for ${month}/${year}`)
+      currentData = cachedData
+      showCacheIndicator(false, 'Updated')
     } else {
       console.log(`Fetching fresh data for ${month}/${year}`)
-      currentData = await getServisByMonth(month, year)
-      setCachedData(cacheKey, currentData)
-      showCacheIndicator(false)
 
-      // Save to localStorage
-      saveServisCacheToStorage()
+      // FASE 1: Try fetch with fallback to cache on error
+      try {
+        currentData = await getServisByMonth(month, year)
+        setCachedData(cacheKey, currentData)
+        showCacheIndicator(false)
+        // Save to localStorage
+        saveServisCacheToStorage()
+      } catch (fetchError) {
+        console.error('Fetch error:', fetchError)
+
+        // FASE 1: Fallback ke cache jika ada
+        const fallbackCache =
+          getCachedData(cacheKey) || smartServisCache.get(`servis_${month}_${year}_all`)
+        if (fallbackCache) {
+          console.log('📦 Using fallback cache due to network error')
+          currentData = fallbackCache
+          showCacheIndicator(true, 'Offline Mode')
+          showAlert('warning', 'Jaringan lambat - menampilkan data dari cache')
+        } else {
+          throw fetchError // Re-throw jika tidak ada cache
+        }
+      }
     }
 
     // PERBAIKAN: Update tracking data count
@@ -822,12 +912,86 @@ async function loadServisData() {
     // Apply filters setelah data loaded
     applyFilters()
     showLoading(false)
+    isLoading = false
+
+    // FASE 2: Subscribe ke real-time updates setelah initial load
+    setupRealtimeUpdates(month, year)
   } catch (error) {
     console.error('Error loading servis data:', error)
     showAlert('danger', 'Terjadi kesalahan saat memuat data: ' + error.message)
     showLoading(false)
+    isLoading = false
     isDataLoaded = false
   }
+}
+
+// ========== FASE 2: REAL-TIME UPDATES ==========
+function setupRealtimeUpdates(month, year) {
+  // Unsubscribe dari listener sebelumnya
+  if (activeRealtimeListener) {
+    unsubscribeFromUpdates()
+    activeRealtimeListener = null
+  }
+
+  activeRealtimeListener = subscribeToMonthUpdates(
+    month,
+    year,
+    handleRealtimeUpdate,
+    handleRealtimeError
+  )
+}
+
+// Handler untuk real-time updates
+function handleRealtimeUpdate(updatedData, docChanges) {
+  if (!docChanges || docChanges.length === 0) return
+
+  console.log(`🔄 Processing ${docChanges.length} real-time changes`)
+
+  // Update currentData dengan data dari cache yang sudah di-update
+  if (updatedData) {
+    currentData = updatedData
+  }
+
+  // FASE 2: Update UI secara surgical (hanya row yang berubah)
+  docChanges.forEach((change) => {
+    const docData = { id: change.doc.id, ...change.doc.data() }
+    const rowId = `row-${docData.id}`
+    const existingRow = document.getElementById(rowId)
+
+    switch (change.type) {
+      case 'modified':
+        if (existingRow) {
+          // Highlight row yang diupdate
+          existingRow.classList.add('row-updated')
+          setTimeout(() => existingRow.classList.remove('row-updated'), 3000)
+        }
+        break
+
+      case 'added':
+        // Show notification untuk data baru
+        showAlert('info', `Data baru ditambahkan: ${docData.namaCustomer || 'Customer'}`)
+        break
+
+      case 'removed':
+        if (existingRow) {
+          existingRow.classList.add('row-removing')
+          setTimeout(() => existingRow.remove(), 300)
+        }
+        break
+    }
+  })
+
+  // Re-apply filters untuk update tampilan
+  applyFilters()
+
+  // Update cache indicator
+  showCacheIndicator(false, 'Live')
+}
+
+// Handler untuk real-time errors
+function handleRealtimeError(error) {
+  console.error('Real-time error:', error)
+  showAlert('warning', 'Koneksi real-time terputus. Data mungkin tidak up-to-date.')
 }
 
 function resetFilters() {
@@ -1118,7 +1282,11 @@ function renderDataBatch(items, startIndex, jenisData, tbody) {
     const globalIndex = (currentPage - 1) * itemsPerPage + i
     const row = document.createElement('tr')
     const jenisInput = item.jenisInput || 'servis'
+
+    // FASE 2: Tambah ID untuk surgical DOM update
+    row.id = `row-${item.id}`
     row.setAttribute('data-jenis', jenisInput)
+    row.setAttribute('data-id', item.id)
 
     const tanggalFormatted = new Date(item.tanggal).toLocaleDateString('id-ID')
     const namaSales = item.namaSales || '-'
@@ -1829,14 +1997,23 @@ function showLoading(show) {
 function showCacheIndicator(isCache, customText = null) {
   const indicator = document.getElementById('cacheIndicator')
   if (indicator) {
-    if (customText) {
-      indicator.style.display = 'inline-block'
+    indicator.style.display = 'inline-block'
+
+    if (customText === 'Live') {
+      indicator.className = 'badge bg-success ms-2'
+      indicator.innerHTML =
+        '<i class="fas fa-circle fa-xs me-1" style="animation: pulse 1s infinite;"></i> Live'
+    } else if (customText === 'Offline Mode') {
+      indicator.className = 'badge bg-warning ms-2'
+      indicator.innerHTML = '<i class="fas fa-wifi-slash me-1"></i> Offline'
+    } else if (customText) {
+      indicator.className = 'badge bg-info ms-2'
       indicator.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i> ${customText}`
+    } else if (isCache) {
+      indicator.className = 'badge bg-info ms-2'
+      indicator.innerHTML = '<i class="fas fa-database me-1"></i> Cache'
     } else {
-      indicator.style.display = isCache ? 'inline-block' : 'none'
-      if (isCache) {
-        indicator.innerHTML = '<i class="fas fa-database me-1"></i> Cache'
-      }
+      indicator.style.display = 'none'
     }
   }
 }
@@ -1909,6 +2086,15 @@ window.addEventListener('servisUpdated', function (event) {
 window.addEventListener('beforeunload', function () {
   // Save cache sebelum halaman ditutup
   saveServisCacheToStorage()
+
+  // FASE 2: Cleanup real-time listener
+  if (activeRealtimeListener) {
+    unsubscribeFromUpdates()
+    activeRealtimeListener = null
+  }
+
+  // FASE 1: Cancel ongoing fetch
+  cancelOngoingFetch()
 })
 
 // PERBAIKAN: Periodic cache cleanup

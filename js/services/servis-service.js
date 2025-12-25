@@ -18,6 +18,45 @@ import { db } from '../configFirebase.js'
 // Collection reference
 const SERVIS_COLLECTION = 'servis'
 
+// ========== FASE 1: TIMEOUT & ABORT CONTROLLER ==========
+const FETCH_TIMEOUT = 15000 // 15 detik timeout
+let currentAbortController = null
+
+// Fungsi wrapper untuk fetch dengan timeout
+async function fetchWithTimeout(queryFn, timeoutMs = FETCH_TIMEOUT) {
+  // Cancel request sebelumnya jika masih berjalan
+  if (currentAbortController) {
+    currentAbortController.abort()
+  }
+
+  currentAbortController = new AbortController()
+
+  const timeoutId = setTimeout(() => {
+    currentAbortController.abort()
+  }, timeoutMs)
+
+  try {
+    const result = await queryFn()
+    clearTimeout(timeoutId)
+    return result
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      throw new Error('Request timeout - jaringan lambat atau tidak stabil')
+    }
+    throw error
+  }
+}
+
+// Cancel ongoing fetch
+export function cancelOngoingFetch() {
+  if (currentAbortController) {
+    currentAbortController.abort()
+    currentAbortController = null
+    console.log('🛑 Fetch cancelled')
+  }
+}
+
 // Cache untuk optimasi reads
 const servisCache = new Map()
 const CACHE_EXPIRATION = 5 * 60 * 1000 // 5 menit
@@ -391,6 +430,7 @@ export async function saveServisData(servisData) {
 
 // Fungsi untuk update cache setelah add
 function updateCacheAfterAdd(newData) {
+  // Update servisCache (per tanggal)
   const dateKey = `date_${newData.tanggal}`
   if (servisCache.has(dateKey)) {
     const cached = servisCache.get(dateKey)
@@ -399,6 +439,40 @@ function updateCacheAfterAdd(newData) {
       data: cached.data,
       timestamp: Date.now(),
     })
+  }
+
+  // PERBAIKAN: Update smartServisCache (per bulan) agar data-servis.js langsung dapat data baru
+  try {
+    const dataDate = new Date(newData.tanggal)
+    const month = dataDate.getMonth() + 1
+    const year = dataDate.getFullYear()
+
+    // Update semua cache key yang relevan untuk bulan ini
+    const possibleKeys = [
+      `servis_${month}_${year}_all`,
+      `servis_${month}_${year}_Belum Diambil`,
+      `servis_${month}_${year}_Sudah Diambil`,
+    ]
+
+    possibleKeys.forEach((cacheKey) => {
+      const cached = smartServisCache.data.get(cacheKey)
+      if (cached) {
+        // Cek apakah data sudah ada (hindari duplikat)
+        const exists = cached.find((item) => item.id === newData.id)
+        if (!exists) {
+          cached.unshift(newData) // Tambah di awal
+          smartServisCache.set(cacheKey, cached)
+          console.log(`✅ SmartCache updated: ${cacheKey} (+1 item)`)
+        }
+      }
+    })
+
+    // Set flag untuk notify data-servis.js
+    localStorage.setItem('newServisDataAdded', 'true')
+    localStorage.setItem('lastServisInputTime', Date.now().toString())
+    localStorage.setItem('lastAddedServisId', newData.id)
+  } catch (error) {
+    console.error('Error updating smartServisCache after add:', error)
   }
 }
 
@@ -474,7 +548,11 @@ export async function getServisByMonth(month, year, statusPengambilan = 'all') {
       orderBy('tanggal', 'desc')
     )
 
-    const querySnapshot = await getDocs(q)
+    // FASE 1: Fetch dengan timeout
+    const querySnapshot = await fetchWithTimeout(async () => {
+      return await getDocs(q)
+    })
+
     let servisData = []
 
     querySnapshot.forEach((doc) => {
@@ -505,8 +583,63 @@ export async function getServisByMonth(month, year, statusPengambilan = 'all') {
 // Real-time listener management
 let activeListener = null
 
+// ========== FASE 2: INCREMENTAL CACHE UPDATE ==========
+// Fungsi untuk update cache secara incremental (tanpa fetch ulang semua data)
+export function updateCacheIncremental(month, year, docChanges) {
+  const cacheKey = `servis_${month}_${year}_all`
+  let cachedData = smartServisCache.get(cacheKey)
+
+  if (!cachedData) {
+    console.log('⚠️ No cache to update incrementally')
+    return null
+  }
+
+  let updated = false
+
+  docChanges.forEach((change) => {
+    const docData = { id: change.doc.id, ...change.doc.data() }
+
+    switch (change.type) {
+      case 'added':
+        // Cek apakah sudah ada (hindari duplikat)
+        const existsAdd = cachedData.find((d) => d.id === docData.id)
+        if (!existsAdd) {
+          cachedData.unshift(docData) // Tambah di awal
+          updated = true
+          console.log(`➕ Cache: Added ${docData.id}`)
+        }
+        break
+
+      case 'modified':
+        const idx = cachedData.findIndex((d) => d.id === docData.id)
+        if (idx >= 0) {
+          cachedData[idx] = docData
+          updated = true
+          console.log(`✏️ Cache: Modified ${docData.id}`)
+        }
+        break
+
+      case 'removed':
+        const removeIdx = cachedData.findIndex((d) => d.id === docData.id)
+        if (removeIdx >= 0) {
+          cachedData.splice(removeIdx, 1)
+          updated = true
+          console.log(`🗑️ Cache: Removed ${docData.id}`)
+        }
+        break
+    }
+  })
+
+  if (updated) {
+    smartServisCache.set(cacheKey, cachedData)
+    console.log(`✅ Cache updated incrementally: ${cachedData.length} items`)
+  }
+
+  return cachedData
+}
+
 // Subscribe ke real-time updates untuk bulan tertentu
-export function subscribeToMonthUpdates(month, year, onUpdate) {
+export function subscribeToMonthUpdates(month, year, onUpdate, onError = null) {
   // Unsubscribe listener sebelumnya jika ada
   if (activeListener) {
     activeListener()
@@ -523,23 +656,37 @@ export function subscribeToMonthUpdates(month, year, onUpdate) {
     orderBy('tanggal', 'desc')
   )
 
-  activeListener = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-    const fromCache = snapshot.metadata.fromCache
+  let isFirstSnapshot = true
 
-    if (!fromCache && !snapshot.metadata.hasPendingWrites) {
-      const servisData = []
-      snapshot.forEach((doc) => {
-        servisData.push({ id: doc.id, ...doc.data() })
-      })
+  activeListener = onSnapshot(
+    q,
+    { includeMetadataChanges: false }, // Disable metadata changes untuk performa
+    (snapshot) => {
+      const docChanges = snapshot.docChanges()
 
-      console.log(
-        `🔄 Real-time update: ${servisData.length} records (${
-          snapshot.docChanges().length
-        } changes)`
-      )
-      onUpdate(servisData, snapshot.docChanges())
+      // Skip first snapshot (initial data sudah di-load via getServisByMonth)
+      if (isFirstSnapshot) {
+        isFirstSnapshot = false
+        console.log(`📡 Real-time listener ready (${snapshot.size} docs)`)
+        return
+      }
+
+      // Hanya proses jika ada perubahan nyata
+      if (docChanges.length === 0) return
+
+      console.log(`🔄 Real-time: ${docChanges.length} changes detected`)
+
+      // FASE 2: Update cache secara incremental
+      const updatedData = updateCacheIncremental(month, year, docChanges)
+
+      // Kirim hanya docChanges ke callback (bukan semua data)
+      onUpdate(updatedData, docChanges)
+    },
+    (error) => {
+      console.error('❌ Real-time listener error:', error)
+      if (onError) onError(error)
     }
-  })
+  )
 
   console.log(`📡 Subscribed to real-time updates for ${month}/${year}`)
   return activeListener
