@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "queue": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "authorized_users": {
+      ".read": true,
+      ".write": "auth != null && auth.token.role == 'admin'"
+    },
+    ".read": "auth != null",
+    ".write": "auth != null"
+  }
+}
