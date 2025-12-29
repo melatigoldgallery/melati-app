@@ -145,7 +145,6 @@ async function loadFaceApiModels() {
     ]);
 
     isFaceApiInitialized = true;
-    console.log("Face-api models loaded successfully");
     return true;
   } catch (error) {
     console.error("Error loading face-api models:", error);
@@ -195,8 +194,6 @@ function saveAttendanceCacheToStorage() {
       metaObj[key] = value;
     }
     localStorage.setItem("attendanceCacheMeta", JSON.stringify(metaObj));
-
-    console.log("Attendance cache saved to localStorage");
     return true;
   } catch (error) {
     console.error("Error saving attendance cache to localStorage:", error);
@@ -1757,7 +1754,6 @@ function fixSpeechSynthesisBugs() {
   // Bug di Chrome: speechSynthesis berhenti setelah sekitar 15 detik
   // Hanya terapkan di Chrome untuk menghindari interval yang tidak perlu di browser lain
   if (isChrome && window.speechSynthesis) {
-    console.log("Applying Chrome-specific speech synthesis fix");
 
     // Gunakan variabel untuk menyimpan interval agar bisa dihapus jika perlu
     let resumeInterval = null;
@@ -2010,10 +2006,6 @@ function updateStats() {
   // Update tanggal absensi
   updateDateInfo();
 
-  // Log untuk debugging
-  console.log(
-    `Stats updated: ${presentCount} present, ${lateCount} late, ${latePermissionCount} late with permission, ${leaveCount} on leave`
-  );
 }
 
 // Helper function untuk mendapatkan string tanggal dari objek Date
@@ -2121,7 +2113,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // TAMBAHAN: Inisialisasi verifikasi wajah jika fitur diaktifkan
     if (isFaceVerificationEnabled) {
-      console.log("Memulai inisialisasi verifikasi wajah...");
 
       // Tambahkan toggle switch untuk mengaktifkan/menonaktifkan verifikasi wajah
       const scannerHeader = document.querySelector(".scanner-card .card-header");
@@ -2144,7 +2135,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           toggleElement.addEventListener("change", function () {
             // Update variabel global
             isFaceVerificationEnabled = this.checked;
-            console.log(`Verifikasi wajah ${isFaceVerificationEnabled ? "diaktifkan" : "dinonaktifkan"}`);
 
             // Simpan preferensi ke localStorage agar tetap konsisten setelah refresh
             localStorage.setItem("faceVerificationEnabled", isFaceVerificationEnabled ? "true" : "false");
@@ -2235,7 +2225,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Coba inisialisasi model di background
       try {
         await loadFaceApiModels();
-        console.log("Model verifikasi wajah berhasil dimuat");
 
         // Tambahkan tombol untuk reset data wajah
         const scannerContainer = document.querySelector(".scanner-container");
@@ -2431,7 +2420,6 @@ function cleanupAttendanceCache() {
     // Simpan perubahan ke localStorage
     saveAttendanceCacheToStorage();
 
-    console.log("Attendance cache cleanup completed");
     return true;
   } catch (error) {
     console.error("Error cleaning up attendance cache:", error);
@@ -2564,7 +2552,6 @@ function initThresholdSettingsListener() {
             ob: docSnap.data().ob || defaults.ob,
           }
         : defaults;
-      console.log("✅ Settings updated:", cachedThresholdSettings);
     },
     (error) => {
       console.error("❌ Settings listener error:", error);
@@ -2740,11 +2727,9 @@ function checkIfLate(timeString, employeeType, shift) {
 // Load employees and cache them
 async function loadEmployees() {
   try {
-    console.log("Memulai loading employees...");
 
     // Periksa apakah cache perlu diperbarui berdasarkan TTL
     if (employeeCache.size === 0 || shouldUpdateEmployeeCache()) {
-      console.log("Cache perlu diperbarui, mengambil data dari server...");
 
       // Coba load dengan retry
       let retryCount = 0;
@@ -2768,7 +2753,6 @@ async function loadEmployees() {
           // Update timestamp
           employeeCacheTimestamp = Date.now();
 
-          console.log(`Berhasil load ${employees.length} employees, cache size: ${employeeCache.size}`);
           return;
         } catch (error) {
           console.error(`Error loading employees (attempt ${retryCount + 1}):`, error);

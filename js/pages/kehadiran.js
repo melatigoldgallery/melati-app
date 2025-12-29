@@ -1050,8 +1050,6 @@ function hideActionButtons() {
       // Gunakan !important untuk memastikan style diterapkan
       actionButtons.setAttribute("style", "display: none !important");
 
-      // Log untuk debugging
-      console.log("Action buttons hidden");
 
       // Tambahan: sembunyikan juga tombol-tombol individual jika ada
       const exportExcelBtn = document.getElementById("exportExcelBtn");
@@ -1076,9 +1074,6 @@ function showActionButtons() {
     if (actionButtons) {
       // Gunakan !important untuk memastikan style diterapkan
       actionButtons.setAttribute("style", "display: flex !important");
-
-      // Log untuk debugging
-      console.log("Action buttons shown");
 
       // Tambahan: tampilkan juga tombol-tombol individual jika ada
       const exportExcelBtn = document.getElementById("exportExcelBtn");
@@ -1208,7 +1203,6 @@ async function generateReport(forceRefresh = false) {
     let attendanceData = [];
 
     if (needsRefresh) {
-      console.log(`Fetching fresh data for range ${startDate} to ${endDate}, shift: ${selectedShift}, status: ${selectedStatus}`);
 
       const cacheIndicator = document.getElementById("cacheIndicator");
       if (cacheIndicator) {

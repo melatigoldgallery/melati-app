@@ -95,7 +95,6 @@ export const smartServisCache = {
         const parsed = JSON.parse(stored)
         this.data = new Map(parsed.data)
         this.timestamps = new Map(parsed.timestamps)
-        console.log(`Loaded ${this.data.size} cached entries from storage`)
       }
     } catch (error) {
       console.warn('Failed to load cache from storage:', error)
@@ -129,11 +128,6 @@ export const smartServisCache = {
       const duration = this.getCacheDuration(month, year)
 
       if (Date.now() - timestamp < duration) {
-        console.log(
-          `✓ Cache hit: ${key} (age: ${Math.round((Date.now() - timestamp) / 1000)}s, valid: ${
-            duration === Infinity ? 'permanent' : Math.round(duration / 1000) + 's'
-          })`
-        )
         return cached
       } else {
         console.log(`✗ Cache expired: ${key}`)
@@ -667,14 +661,11 @@ export function subscribeToMonthUpdates(month, year, onUpdate, onError = null) {
       // Skip first snapshot (initial data sudah di-load via getServisByMonth)
       if (isFirstSnapshot) {
         isFirstSnapshot = false
-        console.log(`📡 Real-time listener ready (${snapshot.size} docs)`)
         return
       }
 
       // Hanya proses jika ada perubahan nyata
       if (docChanges.length === 0) return
-
-      console.log(`🔄 Real-time: ${docChanges.length} changes detected`)
 
       // FASE 2: Update cache secara incremental
       const updatedData = updateCacheIncremental(month, year, docChanges)
@@ -687,8 +678,6 @@ export function subscribeToMonthUpdates(month, year, onUpdate, onError = null) {
       if (onError) onError(error)
     }
   )
-
-  console.log(`📡 Subscribed to real-time updates for ${month}/${year}`)
   return activeListener
 }
 

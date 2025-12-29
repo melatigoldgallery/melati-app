@@ -1270,7 +1270,6 @@ function initDateInputs() {
       }
     }
   });
-  console.log("Date inputs initialized: backdate allowed; end date constrained to >= start date.");
 }
 
 // Tambahkan fungsi ini untuk menangani input tanggal yang ditambahkan secara dinamis

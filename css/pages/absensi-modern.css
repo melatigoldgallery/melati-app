@@ -97,8 +97,22 @@ body {
   display: none !important;
 }
 /* All media queries grouped together at the end of the file */
+@media (max-width: 1400px) {
+  .shift-info-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 992px) {
   .shift-info-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-cards {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -113,6 +127,14 @@ body {
   .app-container {
     position: relative;
     overflow-x: hidden;
+  }
+
+  .shift-info-container {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-cards {
+    grid-template-columns: 1fr;
   }
 
   /* Sidebar styling untuk mobile */
@@ -1346,7 +1368,7 @@ tr:has(.badge.bg-info) {
 /* Stats cards */
 .stats-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   transition: all var(--transition-speed) ease;
 }
@@ -1561,15 +1583,15 @@ tr:has(.badge.bg-info) {
 }
 
 /* Background color utility classes */
-.bg-primary {
+.bg-primary-card {
   background-color: var(--primary-color);
 }
 
-.bg-success {
+.bg-success-card {
   background-color: var(--success-color);
 }
 
-.bg-warning {
+.bg-warning-card {
   background-color: var(--warning-color);
 }
 
@@ -1584,7 +1606,7 @@ tr:has(.badge.bg-info) {
 
 .shift-info-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 0;
   transition: all var(--transition-speed) ease;
 }
@@ -1737,7 +1759,7 @@ tr:has(.badge.bg-info) {
   background: linear-gradient(135deg, #3fbe5d 0%, #075840 100%);
 }
 
-.btn-primary, .bg-primary {
+.btn-primary {
   background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
   color: white;
   border: none;
@@ -1747,7 +1769,7 @@ tr:has(.badge.bg-info) {
   background: linear-gradient(135deg, #3f37c9 0%, #3730a3 100%);
 }
 
-.btn-warning, .bg-warning {
+.btn-warning {
   background: linear-gradient(135deg, #ffc107 0%, #f8961e 100%);
   color: black;
   border: none;

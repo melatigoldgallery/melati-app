@@ -40,8 +40,6 @@ export async function getAttendanceByDateRange(startDate, endDate, lastDoc = nul
     let q = query(attendanceRef, ...queryConstraints);
     const snapshot = await getDocs(q);
     
-    console.log(`Found ${snapshot.docs.length} attendance records before filtering`);
-    
     let attendanceRecords = snapshot.docs.map((doc) => {
       const data = doc.data();
       const timeIn = data.timeIn ? new Date(data.timeIn.seconds * 1000) : null;

@@ -396,8 +396,6 @@ function saveReportCacheToStorage() {
 
     // Broadcast update ke tab lain
     broadcastCacheUpdate("all");
-
-    console.log("Report cache saved to localStorage");
   } catch (error) {
     console.error("Error saving report cache to localStorage:", error);
   }
@@ -409,7 +407,6 @@ if ("BroadcastChannel" in window) {
 
   bc.onmessage = function (event) {
     if (event.data && event.data.type === "cacheUpdate") {
-      console.log("Cache update received from another tab via BroadcastChannel");
 
       // Reload cache dari localStorage
       loadReportCacheFromStorage();
@@ -1741,7 +1738,6 @@ function clearFilterCache(type, filter) {
   } else {
     // Bersihkan semua cache filter
     filterCache.clear();
-    console.log("All filter cache cleared");
   }
 }
 

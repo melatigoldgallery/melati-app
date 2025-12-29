@@ -17,7 +17,6 @@ class EmailNotificationService {
 
       emailjs.init(EMAIL_CONFIG.emailjs.publicKey);
       this.isInitialized = true;
-      console.log("EmailJS initialized successfully");
       return true;
     } catch (error) {
       console.error("Failed to initialize EmailJS:", error);

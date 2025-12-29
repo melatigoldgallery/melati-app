@@ -532,8 +532,6 @@ function saveServisCacheToStorage() {
       metaObj[key] = value
     }
     localStorage.setItem('servisCacheMeta', JSON.stringify(metaObj))
-
-    console.log('Servis cache saved to localStorage')
     return true
   } catch (error) {
     console.error('Error saving servis cache:', error)
@@ -563,8 +561,6 @@ function loadServisCacheFromStorage() {
         cacheMeta.set(key, value)
       }
     }
-
-    console.log('Servis cache loaded from localStorage')
   } catch (error) {
     console.error('Error loading servis cache:', error)
   }
@@ -862,7 +858,6 @@ async function loadServisData() {
     }
 
     if (cachedData && !shouldUpdate) {
-      console.log(`Using cached data for ${month}/${year}`)
       currentData = cachedData
       showCacheIndicator(true)
     } else if (cachedData && hasNewData) {
@@ -871,7 +866,6 @@ async function loadServisData() {
       currentData = cachedData
       showCacheIndicator(false, 'Updated')
     } else {
-      console.log(`Fetching fresh data for ${month}/${year}`)
 
       // FASE 1: Try fetch with fallback to cache on error
       try {
@@ -1032,8 +1026,6 @@ function formatArrayFieldToHTML(items, field, formatter = null) {
 function expandServisData(data, jenisData) {
   let expanded = []
 
-  console.log(`Preparing data for jenisData: ${jenisData}, total items: ${data.length}`)
-
   data.forEach((item) => {
     const jenisInput = item.jenisInput || 'servis'
 
@@ -1066,8 +1058,6 @@ function expandServisData(data, jenisData) {
       })
     }
   })
-
-  console.log(`Total prepared items: ${expanded.length}`)
   return expanded
 }
 
@@ -1133,10 +1123,6 @@ function applyFilters() {
   const statusPengambilanFilter = document.getElementById('statusPengambilanFilter')?.value || ''
   const jenisDataFilter = document.getElementById('jenisDataFilter')?.value || 'servis'
 
-  console.log(`\n=== APPLY FILTERS ===`)
-  console.log(`Filter selected: ${jenisDataFilter}`)
-  console.log(`Total data before filter: ${currentData.length}`)
-
   // First, filter by status AND jenisInput
   let statusFiltered = currentData.filter((item) => {
     const matchesStatusServis = !statusServisFilter || item.statusServis === statusServisFilter
@@ -1149,16 +1135,6 @@ function applyFilters() {
     return matchesStatusServis && matchesStatusPengambilan && matchesJenisInput
   })
 
-  console.log(`Data after jenisInput filter (${jenisDataFilter}): ${statusFiltered.length}`)
-  console.log(
-    `Sample filtered items:`,
-    statusFiltered.slice(0, 2).map((i) => ({
-      id: i.id,
-      jenisInput: i.jenisInput,
-      hasDetailBarangCustom: !!i.detailBarangCustom,
-      hasDetailBarang: !!i.detailBarang,
-    }))
-  )
 
   // Expand data based on jenis
   const expandedData = expandServisData(statusFiltered, jenisDataFilter)

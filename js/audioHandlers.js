@@ -179,7 +179,7 @@ export async function announceVehicleMessage(carType, plateNumber, vehicleColor 
     await playAudio(AUDIO_PATHS.informasi);
 
     const colorInfo = vehicleColor ? `warna ${vehicleColor}` : "";
-    const message = `Mohon kepada pemilik ${carType} ${colorInfo} dengan nomor polisi, ${plateNumber}, untuk memindahkan kendaraan karena ada kendaraan yang akan keluar. Terima kasih atas perhatiannya`;
+    const message = `Mohon kepada pemilik ${carType} ${colorInfo}, dengan nomor polisi, ${plateNumber}, untuk memindahkan kendaraan karena ada kendaraan yang akan keluar. Terima kasih atas perhatiannya`;
 
     await speak(message);
 

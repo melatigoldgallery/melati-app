@@ -319,8 +319,6 @@ export function saveAttendanceCacheToStorage() {
     
     // Simpan timestamp terakhir update
     localStorage.setItem("attendanceCacheLastSaved", Date.now().toString());
-    
-    console.log("Attendance cache saved to localStorage with compression");
   } catch (error) {
     console.error("Error saving attendance cache to localStorage:", error);
     
@@ -672,8 +670,6 @@ export async function getTodayAttendance() {
       const cachedData = attendanceCache.get(today);
       return removeDuplicatesByEmployeeAndDate(cachedData);
     }
-    
-    console.log("Fetching today's attendance from Firestore");
     
     const attendanceCollection = collection(db, "attendance");
     const q = query(
