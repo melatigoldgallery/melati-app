@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection - CRITICAL: Protect password hashes
+    match /users/{username} {
+      // Read: authenticated users dapat melihat user data
+      allow read: if request.auth != null;
+      
+      // Write: hanya bisa dilakukan saat initial setup atau oleh admin
+      // Untuk production, sebaiknya hanya admin yang bisa write
+      allow create: if request.auth != null;
+      allow update, delete: if false; // Disabled untuk security
+    }
+    
+    // Default: All other collections accessible by authenticated users
+    // Includes: leaveRequests, attendance, employees, services, etc.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

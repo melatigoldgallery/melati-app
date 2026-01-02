@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kelola User - Melati Gold Shop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="js/jquery-3.6.3.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="css/pages/absensi-modern.css" />
+    <style>
+      .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      .stat-card i {
+        font-size: 2.5rem;
+        opacity: 0.8;
+      }
+      .stat-card h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0;
+      }
+      .stat-card p {
+        margin: 0;
+        color: #6c757d;
+      }
+      .action-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .role-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+      .role-admin {
+        background: #0d6efd;
+        color: white;
+      }
+      .role-admin_custom {
+        background: #ffc107;
+        color: #000;
+      }
+      .role-staf {
+        background: #6c757d;
+        color: white;
+      }
+      .password-strength {
+        margin-top: 0.5rem;
+      }
+      .strength-weak {
+        background: #dc3545;
+      }
+      .strength-medium {
+        background: #ffc107;
+      }
+      .strength-strong {
+        background: #28a745;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="text-center p-3">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Top Navigation -->
+        <header class="top-nav">
+          <div class="menu-toggle d-md-flex d-none">
+            <i class="fa-solid fa-minimize"></i>
+          </div>
+          <div class="hamburger d-md-none d-flex">
+            <i class="fas fa-bars"></i>
+          </div>
+          <div class="nav-right">
+            <div class="date-time">
+              <div class="current-date" id="current-date"></div>
+              <div class="current-time" id="current-time"></div>
+            </div>
+            <div class="user-profile dropdown">
+              <div class="profile-img" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="user-avatar">M</span>
+              </div>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <button class="dropdown-item" id="logoutBtn" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="page-content">
+          <div class="page-header">
+            <h1 class="page-title">🔐 Kelola User</h1>
+            <p class="page-subtitle">Manajemen akun login untuk akses sistem</p>
+          </div>
+
+          <!-- Stats Cards -->
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <div class="stat-card">
+                <i class="fas fa-users text-primary"></i>
+                <div>
+                  <h3 id="totalUsers">0</h3>
+                  <p>Total User</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="stat-card">
+                <i class="fas fa-user-shield text-info"></i>
+                <div>
+                  <h3 id="totalAdmin">0</h3>
+                  <p>Admin</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="stat-card">
+                <i class="fas fa-user text-secondary"></i>
+                <div>
+                  <h3 id="totalStaff">0</h3>
+                  <p>Staff</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Bar -->
+          <div class="action-bar">
+            <button class="btn btn-primary" onclick="openAddModal()">
+              <i class="fas fa-plus"></i>
+              Tambah User
+            </button>
+            <input
+              type="text"
+              id="searchInput"
+              class="form-control"
+              placeholder="Cari username..."
+              style="max-width: 300px"
+              onkeyup="searchUsers()"
+            />
+          </div>
+
+          <!-- Users Table -->
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover" id="usersTable">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Display Name</th>
+                      <th>Role</th>
+                      <th>Dibuat</th>
+                      <th width="150">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody">
+                    <tr>
+                      <td colspan="5" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                          <span class="visually-hidden">Loading...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Modal Add/Edit User -->
+    <div class="modal fade" id="userModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalTitle">Tambah User</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="userForm">
+              <input type="hidden" id="editMode" value="false" />
+              <input type="hidden" id="originalUsername" />
+
+              <div class="mb-3">
+                <label class="form-label">
+                  Username
+                  <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control" id="username" required />
+                <small class="text-muted">Minimal 3 karakter, tanpa spasi</small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Display Name</label>
+                <input type="text" class="form-control" id="displayName" />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">
+                  Role
+                  <span class="text-danger">*</span>
+                </label>
+                <select class="form-select" id="role" required>
+                  <option value="">-- Pilih Role --</option>
+                  <option value="admin">Admin (Full Access)</option>
+                  <option value="admin_custom">Admin Custom (Servis Only)</option>
+                  <option value="staf">Staff (Limited Access)</option>
+                </select>
+              </div>
+
+              <div class="form-check mb-3" id="changePasswordCheck" style="display: none">
+                <input type="checkbox" class="form-check-input" id="changePassword" />
+                <label class="form-check-label">Ganti Password</label>
+              </div>
+
+              <div class="mb-3" id="passwordGroup">
+                <label class="form-label">
+                  Password
+                  <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="password" onkeyup="checkPasswordStrength()" />
+                  <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password')">
+                    <i class="fas fa-eye" id="passwordIcon"></i>
+                  </button>
+                </div>
+                <div class="password-strength">
+                  <div class="progress" style="height: 5px">
+                    <div id="strengthBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                  </div>
+                  <small id="strengthText" class="text-muted"></small>
+                </div>
+              </div>
+
+              <div class="mb-3" id="confirmPasswordGroup">
+                <label class="form-label">
+                  Konfirmasi Password
+                  <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="confirmPassword" />
+                  <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirmPassword')">
+                    <i class="fas fa-eye" id="confirmPasswordIcon"></i>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" onclick="saveUser()">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Delete Confirmation -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">Hapus User</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>
+              Apakah Anda yakin ingin menghapus user
+              <strong id="deleteUsername"></strong>
+              ?
+            </p>
+            <p class="text-danger mb-0">Tindakan ini tidak dapat dibatalkan!</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-danger" onclick="confirmDelete()">Hapus</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/sidebar-loader.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/menuControl.js"></script>
+    <script type="module" src="js/pages/kelola-user.js"></script>
+    <script>
+      // Access control
+      document.addEventListener("DOMContentLoaded", function () {
+        const user = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+        if (user.username !== "supervisor" || user.role !== "admin") {
+          alert("Akses ditolak. Halaman ini hanya untuk Supervisor.");
+          window.location.href = "dashboard.html";
+        }
+      });
+
+      function togglePassword(fieldId) {
+        const field = document.getElementById(fieldId);
+        const icon = document.getElementById(fieldId + "Icon");
+        if (field.type === "password") {
+          field.type = "text";
+          icon.classList.remove("fa-eye");
+          icon.classList.add("fa-eye-slash");
+        } else {
+          field.type = "password";
+          icon.classList.remove("fa-eye-slash");
+          icon.classList.add("fa-eye");
+        }
+      }
+    </script>
+  </body>
+</html>

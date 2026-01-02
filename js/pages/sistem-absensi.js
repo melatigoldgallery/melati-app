@@ -42,16 +42,9 @@ import {
 import { initCamera, detectAndVerifyFace } from "../face-verification.js";
 // Import Firestore untuk settings
 import { db } from "../configFirebase.js";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  onSnapshot,
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+import { doc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Konstanta untuk settings
-const ADMIN_PASSWORD = "melati2025";
 const SETTINGS_COLLECTION = "settings";
 const THRESHOLD_DOC_ID = "attendanceThresholds";
 
@@ -352,11 +345,6 @@ function updateFaceVerificationUI(isEnabled) {
   const initCameraButton = document.getElementById("initCamera");
   if (initCameraButton) {
     initCameraButton.style.display = isEnabled ? "inline-block" : "none";
-  }
-
-  const resetFaceButton = document.getElementById("resetFaceData");
-  if (resetFaceButton) {
-    resetFaceButton.style.display = isEnabled ? "inline-block" : "none";
   }
 }
 
@@ -1754,7 +1742,6 @@ function fixSpeechSynthesisBugs() {
   // Bug di Chrome: speechSynthesis berhenti setelah sekitar 15 detik
   // Hanya terapkan di Chrome untuk menghindari interval yang tidak perlu di browser lain
   if (isChrome && window.speechSynthesis) {
-
     // Gunakan variabel untuk menyimpan interval agar bisa dihapus jika perlu
     let resumeInterval = null;
 
@@ -2005,7 +1992,6 @@ function updateStats() {
 
   // Update tanggal absensi
   updateDateInfo();
-
 }
 
 // Helper function untuk mendapatkan string tanggal dari objek Date
@@ -2108,12 +2094,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Initialize real-time listener untuk threshold settings
     initThresholdSettingsListener();
 
-    // Setup settings feature untuk modal password dan pengaturan jam
-    setupSettingsFeature();
-
     // TAMBAHAN: Inisialisasi verifikasi wajah jika fitur diaktifkan
     if (isFaceVerificationEnabled) {
-
       // Tambahkan toggle switch untuk mengaktifkan/menonaktifkan verifikasi wajah
       const scannerHeader = document.querySelector(".scanner-card .card-header");
       if (scannerHeader) {
@@ -2158,12 +2140,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             const initCameraButton = document.getElementById("initCamera");
             if (initCameraButton) {
               initCameraButton.style.display = isFaceVerificationEnabled ? "inline-block" : "none";
-            }
-
-            // Sembunyikan/tampilkan tombol reset data wajah
-            const resetFaceButton = document.getElementById("resetFaceData");
-            if (resetFaceButton) {
-              resetFaceButton.style.display = isFaceVerificationEnabled ? "inline-block" : "none";
             }
 
             // Jika verifikasi wajah diaktifkan, coba inisialisasi di background
@@ -2225,37 +2201,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Coba inisialisasi model di background
       try {
         await loadFaceApiModels();
-
-        // Tambahkan tombol untuk reset data wajah
-        const scannerContainer = document.querySelector(".scanner-container");
-        if (scannerContainer) {
-          const resetFaceButton = document.createElement("button");
-          resetFaceButton.id = "resetFaceData";
-          resetFaceButton.className = "btn btn-sm btn-outline-warning mt-2";
-          resetFaceButton.innerHTML = '<i class="fas fa-redo-alt"></i> Reset Data Wajah';
-          scannerContainer.appendChild(resetFaceButton);
-
-          // Tambahkan event listener untuk tombol reset
-          resetFaceButton.addEventListener("click", async function () {
-            const barcodeInput = document.getElementById("barcodeInput");
-            if (!barcodeInput || !barcodeInput.value.trim()) {
-              showScanResult("error", "Scan barcode terlebih dahulu untuk mereset data wajah");
-              return;
-            }
-
-            const barcode = barcodeInput.value.trim();
-            try {
-              await deleteFaceDescriptor(barcode);
-              showScanResult(
-                "success",
-                "Data wajah berhasil direset. Silakan scan ulang untuk menyimpan data wajah baru."
-              );
-            } catch (error) {
-              console.error("Error saat mereset data wajah:", error);
-              showScanResult("error", "Gagal mereset data wajah");
-            }
-          });
-        }
       } catch (error) {
         console.error("Gagal memuat model verifikasi wajah:", error);
         showScanResult("error", "Gagal memuat model verifikasi wajah. Fitur dinonaktifkan.");
@@ -2378,23 +2323,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   } catch (error) {
     console.error("Error initializing attendance system:", error);
-  }
-
-  // Tambahkan event listener untuk tombol refresh
-  const refreshBtn = document.getElementById("refreshLeaveData");
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", function () {
-      // Tampilkan loading state
-      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-      this.disabled = true;
-
-      // Refresh data
-      loadTodayAttendance(true).finally(() => {
-        // Kembalikan tombol ke keadaan semula
-        this.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Data';
-        this.disabled = false;
-      });
-    });
   }
 });
 
@@ -2565,130 +2493,6 @@ function initThresholdSettingsListener() {
   );
 }
 
-/**
- * Load settings to UI modal
- */
-async function loadThresholdSettingsToUI() {
-  const docRef = doc(db, SETTINGS_COLLECTION, THRESHOLD_DOC_ID);
-  const docSnap = await getDoc(docRef);
-  const settings = docSnap.exists()
-    ? docSnap.data()
-    : {
-        staff: { morning: "09:00", afternoon: "14:21" },
-        ob: { morning: "07:31", afternoon: "13:46" },
-      };
-
-  document.getElementById("staffMorningTime").value = settings.staff.morning;
-  document.getElementById("staffAfternoonTime").value = settings.staff.afternoon;
-  document.getElementById("obMorningTime").value = settings.ob.morning;
-  document.getElementById("obAfternoonTime").value = settings.ob.afternoon;
-}
-
-/**
- * Save settings to Firestore
- */
-async function saveThresholdSettings() {
-  const settings = {
-    staff: {
-      morning: document.getElementById("staffMorningTime").value,
-      afternoon: document.getElementById("staffAfternoonTime").value,
-    },
-    ob: {
-      morning: document.getElementById("obMorningTime").value,
-      afternoon: document.getElementById("obAfternoonTime").value,
-    },
-  };
-
-  try {
-    await setDoc(
-      doc(db, SETTINGS_COLLECTION, THRESHOLD_DOC_ID),
-      {
-        ...settings,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-    return true;
-  } catch (error) {
-    console.error("Error saving settings:", error);
-    return false;
-  }
-}
-
-/**
- * Setup settings feature
- */
-function setupSettingsFeature() {
-  const settingsBtn = document.getElementById("settingsBtn");
-  const verifyPasswordBtn = document.getElementById("verifyPasswordBtn");
-  const adminPasswordInput = document.getElementById("adminPassword");
-  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-
-  if (settingsBtn) {
-    settingsBtn.addEventListener("click", () => {
-      adminPasswordInput.value = "";
-      document.getElementById("passwordError").style.display = "none";
-      new bootstrap.Modal(document.getElementById("passwordModal")).show();
-    });
-  }
-
-  if (verifyPasswordBtn) {
-    verifyPasswordBtn.addEventListener("click", async () => {
-      if (adminPasswordInput.value === ADMIN_PASSWORD) {
-        bootstrap.Modal.getInstance(document.getElementById("passwordModal")).hide();
-        await loadThresholdSettingsToUI();
-        new bootstrap.Modal(document.getElementById("settingsModal")).show();
-        adminPasswordInput.value = "";
-        document.getElementById("passwordError").style.display = "none";
-      } else {
-        document.getElementById("passwordError").style.display = "block";
-        adminPasswordInput.value = "";
-        adminPasswordInput.focus();
-      }
-    });
-  }
-
-  if (adminPasswordInput) {
-    adminPasswordInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") verifyPasswordBtn.click();
-    });
-  }
-
-  if (saveSettingsBtn) {
-    saveSettingsBtn.addEventListener("click", async () => {
-      saveSettingsBtn.disabled = true;
-      saveSettingsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
-
-      const success = await saveThresholdSettings();
-
-      saveSettingsBtn.disabled = false;
-      saveSettingsBtn.innerHTML = '<i class="fas fa-save"></i> Simpan Pengaturan';
-
-      if (success) {
-        bootstrap.Modal.getInstance(document.getElementById("settingsModal")).hide();
-
-        // SweetAlert2 untuk sukses
-        Swal.fire({
-          icon: "success",
-          title: "Berhasil!",
-          text: "Pengaturan jam masuk telah disimpan dan berlaku untuk semua perangkat",
-          showConfirmButton: false,
-          timer: 2000,
-          timerProgressBar: true,
-        });
-      } else {
-        // SweetAlert2 untuk error
-        Swal.fire({
-          icon: "error",
-          title: "Gagal!",
-          text: "Terjadi kesalahan saat menyimpan pengaturan. Silakan coba lagi.",
-          confirmButtonText: "OK",
-        });
-      }
-    });
-  }
-}
-
 // Get threshold time for lateness calculation
 function getThresholdTime(employeeType, shift) {
   const settings = cachedThresholdSettings || {
@@ -2727,10 +2531,8 @@ function checkIfLate(timeString, employeeType, shift) {
 // Load employees and cache them
 async function loadEmployees() {
   try {
-
     // Periksa apakah cache perlu diperbarui berdasarkan TTL
     if (employeeCache.size === 0 || shouldUpdateEmployeeCache()) {
-
       // Coba load dengan retry
       let retryCount = 0;
       const maxRetries = 3;

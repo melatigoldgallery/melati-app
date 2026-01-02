@@ -415,21 +415,11 @@
 
             <!-- Scanner Section -->
             <div class="card scanner-card">
-              <div class="card-header d-flex justify-content-start align-items-center">
+              <div class="card-header">
                 <h2 class="mb-0">
                   <i class="fas fa-qrcode"></i>
                   Scan Barcode Kehadiran
                 </h2>
-                <div class="header-actions mx-2">
-                  <button id="refreshLeaveData" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-sync-alt me-1"></i>
-                    Refresh Data
-                  </button>
-                  <button id="settingsBtn" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-cog me-1"></i>
-                    Pengaturan Jam
-                  </button>
-                </div>
               </div>
 
               <div class="alert alert-info m-2">
@@ -551,7 +541,7 @@
               </div>
             </div>
 
-            <div class="info-realtime-section">
+            <div class="info-realtime-section d-none">
               <div class="card">
                 <div class="card-header">
                   <h2>
@@ -662,128 +652,6 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Password -->
-    <div class="modal fade" id="passwordModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="fas fa-lock"></i>
-              Verifikasi Admin
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-info">
-              <i class="fas fa-info-circle"></i>
-              Masukkan kata sandi admin untuk mengakses pengaturan
-            </div>
-            <div class="form-group">
-              <label for="adminPassword">Kata Sandi:</label>
-              <input type="password" id="adminPassword" class="form-control" placeholder="Masukkan kata sandi" />
-            </div>
-            <div id="passwordError" class="text-danger mt-2" style="display: none">Kata sandi salah!</div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-primary" id="verifyPasswordBtn">
-              <i class="fas fa-check"></i>
-              Verifikasi
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Settings -->
-    <div class="modal fade" id="settingsModal" tabindex="-1">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title">
-              <i class="fas fa-cog"></i>
-              Pengaturan Jam Masuk
-            </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              <i class="fas fa-exclamation-triangle"></i>
-              <strong>Perhatian:</strong>
-              Perubahan akan mempengaruhi perhitungan keterlambatan di semua perangkat.
-            </div>
-
-            <!-- Staff Settings -->
-            <div class="card mb-3">
-              <div class="card-header bg-light">
-                <h6 class="mb-0">
-                  <i class="fas fa-user"></i>
-                  Staff
-                </h6>
-              </div>
-              <div class="card-body">
-                <div class="row">
-                  <div class="col-md-6">
-                    <label>
-                      <i class="fas fa-sun"></i>
-                      Shift Pagi:
-                    </label>
-                    <input type="time" id="staffMorningTime" class="form-control" value="09:00" />
-                    <small class="text-muted">Batas tepat waktu (Jadwal: 08:45)</small>
-                  </div>
-                  <div class="col-md-6">
-                    <label>
-                      <i class="fas fa-moon"></i>
-                      Shift Sore:
-                    </label>
-                    <input type="time" id="staffAfternoonTime" class="form-control" value="14:21" />
-                    <small class="text-muted">Batas tepat waktu (Jadwal: 14:20)</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- OB Settings -->
-            <div class="card">
-              <div class="card-header bg-light">
-                <h6 class="mb-0">
-                  <i class="fas fa-broom"></i>
-                  Office Boy (OB)
-                </h6>
-              </div>
-              <div class="card-body">
-                <div class="row">
-                  <div class="col-md-6">
-                    <label>
-                      <i class="fas fa-sun"></i>
-                      Shift Pagi:
-                    </label>
-                    <input type="time" id="obMorningTime" class="form-control" value="07:31" />
-                    <small class="text-muted">Batas tepat waktu (Jadwal: 07:30)</small>
-                  </div>
-                  <div class="col-md-6">
-                    <label>
-                      <i class="fas fa-moon"></i>
-                      Shift Sore:
-                    </label>
-                    <input type="time" id="obAfternoonTime" class="form-control" value="13:46" />
-                    <small class="text-muted">Batas tepat waktu (Jadwal: 13:45)</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-success" id="saveSettingsBtn">
-              <i class="fas fa-save"></i>
-              Simpan Pengaturan
-            </button>
           </div>
         </div>
       </div>
