@@ -1,266 +1,266 @@
-import { saveServisData, getServisByDate } from '../services/servis-service.js'
+import { saveServisData, getServisByDate } from "../services/servis-service.js";
 
 // Global variables
-let todayData = []
-let servisItemsServis = []
-let servisItemsCustom = []
-let editingIndex = -1
-let verifikasiAction = null
-let verifikasiData = null
-let editingRiwayatId = null
-let filterJenisRiwayat = 'servis'
+let todayData = [];
+let servisItemsServis = [];
+let servisItemsCustom = [];
+let editingIndex = -1;
+let verifikasiAction = null;
+let verifikasiData = null;
+let editingRiwayatId = null;
+let filterJenisRiwayat = "servis";
 
 // Global variables untuk detail barang
-let jenisInput = 'servis'
-let detailBarangItems = []
-let detailBarangCounter = 1
-let detailBarangCustomItems = []
-let detailBarangCustomCounter = 1
-let modalClosedBySave = false
+let jenisInput = "servis";
+let detailBarangItems = [];
+let detailBarangCounter = 1;
+let detailBarangCustomItems = [];
+let detailBarangCustomCounter = 1;
+let modalClosedBySave = false;
 
 // SweetAlert Helper Functions
 function showSuccessToast(message, timer = 2000) {
   Swal.fire({
     toast: true,
-    position: 'top-end',
-    icon: 'success',
+    position: "top-end",
+    icon: "success",
     title: message,
     showConfirmButton: false,
     timer: timer,
     timerProgressBar: true,
-  })
+  });
 }
 
 function showErrorAlert(title, message) {
   Swal.fire({
-    icon: 'error',
+    icon: "error",
     title: title,
     text: message,
-    confirmButtonColor: '#d33',
-  })
+    confirmButtonColor: "#d33",
+  });
 }
 
 function showSuccessAlert(title, message) {
   Swal.fire({
-    icon: 'success',
+    icon: "success",
     title: title,
     text: message,
-    confirmButtonColor: '#28a745',
+    confirmButtonColor: "#28a745",
     timer: 3000,
     timerProgressBar: true,
-  })
+  });
 }
 
-async function showConfirmDialog(title, message, confirmText = 'Ya, Hapus!') {
+async function showConfirmDialog(title, message, confirmText = "Ya, Hapus!") {
   return await Swal.fire({
     title: title,
     text: message,
-    icon: 'warning',
+    icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#6c757d',
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#6c757d",
     confirmButtonText: confirmText,
-    cancelButtonText: 'Batal',
-  })
+    cancelButtonText: "Batal",
+  });
 }
 
 // Initialize page
-document.addEventListener('DOMContentLoaded', function () {
-  initializePage()
-  setupEventListeners()
-})
+document.addEventListener("DOMContentLoaded", function () {
+  initializePage();
+  setupEventListeners();
+});
 
 function initializePage() {
   // Set current date and time
-  updateDateTime()
-  setInterval(updateDateTime, 1000)
+  updateDateTime();
+  setInterval(updateDateTime, 1000);
 
   // Initialize datepicker
-  initializeDatePicker()
+  initializeDatePicker();
 
   // Initialize section visibility based on default jenisInput
-  handleJenisInputChange()
+  handleJenisInputChange();
 
   // Set default date to today hanya untuk input tanggal
-  const today = new Date()
-  const formattedDate = today.toLocaleDateString('id-ID')
-  document.getElementById('tanggal').value = formattedDate
-  document.getElementById('tanggalRiwayat').value = formattedDate
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString("id-ID");
+  document.getElementById("tanggal").value = formattedDate;
+  document.getElementById("tanggalRiwayat").value = formattedDate;
 }
 
 function initializeDatePicker() {
-  $('#tanggal').datepicker({
-    format: 'dd/mm/yyyy',
-    language: 'id',
+  $("#tanggal").datepicker({
+    format: "dd/mm/yyyy",
+    language: "id",
     autoclose: true,
     todayHighlight: true,
-    orientation: 'bottom auto',
-  })
+    orientation: "bottom auto",
+  });
 
-  $('#tanggalRiwayat').datepicker({
-    format: 'dd/mm/yyyy',
-    language: 'id',
+  $("#tanggalRiwayat").datepicker({
+    format: "dd/mm/yyyy",
+    language: "id",
     autoclose: true,
     todayHighlight: true,
-    orientation: 'bottom auto',
-  })
+    orientation: "bottom auto",
+  });
 
   // Tambahkan datepicker untuk field tanggal edit
-  $('#tanggalEdit').datepicker({
-    format: 'dd/mm/yyyy',
-    language: 'id',
+  $("#tanggalEdit").datepicker({
+    format: "dd/mm/yyyy",
+    language: "id",
     autoclose: true,
     todayHighlight: true,
-    orientation: 'bottom auto',
-  })
+    orientation: "bottom auto",
+  });
 
   // Calendar icon click handlers
-  document.getElementById('calendarIcon').addEventListener('click', function () {
-    $('#tanggal').datepicker('show')
-  })
+  document.getElementById("calendarIcon").addEventListener("click", function () {
+    $("#tanggal").datepicker("show");
+  });
 
-  document.getElementById('calendarRiwayatIcon').addEventListener('click', function () {
-    $('#tanggalRiwayat').datepicker('show')
-  })
+  document.getElementById("calendarRiwayatIcon").addEventListener("click", function () {
+    $("#tanggalRiwayat").datepicker("show");
+  });
 
-  document.getElementById('calendarEditIcon').addEventListener('click', function () {
-    $('#tanggalEdit').datepicker('show')
-  })
+  document.getElementById("calendarEditIcon").addEventListener("click", function () {
+    $("#tanggalEdit").datepicker("show");
+  });
 }
 
 function updateDateTime() {
-  const now = new Date()
-  const dateElement = document.getElementById('current-date')
-  const timeElement = document.getElementById('current-time')
+  const now = new Date();
+  const dateElement = document.getElementById("current-date");
+  const timeElement = document.getElementById("current-time");
 
   if (dateElement) {
-    dateElement.textContent = now.toLocaleDateString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
+    dateElement.textContent = now.toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   }
 
   if (timeElement) {
-    timeElement.textContent = now.toLocaleTimeString('id-ID')
+    timeElement.textContent = now.toLocaleTimeString("id-ID");
   }
 }
 
 function setupEventListeners() {
   // Tambah servis button
-  document.getElementById('btnTambahServis').addEventListener('click', function () {
-    openServisModal()
-  })
+  document.getElementById("btnTambahServis").addEventListener("click", function () {
+    openServisModal();
+  });
 
   // Simpan servis button in modal
-  document.getElementById('btnSimpanServis').addEventListener('click', function () {
-    saveServisItem()
-  })
+  document.getElementById("btnSimpanServis").addEventListener("click", function () {
+    saveServisItem();
+  });
 
   // Tambah barang button in modal
-  document.getElementById('btnTambahBarang').addEventListener('click', function () {
-    addDetailBarangRow()
-  })
+  document.getElementById("btnTambahBarang").addEventListener("click", function () {
+    addDetailBarangRow();
+  });
 
   // Tambah barang custom button
-  document.getElementById('btnTambahBarangCustom').addEventListener('click', function () {
-    addDetailBarangCustomRow()
-  })
+  document.getElementById("btnTambahBarangCustom").addEventListener("click", function () {
+    addDetailBarangCustomRow();
+  });
 
   // Jenis input change handler
-  document.getElementById('jenisInput').addEventListener('change', function () {
-    handleJenisInputChange()
-  })
+  document.getElementById("jenisInput").addEventListener("change", function () {
+    handleJenisInputChange();
+  });
 
   // Simpan data button
-  document.getElementById('btnSimpanData').addEventListener('click', function () {
-    saveAllServisData()
-  })
+  document.getElementById("btnSimpanData").addEventListener("click", function () {
+    saveAllServisData();
+  });
 
   // Batal button
-  document.getElementById('btnBatal').addEventListener('click', function () {
-    resetForm()
-  })
+  document.getElementById("btnBatal").addEventListener("click", function () {
+    resetForm();
+  });
 
   // Simpan data custom button
-  document.getElementById('btnSimpanDataCustom').addEventListener('click', function () {
-    saveAllServisData()
-  })
+  document.getElementById("btnSimpanDataCustom").addEventListener("click", function () {
+    saveAllServisData();
+  });
 
   // Batal custom button
-  document.getElementById('btnBatalCustom').addEventListener('click', function () {
-    resetForm()
-  })
+  document.getElementById("btnBatalCustom").addEventListener("click", function () {
+    resetForm();
+  });
 
   // Filter jenis riwayat change handler
-  document.getElementById('filterJenisRiwayat').addEventListener('change', function () {
-    filterJenisRiwayat = this.value
-    handleFilterRiwayatChange()
-  })
+  document.getElementById("filterJenisRiwayat").addEventListener("change", function () {
+    filterJenisRiwayat = this.value;
+    handleFilterRiwayatChange();
+  });
 
   // Tampilkan button
-  document.getElementById('tampilkanBtn').addEventListener('click', function () {
-    loadRiwayatData()
-  })
+  document.getElementById("tampilkanBtn").addEventListener("click", function () {
+    loadRiwayatData();
+  });
 
   // Export PDF button
-  document.getElementById('exportPdfBtn').addEventListener('click', function () {
-    if (filterJenisRiwayat === 'servis') {
-      exportServisToPDF()
+  document.getElementById("exportPdfBtn").addEventListener("click", function () {
+    if (filterJenisRiwayat === "servis") {
+      exportServisToPDF();
     } else {
-      exportCustomToPDF()
+      exportCustomToPDF();
     }
-  })
+  });
 
   // Print button
-  document.getElementById('printBtn').addEventListener('click', function () {
-    printReport()
-  })
+  document.getElementById("printBtn").addEventListener("click", function () {
+    printReport();
+  });
 
   // Verifikasi button
-  document.getElementById('btnVerifikasi').addEventListener('click', function () {
-    handleVerifikasi()
-  })
+  document.getElementById("btnVerifikasi").addEventListener("click", function () {
+    handleVerifikasi();
+  });
 
   // Modal hidden events
-  document.getElementById('modalInputServis').addEventListener('hidden.bs.modal', function () {
+  document.getElementById("modalInputServis").addEventListener("hidden.bs.modal", function () {
     if (modalClosedBySave) {
       // Jika modal ditutup karena save, reset form tapi pertahankan jenisInput
-      resetModalForm(false)
-      modalClosedBySave = false
+      resetModalForm(false);
+      modalClosedBySave = false;
     } else {
       // Jika modal ditutup karena cancel/close, reset semua termasuk jenisInput ke default
-      resetModalForm(true)
+      resetModalForm(true);
     }
-  })
+  });
 
-  document.getElementById('verifikasiModal').addEventListener('hidden.bs.modal', function () {
-    document.getElementById('kodeVerifikasi').value = ''
-    verifikasiAction = null
-    verifikasiData = null
-  })
+  document.getElementById("verifikasiModal").addEventListener("hidden.bs.modal", function () {
+    document.getElementById("kodeVerifikasi").value = "";
+    verifikasiAction = null;
+    verifikasiData = null;
+  });
 
   // Enter key handler untuk modal form
-  document.getElementById('formInputServis').addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      saveServisItem()
+  document.getElementById("formInputServis").addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveServisItem();
     }
-  })
+  });
 
   // Enter key handler untuk form verifikasi
-  document.getElementById('formVerifikasi').addEventListener('submit', function (e) {
-    e.preventDefault()
-    handleVerifikasi()
-  })
+  document.getElementById("formVerifikasi").addEventListener("submit", function (e) {
+    e.preventDefault();
+    handleVerifikasi();
+  });
 
-  document.getElementById('kodeVerifikasi').addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleVerifikasi()
+  document.getElementById("kodeVerifikasi").addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleVerifikasi();
     }
-  })
+  });
 }
 
 // Functions untuk mengelola detail barang
@@ -268,31 +268,31 @@ function addDetailBarangRow() {
   const newItem = {
     id: detailBarangCounter++,
     jumlah: 1,
-    namaBarang: '',
-    berat: '',
-    karat: '',
-    jenisServis: '',
-    rincianServis: '',
+    namaBarang: "",
+    berat: "",
+    karat: "",
+    jenisServis: "",
+    rincianServis: "",
     ongkos: 0,
-    statusPembayaran: 'nominal',
-  }
+    statusPembayaran: "nominal",
+  };
 
-  detailBarangItems.push(newItem)
-  updateDetailBarangTable()
+  detailBarangItems.push(newItem);
+  updateDetailBarangTable();
 }
 
 function removeDetailBarangRow(id) {
-  detailBarangItems = detailBarangItems.filter((item) => item.id !== id)
-  updateDetailBarangTable()
+  detailBarangItems = detailBarangItems.filter((item) => item.id !== id);
+  updateDetailBarangTable();
 }
 
 function updateDetailBarangTable() {
-  const tbody = document.getElementById('detailBarangBody')
-  tbody.innerHTML = ''
+  const tbody = document.getElementById("detailBarangBody");
+  tbody.innerHTML = "";
 
   detailBarangItems.forEach((item, index) => {
-    const statusPembayaran = item.statusPembayaran || 'nominal'
-    const row = document.createElement('tr')
+    const statusPembayaran = item.statusPembayaran || "nominal";
+    const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
       <td>
@@ -323,28 +323,16 @@ function updateDetailBarangTable() {
         <select class="form-control form-control-sm"
                 onchange="updateDetailBarangItem(${item.id}, 'jenisServis', this.value)" required>
           <option value="">Pilih Jenis</option>
-          <option value="GRAFIR" ${item.jenisServis === 'GRAFIR' ? 'selected' : ''}>GRAFIR</option>
-          <option value="PATRI" ${item.jenisServis === 'PATRI' ? 'selected' : ''}>PATRI</option>
-          <option value="LASER" ${item.jenisServis === 'LASER' ? 'selected' : ''}>LASER</option>
-          <option value="CUCI" ${item.jenisServis === 'CUCI' ? 'selected' : ''}>CUCI</option>
-          <option value="PASANG BATU" ${
-            item.jenisServis === 'PASANG BATU' ? 'selected' : ''
-          }>PASANG BATU</option>
-          <option value="TAMBAH RING" ${
-            item.jenisServis === 'TAMBAH RING' ? 'selected' : ''
-          }>TAMBAH RING</option>
-          <option value="CHROME GOLD" ${
-            item.jenisServis === 'CHROME GOLD' ? 'selected' : ''
-          }>CHROME GOLD 22K</option>
-          <option value="CHROME SELEB" ${
-            item.jenisServis === 'CHROME SELEB' ? 'selected' : ''
-          }>CHROME SELEB</option>
-          <option value="CHROME PUTIH" ${
-            item.jenisServis === 'CHROME PUTIH' ? 'selected' : ''
-          }>CHROME PUTIH</option>
-          <option value="CHROME ROSE" ${
-            item.jenisServis === 'CHROME ROSE' ? 'selected' : ''
-          }>CHROME ROSE</option>
+          <option value="GRAFIR" ${item.jenisServis === "GRAFIR" ? "selected" : ""}>GRAFIR</option>
+          <option value="PATRI" ${item.jenisServis === "PATRI" ? "selected" : ""}>PATRI</option>
+          <option value="LASER" ${item.jenisServis === "LASER" ? "selected" : ""}>LASER</option>
+          <option value="CUCI" ${item.jenisServis === "CUCI" ? "selected" : ""}>CUCI</option>
+          <option value="PASANG BATU" ${item.jenisServis === "PASANG BATU" ? "selected" : ""}>PASANG BATU</option>
+          <option value="TAMBAH RING" ${item.jenisServis === "TAMBAH RING" ? "selected" : ""}>TAMBAH RING</option>
+          <option value="CHROME GOLD" ${item.jenisServis === "CHROME GOLD" ? "selected" : ""}>CHROME GOLD 22K</option>
+          <option value="CHROME SELEB" ${item.jenisServis === "CHROME SELEB" ? "selected" : ""}>CHROME SELEB</option>
+          <option value="CHROME PUTIH" ${item.jenisServis === "CHROME PUTIH" ? "selected" : ""}>CHROME PUTIH</option>
+          <option value="CHROME ROSE" ${item.jenisServis === "CHROME ROSE" ? "selected" : ""}>CHROME ROSE</option>
         </select>
       </td>
       <td>
@@ -363,48 +351,44 @@ function updateDetailBarangTable() {
       <td>
         <select class="form-select form-select-sm"
                 onchange="updateDetailBarangItem(${item.id}, 'statusPembayaran', this.value)">
-          <option value="nominal" ${statusPembayaran === 'nominal' ? 'selected' : ''}>Lunas</option>
-          <option value="belum_lunas" ${
-            statusPembayaran === 'belum_lunas' ? 'selected' : ''
-          }>Belum Lunas</option>
-          <option value="free" ${statusPembayaran === 'free' ? 'selected' : ''}>Free</option>
+          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>Lunas</option>
+          <option value="belum_lunas" ${statusPembayaran === "belum_lunas" ? "selected" : ""}>Belum Lunas</option>
+          <option value="free" ${statusPembayaran === "free" ? "selected" : ""}>Free</option>
         </select>
       </td>
       <td>
-        <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailBarangRow(${
-          item.id
-        })" title="Hapus">
+        <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailBarangRow(${item.id})" title="Hapus">
           <i class="fas fa-trash"></i>
         </button>
       </td>
-    `
-    tbody.appendChild(row)
-  })
+    `;
+    tbody.appendChild(row);
+  });
 
   // Jika belum ada item, tambahkan satu baris default
   if (detailBarangItems.length === 0) {
-    addDetailBarangRow()
+    addDetailBarangRow();
   }
 }
 
 function updateDetailBarangItem(id, field, value) {
-  const item = detailBarangItems.find((item) => item.id === id)
+  const item = detailBarangItems.find((item) => item.id === id);
   if (item) {
-    item[field] = value
+    item[field] = value;
     // Tidak perlu update table setiap kali perubahan untuk menjaga focus saat Tab
   }
 }
 
 function resetDetailBarang() {
-  detailBarangItems = []
-  detailBarangCounter = 1
-  updateDetailBarangTable()
+  detailBarangItems = [];
+  detailBarangCounter = 1;
+  updateDetailBarangTable();
 }
 
 function resetDetailBarangCustom() {
-  detailBarangCustomItems = []
-  detailBarangCustomCounter = 1
-  updateDetailBarangCustomTable()
+  detailBarangCustomItems = [];
+  detailBarangCustomCounter = 1;
+  updateDetailBarangCustomTable();
 }
 
 // Functions untuk detail barang custom
@@ -412,39 +396,37 @@ function addDetailBarangCustomRow() {
   const newItem = {
     id: detailBarangCustomCounter++,
     jumlah: 1,
-    namaBarang: '',
-    berat: '',
-    panjang: '',
-    kadar: '',
-    warna: '',
+    namaBarang: "",
+    berat: "",
+    panjang: "",
+    kadar: "",
+    warna: "",
     totalDp: 0,
     ongkos: 0,
-    rincianServis: '',
-    statusPembayaran: 'nominal',
-  }
-  detailBarangCustomItems.push(newItem)
-  updateDetailBarangCustomTable()
+    rincianServis: "",
+    statusPembayaran: "nominal",
+  };
+  detailBarangCustomItems.push(newItem);
+  updateDetailBarangCustomTable();
 }
 
 function removeDetailBarangCustomRow(id) {
-  detailBarangCustomItems = detailBarangCustomItems.filter((item) => item.id !== id)
-  updateDetailBarangCustomTable()
+  detailBarangCustomItems = detailBarangCustomItems.filter((item) => item.id !== id);
+  updateDetailBarangCustomTable();
 }
 
 function updateDetailBarangCustomTable() {
-  const tbody = document.getElementById('detailBarangCustomBody')
-  tbody.innerHTML = ''
+  const tbody = document.getElementById("detailBarangCustomBody");
+  tbody.innerHTML = "";
 
   detailBarangCustomItems.forEach((item, index) => {
-    const statusPembayaran = item.statusPembayaran || 'nominal'
-    const row = document.createElement('tr')
+    const statusPembayaran = item.statusPembayaran || "nominal";
+    const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
       <td><input type="number" class="form-control form-control-sm" value="${
         item.jumlah || 1
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'jumlah', this.value)" min="1" required /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'jumlah', this.value)" min="1" required /></td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.namaBarang
       }" onchange="updateDetailBarangCustomItem(${
@@ -452,24 +434,16 @@ function updateDetailBarangCustomTable() {
     }, 'namaBarang', this.value)" placeholder="Nama barang" required /></td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.berat
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'berat', this.value)" placeholder="Berat" /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'berat', this.value)" placeholder="Berat" /></td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.panjang
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'panjang', this.value)" placeholder="Panjang" /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'panjang', this.value)" placeholder="Panjang" /></td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.kadar
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'kadar', this.value)" placeholder="Kadar" /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'kadar', this.value)" placeholder="Kadar" /></td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.warna
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'warna', this.value)" placeholder="Warna" /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'warna', this.value)" placeholder="Warna" /></td>
       <td><input type="number" class="form-control form-control-sm" value="${
         item.totalDp || 0
       }" onchange="updateDetailBarangCustomItem(${
@@ -477,134 +451,127 @@ function updateDetailBarangCustomTable() {
     }, 'totalDp', this.value)" placeholder="Total DP" min="0" /></td>
       <td><input type="number" class="form-control form-control-sm" value="${
         item.ongkos || 0
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'ongkos', this.value)" placeholder="Ongkos" min="0" /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'ongkos', this.value)" placeholder="Ongkos" min="0" /></td>
       <td>
         <select class="form-select form-select-sm"
                 onchange="updateDetailBarangCustomItem(${item.id}, 'statusPembayaran', this.value)">
-          <option value="nominal" ${statusPembayaran === 'nominal' ? 'selected' : ''}>Lunas</option>
-          <option value="custom" ${statusPembayaran === 'custom' ? 'selected' : ''}>Custom</option>
+          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>Lunas</option>
+          <option value="custom" ${statusPembayaran === "custom" ? "selected" : ""}>Custom</option>
         </select>
       </td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.rincianServis
-      }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'rincianServis', this.value)" placeholder="Rincian" /></td>
+      }" onchange="updateDetailBarangCustomItem(${item.id}, 'rincianServis', this.value)" placeholder="Rincian" /></td>
       <td><button type="button" class="btn btn-sm btn-danger" onclick="removeDetailBarangCustomRow(${
         item.id
       })" title="Hapus"><i class="fas fa-trash"></i></button></td>
-    `
-    tbody.appendChild(row)
-  })
+    `;
+    tbody.appendChild(row);
+  });
 
   if (detailBarangCustomItems.length === 0) {
-    addDetailBarangCustomRow()
+    addDetailBarangCustomRow();
   }
 }
 
 function updateDetailBarangCustomItem(id, field, value) {
-  const item = detailBarangCustomItems.find((item) => item.id === id)
+  const item = detailBarangCustomItems.find((item) => item.id === id);
   if (item) {
     // Trim whitespace untuk field string, parse number untuk field numerik
-    if (field === 'jumlah' || field === 'totalDp' || field === 'ongkos') {
-      item[field] = parseInt(value) || 0
-    } else if (typeof value === 'string') {
-      item[field] = value.trim()
+    if (field === "jumlah" || field === "totalDp" || field === "ongkos") {
+      item[field] = parseInt(value) || 0;
+    } else if (typeof value === "string") {
+      item[field] = value.trim();
     } else {
-      item[field] = value
+      item[field] = value;
     }
   }
 }
 
 function validateDetailBarang() {
-  if (jenisInput === 'servis') {
+  if (jenisInput === "servis") {
     if (detailBarangItems.length === 0) {
-      showErrorModal('Validasi Error', 'Minimal harus ada satu detail barang servis!')
-      return false
+      showErrorModal("Validasi Error", "Minimal harus ada satu detail barang servis!");
+      return false;
     }
   } else {
     if (detailBarangCustomItems.length === 0) {
-      showErrorModal('Validasi Error', 'Minimal harus ada satu detail barang custom!')
-      return false
+      showErrorModal("Validasi Error", "Minimal harus ada satu detail barang custom!");
+      return false;
     }
   }
 
-  if (jenisInput === 'servis') {
+  if (jenisInput === "servis") {
     for (let i = 0; i < detailBarangItems.length; i++) {
-      const item = detailBarangItems[i]
+      const item = detailBarangItems[i];
       if (!item.namaBarang.trim() || !item.jenisServis.trim()) {
-        showErrorModal(
-          'Validasi Error',
-          `Nama barang dan jenis servis pada baris ${i + 1} harus diisi!`
-        )
-        return false
+        showErrorModal("Validasi Error", `Nama barang dan jenis servis pada baris ${i + 1} harus diisi!`);
+        return false;
       }
 
       // Validasi status pembayaran per item
-      const itemStatus = item.statusPembayaran || 'nominal'
+      const itemStatus = item.statusPembayaran || "nominal";
       if (!item.statusPembayaran) {
-        showErrorModal('Validasi Error', `Status pembayaran pada baris ${i + 1} harus dipilih!`)
-        return false
+        showErrorModal("Validasi Error", `Status pembayaran pada baris ${i + 1} harus dipilih!`);
+        return false;
       }
 
       // Auto-set ongkos ke 0 jika status free
-      if (itemStatus === 'free') {
-        item.ongkos = 0
+      if (itemStatus === "free") {
+        item.ongkos = 0;
       } else if (
-        (itemStatus === 'nominal' || itemStatus === 'belum_lunas') &&
+        (itemStatus === "nominal" || itemStatus === "belum_lunas") &&
         (!item.ongkos || parseInt(item.ongkos) <= 0)
       ) {
         showErrorModal(
-          'Validasi Error',
+          "Validasi Error",
           `Ongkos pada baris ${i + 1} harus diisi untuk status ${getStatusLabel(itemStatus)}!`
-        )
-        return false
+        );
+        return false;
       }
     }
   } else {
     for (let i = 0; i < detailBarangCustomItems.length; i++) {
-      const item = detailBarangCustomItems[i]
+      const item = detailBarangCustomItems[i];
       if (!item.namaBarang.trim()) {
-        showErrorModal('Validasi Error', `Nama barang pada baris ${i + 1} harus diisi!`)
-        return false
+        showErrorModal("Validasi Error", `Nama barang pada baris ${i + 1} harus diisi!`);
+        return false;
       }
 
       // Validasi status pembayaran per item
       if (!item.statusPembayaran) {
-        showErrorModal('Validasi Error', `Status pembayaran pada baris ${i + 1} harus dipilih!`)
-        return false
+        showErrorModal("Validasi Error", `Status pembayaran pada baris ${i + 1} harus dipilih!`);
+        return false;
       }
     }
   }
 
-  return true
+  return true;
 }
 
 // Global functions untuk inline editing
-window.updateDetailBarangItem = updateDetailBarangItem
-window.removeDetailBarangRow = removeDetailBarangRow
-window.updateDetailBarangCustomItem = updateDetailBarangCustomItem
-window.removeDetailBarangCustomRow = removeDetailBarangCustomRow
+window.updateDetailBarangItem = updateDetailBarangItem;
+window.removeDetailBarangRow = removeDetailBarangRow;
+window.updateDetailBarangCustomItem = updateDetailBarangCustomItem;
+window.removeDetailBarangCustomRow = removeDetailBarangCustomRow;
 
 function handleJenisInputChange() {
-  jenisInput = document.getElementById('jenisInput').value
-  const sectionServis = document.getElementById('sectionServis')
-  const sectionCustom = document.getElementById('sectionCustom')
-  const sectionInputServis = document.getElementById('sectionInputServis')
-  const sectionInputCustom = document.getElementById('sectionInputCustom')
+  jenisInput = document.getElementById("jenisInput").value;
+  const sectionServis = document.getElementById("sectionServis");
+  const sectionCustom = document.getElementById("sectionCustom");
+  const sectionInputServis = document.getElementById("sectionInputServis");
+  const sectionInputCustom = document.getElementById("sectionInputCustom");
 
-  if (jenisInput === 'servis') {
-    sectionServis.style.display = 'block'
-    sectionCustom.style.display = 'none'
-    sectionInputServis.style.display = 'block'
-    sectionInputCustom.style.display = 'none'
+  if (jenisInput === "servis") {
+    sectionServis.style.display = "block";
+    sectionCustom.style.display = "none";
+    sectionInputServis.style.display = "block";
+    sectionInputCustom.style.display = "none";
   } else {
-    sectionServis.style.display = 'none'
-    sectionCustom.style.display = 'block'
-    sectionInputServis.style.display = 'none'
-    sectionInputCustom.style.display = 'block'
+    sectionServis.style.display = "none";
+    sectionCustom.style.display = "block";
+    sectionInputServis.style.display = "none";
+    sectionInputCustom.style.display = "block";
   }
 }
 
@@ -614,130 +581,130 @@ function handleStatusPembayaranChange() {
 }
 
 function openServisModal(index = -1) {
-  editingIndex = index
+  editingIndex = index;
 
   if (index >= 0) {
     // Edit mode
-    const item = jenisInput === 'servis' ? servisItemsServis[index] : servisItemsCustom[index]
-    document.getElementById('modalInputServisLabel').textContent =
-      jenisInput === 'servis' ? 'Edit Data Servis' : 'Edit Data Custom'
-    document.getElementById('namaSales').value = item.namaSales || ''
-    document.getElementById('namaCustomer').value = item.namaCustomer
-    document.getElementById('noHp').value = item.noHp
+    const item = jenisInput === "servis" ? servisItemsServis[index] : servisItemsCustom[index];
+    document.getElementById("modalInputServisLabel").textContent =
+      jenisInput === "servis" ? "Edit Data Servis" : "Edit Data Custom";
+    document.getElementById("namaSales").value = item.namaSales || "";
+    document.getElementById("namaCustomer").value = item.namaCustomer;
+    document.getElementById("noHp").value = item.noHp;
 
     // Set jenis input
-    jenisInput = item.jenisInput || 'servis'
-    document.getElementById('jenisInput').value = jenisInput
-    handleJenisInputChange()
+    jenisInput = item.jenisInput || "servis";
+    document.getElementById("jenisInput").value = jenisInput;
+    handleJenisInputChange();
 
     // Load detail barang
-    if (jenisInput === 'servis' && item.detailBarang && item.detailBarang.length > 0) {
+    if (jenisInput === "servis" && item.detailBarang && item.detailBarang.length > 0) {
       detailBarangItems = item.detailBarang.map((detail, idx) => ({
         id: idx + 1,
         jumlah: detail.jumlah || 1,
-        namaBarang: detail.namaBarang || '',
-        berat: detail.berat || '',
-        karat: detail.karat || '',
-        jenisServis: detail.jenisServis || '',
-        rincianServis: detail.rincianServis || '',
+        namaBarang: detail.namaBarang || "",
+        berat: detail.berat || "",
+        karat: detail.karat || "",
+        jenisServis: detail.jenisServis || "",
+        rincianServis: detail.rincianServis || "",
         ongkos: detail.ongkos || 0,
-        statusPembayaran: detail.statusPembayaran || 'nominal',
-      }))
-      detailBarangCounter = detailBarangItems.length + 1
+        statusPembayaran: detail.statusPembayaran || "nominal",
+      }));
+      detailBarangCounter = detailBarangItems.length + 1;
     } else {
       // Backward compatibility - convert old format
       detailBarangItems = [
         {
           id: 1,
           jumlah: 1,
-          namaBarang: item.namaBarang || '',
-          berat: item.berat || '',
-          karat: item.karat || '',
-          jenisServis: item.jenisServis || '',
-          rincianServis: '',
+          namaBarang: item.namaBarang || "",
+          berat: item.berat || "",
+          karat: item.karat || "",
+          jenisServis: item.jenisServis || "",
+          rincianServis: "",
           ongkos: item.ongkos || 0,
-          statusPembayaran: item.statusPembayaran || 'nominal',
+          statusPembayaran: item.statusPembayaran || "nominal",
         },
-      ]
-      detailBarangCounter = 2
+      ];
+      detailBarangCounter = 2;
     }
 
-    updateDetailBarangTable()
+    updateDetailBarangTable();
 
-    if (jenisInput === 'custom' && item.detailBarangCustom && item.detailBarangCustom.length > 0) {
+    if (jenisInput === "custom" && item.detailBarangCustom && item.detailBarangCustom.length > 0) {
       detailBarangCustomItems = item.detailBarangCustom.map((detail, idx) => ({
         id: idx + 1,
         jumlah: detail.jumlah || 1,
-        namaBarang: detail.namaBarang || '',
-        berat: detail.berat || '',
-        panjang: detail.panjang || '',
-        kadar: detail.kadar || '',
-        warna: detail.warna || '',
+        namaBarang: detail.namaBarang || "",
+        berat: detail.berat || "",
+        panjang: detail.panjang || "",
+        kadar: detail.kadar || "",
+        warna: detail.warna || "",
         totalDp: detail.totalDp || 0,
         ongkos: detail.ongkos || 0,
-        rincianServis: detail.rincianServis || '',
-        statusPembayaran: detail.statusPembayaran || 'nominal',
-      }))
-      detailBarangCustomCounter = detailBarangCustomItems.length + 1
-      updateDetailBarangCustomTable()
+        rincianServis: detail.rincianServis || "",
+        statusPembayaran: detail.statusPembayaran || "nominal",
+      }));
+      detailBarangCustomCounter = detailBarangCustomItems.length + 1;
+      updateDetailBarangCustomTable();
     }
   } else {
     // Add mode
-    document.getElementById('modalInputServisLabel').textContent = 'Input Data Servis'
-    resetModalForm()
+    document.getElementById("modalInputServisLabel").textContent = "Input Data Servis";
+    resetModalForm();
   }
 
-  const modal = new bootstrap.Modal(document.getElementById('modalInputServis'))
-  modal.show()
+  const modal = new bootstrap.Modal(document.getElementById("modalInputServis"));
+  modal.show();
 
   // Auto focus pada nama sales setelah modal terbuka
-  document.getElementById('modalInputServis').addEventListener(
-    'shown.bs.modal',
+  document.getElementById("modalInputServis").addEventListener(
+    "shown.bs.modal",
     function () {
-      document.getElementById('namaSales').focus()
+      document.getElementById("namaSales").focus();
     },
     { once: true }
-  )
+  );
 }
 
 function resetModalForm(resetJenisInput = true) {
-  document.getElementById('formInputServis').reset()
-  document.getElementById('ongkos').disabled = false
-  document.getElementById('ongkos').required = true
-  document.getElementById('ongkosLabel').textContent = 'Total Ongkos / DP'
-  editingIndex = -1
-  editingRiwayatId = null
-  document.getElementById('modalInputServisLabel').textContent = 'Input Data Servis'
+  document.getElementById("formInputServis").reset();
+  document.getElementById("ongkos").disabled = false;
+  document.getElementById("ongkos").required = true;
+  document.getElementById("ongkosLabel").textContent = "Total Ongkos / DP";
+  editingIndex = -1;
+  editingRiwayatId = null;
+  document.getElementById("modalInputServisLabel").textContent = "Input Data Servis";
 
   // Sembunyikan field tanggal edit
-  document.getElementById('tanggalEditRow').style.display = 'none'
+  document.getElementById("tanggalEditRow").style.display = "none";
 
   // Reset detail barang
-  resetDetailBarang()
-  resetDetailBarangCustom()
+  resetDetailBarang();
+  resetDetailBarangCustom();
 
   // Reset jenis input to default hanya jika diminta (saat user cancel/close modal)
   if (resetJenisInput) {
-    jenisInput = 'servis'
-    document.getElementById('jenisInput').value = 'servis'
-    handleJenisInputChange()
+    jenisInput = "servis";
+    document.getElementById("jenisInput").value = "servis";
+    handleJenisInputChange();
   }
 }
 
 async function saveServisItem() {
-  const namaSales = document.getElementById('namaSales').value.trim()
-  const namaCustomer = document.getElementById('namaCustomer').value.trim()
-  const noHp = document.getElementById('noHp').value.trim()
+  const namaSales = document.getElementById("namaSales").value.trim();
+  const namaCustomer = document.getElementById("namaCustomer").value.trim();
+  const noHp = document.getElementById("noHp").value.trim();
 
   // Validation
   if (!namaSales || !namaCustomer || !noHp) {
-    showErrorModal('Validasi Error', 'Data customer harus diisi dengan benar!')
-    return
+    showErrorModal("Validasi Error", "Data customer harus diisi dengan benar!");
+    return;
   }
 
   // Validate detail barang (include status pembayaran per item validation)
   if (!validateDetailBarang()) {
-    return
+    return;
   }
 
   let servisItem = {
@@ -745,13 +712,10 @@ async function saveServisItem() {
     namaCustomer,
     noHp,
     jenisInput: jenisInput,
-  }
+  };
 
-  if (jenisInput === 'servis') {
-    const totalOngkos = detailBarangItems.reduce(
-      (sum, item) => sum + (parseInt(item.ongkos) || 0),
-      0
-    )
+  if (jenisInput === "servis") {
+    const totalOngkos = detailBarangItems.reduce((sum, item) => sum + (parseInt(item.ongkos) || 0), 0);
     servisItem.detailBarang = detailBarangItems.map((item) => ({
       jumlah: parseInt(item.jumlah) || 1,
       namaBarang: item.namaBarang.trim(),
@@ -760,23 +724,17 @@ async function saveServisItem() {
       jenisServis: item.jenisServis.trim(),
       rincianServis: item.rincianServis.trim(),
       ongkos: parseInt(item.ongkos) || 0,
-      statusPembayaran: item.statusPembayaran || 'nominal',
-    }))
-    servisItem.totalOngkos = totalOngkos
-    servisItem.namaBarang = detailBarangItems[0]?.namaBarang || ''
-    servisItem.berat = detailBarangItems[0]?.berat || ''
-    servisItem.karat = detailBarangItems[0]?.karat || ''
-    servisItem.jenisServis = detailBarangItems[0]?.jenisServis || ''
-    servisItem.ongkos = totalOngkos
+      statusPembayaran: item.statusPembayaran || "nominal",
+    }));
+    servisItem.totalOngkos = totalOngkos;
+    servisItem.namaBarang = detailBarangItems[0]?.namaBarang || "";
+    servisItem.berat = detailBarangItems[0]?.berat || "";
+    servisItem.karat = detailBarangItems[0]?.karat || "";
+    servisItem.jenisServis = detailBarangItems[0]?.jenisServis || "";
+    servisItem.ongkos = totalOngkos;
   } else {
-    const totalDp = detailBarangCustomItems.reduce(
-      (sum, item) => sum + (parseInt(item.totalDp) || 0),
-      0
-    )
-    const totalOngkos = detailBarangCustomItems.reduce(
-      (sum, item) => sum + (parseInt(item.ongkos) || 0),
-      0
-    )
+    const totalDp = detailBarangCustomItems.reduce((sum, item) => sum + (parseInt(item.totalDp) || 0), 0);
+    const totalOngkos = detailBarangCustomItems.reduce((sum, item) => sum + (parseInt(item.ongkos) || 0), 0);
     servisItem.detailBarangCustom = detailBarangCustomItems.map((item) => ({
       jumlah: parseInt(item.jumlah) || 1,
       namaBarang: item.namaBarang.trim(),
@@ -786,27 +744,27 @@ async function saveServisItem() {
       warna: item.warna.trim(),
       totalDP: parseInt(item.totalDp) || 0,
       ongkos: parseInt(item.ongkos) || 0,
-      statusPembayaran: item.statusPembayaran || 'nominal',
+      statusPembayaran: item.statusPembayaran || "nominal",
       rincianServis: item.rincianServis.trim(),
-    }))
-    servisItem.totalDP = totalDp
-    servisItem.totalOngkos = totalOngkos
-    servisItem.namaBarang = detailBarangCustomItems[0]?.namaBarang || ''
-    servisItem.ongkos = totalOngkos
+    }));
+    servisItem.totalDP = totalDp;
+    servisItem.totalOngkos = totalOngkos;
+    servisItem.namaBarang = detailBarangCustomItems[0]?.namaBarang || "";
+    servisItem.ongkos = totalOngkos;
   }
 
   // Handle edit riwayat data
   if (editingRiwayatId) {
     try {
       // Ambil tanggal dari field edit jika sedang edit riwayat
-      const tanggalEdit = document.getElementById('tanggalEdit').value
+      const tanggalEdit = document.getElementById("tanggalEdit").value;
       if (tanggalEdit) {
         // Get original item to preserve timestamp
-        const originalItem = todayData.find((item) => item.id === editingRiwayatId)
-        const originalDate = originalItem ? new Date(originalItem.tanggal) : new Date()
+        const originalItem = todayData.find((item) => item.id === editingRiwayatId);
+        const originalDate = originalItem ? new Date(originalItem.tanggal) : new Date();
 
         // Parse new date but keep original time
-        const [day, month, year] = tanggalEdit.split('/')
+        const [day, month, year] = tanggalEdit.split("/");
         const updatedDate = new Date(
           year,
           month - 1,
@@ -814,115 +772,108 @@ async function saveServisItem() {
           originalDate.getHours(),
           originalDate.getMinutes(),
           originalDate.getSeconds()
-        )
-        servisItem.tanggal = updatedDate.toISOString()
+        );
+        servisItem.tanggal = updatedDate.toISOString();
       }
 
-      const { updateServisData } = await import('../services/servis-service.js')
-      await updateServisData(editingRiwayatId, servisItem)
+      const { updateServisData } = await import("../services/servis-service.js");
+      await updateServisData(editingRiwayatId, servisItem);
 
       // Update todayData langsung
-      const itemIndex = todayData.findIndex((item) => item.id === editingRiwayatId)
+      const itemIndex = todayData.findIndex((item) => item.id === editingRiwayatId);
       if (itemIndex !== -1) {
-        todayData[itemIndex] = { ...todayData[itemIndex], ...servisItem }
-        updateRiwayatTable()
+        todayData[itemIndex] = { ...todayData[itemIndex], ...servisItem };
+        updateRiwayatTable();
       }
 
-      showSuccessAlert('Berhasil!', 'Data riwayat berhasil diupdate')
-      editingRiwayatId = null
+      showSuccessAlert("Berhasil!", "Data riwayat berhasil diupdate");
+      editingRiwayatId = null;
 
       // Close modal and stop execution
-      modalClosedBySave = true
-      const modal = bootstrap.Modal.getInstance(document.getElementById('modalInputServis'))
-      modal.hide()
-      return
+      modalClosedBySave = true;
+      const modal = bootstrap.Modal.getInstance(document.getElementById("modalInputServis"));
+      modal.hide();
+      return;
     } catch (error) {
-      console.error('Error updating data:', error)
-      showErrorAlert('Error!', 'Terjadi kesalahan saat mengupdate data: ' + error.message)
-      return
+      console.error("Error updating data:", error);
+      showErrorAlert("Error!", "Terjadi kesalahan saat mengupdate data: " + error.message);
+      return;
     }
   }
   // Handle regular servis items
   else if (editingIndex >= 0) {
-    if (jenisInput === 'servis') {
-      servisItemsServis[editingIndex] = servisItem
+    if (jenisInput === "servis") {
+      servisItemsServis[editingIndex] = servisItem;
     } else {
-      servisItemsCustom[editingIndex] = servisItem
+      servisItemsCustom[editingIndex] = servisItem;
     }
   } else {
     // Cek duplikasi sebelum menambah data baru
-    const targetArray = jenisInput === 'servis' ? servisItemsServis : servisItemsCustom
+    const targetArray = jenisInput === "servis" ? servisItemsServis : servisItemsCustom;
     const isDuplicate = targetArray.some(
       (item) =>
         item.namaCustomer.toLowerCase() === namaCustomer.toLowerCase() &&
         item.noHp === noHp &&
         item.namaBarang.toLowerCase() === servisItem.namaBarang.toLowerCase()
-    )
+    );
     if (isDuplicate) {
-      showErrorModal(
-        'Duplikasi Data',
-        'Data dengan kombinasi customer, no HP, dan barang yang sama sudah ada!'
-      )
-      return
+      showErrorModal("Duplikasi Data", "Data dengan kombinasi customer, no HP, dan barang yang sama sudah ada!");
+      return;
     }
-    targetArray.push(servisItem)
+    targetArray.push(servisItem);
   }
 
   if (!editingRiwayatId) {
-    if (jenisInput === 'servis') {
-      updateServisTableServis()
+    if (jenisInput === "servis") {
+      updateServisTableServis();
     } else {
-      updateServisTableCustom()
+      updateServisTableCustom();
     }
   }
 
   // Set flag bahwa modal ditutup karena save
-  modalClosedBySave = true
+  modalClosedBySave = true;
 
   // Close modal
-  const modal = bootstrap.Modal.getInstance(document.getElementById('modalInputServis'))
-  modal.hide()
+  const modal = bootstrap.Modal.getInstance(document.getElementById("modalInputServis"));
+  modal.hide();
 
   // Show success notification
   if (!editingRiwayatId) {
-    const actionText = editingIndex >= 0 ? 'diupdate' : 'ditambahkan'
+    const actionText = editingIndex >= 0 ? "diupdate" : "ditambahkan";
     setTimeout(() => {
-      showSuccessToast(`Item berhasil ${actionText} ke daftar!`)
-    }, 300)
+      showSuccessToast(`Item berhasil ${actionText} ke daftar!`);
+    }, 300);
   }
 }
 
 function updateServisTableServis() {
-  const tbody = document.querySelector('#tableInputServis tbody')
-  tbody.innerHTML = ''
+  const tbody = document.querySelector("#tableInputServis tbody");
+  tbody.innerHTML = "";
 
-  let totalOngkos = 0
+  let totalOngkos = 0;
 
   servisItemsServis.forEach((item, index) => {
-    const row = document.createElement('tr')
+    const row = document.createElement("tr");
 
-    totalOngkos += item.totalOngkos || item.ongkos || 0
+    totalOngkos += item.totalOngkos || item.ongkos || 0;
 
-    const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : []
+    const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [];
 
-    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || '-'}</div>`).join('')
-    const beratHtml = details.map((d) => `<div>${d.berat || '-'}</div>`).join('')
-    const karatHtml = details.map((d) => `<div>${d.karat || '-'}</div>`).join('')
-    const jenisHtml = details.map((d) => `<div>${d.jenisServis || '-'}</div>`).join('')
-    const rincianHtml = details.map((d) => `<div>${d.rincianServis || '-'}</div>`).join('')
-    const ongkosHtml = details
-      .map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString('id-ID')}</div>`)
-      .join('')
+    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || "-"}</div>`).join("");
+    const beratHtml = details.map((d) => `<div>${d.berat || "-"}</div>`).join("");
+    const karatHtml = details.map((d) => `<div>${d.karat || "-"}</div>`).join("");
+    const jenisHtml = details.map((d) => `<div>${d.jenisServis || "-"}</div>`).join("");
+    const rincianHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
+    const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
 
     // Status per item
     const statusHtml = details
       .map((d) => {
-        const status = d.statusPembayaran || 'nominal'
-        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(
-          status
-        )}</span></div>`
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
       })
-      .join('')
+      .join("");
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -943,52 +894,45 @@ function updateServisTableServis() {
           <i class="fas fa-trash"></i>
         </button>
       </td>
-    `
-    tbody.appendChild(row)
-  })
+    `;
+    tbody.appendChild(row);
+  });
 
-  document.getElementById('total-ongkos').textContent = `Rp ${totalOngkos.toLocaleString('id-ID')}`
+  document.getElementById("total-ongkos").textContent = `Rp ${totalOngkos.toLocaleString("id-ID")}`;
 }
 
 function updateServisTableCustom() {
-  const tbody = document.querySelector('#tableInputCustom tbody')
-  tbody.innerHTML = ''
+  const tbody = document.querySelector("#tableInputCustom tbody");
+  tbody.innerHTML = "";
 
-  let totalDP = 0
-  let totalOngkos = 0
+  let totalDP = 0;
+  let totalOngkos = 0;
 
   servisItemsCustom.forEach((item, index) => {
-    const row = document.createElement('tr')
+    const row = document.createElement("tr");
 
-    const details =
-      item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : []
+    const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
 
-    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || '-'}</div>`).join('')
-    const beratHtml = details.map((d) => `<div>${d.berat || '-'}</div>`).join('')
-    const panjangHtml = details.map((d) => `<div>${d.panjang || '-'}</div>`).join('')
-    const kadarHtml = details.map((d) => `<div>${d.kadar || '-'}</div>`).join('')
-    const warnaHtml = details.map((d) => `<div>${d.warna || '-'}</div>`).join('')
-    const totalDPHtml = details
-      .map((d) => `<div>Rp ${(d.totalDP || 0).toLocaleString('id-ID')}</div>`)
-      .join('')
-    const ongkosHtml = details
-      .map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString('id-ID')}</div>`)
-      .join('')
+    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || "-"}</div>`).join("");
+    const beratHtml = details.map((d) => `<div>${d.berat || "-"}</div>`).join("");
+    const panjangHtml = details.map((d) => `<div>${d.panjang || "-"}</div>`).join("");
+    const kadarHtml = details.map((d) => `<div>${d.kadar || "-"}</div>`).join("");
+    const warnaHtml = details.map((d) => `<div>${d.warna || "-"}</div>`).join("");
+    const totalDPHtml = details.map((d) => `<div>Rp ${(d.totalDP || 0).toLocaleString("id-ID")}</div>`).join("");
+    const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
 
     // Status per item
     const statusHtml = details
       .map((d) => {
-        const status = d.statusPembayaran || 'nominal'
-        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(
-          status
-        )}</span></div>`
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
       })
-      .join('')
+      .join("");
 
     details.forEach((d) => {
-      totalDP += d.totalDP || 0
-      totalOngkos += d.ongkos || 0
-    })
+      totalDP += d.totalDP || 0;
+      totalOngkos += d.ongkos || 0;
+    });
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -1010,191 +954,189 @@ function updateServisTableCustom() {
           <i class="fas fa-trash"></i>
         </button>
       </td>
-    `
-    tbody.appendChild(row)
-  })
+    `;
+    tbody.appendChild(row);
+  });
 
-  document.getElementById('total-dp-custom').textContent = `Rp ${totalDP.toLocaleString('id-ID')}`
-  document.getElementById('total-ongkos-custom').textContent = `Rp ${totalOngkos.toLocaleString(
-    'id-ID'
-  )}`
+  document.getElementById("total-dp-custom").textContent = `Rp ${totalDP.toLocaleString("id-ID")}`;
+  document.getElementById("total-ongkos-custom").textContent = `Rp ${totalOngkos.toLocaleString("id-ID")}`;
 }
 
 function getOngkosDisplay(item) {
-  const statusPembayaran = item.statusPembayaran || 'nominal'
-  const ongkos = item.totalOngkos || item.ongkos || 0
+  const statusPembayaran = item.statusPembayaran || "nominal";
+  const ongkos = item.totalOngkos || item.ongkos || 0;
 
-  if (statusPembayaran === 'free') {
-    return 'GRATIS'
-  } else if (statusPembayaran === 'belum_lunas') {
-    return ongkos > 0 ? `Rp ${ongkos.toLocaleString('id-ID')}` : 'BELUM LUNAS'
-  } else if (statusPembayaran === 'custom') {
-    return `DP: Rp ${ongkos.toLocaleString('id-ID')}`
+  if (statusPembayaran === "free") {
+    return "GRATIS";
+  } else if (statusPembayaran === "belum_lunas") {
+    return ongkos > 0 ? `Rp ${ongkos.toLocaleString("id-ID")}` : "BELUM LUNAS";
+  } else if (statusPembayaran === "custom") {
+    return `DP: Rp ${ongkos.toLocaleString("id-ID")}`;
   } else {
-    return `Rp ${ongkos.toLocaleString('id-ID')}`
+    return `Rp ${ongkos.toLocaleString("id-ID")}`;
   }
 }
 
 function getStatusLabel(status) {
   const labels = {
-    nominal: 'LUNAS',
-    free: 'GRATIS',
-    belum_lunas: 'BELUM LUNAS',
-    custom: 'CUSTOM',
-  }
-  return labels[status] || 'LUNAS'
+    nominal: "LUNAS",
+    free: "GRATIS",
+    belum_lunas: "BELUM LUNAS",
+    custom: "CUSTOM",
+  };
+  return labels[status] || "LUNAS";
 }
 
 function getStatusBadgeColor(status) {
   const colors = {
-    nominal: 'success',
-    free: 'primary',
-    belum_lunas: 'warning',
-    custom: 'secondary',
-  }
-  return colors[status] || 'success'
+    nominal: "success",
+    free: "primary",
+    belum_lunas: "warning",
+    custom: "secondary",
+  };
+  return colors[status] || "success";
 }
 
 // Global functions for button clicks
 window.editServisItem = function (index) {
-  jenisInput = 'servis'
-  openServisModal(index)
-}
+  jenisInput = "servis";
+  openServisModal(index);
+};
 
 window.deleteServisItem = async function (index) {
   const result = await showConfirmDialog(
-    'Hapus Item?',
-    'Item ini akan dihapus dari daftar (belum tersimpan ke database)',
-    'Ya, Hapus!'
-  )
+    "Hapus Item?",
+    "Item ini akan dihapus dari daftar (belum tersimpan ke database)",
+    "Ya, Hapus!"
+  );
 
   if (result.isConfirmed) {
-    servisItemsServis.splice(index, 1)
-    updateServisTableServis()
-    showSuccessToast('Item berhasil dihapus dari daftar!')
+    servisItemsServis.splice(index, 1);
+    updateServisTableServis();
+    showSuccessToast("Item berhasil dihapus dari daftar!");
   }
-}
+};
 
 window.editCustomItem = function (index) {
-  jenisInput = 'custom'
-  openServisModal(index)
-}
+  jenisInput = "custom";
+  openServisModal(index);
+};
 
 window.deleteCustomItem = async function (index) {
   const result = await showConfirmDialog(
-    'Hapus Item?',
-    'Item ini akan dihapus dari daftar (belum tersimpan ke database)',
-    'Ya, Hapus!'
-  )
+    "Hapus Item?",
+    "Item ini akan dihapus dari daftar (belum tersimpan ke database)",
+    "Ya, Hapus!"
+  );
 
   if (result.isConfirmed) {
-    servisItemsCustom.splice(index, 1)
-    updateServisTableCustom()
-    showSuccessToast('Item berhasil dihapus dari daftar!')
+    servisItemsCustom.splice(index, 1);
+    updateServisTableCustom();
+    showSuccessToast("Item berhasil dihapus dari daftar!");
   }
-}
+};
 
 window.editRiwayatItem = function (id, index) {
   // Cari item dari todayData berdasarkan id
-  const actualIndex = todayData.findIndex((item) => item.id === id)
-  verifikasiAction = 'edit'
-  verifikasiData = { id, index: actualIndex }
-  const modal = new bootstrap.Modal(document.getElementById('verifikasiModal'))
-  modal.show()
+  const actualIndex = todayData.findIndex((item) => item.id === id);
+  verifikasiAction = "edit";
+  verifikasiData = { id, index: actualIndex };
+  const modal = new bootstrap.Modal(document.getElementById("verifikasiModal"));
+  modal.show();
 
   // Auto focus pada input kode verifikasi setelah modal terbuka
-  document.getElementById('verifikasiModal').addEventListener(
-    'shown.bs.modal',
+  document.getElementById("verifikasiModal").addEventListener(
+    "shown.bs.modal",
     function () {
-      document.getElementById('kodeVerifikasi').focus()
+      document.getElementById("kodeVerifikasi").focus();
     },
     { once: true }
-  )
-}
+  );
+};
 
 window.deleteRiwayatItem = async function (id, index) {
   // Confirm first with SweetAlert
   const result = await showConfirmDialog(
-    'Hapus Data Riwayat?',
-    'Data ini akan dihapus permanen dari database. Anda perlu memasukkan kode verifikasi.',
-    'Lanjutkan'
-  )
+    "Hapus Data Riwayat?",
+    "Data ini akan dihapus permanen dari database. Anda perlu memasukkan kode verifikasi.",
+    "Lanjutkan"
+  );
 
-  if (!result.isConfirmed) return
+  if (!result.isConfirmed) return;
 
   // Cari item dari todayData berdasarkan id
-  const actualIndex = todayData.findIndex((item) => item.id === id)
-  verifikasiAction = 'delete'
-  verifikasiData = { id, index: actualIndex }
-  const modal = new bootstrap.Modal(document.getElementById('verifikasiModal'))
-  modal.show()
+  const actualIndex = todayData.findIndex((item) => item.id === id);
+  verifikasiAction = "delete";
+  verifikasiData = { id, index: actualIndex };
+  const modal = new bootstrap.Modal(document.getElementById("verifikasiModal"));
+  modal.show();
 
   // Auto focus pada input kode verifikasi setelah modal terbuka
-  document.getElementById('verifikasiModal').addEventListener(
-    'shown.bs.modal',
+  document.getElementById("verifikasiModal").addEventListener(
+    "shown.bs.modal",
     function () {
-      document.getElementById('kodeVerifikasi').focus()
+      document.getElementById("kodeVerifikasi").focus();
     },
     { once: true }
-  )
-}
+  );
+};
 
 async function handleVerifikasi() {
-  const kode = document.getElementById('kodeVerifikasi').value
+  const kode = document.getElementById("kodeVerifikasi").value;
 
-  if (kode !== 'smlt116') {
-    showErrorAlert('Verifikasi Gagal!', 'Kode verifikasi yang Anda masukkan salah')
-    document.getElementById('kodeVerifikasi').focus()
-    return
+  if (kode !== "smlt116") {
+    showErrorAlert("Verifikasi Gagal!", "Kode verifikasi yang Anda masukkan salah");
+    document.getElementById("kodeVerifikasi").focus();
+    return;
   }
 
   try {
-    if (verifikasiAction === 'edit') {
-      const item = todayData[verifikasiData.index]
-      editingRiwayatId = verifikasiData.id
+    if (verifikasiAction === "edit") {
+      const item = todayData[verifikasiData.index];
+      editingRiwayatId = verifikasiData.id;
 
       // Set jenis input dari item
-      jenisInput = item.jenisInput || 'servis'
-      document.getElementById('jenisInput').value = jenisInput
-      handleJenisInputChange()
+      jenisInput = item.jenisInput || "servis";
+      document.getElementById("jenisInput").value = jenisInput;
+      handleJenisInputChange();
 
       // Set data customer ke form
-      document.getElementById('namaSales').value = item.namaSales
-      document.getElementById('namaCustomer').value = item.namaCustomer
-      document.getElementById('noHp').value = item.noHp
+      document.getElementById("namaSales").value = item.namaSales;
+      document.getElementById("namaCustomer").value = item.namaCustomer;
+      document.getElementById("noHp").value = item.noHp;
 
       // Load detail barang berdasarkan jenis input
-      if (jenisInput === 'servis') {
+      if (jenisInput === "servis") {
         // Load detail barang servis
         if (item.detailBarang && item.detailBarang.length > 0) {
           detailBarangItems = item.detailBarang.map((detail, idx) => ({
             id: idx + 1,
             jumlah: detail.jumlah || 1,
-            namaBarang: detail.namaBarang || '',
-            berat: detail.berat || '',
-            karat: detail.karat || '',
-            jenisServis: detail.jenisServis || '',
-            rincianServis: detail.rincianServis || '',
+            namaBarang: detail.namaBarang || "",
+            berat: detail.berat || "",
+            karat: detail.karat || "",
+            jenisServis: detail.jenisServis || "",
+            rincianServis: detail.rincianServis || "",
             ongkos: detail.ongkos || 0,
-            statusPembayaran: detail.statusPembayaran || 'nominal',
-          }))
-          detailBarangCounter = detailBarangItems.length + 1
+            statusPembayaran: detail.statusPembayaran || "nominal",
+          }));
+          detailBarangCounter = detailBarangItems.length + 1;
         } else {
           // Backward compatibility - convert old format
           detailBarangItems = [
             {
               id: 1,
               jumlah: 1,
-              namaBarang: item.namaBarang || '',
-              berat: item.berat || '',
-              karat: item.karat || '',
-              jenisServis: item.jenisServis || '',
-              rincianServis: '',
+              namaBarang: item.namaBarang || "",
+              berat: item.berat || "",
+              karat: item.karat || "",
+              jenisServis: item.jenisServis || "",
+              rincianServis: "",
               ongkos: item.ongkos || 0,
-              statusPembayaran: item.statusPembayaran || 'nominal',
+              statusPembayaran: item.statusPembayaran || "nominal",
             },
-          ]
-          detailBarangCounter = 2
+          ];
+          detailBarangCounter = 2;
         }
       } else {
         // Load detail barang custom
@@ -1202,322 +1144,298 @@ async function handleVerifikasi() {
           detailBarangCustomItems = item.detailBarangCustom.map((detail, idx) => ({
             id: idx + 1,
             jumlah: detail.jumlah || 1,
-            namaBarang: detail.namaBarang || '',
-            berat: detail.berat || '',
-            panjang: detail.panjang || '',
-            kadar: detail.kadar || '',
-            warna: detail.warna || '',
+            namaBarang: detail.namaBarang || "",
+            berat: detail.berat || "",
+            panjang: detail.panjang || "",
+            kadar: detail.kadar || "",
+            warna: detail.warna || "",
             totalDp: detail.totalDP || detail.totalDp || 0,
             ongkos: detail.ongkos || 0,
-            rincianServis: detail.rincianServis || '',
-            statusPembayaran: detail.statusPembayaran || 'nominal',
-          }))
-          detailBarangCustomCounter = detailBarangCustomItems.length + 1
+            rincianServis: detail.rincianServis || "",
+            statusPembayaran: detail.statusPembayaran || "nominal",
+          }));
+          detailBarangCustomCounter = detailBarangCustomItems.length + 1;
         }
       }
 
       // Tampilkan dan isi field tanggal edit (with time info)
-      document.getElementById('tanggalEditRow').style.display = 'block'
-      const tanggalObj = new Date(item.tanggal)
-      const tanggalFormatted = tanggalObj.toLocaleDateString('id-ID')
-      const jamFormatted = tanggalObj.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-      document.getElementById('tanggalEdit').value = tanggalFormatted
+      document.getElementById("tanggalEditRow").style.display = "block";
+      const tanggalObj = new Date(item.tanggal);
+      const tanggalFormatted = tanggalObj.toLocaleDateString("id-ID");
+      const jamFormatted = tanggalObj.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      document.getElementById("tanggalEdit").value = tanggalFormatted;
       // Store time info for display (optional: could show in label)
-      document.getElementById('tanggalEdit').title = `Waktu input: ${jamFormatted}`
+      document.getElementById("tanggalEdit").title = `Waktu input: ${jamFormatted}`;
 
-      handleStatusPembayaranChange()
-      document.getElementById('modalInputServisLabel').textContent =
-        jenisInput === 'servis' ? 'Edit Data Riwayat Servis' : 'Edit Data Riwayat Custom'
+      handleStatusPembayaranChange();
+      document.getElementById("modalInputServisLabel").textContent =
+        jenisInput === "servis" ? "Edit Data Riwayat Servis" : "Edit Data Riwayat Custom";
 
-      const verifikasiModal = bootstrap.Modal.getInstance(
-        document.getElementById('verifikasiModal')
-      )
-      verifikasiModal.hide()
+      const verifikasiModal = bootstrap.Modal.getInstance(document.getElementById("verifikasiModal"));
+      verifikasiModal.hide();
 
       setTimeout(() => {
-        const modal = new bootstrap.Modal(document.getElementById('modalInputServis'))
-        modal.show()
+        const modal = new bootstrap.Modal(document.getElementById("modalInputServis"));
+        modal.show();
 
         // Update detail barang table sesuai jenis input
-        if (jenisInput === 'servis') {
-          updateDetailBarangTable()
+        if (jenisInput === "servis") {
+          updateDetailBarangTable();
         } else {
-          updateDetailBarangCustomTable()
+          updateDetailBarangCustomTable();
         }
 
-        document.getElementById('modalInputServis').addEventListener(
-          'shown.bs.modal',
+        document.getElementById("modalInputServis").addEventListener(
+          "shown.bs.modal",
           function () {
-            document.getElementById('namaSales').focus()
+            document.getElementById("namaSales").focus();
           },
           { once: true }
-        )
-      }, 300)
+        );
+      }, 300);
 
-      return
-    } else if (verifikasiAction === 'delete') {
+      return;
+    } else if (verifikasiAction === "delete") {
       // Delete logic remains the same
-      const { deleteServisData } = await import('../services/servis-service.js')
-      await deleteServisData(verifikasiData.id)
+      const { deleteServisData } = await import("../services/servis-service.js");
+      await deleteServisData(verifikasiData.id);
 
-      todayData = todayData.filter((item) => item.id !== verifikasiData.id)
-      updateRiwayatTable()
+      todayData = todayData.filter((item) => item.id !== verifikasiData.id);
+      updateRiwayatTable();
 
       Swal.fire({
-        icon: 'success',
-        title: 'Berhasil Dihapus!',
-        text: 'Data riwayat telah dihapus dari sistem',
-        confirmButtonColor: '#28a745',
+        icon: "success",
+        title: "Berhasil Dihapus!",
+        text: "Data riwayat telah dihapus dari sistem",
+        confirmButtonColor: "#28a745",
         timer: 3000,
         timerProgressBar: true,
-      })
+      });
     }
   } catch (error) {
-    console.error('Error:', error)
-    showErrorAlert('Error!', 'Terjadi kesalahan: ' + error.message)
+    console.error("Error:", error);
+    showErrorAlert("Error!", "Terjadi kesalahan: " + error.message);
   }
 
-  const modal = bootstrap.Modal.getInstance(document.getElementById('verifikasiModal'))
-  modal.hide()
+  const modal = bootstrap.Modal.getInstance(document.getElementById("verifikasiModal"));
+  modal.hide();
 }
 
 function showDeleteSuccessModal() {
-  const modal = new bootstrap.Modal(document.getElementById('deleteSuccessModal'))
-  modal.show()
+  const modal = new bootstrap.Modal(document.getElementById("deleteSuccessModal"));
+  modal.show();
 }
 
 async function saveAllServisData() {
-  const allItems = [...servisItemsServis, ...servisItemsCustom]
+  const allItems = [...servisItemsServis, ...servisItemsCustom];
 
   if (allItems.length === 0) {
-    showErrorModal('Validasi Error', 'Tidak ada data untuk disimpan!')
-    return
+    showErrorModal("Validasi Error", "Tidak ada data untuk disimpan!");
+    return;
   }
 
-  const tanggal = document.getElementById('tanggal').value
+  const tanggal = document.getElementById("tanggal").value;
 
   if (!tanggal) {
-    showErrorModal('Validasi Error', 'Tanggal harus diisi!')
-    return
+    showErrorModal("Validasi Error", "Tanggal harus diisi!");
+    return;
   }
 
   // Convert date format from dd/mm/yyyy to yyyy-mm-dd with current time
-  const [day, month, year] = tanggal.split('/')
-  const now = new Date()
-  const tanggalWithTime = new Date(
-    year,
-    month - 1,
-    day,
-    now.getHours(),
-    now.getMinutes(),
-    now.getSeconds()
-  )
-  const formattedDate = tanggalWithTime.toISOString()
+  const [day, month, year] = tanggal.split("/");
+  const now = new Date();
+  const tanggalWithTime = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
+  const formattedDate = tanggalWithTime.toISOString();
 
   try {
-    showLoading(true)
-    const savedItems = []
+    showLoading(true);
+    const savedItems = [];
 
     for (const item of allItems) {
       const servisData = {
         tanggal: formattedDate,
         ...item,
-      }
+      };
 
-      const docId = await saveServisData(servisData)
-      const savedItem = { ...servisData, id: docId }
-      savedItems.push(savedItem)
+      const docId = await saveServisData(servisData);
+      const savedItem = { ...servisData, id: docId };
+      savedItems.push(savedItem);
     }
 
-    showLoading(false)
+    showLoading(false);
     // Broadcast each new item
     savedItems.forEach((item) => {
       const event = {
-        action: 'add',
+        action: "add",
         data: item,
         timestamp: Date.now(),
-        source: 'input-servis',
-      }
+        source: "input-servis",
+      };
 
-      localStorage.setItem('servisDataChange', JSON.stringify(event))
-      window.dispatchEvent(new CustomEvent('servisDataChanged', { detail: event }))
-    })
+      localStorage.setItem("servisDataChange", JSON.stringify(event));
+      window.dispatchEvent(new CustomEvent("servisDataChanged", { detail: event }));
+    });
 
     // Show success modal and print nota
-    showSuccessModal(
-      'Data Berhasil Disimpan',
-      `${savedItems.length} data berhasil disimpan.`,
-      savedItems
-    )
+    showSuccessModal("Data Berhasil Disimpan", `${savedItems.length} data berhasil disimpan.`, savedItems);
 
     // Auto print nota after 500ms
     setTimeout(() => {
-      const servisItems = savedItems.filter((item) => item.jenisInput === 'servis')
-      const customItems = savedItems.filter((item) => item.jenisInput === 'custom')
+      const servisItems = savedItems.filter((item) => item.jenisInput === "servis");
+      const customItems = savedItems.filter((item) => item.jenisInput === "custom");
 
       if (servisItems.length > 0 && customItems.length > 0) {
         // Jika ada keduanya, print servis dulu
-        printNotaServis(servisItems)
+        printNotaServis(servisItems);
         // Delay print custom untuk menghindari konflik dengan popup servis
         setTimeout(() => {
-          printNotaCustom(customItems)
-        }, 1500)
+          printNotaCustom(customItems);
+        }, 1500);
       } else if (servisItems.length > 0) {
         // Hanya servis
-        printNotaServis(servisItems)
+        printNotaServis(servisItems);
       } else if (customItems.length > 0) {
         // Hanya custom - langsung print tanpa delay panjang
-        printNotaCustom(customItems)
+        printNotaCustom(customItems);
       }
-    }, 500)
+    }, 500);
 
     // Reset form
-    resetForm()
+    resetForm();
   } catch (error) {
-    console.error('Error saving servis data:', error)
-    showLoading(false)
-    showErrorModal('Error', 'Terjadi kesalahan saat menyimpan data: ' + error.message)
+    console.error("Error saving servis data:", error);
+    showLoading(false);
+    showErrorModal("Error", "Terjadi kesalahan saat menyimpan data: " + error.message);
   }
 }
 
 function resetForm() {
-  servisItemsServis = []
-  servisItemsCustom = []
-  updateServisTableServis()
-  updateServisTableCustom()
+  servisItemsServis = [];
+  servisItemsCustom = [];
+  updateServisTableServis();
+  updateServisTableCustom();
 
   // Reset date to today
-  const today = new Date()
-  const formattedDate = today.toLocaleDateString('id-ID')
-  document.getElementById('tanggal').value = formattedDate
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString("id-ID");
+  document.getElementById("tanggal").value = formattedDate;
 }
 
 function handleFilterRiwayatChange() {
-  const sectionServis = document.getElementById('sectionRiwayatServis')
-  const sectionCustom = document.getElementById('sectionRiwayatCustom')
+  const sectionServis = document.getElementById("sectionRiwayatServis");
+  const sectionCustom = document.getElementById("sectionRiwayatCustom");
 
-  if (filterJenisRiwayat === 'servis') {
-    sectionServis.style.display = 'block'
-    sectionCustom.style.display = 'none'
+  if (filterJenisRiwayat === "servis") {
+    sectionServis.style.display = "block";
+    sectionCustom.style.display = "none";
   } else {
-    sectionServis.style.display = 'none'
-    sectionCustom.style.display = 'block'
+    sectionServis.style.display = "none";
+    sectionCustom.style.display = "block";
   }
 
   // Update table jika sudah ada data
   if (todayData.length > 0) {
-    updateRiwayatTable()
+    updateRiwayatTable();
   }
 }
 
 async function loadRiwayatData() {
-  const tanggalRiwayat = document.getElementById('tanggalRiwayat').value
+  const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
 
   if (!tanggalRiwayat) {
-    alert('Pilih tanggal terlebih dahulu')
-    return
+    alert("Pilih tanggal terlebih dahulu");
+    return;
   }
 
   try {
     // Convert date format from dd/mm/yyyy to yyyy-mm-dd
-    const [day, month, year] = tanggalRiwayat.split('/')
-    const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    const [day, month, year] = tanggalRiwayat.split("/");
+    const formattedDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 
-    todayData = await getServisByDate(formattedDate)
-    updateRiwayatTable()
+    todayData = await getServisByDate(formattedDate);
+    updateRiwayatTable();
 
     // Tampilkan tombol export dan print setelah data ditampilkan
-    const actionButtons = document.getElementById('actionButtons')
-    const filteredData = todayData.filter(
-      (item) => (item.jenisInput || 'servis') === filterJenisRiwayat
-    )
+    const actionButtons = document.getElementById("actionButtons");
+    const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === filterJenisRiwayat);
     if (filteredData.length > 0) {
-      actionButtons.style.display = 'block'
+      actionButtons.style.display = "block";
     } else {
-      actionButtons.style.display = 'none'
+      actionButtons.style.display = "none";
     }
   } catch (error) {
-    console.error('Error loading riwayat data:', error)
-    alert('Terjadi kesalahan saat memuat data')
+    console.error("Error loading riwayat data:", error);
+    alert("Terjadi kesalahan saat memuat data");
   }
 }
 
 function updateRiwayatTable() {
   // Filter data berdasarkan jenis input
-  const filteredData = todayData.filter(
-    (item) => (item.jenisInput || 'servis') === filterJenisRiwayat
-  )
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === filterJenisRiwayat);
 
-  if (filterJenisRiwayat === 'servis') {
-    updateRiwayatTableServis(filteredData)
+  if (filterJenisRiwayat === "servis") {
+    updateRiwayatTableServis(filteredData);
   } else {
-    updateRiwayatTableCustom(filteredData)
+    updateRiwayatTableCustom(filteredData);
   }
 }
 
 function updateRiwayatTableServis(filteredData) {
-  const tbody = document.querySelector('#tableRiwayatServis tbody')
-  tbody.innerHTML = ''
+  const tbody = document.querySelector("#tableRiwayatServis tbody");
+  tbody.innerHTML = "";
 
-  let totalOngkos = 0
+  let totalOngkos = 0;
 
   if (filteredData.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="14" class="text-center">Belum ada data servis pada tanggal ini</td></tr>'
-    document.getElementById('total-riwayat-ongkos').textContent = 'Rp 0'
-    return
+    tbody.innerHTML = '<tr><td colspan="14" class="text-center">Belum ada data servis pada tanggal ini</td></tr>';
+    document.getElementById("total-riwayat-ongkos").textContent = "Rp 0";
+    return;
   }
 
   filteredData.forEach((item, index) => {
-    const row = document.createElement('tr')
-    const tanggalObj = new Date(item.tanggal)
-    const tanggalFormatted = tanggalObj.toLocaleDateString('id-ID')
+    const row = document.createElement("tr");
+    const tanggalObj = new Date(item.tanggal);
+    const tanggalFormatted = tanggalObj.toLocaleDateString("id-ID");
 
     // Use createdAt for accurate time, fallback to tanggal for old data
-    let jamFormatted
+    let jamFormatted;
     if (item.createdAt && item.createdAt.toDate) {
       // Firestore Timestamp object
-      jamFormatted = item.createdAt
-        .toDate()
-        .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      jamFormatted = item.createdAt.toDate().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     } else if (item.createdAt) {
       // Plain date object or string
-      jamFormatted = new Date(item.createdAt).toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      jamFormatted = new Date(item.createdAt).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } else {
       // Fallback to tanggal for old data
-      jamFormatted = tanggalObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     }
 
     // Hitung total ongkos dari semua items
-    totalOngkos += item.ongkos || 0
+    totalOngkos += item.ongkos || 0;
 
     // Prepare details
-    const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : []
+    const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [];
 
-    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || '-'}</div>`).join('')
-    const beratHtml = details.map((d) => `<div>${d.berat || '-'}</div>`).join('')
-    const karatHtml = details.map((d) => `<div>${d.karat || '-'}</div>`).join('')
-    const jenisHtml = details.map((d) => `<div>${d.jenisServis || '-'}</div>`).join('')
-    const rincianHtml = details.map((d) => `<div>${d.rincianServis || '-'}</div>`).join('')
-    const ongkosHtml = details
-      .map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString('id-ID')}</div>`)
-      .join('')
+    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || "-"}</div>`).join("");
+    const beratHtml = details.map((d) => `<div>${d.berat || "-"}</div>`).join("");
+    const karatHtml = details.map((d) => `<div>${d.karat || "-"}</div>`).join("");
+    const jenisHtml = details.map((d) => `<div>${d.jenisServis || "-"}</div>`).join("");
+    const rincianHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
+    const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
 
     // Status per item
     const statusHtml = details
       .map((d) => {
-        const status = d.statusPembayaran || 'nominal'
-        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(
-          status
-        )}</span></div>`
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
       })
-      .join('')
+      .join("");
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -1558,84 +1476,72 @@ function updateRiwayatTableServis(filteredData) {
           <i class="fas fa-receipt"></i>
         </button>
       </td>
-    `
-    tbody.appendChild(row)
-  })
+    `;
+    tbody.appendChild(row);
+  });
 
-  document.getElementById('total-riwayat-ongkos').textContent = `Rp ${totalOngkos.toLocaleString(
-    'id-ID'
-  )}`
+  document.getElementById("total-riwayat-ongkos").textContent = `Rp ${totalOngkos.toLocaleString("id-ID")}`;
 }
 
 function updateRiwayatTableCustom(filteredData) {
-  const tbody = document.querySelector('#tableRiwayatCustom tbody')
-  tbody.innerHTML = ''
+  const tbody = document.querySelector("#tableRiwayatCustom tbody");
+  tbody.innerHTML = "";
 
-  let totalDP = 0
-  let totalOngkos = 0
+  let totalDP = 0;
+  let totalOngkos = 0;
 
   if (filteredData.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="16" class="text-center">Belum ada data custom pada tanggal ini</td></tr>'
-    document.getElementById('total-riwayat-dp').textContent = 'Rp 0'
-    document.getElementById('total-riwayat-ongkos-custom').textContent = 'Rp 0'
-    document.getElementById('total-riwayat-nominal').textContent = 'Rp 0'
-    return
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center">Belum ada data custom pada tanggal ini</td></tr>';
+    document.getElementById("total-riwayat-dp").textContent = "Rp 0";
+    document.getElementById("total-riwayat-ongkos-custom").textContent = "Rp 0";
+    document.getElementById("total-riwayat-nominal").textContent = "Rp 0";
+    return;
   }
 
   filteredData.forEach((item, index) => {
-    const row = document.createElement('tr')
-    const tanggalObj = new Date(item.tanggal)
-    const tanggalFormatted = tanggalObj.toLocaleDateString('id-ID')
+    const row = document.createElement("tr");
+    const tanggalObj = new Date(item.tanggal);
+    const tanggalFormatted = tanggalObj.toLocaleDateString("id-ID");
 
     // Use createdAt for accurate time, fallback to tanggal for old data
-    let jamFormatted
+    let jamFormatted;
     if (item.createdAt && item.createdAt.toDate) {
       // Firestore Timestamp object
-      jamFormatted = item.createdAt
-        .toDate()
-        .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      jamFormatted = item.createdAt.toDate().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     } else if (item.createdAt) {
       // Plain date object or string
-      jamFormatted = new Date(item.createdAt).toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      jamFormatted = new Date(item.createdAt).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } else {
       // Fallback to tanggal for old data
-      jamFormatted = tanggalObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      jamFormatted = tanggalObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     }
 
-    const details =
-      item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : []
+    const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
 
-    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || '-'}</div>`).join('')
-    const beratHtml = details.map((d) => `<div>${d.berat || '-'}</div>`).join('')
-    const panjangHtml = details.map((d) => `<div>${d.panjang || '-'}</div>`).join('')
-    const kadarHtml = details.map((d) => `<div>${d.kadar || '-'}</div>`).join('')
-    const warnaHtml = details.map((d) => `<div>${d.warna || '-'}</div>`).join('')
-    const rincianCustomHtml = details.map((d) => `<div>${d.rincianServis || '-'}</div>`).join('')
-    const totalDPHtml = details
-      .map((d) => `<div>Rp ${(d.totalDP || 0).toLocaleString('id-ID')}</div>`)
-      .join('')
-    const ongkosHtml = details
-      .map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString('id-ID')}</div>`)
-      .join('')
+    const namaBarangHtml = details.map((d) => `<div>${d.namaBarang || "-"}</div>`).join("");
+    const beratHtml = details.map((d) => `<div>${d.berat || "-"}</div>`).join("");
+    const panjangHtml = details.map((d) => `<div>${d.panjang || "-"}</div>`).join("");
+    const kadarHtml = details.map((d) => `<div>${d.kadar || "-"}</div>`).join("");
+    const warnaHtml = details.map((d) => `<div>${d.warna || "-"}</div>`).join("");
+    const rincianCustomHtml = details.map((d) => `<div>${d.rincianServis || "-"}</div>`).join("");
+    const totalDPHtml = details.map((d) => `<div>Rp ${(d.totalDP || 0).toLocaleString("id-ID")}</div>`).join("");
+    const ongkosHtml = details.map((d) => `<div>Rp ${(d.ongkos || 0).toLocaleString("id-ID")}</div>`).join("");
 
     // Status per item
     const statusHtml = details
       .map((d) => {
-        const status = d.statusPembayaran || 'nominal'
-        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(
-          status
-        )}</span></div>`
+        const status = d.statusPembayaran || "nominal";
+        return `<div><span class="badge bg-${getStatusBadgeColor(status)}">${getStatusLabel(status)}</span></div>`;
       })
-      .join('')
+      .join("");
 
     details.forEach((d) => {
-      totalDP += d.totalDP || 0
-      totalOngkos += d.ongkos || 0
-    })
+      totalDP += d.totalDP || 0;
+      totalOngkos += d.ongkos || 0;
+    });
 
     row.innerHTML = `
       <td>${index + 1}</td>
@@ -1675,51 +1581,46 @@ function updateRiwayatTableCustom(filteredData) {
           <i class="fas fa-receipt"></i>
         </button>
       </td>
-    `
-    tbody.appendChild(row)
-  })
+    `;
+    tbody.appendChild(row);
+  });
 
-  const totalNominal = totalDP + totalOngkos
-  document.getElementById('total-riwayat-dp').textContent = `Rp ${totalDP.toLocaleString('id-ID')}`
-  document.getElementById(
-    'total-riwayat-ongkos-custom'
-  ).textContent = `Rp ${totalOngkos.toLocaleString('id-ID')}`
-  document.getElementById('total-riwayat-nominal').textContent = `Rp ${totalNominal.toLocaleString(
-    'id-ID'
-  )}`
+  const totalNominal = totalDP + totalOngkos;
+  document.getElementById("total-riwayat-dp").textContent = `Rp ${totalDP.toLocaleString("id-ID")}`;
+  document.getElementById("total-riwayat-ongkos-custom").textContent = `Rp ${totalOngkos.toLocaleString("id-ID")}`;
+  document.getElementById("total-riwayat-nominal").textContent = `Rp ${totalNominal.toLocaleString("id-ID")}`;
 }
 
 // Create shared function for generating print box HTML
 function generatePrintBox(item) {
-  const jenisInput = item.jenisInput || 'servis'
-  const namaCustomer = item.namaCustomer || 'N/A'
+  const jenisInput = item.jenisInput || "servis";
+  const namaCustomer = item.namaCustomer || "N/A";
 
-  if (jenisInput === 'custom') {
+  if (jenisInput === "custom") {
     // Format untuk custom
-    const details =
-      item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : []
+    const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [];
 
-    let combinedItems = ''
+    let combinedItems = "";
     if (details.length > 0) {
       combinedItems = details
         .map((d) => {
-          const namaBarang = d.namaBarang || '-'
-          const berat = d.berat || '-'
-          const panjang = d.panjang || '-'
-          const kadar = d.kadar || '-'
-          const warna = d.warna || '-'
-          const rincianCustom = d.rincianServis?.trim() || ''
+          const namaBarang = d.namaBarang || "-";
+          const berat = d.berat || "-";
+          const panjang = d.panjang || "-";
+          const kadar = d.kadar || "-";
+          const warna = d.warna || "-";
+          const rincianCustom = d.rincianServis?.trim() || "";
 
           // Format: Nama Barang | Berat | Panjang | Kadar | Warna | Rincian
-          let itemText = `${namaBarang}<br>B:${berat} P:${panjang}K:${kadar} W:${warna}`
+          let itemText = `${namaBarang}<br>B:${berat} P:${panjang}K:${kadar} W:${warna}`;
           if (rincianCustom) {
-            itemText += `<br>${rincianCustom}`
+            itemText += `<br>${rincianCustom}`;
           }
-          return itemText
+          return itemText;
         })
-        .join('<br>')
+        .join("<br>");
     } else {
-      combinedItems = 'Data tidak tersedia'
+      combinedItems = "Data tidak tersedia";
     }
 
     return `
@@ -1728,41 +1629,41 @@ function generatePrintBox(item) {
         <div class="print-nama-brg">${combinedItems}</div>
         <div class="print-status">CUSTOM</div>
       </div>
-    `
+    `;
   } else {
     // Format untuk servis
-    const statusPembayaran = item.statusPembayaran || 'nominal'
-    let statusText = getStatusLabel(statusPembayaran)
+    const statusPembayaran = item.statusPembayaran || "nominal";
+    let statusText = getStatusLabel(statusPembayaran);
 
     const details =
       item.detailBarang && item.detailBarang.length > 0
         ? item.detailBarang
         : [
             {
-              namaBarang: item.namaBarang || '-',
-              jenisServis: item.jenisServis || '-',
-              rincianServis: item.rincianServis || '',
+              namaBarang: item.namaBarang || "-",
+              jenisServis: item.jenisServis || "-",
+              rincianServis: item.rincianServis || "",
             },
-          ]
+          ];
 
-    let combinedItems = ''
+    let combinedItems = "";
     if (details.length > 0) {
       combinedItems = details
         .map((d) => {
-          const namaBarang = d.namaBarang || '-'
-          const jenisServis = d.jenisServis || '-'
-          const rincianServis = d.rincianServis?.trim() || ''
+          const namaBarang = d.namaBarang || "-";
+          const jenisServis = d.jenisServis || "-";
+          const rincianServis = d.rincianServis?.trim() || "";
 
           // Format: Nama Barang - Jenis Servis - Rincian Servis (jika ada)
           if (rincianServis) {
-            return `${namaBarang} - ${jenisServis} - ${rincianServis}`
+            return `${namaBarang} - ${jenisServis} - ${rincianServis}`;
           } else {
-            return `${namaBarang} - ${jenisServis}`
+            return `${namaBarang} - ${jenisServis}`;
           }
         })
-        .join('<br>')
+        .join("<br>");
     } else {
-      combinedItems = 'Data tidak tersedia'
+      combinedItems = "Data tidak tersedia";
     }
 
     return `
@@ -1771,7 +1672,7 @@ function generatePrintBox(item) {
         <div class="print-nama-brg">${combinedItems}</div>
         <div class="print-status">${statusText}</div>
       </div>
-    `
+    `;
   }
 }
 
@@ -1837,19 +1738,19 @@ function getPrintStyles() {
         padding: 0;
       }
     </style>
-  `
+  `;
 }
 
 window.printSingleItem = function (id, index) {
-  const item = todayData.find((item) => item.id === id)
+  const item = todayData.find((item) => item.id === id);
 
   if (!item) {
-    alert("Data tidak ditemukan. Silakan klik 'Tampilkan' terlebih dahulu.")
-    return
+    alert("Data tidak ditemukan. Silakan klik 'Tampilkan' terlebih dahulu.");
+    return;
   }
 
-  const printWindow = window.open('', '_blank')
-  const tanggalFormatted = new Date(item.tanggal).toLocaleDateString('id-ID')
+  const printWindow = window.open("", "_blank");
+  const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
 
   const printContent = `
     <html>
@@ -1863,65 +1764,65 @@ window.printSingleItem = function (id, index) {
         </div>
       </body>
     </html>
-  `
+  `;
 
-  printWindow.document.write(printContent)
-  printWindow.document.close()
+  printWindow.document.write(printContent);
+  printWindow.document.close();
 
   // Auto print 2x (double print) dengan auto-close
-  let printCount = 0
+  let printCount = 0;
   const handleAfterPrint = () => {
-    printCount++
+    printCount++;
     if (printCount === 2) {
-      printWindow.removeEventListener('afterprint', handleAfterPrint)
-      setTimeout(() => printWindow.close(), 100)
+      printWindow.removeEventListener("afterprint", handleAfterPrint);
+      setTimeout(() => printWindow.close(), 100);
     }
-  }
+  };
 
-  printWindow.addEventListener('afterprint', handleAfterPrint)
+  printWindow.addEventListener("afterprint", handleAfterPrint);
 
-  printWindow.print()
+  printWindow.print();
   setTimeout(() => {
-    printWindow.print()
-  }, 100)
-}
+    printWindow.print();
+  }, 100);
+};
 
 // Fungsi untuk reprint nota servis individual dari riwayat
 window.printNotaServisItem = function (id, index) {
-  const filteredData = todayData.filter((item) => (item.jenisInput || 'servis') === 'servis')
-  const item = filteredData[index]
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === "servis");
+  const item = filteredData[index];
   if (!item) {
-    alert('Data tidak ditemukan')
-    return
+    alert("Data tidak ditemukan");
+    return;
   }
-  printNotaServis([item])
-}
+  printNotaServis([item]);
+};
 
 // Fungsi untuk reprint nota custom individual dari riwayat
 window.printNotaCustomItem = function (id, index) {
-  const filteredData = todayData.filter((item) => (item.jenisInput || 'servis') === 'custom')
-  const item = filteredData[index]
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === "custom");
+  const item = filteredData[index];
   if (!item) {
-    alert('Data tidak ditemukan')
-    return
+    alert("Data tidak ditemukan");
+    return;
   }
-  printNotaCustom([item])
-}
+  printNotaCustom([item]);
+};
 
 function printReport() {
   if (todayData.length === 0) {
-    alert('Tidak ada data untuk dicetak')
-    return
+    alert("Tidak ada data untuk dicetak");
+    return;
   }
 
-  const tanggalRiwayat = document.getElementById('tanggalRiwayat').value
-  const printWindow = window.open('', '_blank')
+  const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
+  const printWindow = window.open("", "_blank");
 
   // Generate boxes menggunakan shared function
-  let boxesContent = ''
+  let boxesContent = "";
   todayData.forEach((item) => {
-    boxesContent += generatePrintBox(item)
-  })
+    boxesContent += generatePrintBox(item);
+  });
 
   const printContent = `
     <html>
@@ -1935,89 +1836,89 @@ function printReport() {
         </div>
       </body>
     </html>
-  `
+  `;
 
-  printWindow.document.write(printContent)
-  printWindow.document.close()
+  printWindow.document.write(printContent);
+  printWindow.document.close();
 
   // Auto-close setelah print selesai
-  printWindow.addEventListener('afterprint', () => {
-    setTimeout(() => printWindow.close(), 100)
-  })
+  printWindow.addEventListener("afterprint", () => {
+    setTimeout(() => printWindow.close(), 100);
+  });
 
-  printWindow.print()
+  printWindow.print();
 }
 
 // Helper function untuk format text dengan padding
-function padText(text, width, align = 'left') {
-  const cleanText = text.toString().trim()
+function padText(text, width, align = "left") {
+  const cleanText = text.toString().trim();
   if (cleanText.length >= width) {
-    return cleanText.substring(0, width)
+    return cleanText.substring(0, width);
   }
 
-  const padding = width - cleanText.length
-  if (align === 'right') {
-    return ' '.repeat(padding) + cleanText
-  } else if (align === 'center') {
-    const leftPad = Math.floor(padding / 2)
-    const rightPad = padding - leftPad
-    return ' '.repeat(leftPad) + cleanText + ' '.repeat(rightPad)
+  const padding = width - cleanText.length;
+  if (align === "right") {
+    return " ".repeat(padding) + cleanText;
+  } else if (align === "center") {
+    const leftPad = Math.floor(padding / 2);
+    const rightPad = padding - leftPad;
+    return " ".repeat(leftPad) + cleanText + " ".repeat(rightPad);
   } else {
-    return cleanText + ' '.repeat(padding)
+    return cleanText + " ".repeat(padding);
   }
 }
 
 // Helper function untuk wrap text ke multiple lines
 function wrapText(text, width) {
-  const cleanText = text.toString().trim()
+  const cleanText = text.toString().trim();
   if (cleanText.length <= width) {
-    return [cleanText]
+    return [cleanText];
   }
 
-  const lines = []
-  let currentLine = ''
-  const words = cleanText.split(' ')
+  const lines = [];
+  let currentLine = "";
+  const words = cleanText.split(" ");
 
   for (const word of words) {
-    if ((currentLine + ' ' + word).trim().length <= width) {
-      currentLine = (currentLine + ' ' + word).trim()
+    if ((currentLine + " " + word).trim().length <= width) {
+      currentLine = (currentLine + " " + word).trim();
     } else {
       if (currentLine) {
-        lines.push(currentLine)
-        currentLine = word
+        lines.push(currentLine);
+        currentLine = word;
       } else {
         // Jika satu kata terlalu panjang, potong
-        lines.push(word.substring(0, width))
-        currentLine = word.substring(width)
+        lines.push(word.substring(0, width));
+        currentLine = word.substring(width);
       }
     }
   }
 
   if (currentLine) {
-    lines.push(currentLine)
+    lines.push(currentLine);
   }
 
-  return lines
+  return lines;
 }
 
 // Helper function untuk format currency
 function formatCurrency(amount) {
-  return new Intl.NumberFormat('id-ID').format(amount)
+  return new Intl.NumberFormat("id-ID").format(amount);
 }
 
 // Fungsi untuk generate HTML nota servis dengan table
 function generateNotaHTML(servisData) {
-  const today = new Date()
-  const formattedDate = today.toLocaleDateString('id-ID')
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString("id-ID");
 
-  if (servisData.length === 0) return ''
+  if (servisData.length === 0) return "";
 
-  const firstCustomer = servisData[0]
-  const salesName = firstCustomer.namaSales || 'Admin'
-  const customerName = firstCustomer.namaCustomer || ''
+  const firstCustomer = servisData[0];
+  const salesName = firstCustomer.namaSales || "Admin";
+  const customerName = firstCustomer.namaCustomer || "";
 
   // Generate table rows
-  let tableRows = ''
+  let tableRows = "";
   servisData.forEach((servis) => {
     const details =
       servis.detailBarang && servis.detailBarang.length > 0
@@ -2025,41 +1926,41 @@ function generateNotaHTML(servisData) {
         : [
             {
               jumlah: 1,
-              namaBarang: servis.namaBarang || '',
-              berat: servis.berat || '',
-              karat: servis.karat || '',
-              jenisServis: servis.jenisServis || '',
-              rincianServis: servis.rincianServis || '',
+              namaBarang: servis.namaBarang || "",
+              berat: servis.berat || "",
+              karat: servis.karat || "",
+              jenisServis: servis.jenisServis || "",
+              rincianServis: servis.rincianServis || "",
               ongkos: servis.ongkos || 0,
             },
-          ]
+          ];
 
     details.forEach((item) => {
-      const statusPembayaran = item.statusPembayaran || 'nominal'
-      const statusLabel = getStatusLabel(statusPembayaran)
-      const rincianServisText = item.rincianServis?.trim() || ''
+      const statusPembayaran = item.statusPembayaran || "nominal";
+      const statusLabel = getStatusLabel(statusPembayaran);
+      const rincianServisText = item.rincianServis?.trim() || "";
       const namaBarangDisplay = rincianServisText
         ? `${item.namaBarang} - ${rincianServisText} [${statusLabel}]`
-        : `${item.namaBarang} [${statusLabel}]`
+        : `${item.namaBarang} [${statusLabel}]`;
 
       tableRows += `
         <tr>
           <td style="text-align: center;">${item.jumlah || 1} pcs</td>
           <td>${namaBarangDisplay}</td>
-          <td>${item.berat || ''}</td>
-          <td>${item.karat || ''}</td>
+          <td>${item.berat || ""}</td>
+          <td>${item.karat || ""}</td>
           <td style="text-align: right;">${formatCurrency(item.ongkos || 0)}</td>
-          <td>${item.jenisServis || ''}</td>
+          <td>${item.jenisServis || ""}</td>
         </tr>
-      `
-    })
-  })
+      `;
+    });
+  });
 
   return `
     <div class="customer-info">
       <div>${formattedDate}</div>
       <div style="margin-top: 3mm;">${customerName}</div>
-      <div style="margin-top: 3mm;">${firstCustomer.noHp || firstCustomer.noTelepon || ''}</div>
+      <div style="margin-top: 3mm;">${firstCustomer.noHp || firstCustomer.noTelepon || ""}</div>
     </div>
 
     <div class="nota-table">
@@ -2078,26 +1979,23 @@ function generateNotaHTML(servisData) {
     <div class="nota-catatan">
       Catatan : Penurunan berat pasca pencucian/servis dapat terjadi karena pembersihan kotoran yang menempel
     </div>
-  `
+  `;
 }
 
 // Fungsi utama untuk print nota servis dengan HTML table
 function printNotaServis(servisData) {
-  const notaHTML = generateNotaHTML(servisData)
-  const printWindow = window.open('', '_blank')
+  const notaHTML = generateNotaHTML(servisData);
+  const printWindow = window.open("", "_blank");
 
   if (!printWindow) {
-    showErrorAlert(
-      'Popup Diblokir',
-      'Popup diblokir oleh browser. Silakan izinkan popup untuk mencetak nota.'
-    )
-    return
+    showErrorAlert("Popup Diblokir", "Popup diblokir oleh browser. Silakan izinkan popup untuk mencetak nota.");
+    return;
   }
 
   printWindow.document.write(`
     <html>
       <head>
-        <title>Nota Servis - ${new Date().toLocaleDateString('id-ID')}</title>
+        <title>Nota Servis - ${new Date().toLocaleDateString("id-ID")}</title>
         <style>
           @page {
             size: 20cm 12.9cm landscape;
@@ -2181,58 +2079,58 @@ function printNotaServis(servisData) {
         ${notaHTML}
       </body>
     </html>
-  `)
+  `);
 
-  printWindow.document.close()
+  printWindow.document.close();
 
   // Auto print 2x (double print) dengan auto-close
-  let printCount = 0
+  let printCount = 0;
   const handleAfterPrint = () => {
-    printCount++
+    printCount++;
     if (printCount === 2) {
-      printWindow.removeEventListener('afterprint', handleAfterPrint)
-      setTimeout(() => printWindow.close(), 100)
+      printWindow.removeEventListener("afterprint", handleAfterPrint);
+      setTimeout(() => printWindow.close(), 100);
     }
-  }
+  };
 
-  printWindow.addEventListener('afterprint', handleAfterPrint)
+  printWindow.addEventListener("afterprint", handleAfterPrint);
 
-  printWindow.print()
+  printWindow.print();
   setTimeout(() => {
-    printWindow.print()
-  }, 100)
+    printWindow.print();
+  }, 100);
 }
 
 // Fungsi untuk generate HTML nota custom
 function generateNotaCustomHTML(servisData) {
-  const today = new Date()
-  const formattedDate = today.toLocaleDateString('id-ID')
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString("id-ID");
 
-  if (servisData.length === 0) return ''
+  if (servisData.length === 0) return "";
 
-  const firstCustomer = servisData[0]
-  const salesName = firstCustomer.namaSales || 'Admin'
+  const firstCustomer = servisData[0];
+  const salesName = firstCustomer.namaSales || "Admin";
 
-  let tableRows = ''
-  let totalDP = 0
-  let totalOngkos = 0
+  let tableRows = "";
+  let totalDP = 0;
+  let totalOngkos = 0;
 
   servisData.forEach((servis) => {
-    const details = servis.detailBarangCustom || []
+    const details = servis.detailBarangCustom || [];
 
     details.forEach((item) => {
-      const namaBarangParts = [item.namaBarang || '-']
-      if (item.panjang && item.panjang.trim()) namaBarangParts.push(`P: ${item.panjang}cm`)
-      if (item.kadar && item.kadar.trim()) namaBarangParts.push(`K: ${item.kadar}`)
-      if (item.warna && item.warna.trim()) namaBarangParts.push(`W: ${item.warna}`)
-      const namaBarangGabungan = namaBarangParts.join(', ')
+      const namaBarangParts = [item.namaBarang || "-"];
+      if (item.panjang && item.panjang.trim()) namaBarangParts.push(`P: ${item.panjang}cm`);
+      if (item.kadar && item.kadar.trim()) namaBarangParts.push(`K: ${item.kadar}`);
+      if (item.warna && item.warna.trim()) namaBarangParts.push(`W: ${item.warna}`);
+      const namaBarangGabungan = namaBarangParts.join(", ");
 
       // Tambahkan simbol ± di depan berat jika ada nilai, default "-"
-      const beratText = item.berat && item.berat.trim() ? `± ${item.berat}` : '-'
+      const beratText = item.berat && item.berat.trim() ? `± ${item.berat}` : "-";
 
       // Get status pembayaran
-      const status = item.statusPembayaran || 'nominal'
-      const statusText = getStatusLabel(status)
+      const status = item.statusPembayaran || "nominal";
+      const statusText = getStatusLabel(status);
 
       tableRows += `
         <tr>
@@ -2241,24 +2139,24 @@ function generateNotaCustomHTML(servisData) {
           <td>${beratText}</td>
           <td style="text-align: right;">${formatCurrency(item.totalDP || 0)}</td>
           <td style="text-align: right;">${formatCurrency(item.ongkos || 0)}</td>
-          <td>${item.rincianServis && item.rincianServis.trim() ? item.rincianServis : '-'}</td>
+          <td>${item.rincianServis && item.rincianServis.trim() ? item.rincianServis : "-"}</td>
         </tr>
-      `
+      `;
 
       // Akumulasi total
-      totalDP += item.totalDP || 0
-      totalOngkos += item.ongkos || 0
-    })
-  })
+      totalDP += item.totalDP || 0;
+      totalOngkos += item.ongkos || 0;
+    });
+  });
 
   // Hitung grand total (DP + Ongkos)
-  const grandTotal = totalDP + totalOngkos
+  const grandTotal = totalDP + totalOngkos;
 
   return `
     <div class="customer-info">
       <div>${formattedDate}</div>
       <div style="margin-top: 3mm;">${firstCustomer.namaCustomer}</div>
-      <div style="margin-top: 3mm;">${firstCustomer.noHp || ''}</div>
+      <div style="margin-top: 3mm;">${firstCustomer.noHp || ""}</div>
     </div>
 
     <div class="nota-table">
@@ -2285,26 +2183,23 @@ function generateNotaCustomHTML(servisData) {
     <div class="signature-section">
       <div class="signature-sales">Sales: ${salesName}</div>
     </div>
-  `
+  `;
 }
 
 // Fungsi utama untuk print nota custom
 function printNotaCustom(servisData) {
-  const notaHTML = generateNotaCustomHTML(servisData)
-  const printWindow = window.open('', '_blank')
+  const notaHTML = generateNotaCustomHTML(servisData);
+  const printWindow = window.open("", "_blank");
 
   if (!printWindow) {
-    showErrorAlert(
-      'Popup Diblokir',
-      'Popup diblokir oleh browser. Silakan izinkan popup untuk mencetak nota.'
-    )
-    return
+    showErrorAlert("Popup Diblokir", "Popup diblokir oleh browser. Silakan izinkan popup untuk mencetak nota.");
+    return;
   }
 
   printWindow.document.write(`
     <html>
       <head>
-        <title>Nota Custom - ${new Date().toLocaleDateString('id-ID')}</title>
+        <title>Nota Custom - ${new Date().toLocaleDateString("id-ID")}</title>
         <style>
           @page {
             size: 17cm 12cm landscape;
@@ -2409,86 +2304,78 @@ function printNotaCustom(servisData) {
         ${notaHTML}
       </body>
     </html>
-  `)
+  `);
 
-  printWindow.document.close()
+  printWindow.document.close();
 
-  let printCount = 0
+  let printCount = 0;
   const handleAfterPrint = () => {
-    printCount++
+    printCount++;
     if (printCount === 2) {
-      printWindow.removeEventListener('afterprint', handleAfterPrint)
-      setTimeout(() => printWindow.close(), 100)
+      printWindow.removeEventListener("afterprint", handleAfterPrint);
+      setTimeout(() => printWindow.close(), 100);
     }
-  }
+  };
 
-  printWindow.addEventListener('afterprint', handleAfterPrint)
-  printWindow.print()
-  setTimeout(() => printWindow.print(), 100)
+  printWindow.addEventListener("afterprint", handleAfterPrint);
+  printWindow.print();
+  setTimeout(() => printWindow.print(), 100);
 }
 
 function exportServisToPDF() {
-  const filteredData = todayData.filter((item) => (item.jenisInput || 'servis') === 'servis')
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === "servis");
 
   if (filteredData.length === 0) {
-    alert('Tidak ada data servis untuk diekspor')
-    return
+    alert("Tidak ada data servis untuk diekspor");
+    return;
   }
 
   try {
-    const tanggalRiwayat = document.getElementById('tanggalRiwayat').value
+    const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
     const totalOngkos = filteredData.reduce((sum, item) => {
-      const statusPembayaran = item.statusPembayaran || 'nominal'
-      return statusPembayaran === 'nominal' || statusPembayaran === 'custom'
-        ? sum + (item.ongkos || 0)
-        : sum
-    }, 0)
+      const statusPembayaran = item.statusPembayaran || "nominal";
+      return statusPembayaran === "nominal" || statusPembayaran === "custom" ? sum + (item.ongkos || 0) : sum;
+    }, 0);
 
     const tableBody = [
       [
-        { text: 'No', style: 'tableHeader' },
-        { text: 'Sales', style: 'tableHeader' },
-        { text: 'Customer', style: 'tableHeader' },
-        { text: 'No HP', style: 'tableHeader' },
-        { text: 'Nama Barang', style: 'tableHeader' },
-        { text: 'Berat', style: 'tableHeader' },
-        { text: 'Karat', style: 'tableHeader' },
-        { text: 'Jenis Servis', style: 'tableHeader' },
-        { text: 'Rincian Servis', style: 'tableHeader' },
-        { text: 'Ongkos', style: 'tableHeader' },
-        { text: 'Status', style: 'tableHeader' },
+        { text: "No", style: "tableHeader" },
+        { text: "Sales", style: "tableHeader" },
+        { text: "Customer", style: "tableHeader" },
+        { text: "No HP", style: "tableHeader" },
+        { text: "Nama Barang", style: "tableHeader" },
+        { text: "Berat", style: "tableHeader" },
+        { text: "Karat", style: "tableHeader" },
+        { text: "Jenis Servis", style: "tableHeader" },
+        { text: "Rincian Servis", style: "tableHeader" },
+        { text: "Ongkos", style: "tableHeader" },
+        { text: "Status", style: "tableHeader" },
       ],
-    ]
+    ];
 
     filteredData.forEach((item, index) => {
-      const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [{}]
+      const details = item.detailBarang && item.detailBarang.length > 0 ? item.detailBarang : [{}];
       details.forEach((d, idx) => {
-        const statusPembayaran = item.statusPembayaran || 'nominal'
-        let ongkosText =
-          statusPembayaran === 'free'
-            ? 'GRATIS'
-            : statusPembayaran === 'belum_lunas'
-            ? 'BELUM LUNAS'
-            : `Rp ${(d.ongkos || 0).toLocaleString('id-ID')}`
+        const statusPembayaran = d.statusPembayaran || "nominal";
 
         tableBody.push([
-          { text: idx === 0 ? (index + 1).toString() : '', style: 'tableCell' },
-          { text: idx === 0 ? item.namaSales || '' : '', style: 'tableCell' },
-          { text: idx === 0 ? item.namaCustomer || '' : '', style: 'tableCell' },
-          { text: idx === 0 ? item.noHp || '' : '', style: 'tableCell' },
-          { text: d.namaBarang || '-', style: 'tableCell' },
-          { text: d.berat || '-', style: 'tableCell' },
-          { text: d.karat || '-', style: 'tableCell' },
-          { text: d.jenisServis || '-', style: 'tableCell' },
-          { text: d.rincianServis || '-', style: 'tableCell' },
-          { text: ongkosText, style: 'tableCellRight' },
-          { text: idx === 0 ? getStatusLabel(statusPembayaran) : '', style: 'tableCell' },
-        ])
-      })
-    })
+          { text: idx === 0 ? (index + 1).toString() : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaSales || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaCustomer || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.noHp || "" : "", style: "tableCell" },
+          { text: d.namaBarang || "-", style: "tableCell" },
+          { text: d.berat || "-", style: "tableCell" },
+          { text: d.karat || "-", style: "tableCell" },
+          { text: d.jenisServis || "-", style: "tableCell" },
+          { text: d.rincianServis || "-", style: "tableCell" },
+          { text: `Rp ${(d.ongkos || 0).toLocaleString("id-ID")}`, style: "tableCellRight" },
+          { text: getStatusLabel(statusPembayaran), style: "tableCell" },
+        ]);
+      });
+    });
 
     tableBody.push([
-      { text: '', colSpan: 8, style: 'tableCell' },
+      { text: "", colSpan: 8, style: "tableCell" },
       {},
       {},
       {},
@@ -2496,25 +2383,25 @@ function exportServisToPDF() {
       {},
       {},
       {},
-      { text: 'TOTAL:', style: 'tableCellBold', alignment: 'right' },
-      { text: `Rp ${totalOngkos.toLocaleString('id-ID')}`, style: 'tableCellBoldRight' },
-      { text: '', style: 'tableCell' },
-    ])
+      { text: "TOTAL:", style: "tableCellBold", alignment: "right" },
+      { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+      { text: "", style: "tableCell" },
+    ]);
 
     const docDefinition = {
-      pageOrientation: 'landscape',
+      pageOrientation: "landscape",
       pageMargins: [15, 25, 15, 25],
       content: [
         {
-          text: 'LAPORAN SERVIS MELATI GOLD SHOP',
-          style: 'header',
-          alignment: 'center',
+          text: "LAPORAN SERVIS MELATI GOLD SHOP",
+          style: "header",
+          alignment: "center",
           margin: [0, 0, 0, 5],
         },
         {
           text: `Tanggal: ${tanggalRiwayat}`,
-          style: 'subheader',
-          alignment: 'center',
+          style: "subheader",
+          alignment: "center",
           margin: [0, 0, 0, 8],
         },
         {
@@ -2527,76 +2414,71 @@ function exportServisToPDF() {
         },
       ],
       styles: getPDFStyles(),
-    }
+    };
 
-    pdfMake
-      .createPdf(docDefinition)
-      .download(`Laporan_Servis_${tanggalRiwayat.replace(/\//g, '-')}.pdf`)
+    pdfMake.createPdf(docDefinition).download(`Laporan_Servis_${tanggalRiwayat.replace(/\//g, "-")}.pdf`);
   } catch (error) {
-    console.error('Error exporting PDF:', error)
-    alert('Terjadi kesalahan saat mengekspor PDF')
+    console.error("Error exporting PDF:", error);
+    alert("Terjadi kesalahan saat mengekspor PDF");
   }
 }
 
 function exportCustomToPDF() {
-  const filteredData = todayData.filter((item) => (item.jenisInput || 'servis') === 'custom')
+  const filteredData = todayData.filter((item) => (item.jenisInput || "servis") === "custom");
 
   if (filteredData.length === 0) {
-    alert('Tidak ada data custom untuk diekspor')
-    return
+    alert("Tidak ada data custom untuk diekspor");
+    return;
   }
 
   try {
-    const tanggalRiwayat = document.getElementById('tanggalRiwayat').value
-    let totalDP = 0
-    let totalOngkos = 0
+    const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
+    let totalDP = 0;
+    let totalOngkos = 0;
 
     const tableBody = [
       [
-        { text: 'No', style: 'tableHeader' },
-        { text: 'Sales', style: 'tableHeader' },
-        { text: 'Customer', style: 'tableHeader' },
-        { text: 'No HP', style: 'tableHeader' },
-        { text: 'Nama Barang', style: 'tableHeader' },
-        { text: 'Berat', style: 'tableHeader' },
-        { text: 'Panjang', style: 'tableHeader' },
-        { text: 'Kadar', style: 'tableHeader' },
-        { text: 'Warna', style: 'tableHeader' },
-        { text: 'Rincian Custom', style: 'tableHeader' },
-        { text: 'Total DP', style: 'tableHeader' },
-        { text: 'Ongkos', style: 'tableHeader' },
+        { text: "No", style: "tableHeader" },
+        { text: "Sales", style: "tableHeader" },
+        { text: "Customer", style: "tableHeader" },
+        { text: "No HP", style: "tableHeader" },
+        { text: "Nama Barang", style: "tableHeader" },
+        { text: "Berat", style: "tableHeader" },
+        { text: "Panjang", style: "tableHeader" },
+        { text: "Kadar", style: "tableHeader" },
+        { text: "Warna", style: "tableHeader" },
+        { text: "Rincian Custom", style: "tableHeader" },
+        { text: "Total DP", style: "tableHeader" },
+        { text: "Ongkos", style: "tableHeader" },
       ],
-    ]
+    ];
 
     filteredData.forEach((item, index) => {
-      const details =
-        item.detailBarangCustom && item.detailBarangCustom.length > 0
-          ? item.detailBarangCustom
-          : [{}]
+      const details = item.detailBarangCustom && item.detailBarangCustom.length > 0 ? item.detailBarangCustom : [{}];
       details.forEach((d, idx) => {
-        totalDP += d.totalDP || 0
-        totalOngkos += d.ongkos || 0
+        totalDP += d.totalDP || 0;
+        totalOngkos += d.ongkos || 0;
 
         tableBody.push([
-          { text: idx === 0 ? (index + 1).toString() : '', style: 'tableCell' },
-          { text: idx === 0 ? item.namaSales || '' : '', style: 'tableCell' },
-          { text: idx === 0 ? item.namaCustomer || '' : '', style: 'tableCell' },
-          { text: idx === 0 ? item.noHp || '' : '', style: 'tableCell' },
-          { text: d.namaBarang || '-', style: 'tableCell' },
-          { text: d.berat || '-', style: 'tableCell' },
-          { text: d.panjang || '-', style: 'tableCell' },
-          { text: d.kadar || '-', style: 'tableCell' },
-          { text: d.warna || '-', style: 'tableCell' },
-          { text: d.rincianServis || '-', style: 'tableCell' },
-          { text: `Rp ${(d.totalDP || 0).toLocaleString('id-ID')}`, style: 'tableCellRight' },
-          { text: `Rp ${(d.ongkos || 0).toLocaleString('id-ID')}`, style: 'tableCellRight' },
-        ])
-      })
-    })
+          { text: idx === 0 ? (index + 1).toString() : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaSales || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.namaCustomer || "" : "", style: "tableCell" },
+          { text: idx === 0 ? item.noHp || "" : "", style: "tableCell" },
+          { text: d.namaBarang || "-", style: "tableCell" },
+          { text: d.berat || "-", style: "tableCell" },
+          { text: d.panjang || "-", style: "tableCell" },
+          { text: d.kadar || "-", style: "tableCell" },
+          { text: d.warna || "-", style: "tableCell" },
+          { text: d.rincianServis || "-", style: "tableCell" },
+          { text: `Rp ${(d.totalDP || 0).toLocaleString("id-ID")}`, style: "tableCellRight" },
+          { text: `Rp ${(d.ongkos || 0).toLocaleString("id-ID")}`, style: "tableCellRight" },
+        ]);
+      });
+    });
 
-    const totalNominal = totalDP + totalOngkos
+    const totalNominal = totalDP + totalOngkos;
     tableBody.push([
-      { text: 'TOTAL:', colSpan: 10, style: 'tableCellBold', alignment: 'right' },
+      { text: "TOTAL:", colSpan: 10, style: "tableCellBold", alignment: "right" },
       {},
       {},
       {},
@@ -2606,11 +2488,11 @@ function exportCustomToPDF() {
       {},
       {},
       {},
-      { text: `Rp ${totalDP.toLocaleString('id-ID')}`, style: 'tableCellBoldRight' },
-      { text: `Rp ${totalOngkos.toLocaleString('id-ID')}`, style: 'tableCellBoldRight' },
-    ])
+      { text: `Rp ${totalDP.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+      { text: `Rp ${totalOngkos.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+    ]);
     tableBody.push([
-      { text: 'TOTAL NOMINAL:', colSpan: 11, style: 'tableCellBold', alignment: 'right' },
+      { text: "TOTAL NOMINAL:", colSpan: 11, style: "tableCellBold", alignment: "right" },
       {},
       {},
       {},
@@ -2621,23 +2503,23 @@ function exportCustomToPDF() {
       {},
       {},
       {},
-      { text: `Rp ${totalNominal.toLocaleString('id-ID')}`, style: 'tableCellBoldRight' },
-    ])
+      { text: `Rp ${totalNominal.toLocaleString("id-ID")}`, style: "tableCellBoldRight" },
+    ]);
 
     const docDefinition = {
-      pageOrientation: 'landscape',
+      pageOrientation: "landscape",
       pageMargins: [15, 25, 15, 25],
       content: [
         {
-          text: 'LAPORAN CUSTOM MELATI GOLD SHOP',
-          style: 'header',
-          alignment: 'center',
+          text: "LAPORAN CUSTOM MELATI GOLD SHOP",
+          style: "header",
+          alignment: "center",
           margin: [0, 0, 0, 5],
         },
         {
           text: `Tanggal: ${tanggalRiwayat}`,
-          style: 'subheader',
-          alignment: 'center',
+          style: "subheader",
+          alignment: "center",
           margin: [0, 0, 0, 8],
         },
         {
@@ -2650,14 +2532,12 @@ function exportCustomToPDF() {
         },
       ],
       styles: getPDFStyles(),
-    }
+    };
 
-    pdfMake
-      .createPdf(docDefinition)
-      .download(`Laporan_Custom_${tanggalRiwayat.replace(/\//g, '-')}.pdf`)
+    pdfMake.createPdf(docDefinition).download(`Laporan_Custom_${tanggalRiwayat.replace(/\//g, "-")}.pdf`);
   } catch (error) {
-    console.error('Error exporting PDF:', error)
-    alert('Terjadi kesalahan saat mengekspor PDF')
+    console.error("Error exporting PDF:", error);
+    alert("Terjadi kesalahan saat mengekspor PDF");
   }
 }
 
@@ -2665,46 +2545,46 @@ function getPDFLayout() {
   return {
     hLineWidth: (i, node) => (i === 0 || i === node.table.body.length ? 2 : 1),
     vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length ? 2 : 1),
-    hLineColor: (i, node) => (i === 0 || i === node.table.body.length ? '#666666' : '#cccccc'),
-    vLineColor: (i, node) => (i === 0 || i === node.table.widths.length ? '#666666' : '#cccccc'),
+    hLineColor: (i, node) => (i === 0 || i === node.table.body.length ? "#666666" : "#cccccc"),
+    vLineColor: (i, node) => (i === 0 || i === node.table.widths.length ? "#666666" : "#cccccc"),
     paddingLeft: () => 3,
     paddingRight: () => 3,
     paddingTop: () => 2,
     paddingBottom: () => 1,
-  }
+  };
 }
 
 function getPDFStyles() {
   return {
-    header: { fontSize: 16, bold: true, color: '#2c3e50' },
-    subheader: { fontSize: 12, bold: true, color: '#34495e' },
+    header: { fontSize: 16, bold: true, color: "#2c3e50" },
+    subheader: { fontSize: 12, bold: true, color: "#34495e" },
     tableHeader: {
       bold: true,
       fontSize: 9,
-      color: 'white',
-      fillColor: '#3498db',
-      alignment: 'center',
+      color: "white",
+      fillColor: "#3498db",
+      alignment: "center",
     },
     tableCell: { fontSize: 8, margin: [0, 1, 0, 1] },
-    tableCellRight: { fontSize: 8, alignment: 'right', margin: [0, 1, 0, 1] },
-    tableCellBold: { fontSize: 8, bold: true, fillColor: '#ecf0f1', margin: [0, 1, 0, 1] },
+    tableCellRight: { fontSize: 8, alignment: "right", margin: [0, 1, 0, 1] },
+    tableCellBold: { fontSize: 8, bold: true, fillColor: "#ecf0f1", margin: [0, 1, 0, 1] },
     tableCellBoldRight: {
       fontSize: 8,
       bold: true,
-      alignment: 'right',
-      fillColor: '#ecf0f1',
+      alignment: "right",
+      fillColor: "#ecf0f1",
       margin: [0, 1, 0, 1],
     },
-  }
+  };
 }
 
 function showLoading(show) {
-  let loadingOverlay = document.getElementById('loadingOverlay')
+  let loadingOverlay = document.getElementById("loadingOverlay");
 
   if (show) {
     if (!loadingOverlay) {
-      loadingOverlay = document.createElement('div')
-      loadingOverlay.id = 'loadingOverlay'
+      loadingOverlay = document.createElement("div");
+      loadingOverlay.id = "loadingOverlay";
       loadingOverlay.innerHTML = `
         <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                     background: rgba(0,0,0,0.5); z-index: 9999; display: flex;
@@ -2716,20 +2596,20 @@ function showLoading(show) {
             <div class="mt-2">Menyimpan data...</div>
           </div>
         </div>
-      `
-      document.body.appendChild(loadingOverlay)
+      `;
+      document.body.appendChild(loadingOverlay);
     }
-    document.body.style.cursor = 'wait'
+    document.body.style.cursor = "wait";
   } else {
     if (loadingOverlay) {
-      loadingOverlay.remove()
+      loadingOverlay.remove();
     }
-    document.body.style.cursor = 'default'
+    document.body.style.cursor = "default";
   }
 }
 
 function showSuccessModal(title, message, items = []) {
-  document.getElementById('successModalTitle').textContent = title
+  document.getElementById("successModalTitle").textContent = title;
 
   // Simplified content - hanya tampilkan ringkasan
   let content = `
@@ -2737,27 +2617,27 @@ function showSuccessModal(title, message, items = []) {
       <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
       <p class="mt-3 mb-2">${message}</p>
     </div>
-  `
+  `;
 
-  document.getElementById('successModalContent').innerHTML = content
+  document.getElementById("successModalContent").innerHTML = content;
 
-  const modal = new bootstrap.Modal(document.getElementById('successModal'))
-  modal.show()
+  const modal = new bootstrap.Modal(document.getElementById("successModal"));
+  modal.show();
 
   // Auto close setelah 1.5 detik untuk UX lebih cepat
   setTimeout(() => {
-    const modalElement = document.getElementById('successModal')
-    const modalInstance = bootstrap.Modal.getInstance(modalElement)
+    const modalElement = document.getElementById("successModal");
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
     if (modalInstance) {
-      modalInstance.hide()
+      modalInstance.hide();
     }
-  }, 1500)
+  }, 1500);
 }
 
 function showErrorModal(title, message) {
-  document.getElementById('errorModalTitle').textContent = title
-  document.getElementById('errorModalContent').innerHTML = `<p>${message}</p>`
+  document.getElementById("errorModalTitle").textContent = title;
+  document.getElementById("errorModalContent").innerHTML = `<p>${message}</p>`;
 
-  const modal = new bootstrap.Modal(document.getElementById('errorModal'))
-  modal.show()
+  const modal = new bootstrap.Modal(document.getElementById("errorModal"));
+  modal.show();
 }
