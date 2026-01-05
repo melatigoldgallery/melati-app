@@ -33,6 +33,93 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const reportCache = new Map(); // Cache untuk laporan
 const cacheTimestamps = new Map(); // Untuk menyimpan waktu cache
 
+// localStorage Safety Functions
+function getLocalStorageSize() {
+  let total = 0;
+  try {
+    for (let key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        const itemSize = (localStorage[key].length + key.length) * 2; // UTF-16 = 2 bytes per char
+        total += itemSize;
+      }
+    }
+  } catch (error) {
+    console.error("Error calculating localStorage size:", error);
+  }
+  return total;
+}
+
+function cleanupOldestCache() {
+  try {
+    const cacheKeys = [];
+
+    // Collect all cache entries with timestamps
+    for (const [key, timestamp] of cacheTimestamps.entries()) {
+      cacheKeys.push({ key, timestamp });
+    }
+
+    // Sort by timestamp (oldest first)
+    cacheKeys.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Delete oldest 30% of cache entries
+    const deleteCount = Math.ceil(cacheKeys.length * 0.3);
+    for (let i = 0; i < deleteCount && i < cacheKeys.length; i++) {
+      const key = cacheKeys[i].key;
+      reportCache.delete(key);
+      cacheTimestamps.delete(key);
+      console.log(`Cleaned up old cache: ${key}`);
+    }
+
+    console.log(`Cleaned up ${deleteCount} cache entries`);
+  } catch (error) {
+    console.error("Error cleaning up cache:", error);
+  }
+}
+
+function safeSetCache(key, value) {
+  try {
+    // Check localStorage size before saving
+    const currentSize = getLocalStorageSize();
+    const maxSize = 4.5 * 1024 * 1024; // 4.5MB limit
+
+    if (currentSize > maxSize) {
+      console.warn(`localStorage approaching limit (${(currentSize / 1024 / 1024).toFixed(2)}MB), cleaning up...`);
+      cleanupOldestCache();
+    }
+
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e.name === "QuotaExceededError") {
+      console.error("QuotaExceededError: localStorage is full, attempting cleanup...");
+
+      // Emergency cleanup
+      cleanupOldestCache();
+
+      // Try again after cleanup
+      try {
+        localStorage.setItem(key, value);
+        console.log("Successfully saved after cleanup");
+      } catch (retryError) {
+        console.error("Failed to save even after cleanup, clearing all cache...");
+        // Last resort: clear all cache
+        localStorage.removeItem("leaveReportCache");
+        localStorage.removeItem("leaveReportTimestamps");
+        reportCache.clear();
+        cacheTimestamps.clear();
+
+        // Try one more time
+        try {
+          localStorage.setItem(key, value);
+        } catch (finalError) {
+          console.error("Critical: Cannot save to localStorage even after full cleanup");
+        }
+      }
+    } else {
+      console.error("Error saving to localStorage:", e);
+    }
+  }
+}
+
 // Fungsi untuk mengompresi data sebelum disimpan ke localStorage
 function compressData(data) {
   try {
@@ -89,13 +176,13 @@ function loadReportCacheFromStorage() {
 // Fungsi untuk membersihkan cache laporan yang sudah lama
 function cleanupOldReportCache() {
   const now = Date.now();
-  const oneMonth = 30 * 24 * 60 * 60 * 1000; // 30 hari dalam milidetik
+  const oneWeek = 7 * 24 * 60 * 60 * 1000; // 7 hari dalam milidetik (dikurangi dari 30 hari)
 
-  // Hapus cache yang lebih dari 1 bulan
+  // Hapus cache yang lebih dari 1 minggu
   const keysToDelete = [];
 
   for (const [key, timestamp] of cacheTimestamps.entries()) {
-    if (now - timestamp > oneMonth) {
+    if (now - timestamp > oneWeek) {
       keysToDelete.push(key);
     }
   }
@@ -391,8 +478,8 @@ function saveReportCacheToStorage() {
       timestampsObj[key] = value;
     }
 
-    localStorage.setItem("leaveReportCache", compressData(cacheObj));
-    localStorage.setItem("leaveReportTimestamps", compressData(timestampsObj));
+    safeSetCache("leaveReportCache", compressData(cacheObj));
+    safeSetCache("leaveReportTimestamps", compressData(timestampsObj));
 
     // Broadcast update ke tab lain
     broadcastCacheUpdate("all");
@@ -407,7 +494,6 @@ if ("BroadcastChannel" in window) {
 
   bc.onmessage = function (event) {
     if (event.data && event.data.type === "cacheUpdate") {
-
       // Reload cache dari localStorage
       loadReportCacheFromStorage();
 
@@ -546,7 +632,7 @@ function setDefaultMonthAndYear() {
 
 async function generateReport(forceRefresh = false) {
   try {
-   const monthSelector = document.getElementById("monthSelector");
+    const monthSelector = document.getElementById("monthSelector");
     const yearSelector = document.getElementById("yearSelector");
     const replacementTypeFilter = document.getElementById("replacementTypeFilter");
     const replacementStatusFilter = document.getElementById("replacementStatusFilter");
@@ -713,8 +799,8 @@ async function generateReport(forceRefresh = false) {
       const replacementTypeFilter = document.getElementById("replacementTypeFilter");
       const selectedReplacementType = replacementTypeFilter ? replacementTypeFilter.value : "all";
 
-    if (selectedReplacementType !== "all" || selectedReplacementStatus !== "all") {
-      applyFilters(selectedReplacementType, selectedReplacementStatus);
+      if (selectedReplacementType !== "all" || selectedReplacementStatus !== "all") {
+        applyFilters(selectedReplacementType, selectedReplacementStatus);
       } else {
         // Update UI
         updateSummaryCards();
@@ -761,44 +847,39 @@ function applyFilters(typeFilter, statusFilter) {
 
     // Apply type filter if not "all"
     if (typeFilter !== "all") {
-      filteredData = filteredData.filter(leave => leave.replacementType === typeFilter);
+      filteredData = filteredData.filter((leave) => leave.replacementType === typeFilter);
       console.log(`After type filter: ${filteredData.length} items`);
     }
 
     // Apply status filter if not "all"
     if (statusFilter !== "all") {
-      filteredData = filteredData.filter(leave => {
+      filteredData = filteredData.filter((leave) => {
         // Check for special cases first (medical certificate or leave)
-        const hasMedicalCert = 
-          leave.leaveType === "sakit" && 
-          leave.replacementDetails && 
-          leave.replacementDetails.hasMedicalCertificate;
-        
+        const hasMedicalCert =
+          leave.leaveType === "sakit" && leave.replacementDetails && leave.replacementDetails.hasMedicalCertificate;
+
         const isLeave = leave.leaveType === "cuti";
-        
+
         // These types don't need replacement
         if (hasMedicalCert || isLeave) {
           // If filtering for "sudah" or "belum", these should be excluded
           return statusFilter === "all";
         }
-        
+
         // Check if it's a multi-day leave
-        const isMultiDay = 
-          leave.leaveStartDate && 
-          leave.leaveEndDate && 
-          leave.leaveStartDate !== leave.leaveEndDate;
-        
+        const isMultiDay = leave.leaveStartDate && leave.leaveEndDate && leave.leaveStartDate !== leave.leaveEndDate;
+
         if (isMultiDay && leave.replacementStatusArray && leave.replacementStatusArray.length > 0) {
           // For multi-day, check if any day matches the filter
           if (statusFilter === "sudah") {
             // Check for any status containing "sudah" (case insensitive)
-            return leave.replacementStatusArray.some(status => {
+            return leave.replacementStatusArray.some((status) => {
               if (!status) return false;
               return status.toLowerCase().includes("sudah");
             });
           } else if (statusFilter === "belum") {
             // Check for any status containing "belum" or empty
-            return leave.replacementStatusArray.some(status => {
+            return leave.replacementStatusArray.some((status) => {
               if (!status) return true;
               return status.toLowerCase().includes("belum");
             });
@@ -806,17 +887,17 @@ function applyFilters(typeFilter, statusFilter) {
         } else {
           // For single-day, check replacementStatus
           let status = leave.replacementStatus || "";
-          
+
           // Convert to string and lowercase for consistent comparison
           status = String(status).toLowerCase();
-          
+
           if (statusFilter === "sudah") {
             return status.includes("sudah");
           } else if (statusFilter === "belum") {
             return !status || status.includes("belum");
           }
         }
-        
+
         // Default for "all" filter
         return true;
       });
@@ -891,13 +972,13 @@ function setupEventListeners() {
     loadMoreBtn.addEventListener("click", loadMoreData);
   }
 
- // Replacement type filter
+  // Replacement type filter
   const replacementTypeFilter = document.getElementById("replacementTypeFilter");
   if (replacementTypeFilter) {
-    replacementTypeFilter.addEventListener("change", function() {
+    replacementTypeFilter.addEventListener("change", function () {
       const replacementStatusFilter = document.getElementById("replacementStatusFilter");
       const statusValue = replacementStatusFilter ? replacementStatusFilter.value : "all";
-      
+
       // If data exists, apply both filters
       if (currentLeaveData && currentLeaveData.length > 0) {
         applyFilters(this.value, statusValue);
@@ -908,10 +989,10 @@ function setupEventListeners() {
   // Replacement status filter
   const replacementStatusFilter = document.getElementById("replacementStatusFilter");
   if (replacementStatusFilter) {
-    replacementStatusFilter.addEventListener("change", function() {
+    replacementStatusFilter.addEventListener("change", function () {
       const replacementTypeFilter = document.getElementById("replacementTypeFilter");
       const typeValue = replacementTypeFilter ? replacementTypeFilter.value : "all";
-      
+
       // If data exists, apply both filters
       if (currentLeaveData && currentLeaveData.length > 0) {
         applyFilters(typeValue, this.value);
@@ -1572,21 +1653,21 @@ function filterLeaveData(type, filter) {
   try {
     // If no data, do nothing
     if (!currentLeaveData || currentLeaveData.length === 0) return;
-    
+
     // Buat kunci cache untuk filter ini
     const month = parseInt(document.getElementById("monthSelector").value);
     const year = parseInt(document.getElementById("yearSelector").value);
     const filterCacheKey = `${month}_${year}_${type}_${filter}`;
-    
+
     // Clear filter cache to ensure fresh filtering
     if (filterCache.has(filterCacheKey)) {
       filterCache.delete(filterCacheKey);
     }
-    
+
     // Get original data from cache if needed
     const cacheKey = `${month}_${year}`;
     let originalData = [];
-    
+
     if (reportCache.has(cacheKey)) {
       originalData = [...reportCache.get(cacheKey).data];
       // Update allCachedData dengan data lengkap dari cache
@@ -1594,11 +1675,11 @@ function filterLeaveData(type, filter) {
     } else {
       originalData = [...currentLeaveData];
     }
-    
+
     console.log(`Filtering by ${type}, filter: ${filter}, total data: ${originalData.length}`);
-    
+
     let filteredData = [];
-    
+
     if (filter === "all") {
       // Reset to original data
       filteredData = [...originalData];
@@ -1619,36 +1700,31 @@ function filterLeaveData(type, filter) {
       // Filter by replacement status - FIXED VERSION
       filteredData = originalData.filter((leave) => {
         // Check for special cases first (medical certificate or leave)
-        const hasMedicalCert = 
-          leave.leaveType === "sakit" && 
-          leave.replacementDetails && 
-          leave.replacementDetails.hasMedicalCertificate;
-        
+        const hasMedicalCert =
+          leave.leaveType === "sakit" && leave.replacementDetails && leave.replacementDetails.hasMedicalCertificate;
+
         const isLeave = leave.leaveType === "cuti";
-        
+
         // These types don't need replacement
         if (hasMedicalCert || isLeave) {
           // If filtering for "sudah" or "belum", these should be excluded
           return filter === "all";
         }
-        
+
         // Check if it's a multi-day leave
-        const isMultiDay = 
-          leave.leaveStartDate && 
-          leave.leaveEndDate && 
-          leave.leaveStartDate !== leave.leaveEndDate;
-        
+        const isMultiDay = leave.leaveStartDate && leave.leaveEndDate && leave.leaveStartDate !== leave.leaveEndDate;
+
         if (isMultiDay && leave.replacementStatusArray && leave.replacementStatusArray.length > 0) {
           // For multi-day, check if any day matches the filter
           if (filter === "sudah") {
             // Check for any status containing "sudah" (case insensitive)
-            return leave.replacementStatusArray.some(status => {
+            return leave.replacementStatusArray.some((status) => {
               if (!status) return false;
               return status.toLowerCase().includes("sudah");
             });
           } else if (filter === "belum") {
             // Check for any status containing "belum" or empty
-            return leave.replacementStatusArray.some(status => {
+            return leave.replacementStatusArray.some((status) => {
               if (!status) return true;
               return status.toLowerCase().includes("belum");
             });
@@ -1656,44 +1732,44 @@ function filterLeaveData(type, filter) {
         } else {
           // For single-day, check replacementStatus
           let status = leave.replacementStatus || "";
-          
+
           // Convert to string and lowercase for consistent comparison
           status = String(status).toLowerCase();
-          
+
           if (filter === "sudah") {
             return status.includes("sudah");
           } else if (filter === "belum") {
             return !status || status.includes("belum");
           }
         }
-        
+
         // Default for "all" filter
         return true;
       });
     }
-    
+
     console.log(`Filter results: ${filteredData.length} items found`);
-    
+
     // If no results found, show a message
     if (filteredData.length === 0) {
       showAlert("info", `Tidak ada data izin dengan filter yang dipilih`, true);
     }
-    
+
     // Cache hasil filter dengan timestamp
     filterCache.set(filterCacheKey, {
       data: filteredData,
       timestamp: Date.now(),
     });
-    
+
     // Update data untuk tampilan dan ekspor
     currentLeaveData = filteredData.slice(0, itemsPerPage);
     allCachedData = filteredData;
     hasMoreData = filteredData.length > itemsPerPage;
-    
+
     // Update UI
     populateLeaveTable();
     updateSummaryCards();
-    
+
     // Update tombol Load More
     const loadMoreContainer = document.getElementById("loadMoreContainer");
     if (loadMoreContainer) {
@@ -1704,7 +1780,6 @@ function filterLeaveData(type, filter) {
     showAlert("danger", "Terjadi kesalahan saat memfilter data: " + error.message);
   }
 }
-
 
 // Fungsi untuk memeriksa validitas cache filter
 function isFilterCacheValid(filterCacheKey) {
@@ -2606,70 +2681,90 @@ function filterByReplacementType(type) {
 // Tambahkan helper hapus single leave (ringkas)
 import { deleteLeaveRequest } from "../services/leave-service.js";
 
-function attachSingleDeleteHandlers(){
-  const table=document.getElementById("leaveReportTable");
-  if(!table)return;
-  table.querySelectorAll("button[data-delete-id]").forEach(btn=>{
-    btn.onclick=()=>{
-      const id=btn.getAttribute("data-delete-id");
-      const idInput=document.getElementById("deleteLeaveId");
-      if(idInput) idInput.value=id;
-      document.getElementById("singleDeletePassword").value="";
-      document.getElementById("singleDeleteFeedback").style.display="none";
-      const modalEl=document.getElementById("deleteSingleModal");
-      if(window.bootstrap){
-        const m=new bootstrap.Modal(modalEl);m.show();
+function attachSingleDeleteHandlers() {
+  const table = document.getElementById("leaveReportTable");
+  if (!table) return;
+  table.querySelectorAll("button[data-delete-id]").forEach((btn) => {
+    btn.onclick = () => {
+      const id = btn.getAttribute("data-delete-id");
+      const idInput = document.getElementById("deleteLeaveId");
+      if (idInput) idInput.value = id;
+      document.getElementById("singleDeletePassword").value = "";
+      document.getElementById("singleDeleteFeedback").style.display = "none";
+      const modalEl = document.getElementById("deleteSingleModal");
+      if (window.bootstrap) {
+        const m = new bootstrap.Modal(modalEl);
+        m.show();
       } else {
         // fallback
         modalEl.classList.add("show");
       }
     };
   });
-  const confirmBtn=document.getElementById("confirmSingleDeleteBtn");
-  if(confirmBtn && !confirmBtn._bound){
-    confirmBtn._bound=true;
-    confirmBtn.addEventListener("click", async ()=>{
-      const pass=document.getElementById("singleDeletePassword").value.trim();
-      const feedback=document.getElementById("singleDeleteFeedback");
-      if(pass!=="svmlt"){feedback.textContent="Password salah";feedback.style.display="block";return;}
-      const id=document.getElementById("deleteLeaveId").value;
-      if(!id){return;}
-      confirmBtn.disabled=true;const old=confirmBtn.innerHTML;confirmBtn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i> Menghapus';
-      try{
+  const confirmBtn = document.getElementById("confirmSingleDeleteBtn");
+  if (confirmBtn && !confirmBtn._bound) {
+    confirmBtn._bound = true;
+    confirmBtn.addEventListener("click", async () => {
+      const pass = document.getElementById("singleDeletePassword").value.trim();
+      const feedback = document.getElementById("singleDeleteFeedback");
+      if (pass !== "svmlt") {
+        feedback.textContent = "Password salah";
+        feedback.style.display = "block";
+        return;
+      }
+      const id = document.getElementById("deleteLeaveId").value;
+      if (!id) {
+        return;
+      }
+      confirmBtn.disabled = true;
+      const old = confirmBtn.innerHTML;
+      confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menghapus';
+      try {
         await deleteLeaveRequest(id);
         // Hapus dari currentLeaveData & allCachedData jika ada
-        if(Array.isArray(currentLeaveData)) currentLeaveData=currentLeaveData.filter(l=>l.id!==id);
-        if(Array.isArray(allCachedData)) allCachedData=allCachedData.filter(l=>l.id!==id);
+        if (Array.isArray(currentLeaveData)) currentLeaveData = currentLeaveData.filter((l) => l.id !== id);
+        if (Array.isArray(allCachedData)) allCachedData = allCachedData.filter((l) => l.id !== id);
         populateLeaveTable(); // refresh tampilan
-        showAlert("success","Data izin berhasil dihapus",true,3000);
-        const modalEl=document.getElementById("deleteSingleModal");
-        if(window.bootstrap){bootstrap.Modal.getInstance(modalEl)?.hide();}
-      }catch(err){
-        console.error(err);feedback.textContent="Gagal menghapus: "+err.message;feedback.style.display="block";
-      }finally{confirmBtn.disabled=false;confirmBtn.innerHTML=old;}
+        showAlert("success", "Data izin berhasil dihapus", true, 3000);
+        const modalEl = document.getElementById("deleteSingleModal");
+        if (window.bootstrap) {
+          bootstrap.Modal.getInstance(modalEl)?.hide();
+        }
+      } catch (err) {
+        console.error(err);
+        feedback.textContent = "Gagal menghapus: " + err.message;
+        feedback.style.display = "block";
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = old;
+      }
     });
   }
 }
 // Sisipkan pemanggilan attachSingleDeleteHandlers di akhir populateLeaveTable setelah baris ditambahkan
-(function(){
-  const oldPopulate=populateLeaveTable;
-  populateLeaveTable=function(){
-    oldPopulate.apply(this,arguments);
+(function () {
+  const oldPopulate = populateLeaveTable;
+  populateLeaveTable = function () {
+    oldPopulate.apply(this, arguments);
     // setelah tabel ter-render, tambahkan tombol hapus ke setiap baris (kecuali header)
-    const tbody=document.getElementById("leaveReportList");
-    if(tbody){
-      Array.from(tbody.rows).forEach((tr,i)=>{
+    const tbody = document.getElementById("leaveReportList");
+    if (tbody) {
+      Array.from(tbody.rows).forEach((tr, i) => {
         // Pastikan kolom aksi ada di index terakhir
-        if(!tr.querySelector("button[data-delete-id]")){
-          const idRef=(currentLeaveData[i]&&currentLeaveData[i].id)||null;
+        if (!tr.querySelector("button[data-delete-id]")) {
+          const idRef = (currentLeaveData[i] && currentLeaveData[i].id) || null;
           // Jika kolom aksi belum ada, tambahkan td
-          if(tr.cells.length<10){
-            const td=document.createElement("td");
-            td.innerHTML=idRef?`<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`:"-";
+          if (tr.cells.length < 10) {
+            const td = document.createElement("td");
+            td.innerHTML = idRef
+              ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
+              : "-";
             tr.appendChild(td);
           } else {
             // overwrite kolom aksi
-            tr.cells[9].innerHTML=idRef?`<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`:"-";
+            tr.cells[9].innerHTML = idRef
+              ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
+              : "-";
           }
         }
       });

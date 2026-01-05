@@ -1266,7 +1266,9 @@ async function saveAllServisData() {
     }
 
     showLoading(false);
-    // Broadcast each new item
+    // Broadcast each new item via BroadcastChannel (no localStorage)
+    const servisBC = new BroadcastChannel("servisDataChannel");
+
     savedItems.forEach((item) => {
       const event = {
         action: "add",
@@ -1275,9 +1277,14 @@ async function saveAllServisData() {
         source: "input-servis",
       };
 
-      localStorage.setItem("servisDataChange", JSON.stringify(event));
+      // Use BroadcastChannel for cross-tab communication (no localStorage needed)
+      servisBC.postMessage(event);
+
+      // Dispatch local event for same-tab listeners
       window.dispatchEvent(new CustomEvent("servisDataChanged", { detail: event }));
     });
+
+    servisBC.close();
 
     // Show success modal and print nota
     showSuccessModal("Data Berhasil Disimpan", `${savedItems.length} data berhasil disimpan.`, savedItems);
@@ -1632,9 +1639,6 @@ function generatePrintBox(item) {
     `;
   } else {
     // Format untuk servis
-    const statusPembayaran = item.statusPembayaran || "nominal";
-    let statusText = getStatusLabel(statusPembayaran);
-
     const details =
       item.detailBarang && item.detailBarang.length > 0
         ? item.detailBarang
@@ -1643,8 +1647,21 @@ function generatePrintBox(item) {
               namaBarang: item.namaBarang || "-",
               jenisServis: item.jenisServis || "-",
               rincianServis: item.rincianServis || "",
+              statusPembayaran: item.statusPembayaran || "nominal", // Fallback untuk data lama
             },
           ];
+
+    // Kumpulkan semua status unik dari detail barang
+    const uniqueStatuses = [...new Set(details.map((d) => d.statusPembayaran || "nominal"))];
+    let statusText;
+
+    if (uniqueStatuses.length === 1) {
+      // Semua detail punya status sama
+      statusText = getStatusLabel(uniqueStatuses[0]);
+    } else {
+      // Multiple status berbeda, gabungkan
+      statusText = uniqueStatuses.map((s) => getStatusLabel(s)).join(" / ");
+    }
 
     let combinedItems = "";
     if (details.length > 0) {
