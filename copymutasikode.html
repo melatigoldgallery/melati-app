@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Copy Mutasi Kode - 2 Langkah</title>
+    <style>
+      body {
+        font-family: Arial;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .step {
+        background: #f5f5f5;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .step h2 {
+        margin-top: 0;
+        color: #333;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background: #4285f4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      button:hover {
+        background: #357ae8;
+      }
+      #status {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+      textarea {
+        width: 100%;
+        height: 150px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .warning {
+        background: #fff3cd;
+        padding: 10px;
+        border-left: 4px solid #ffc107;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📋 Copy Data Mutasi Kode</h1>
+
+    <div class="warning">
+      <strong>⚠️ PENTING:</strong>
+      Karena aksesoris-app Firestore tidak aktif, gunakan cara 2 langkah ini:
+      <br />
+      1. Export data dari halaman yang sudah punya akses aksesoris-app
+      <br />
+      2. Import data ke sistem-antrian menggunakan halaman ini
+    </div>
+
+    <!-- LANGKAH 1: EXPORT -->
+    <div class="step">
+      <h2>🔽 LANGKAH 1: Export dari Aksesoris-App</h2>
+      <p>
+        Buka halaman web app yang
+        <strong>sudah connect ke aksesoris-app</strong>
+        (bukan halaman ini!)
+      </p>
+      <p>Lalu buka Console (F12) dan jalankan script ini:</p>
+      <textarea readonly onclick="this.select()">
+// Copy script ini ke Console (F12) di halaman aksesoris-app
+(async function() {
+  try {
+    console.log('⏳ Mengambil data mutasiKode...');
+    const snapshot = await firebase.firestore().collection('mutasiKode').get();
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Download sebagai file JSON
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mutasiKode-backup-' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+    
+    console.log('✅ BERHASIL! Downloaded', data.length, 'dokumen');
+    console.log('📁 File: mutasiKode-backup.json');
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+  }
+})();
+    </textarea
+      >
+      <p><small>💡 Script ini akan download file JSON berisi semua data mutasiKode</small></p>
+    </div>
+
+    <!-- LANGKAH 2: IMPORT -->
+    <div class="step">
+      <h2>🔼 LANGKAH 2: Import ke Sistem-Antrian</h2>
+      <p>Paste isi file JSON yang di-download tadi ke textarea di bawah:</p>
+      <textarea
+        id="jsonData"
+        placeholder='Paste data JSON di sini, contoh: [{"id":"doc1","kode":"ABC123",...}, ...]'
+      ></textarea>
+      <br />
+      <br />
+      <button onclick="importData()">Import ke Sistem-Antrian</button>
+      <div id="status"></div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+      import { getFirestore, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+      // Hanya init sistem-antrian (destination)
+      const app = initializeApp({
+        apiKey: "AIzaSyB6WS177m4mFIIlDE9sSSW21XHkWHQdwdU",
+        authDomain: "sistem-antrian-76aa8.firebaseapp.com",
+        projectId: "sistem-antrian-76aa8",
+        storageBucket: "sistem-antrian-76aa8.firebasestorage.app",
+        messagingSenderId: "545586001781",
+        appId: "1:545586001781:web:cae2e84ad9c8d905c7053c",
+      });
+
+      const db = getFirestore(app);
+
+      window.importData = async function () {
+        const status = document.getElementById("status");
+        const jsonText = document.getElementById("jsonData").value.trim();
+
+        if (!jsonText) {
+          status.className = "error";
+          status.innerHTML = "❌ Silakan paste data JSON terlebih dahulu!";
+          return;
+        }
+
+        try {
+          status.className = "info";
+          status.innerHTML = "⏳ Parsing JSON...";
+
+          const data = JSON.parse(jsonText);
+
+          if (!Array.isArray(data)) {
+            throw new Error("Data harus berupa array");
+          }
+
+          if (data.length === 0) {
+            throw new Error("Data kosong");
+          }
+
+          status.innerHTML = `📊 Ditemukan ${data.length} dokumen. Memulai import...`;
+
+          // Batch write (max 500 per batch)
+          const BATCH_SIZE = 500;
+          let totalImported = 0;
+
+          for (let i = 0; i < data.length; i += BATCH_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = data.slice(i, i + BATCH_SIZE);
+
+            chunk.forEach((item) => {
+              if (!item.id) {
+                console.warn("Skipping item without ID:", item);
+                return;
+              }
+              const { id, ...docData } = item;
+              const docRef = doc(db, "mutasiKode", id);
+              batch.set(docRef, docData);
+            });
+
+            await batch.commit();
+            totalImported += chunk.length;
+            status.innerHTML = `⏳ Progress: ${totalImported}/${data.length} dokumen...`;
+          }
+
+          status.className = "success";
+          status.innerHTML = `✅ BERHASIL! ${totalImported} dokumen telah di-import ke sistem-antrian!`;
+        } catch (error) {
+          status.className = "error";
+          status.innerHTML = `❌ Error: ${error.message}`;
+          console.error("Import error:", error);
+        }
+      };
+    </script>
+  </body>
+</html>

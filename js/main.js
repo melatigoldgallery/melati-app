@@ -1,6 +1,7 @@
 import { sidebarToggle } from "./components/sidebar.js";
 import { initializeDateTime } from "./components/header.js";
 import { setupMenuVisibility } from "./menuControl.js";
+import { ensureDailySnapshotExists } from "./pages/laporanStok.js";
 
 // Authentication functions
 async function checkLoginStatus() {
@@ -122,5 +123,106 @@ try {
   console.error("Error initializing UI components:", error);
 }
 
+function setupPasswordVerification() {
+  document.addEventListener("click", function (e) {
+    const link = e.target.closest('a[href="tambahAksesoris.html"]');
+
+    if (link) {
+      e.preventDefault();
+      e.stopPropagation();
+      createPasswordModal();
+    }
+  });
+}
+
+function createPasswordModal() {
+  const modalHTML = `
+    <div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="passwordModalLabel">
+              <i class="fas fa-lock me-2"></i>Verifikasi Password
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted mb-3">Masukkan password untuk mengakses menu Tambah Aksesoris:</p>
+            <div class="mb-3">
+              <input type="password" class="form-control p-2" id="verificationPassword" placeholder="Password verifikasi">
+              <div class="invalid-feedback" id="passwordError"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="verifyPasswordBtn">Verifikasi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const existingModal = document.getElementById("passwordModal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  document.body.insertAdjacentHTML("beforeend", modalHTML);
+
+  const passwordModal = new bootstrap.Modal(document.getElementById("passwordModal"));
+  const verificationPassword = document.getElementById("verificationPassword");
+  const verifyPasswordBtn = document.getElementById("verifyPasswordBtn");
+  const passwordError = document.getElementById("passwordError");
+
+  const verifyPassword = function () {
+    const password = verificationPassword.value;
+    const correctPassword = "smlt116";
+
+    if (password === correctPassword) {
+      passwordModal.hide();
+      window.location.href = "tambahAksesoris.html";
+    } else {
+      verificationPassword.classList.add("is-invalid");
+      passwordError.textContent = "Password salah!";
+    }
+  };
+
+  verifyPasswordBtn.addEventListener("click", verifyPassword);
+
+  verificationPassword.addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      verifyPassword();
+    }
+  });
+
+  document.getElementById("passwordModal").addEventListener("hidden.bs.modal", function () {
+    document.getElementById("passwordModal").remove();
+  });
+
+  document.getElementById("passwordModal").addEventListener("shown.bs.modal", function () {
+    verificationPassword.focus();
+  });
+  passwordModal.show();
+}
+
+$(document).ready(function () {
+  checkLoginStatus();
+  setupPasswordVerification();
+
+  if (window.location.pathname.includes("dashboard.html") || window.location.pathname.endsWith("/")) {
+    ensureDailySnapshotExists()
+      .then((result) => {
+        if (result.created) {
+          console.log("✅ Daily snapshot created successfully");
+        } else if (result.success) {
+          console.log("✅ Daily snapshot already exists or being processed");
+        }
+      })
+      .catch((error) => {
+        console.error("⚠️ Snapshot creation failed (non-critical):", error);
+      });
+  }
+});
 // Export global functions
 window.handleLogout = handleLogout;

@@ -30,6 +30,10 @@ const db = getFirestore(app)
 const rtdb = getDatabase(app)
 const auth = getAuth(app)
 const storage = getStorage(app)
+const firestore = getFirestore(app);
+
+// Make firestore available globally
+window.firestore = firestore;
 
 // Auth service untuk digunakan di seluruh aplikasi
 export const authService = {
@@ -108,4 +112,4 @@ export const authService = {
 }
 
 export default app
-export { db, rtdb, auth, storage }
+export { db, rtdb, auth, storage, firestore }
