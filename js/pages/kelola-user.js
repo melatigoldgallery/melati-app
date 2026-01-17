@@ -10,6 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 import { hashPassword } from "../auth/passwordHelper.js";
 import { db, auth } from "../configFirebase.js";
+import { MENU_STRUCTURE, getDefaultPermissions } from "../config/menu-structure.js";
 
 let allUsers = [];
 let userModalInstance;
@@ -87,7 +88,9 @@ function renderUsersTable(users) {
     <tr>
       <td><strong>${user.username}</strong></td>
       <td>${user.displayName || "-"}</td>
-      <td><span class="role-badge role-${user.role}">${getRoleLabel(user.role)}</span></td>
+      <td><span class="role-badge role-${user.role}">${
+        user.username === "supervisor" ? "Super Admin" : getRoleLabel(user.role)
+      }</span></td>
       <td>${user.createdAt ? new Date(user.createdAt.seconds * 1000).toLocaleDateString("id-ID") : "-"}</td>
       <td>
         ${
@@ -112,9 +115,7 @@ function renderUsersTable(users) {
 // Update stats
 function updateStats(users) {
   document.getElementById("totalUsers").textContent = users.length;
-  document.getElementById("totalAdmin").textContent = users.filter(
-    (u) => u.role === "admin" || u.role === "admin_custom"
-  ).length;
+  document.getElementById("totalAdmin").textContent = users.filter((u) => u.role === "admin").length;
   document.getElementById("totalStaff").textContent = users.filter((u) => u.role === "staf").length;
 }
 
@@ -122,7 +123,6 @@ function updateStats(users) {
 function getRoleLabel(role) {
   const labels = {
     admin: "Admin",
-    admin_custom: "Admin Custom",
     staf: "Staff",
   };
   return labels[role] || role;
@@ -146,8 +146,182 @@ window.openAddModal = function () {
   document.getElementById("confirmPasswordGroup").style.display = "block";
   document.getElementById("password").required = true;
   document.getElementById("confirmPassword").required = true;
+  document.getElementById("adminInfo").style.display = "none";
+  document.getElementById("permissionsSection").style.display = "none";
   userModalInstance.show();
 };
+
+// Handle role change
+window.handleRoleChange = function () {
+  const role = document.getElementById("role").value;
+  const adminInfo = document.getElementById("adminInfo");
+  const permissionsSection = document.getElementById("permissionsSection");
+
+  if (role === "admin") {
+    adminInfo.style.display = "block";
+    permissionsSection.style.display = "none";
+  } else if (role === "staf") {
+    adminInfo.style.display = "none";
+    permissionsSection.style.display = "block";
+    renderPermissionToggles();
+  } else {
+    adminInfo.style.display = "none";
+    permissionsSection.style.display = "none";
+  }
+};
+
+// Render permission toggles
+function renderPermissionToggles(existingPermissions = null) {
+  const container = document.getElementById("permissionsContainer");
+  const permissions = existingPermissions || getDefaultPermissions("staf");
+
+  let html = "";
+
+  MENU_STRUCTURE.forEach((menu) => {
+    if (menu.id === "dashboard" || menu.superAdminOnly) return; // Skip dashboard & super admin only menus
+
+    if (menu.hasSubmenu) {
+      const activeCount = menu.submenu.filter((sub) => {
+        if (sub.superAdminOnly) return false;
+        return permissions[menu.id]?.[sub.id] === true;
+      }).length;
+      const totalCount = menu.submenu.filter((sub) => !sub.superAdminOnly).length;
+
+      html += `
+        <div class="permission-item">
+          <div class="permission-header" onclick="toggleSubmenu('${menu.id}')">
+            <div class="permission-label">
+              <i class="${menu.icon}"></i>
+              <span>${menu.label}</span>
+              <span class="submenu-count">(${activeCount}/${totalCount})</span>
+            </div>
+            <i class="fas fa-chevron-down expand-icon" id="expand-${menu.id}"></i>
+          </div>
+          <div class="submenu-permissions" id="submenu-${menu.id}" style="display: none">
+      `;
+
+      menu.submenu.forEach((sub) => {
+        if (sub.superAdminOnly) return; // Skip super admin only submenus
+
+        const checked = permissions[menu.id]?.[sub.id] === true ? "checked" : "";
+        html += `
+          <div class="submenu-item">
+            <div class="form-check form-switch">
+              <input 
+                type="checkbox" 
+                class="form-check-input permission-toggle" 
+                id="perm-${menu.id}-${sub.id}"
+                data-menu="${menu.id}"
+                data-submenu="${sub.id}"
+                ${checked}
+                onchange="updateParentToggle('${menu.id}')"
+              >
+              <label class="form-check-label" for="perm-${menu.id}-${sub.id}">
+                ${sub.label}
+              </label>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+    } else {
+      // Single menu without submenu
+      const checked = permissions[menu.id] === true ? "checked" : "";
+      html += `
+        <div class="permission-item">
+          <div class="form-check form-switch">
+            <input 
+              type="checkbox" 
+              class="form-check-input permission-toggle" 
+              id="perm-${menu.id}"
+              data-menu="${menu.id}"
+              ${checked}
+            >
+            <label class="form-check-label permission-label" for="perm-${menu.id}">
+              <i class="${menu.icon}"></i>
+              <span>${menu.label}</span>
+            </label>
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  container.innerHTML = html;
+}
+
+// Toggle submenu visibility
+window.toggleSubmenu = function (menuId) {
+  const submenu = document.getElementById(`submenu-${menuId}`);
+  const icon = document.getElementById(`expand-${menuId}`);
+
+  if (submenu.style.display === "none") {
+    submenu.style.display = "block";
+    icon.classList.add("expanded");
+  } else {
+    submenu.style.display = "none";
+    icon.classList.remove("expanded");
+  }
+};
+
+// Update parent toggle count
+window.updateParentToggle = function (menuId) {
+  const menu = MENU_STRUCTURE.find((m) => m.id === menuId);
+  if (!menu || !menu.hasSubmenu) return;
+
+  const visibleSubmenus = menu.submenu.filter((sub) => !sub.superAdminOnly);
+  const activeCount = visibleSubmenus.filter((sub) => {
+    const checkbox = document.getElementById(`perm-${menuId}-${sub.id}`);
+    return checkbox && checkbox.checked;
+  }).length;
+
+  const countSpan = document
+    .querySelector(`#submenu-${menuId}`)
+    ?.closest(".permission-item")
+    ?.querySelector(".submenu-count");
+  if (countSpan) {
+    countSpan.textContent = `(${activeCount}/${visibleSubmenus.length})`;
+  }
+};
+
+// Set all permissions
+window.setAllPermissions = function (enable) {
+  const checkboxes = document.querySelectorAll(".permission-toggle");
+  checkboxes.forEach((checkbox) => {
+    checkbox.checked = enable;
+    const menuId = checkbox.dataset.menu;
+    if (checkbox.dataset.submenu) {
+      updateParentToggle(menuId);
+    }
+  });
+};
+
+// Get permissions from form
+function getPermissionsFromForm() {
+  const permissions = { dashboard: true }; // Dashboard always accessible
+
+  MENU_STRUCTURE.forEach((menu) => {
+    if (menu.id === "dashboard" || menu.superAdminOnly) return;
+
+    if (menu.hasSubmenu) {
+      permissions[menu.id] = {};
+      menu.submenu.forEach((sub) => {
+        if (sub.superAdminOnly) return;
+        const checkbox = document.getElementById(`perm-${menu.id}-${sub.id}`);
+        permissions[menu.id][sub.id] = checkbox ? checkbox.checked : false;
+      });
+    } else {
+      const checkbox = document.getElementById(`perm-${menu.id}`);
+      permissions[menu.id] = checkbox ? checkbox.checked : false;
+    }
+  });
+
+  return permissions;
+}
 
 // Open edit modal
 window.openEditModal = async function (username) {
@@ -172,6 +346,38 @@ window.openEditModal = async function (username) {
     document.getElementById("confirmPasswordGroup").style.display = "none";
     document.getElementById("password").required = false;
     document.getElementById("confirmPassword").required = false;
+
+    // Handle role-specific UI
+    if (userData.role === "admin" && userData.username === "supervisor") {
+      // Super Admin - show special info
+      document.getElementById("adminInfo").innerHTML = `
+        <small>
+          <strong>🛡️ Super Admin Access:</strong><br>
+          Full access ke semua menu dan fitur sistem
+        </small>
+      `;
+      document.getElementById("adminInfo").style.display = "block";
+      document.getElementById("permissionsSection").style.display = "none";
+    } else if (userData.role === "admin") {
+      // Regular Admin - show access policy
+      document.getElementById("adminInfo").innerHTML = `
+        <small>
+          <strong>ℹ️ Admin Access Policy:</strong><br>
+          🖥️ <strong>Desktop:</strong> Full access (kecuali Maintenance, Supervisor & Setting)<br>
+          📱 <strong>Mobile:</strong> Servis only
+        </small>
+      `;
+      document.getElementById("adminInfo").style.display = "block";
+      document.getElementById("permissionsSection").style.display = "none";
+    } else if (userData.role === "staf") {
+      document.getElementById("adminInfo").style.display = "none";
+      document.getElementById("permissionsSection").style.display = "block";
+      const permissions = userData.permissions || getDefaultPermissions("staf");
+      renderPermissionToggles(permissions);
+    } else {
+      document.getElementById("adminInfo").style.display = "none";
+      document.getElementById("permissionsSection").style.display = "none";
+    }
 
     userModalInstance.show();
   } catch (error) {
@@ -231,6 +437,14 @@ window.saveUser = async function () {
       updatedAt: new Date(),
     };
 
+    // Add permissions for staff
+    if (role === "staf") {
+      userData.permissions = getPermissionsFromForm();
+    } else {
+      // Admin doesn't need permissions object
+      userData.permissions = null;
+    }
+
     if (needPassword) {
       userData.passwordHash = await hashPassword(password);
     }
@@ -256,11 +470,21 @@ window.saveUser = async function () {
       showToast("User berhasil ditambahkan", "success");
     }
 
+    // Reset button state
+    saveButton.disabled = false;
+    saveButton.textContent = "Simpan";
+
     userModalInstance.hide();
     await loadUsers();
   } catch (error) {
     console.error("Error saving user:", error);
     showToast("Gagal menyimpan user", "error");
+    // Reset button on error too
+    const saveButton = event.target;
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "Simpan";
+    }
   }
 };
 

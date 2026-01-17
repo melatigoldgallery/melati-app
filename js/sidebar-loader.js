@@ -7,27 +7,253 @@ async function initSidebar() {
     const html = await response.text();
     sidebar.innerHTML = html;
 
+    // Filter menu based on user permissions
+    await filterMenuByPermissions();
+
     // Set active menu berdasarkan halaman saat ini
     setActiveMenu();
-
-    // Show Setting menu for supervisor (after sidebar loaded)
-    showSettingMenuForSupervisor();
   } catch (error) {
     console.error("Error loading sidebar:", error);
   }
 }
 
-// Show Setting menu only for supervisor
-function showSettingMenuForSupervisor() {
+// Filter menu based on user role and permissions
+async function filterMenuByPermissions() {
   const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
-  const isSupervisor = currentUser.username === "supervisor" && currentUser.role === "admin";
+  const isMobile = window.innerWidth < 768;
 
-  if (isSupervisor) {
-    const settingMenu = document.querySelector(".setting-menu");
-    if (settingMenu) {
-      settingMenu.style.display = "block";
+  // Supervisor: Full access - show everything
+  if (currentUser.username === "supervisor" && currentUser.role === "admin") {
+    showSettingMenu();
+    showSupervisorSubmenu();
+    return;
+  }
+
+  // Admin: Different behavior for mobile/desktop
+  if (currentUser.role === "admin") {
+    if (isMobile) {
+      // Mobile: Servis only
+      hideAllMenusExcept(["dashboard", "servis"]);
+    } else {
+      // Desktop: All except maintenance, supervisor submenu, and setting
+      hideMenu("maintenance");
+      hideSupervisorSubmenu();
+      // Hide setting menu (only for Super Admin)
+      const settingMenu = document.querySelector(".setting-menu");
+      if (settingMenu) settingMenu.style.display = "none";
+    }
+    return;
+  }
+
+  // Staff: Filter by permissions
+  if (currentUser.role === "staf") {
+    if (currentUser.permissions) {
+      filterStaffMenus(currentUser.permissions);
+    } else {
+      hideAllMenusExcept(["dashboard"]);
+    }
+    return;
+  }
+
+  // Default: Only dashboard
+  hideAllMenusExcept(["dashboard"]);
+}
+
+// Show setting menu
+function showSettingMenu() {
+  const settingMenu = document.querySelector(".setting-menu");
+  if (settingMenu) {
+    settingMenu.style.display = "block";
+  }
+}
+
+// Show supervisor submenu
+function showSupervisorSubmenu() {
+  const supervisorMenu = document.querySelector(".supervisor-menu");
+  const supervisorToggle = document.querySelector(".supervisor-toggle");
+  if (supervisorMenu) supervisorMenu.style.display = "block";
+  if (supervisorToggle) supervisorToggle.style.display = "flex";
+}
+
+// Hide supervisor submenu
+function hideSupervisorSubmenu() {
+  const supervisorMenu = document.querySelector(".supervisor-menu");
+  const supervisorToggle = document.querySelector(".supervisor-toggle");
+  if (supervisorMenu) supervisorMenu.closest(".nav-item").style.display = "none";
+  if (supervisorToggle) supervisorToggle.style.display = "none";
+}
+
+// Hide specific menu
+function hideMenu(menuName) {
+  const menuMap = {
+    maintenance: 'a[href="maintenance.html"]',
+    dashboard: 'a[href="dashboard.html"]',
+    "inventory-barang": '[data-bs-target="#barangSubmenu"]',
+    layanan: '[data-bs-target="#orderSubmenu"]',
+    aksesoris: '[data-bs-target="#aksesorisSubmenu"]',
+    antrian: '[data-bs-target="#antrianSubmenu"]',
+    absensi: '[data-bs-target="#absensiSubmenu"]',
+    servis: '[data-bs-target="#servisSubmenu"]',
+    promosi: '[data-bs-target="#promosiSubmenu"]',
+  };
+
+  const selector = menuMap[menuName];
+  if (selector) {
+    const menuElement = document.querySelector(selector);
+    if (menuElement) {
+      menuElement.closest(".nav-item").style.display = "none";
     }
   }
+}
+
+// Hide all menus except specified ones
+function hideAllMenusExcept(keepMenus = []) {
+  const allMenus = [
+    "dashboard",
+    "maintenance",
+    "inventory-barang",
+    "layanan",
+    "aksesoris",
+    "antrian",
+    "absensi",
+    "servis",
+    "promosi",
+  ];
+
+  allMenus.forEach((menu) => {
+    if (!keepMenus.includes(menu)) {
+      hideMenu(menu);
+    }
+  });
+
+  // Hide setting menu
+  const settingMenu = document.querySelector(".setting-menu");
+  if (settingMenu) {
+    settingMenu.style.display = "none";
+  }
+}
+
+// Filter staff menus based on permissions
+function filterStaffMenus(permissions) {
+  // Hide maintenance and setting (super admin only)
+  hideMenu("maintenance");
+  const settingMenu = document.querySelector(".setting-menu");
+  if (settingMenu) settingMenu.style.display = "none";
+
+  // Always hide supervisor submenu for staff
+  hideSupervisorSubmenu();
+
+  // Check each menu - updated keys match menu-structure.js
+  const menuPermissionMap = {
+    "inventory-barang": "inventory-barang",
+    layanan: "layanan",
+    aksesoris: "aksesoris",
+    antrian: "antrian",
+    absensi: "absensi",
+    servis: "servis",
+    promosi: "promosi",
+  };
+
+  Object.entries(menuPermissionMap).forEach(([menuName, permKey]) => {
+    const perm = permissions[permKey];
+
+    if (typeof perm === "boolean") {
+      // Simple menu (no submenu)
+      if (!perm) {
+        hideMenu(menuName);
+      }
+    } else if (typeof perm === "object" && perm !== null) {
+      // Menu with submenus
+      const hasAnyAccess = Object.values(perm).some((val) => val === true);
+
+      if (!hasAnyAccess) {
+        // No access to any submenu, hide entire menu
+        hideMenu(menuName);
+      } else {
+        // Has access to some submenus, filter them
+        filterSubmenu(menuName, perm);
+      }
+    } else {
+      // No permission defined, hide it
+      hideMenu(menuName);
+    }
+  });
+}
+
+// Filter submenu items based on permissions
+function filterSubmenu(menuName, submenuPermissions) {
+  const submenuMap = {
+    "inventory-barang": {
+      container: "#barangSubmenu",
+      items: {
+        "manajemen-stok": 'a[href="manajemenStok.html"]',
+        "laporan-stok-harian": 'a[href="laporanStokHarian.html"]',
+        "mutasi-kode": 'a[href="mutasiKode.html"]',
+        "restok-barang": 'a[href="restokBarang.html"]',
+      },
+    },
+    layanan: {
+      container: "#orderSubmenu",
+      items: {
+        "order-barang": 'a[href="order-barang.html"]',
+      },
+    },
+    aksesoris: {
+      container: "#aksesorisSubmenu",
+      items: {
+        "tambah-barang": 'a[href="tambahAksesoris.html"]',
+        penjualan: 'a[href="penjualanAksesoris.html"]',
+        return: 'a[href="return.html"]',
+        "laporan-penjualan": 'a[href="laporanPenjualan.html"]',
+        "laporan-stok": 'a[href="laporanStok.html"]',
+      },
+    },
+    antrian: {
+      container: "#antrianSubmenu",
+      items: {
+        "admin-antrian": 'a[href="admin-antrian.html"]',
+        "display-antrian": 'a[href="display.html"]',
+        "laporan-antrian": 'a[href="analisis.html"]',
+      },
+    },
+    absensi: {
+      container: "#absensiSubmenu",
+      items: {
+        kehadiran: 'a[href="sistemAbsensi.html"]',
+        "pengajuan-izin": 'a[href="pengajuan-izin.html"]',
+        "laporan-kehadiran": 'a[href="laporan-kehadiran.html"]',
+        "laporan-izin": 'a[href="laporan-izin.html"]',
+      },
+    },
+    servis: {
+      container: "#servisSubmenu",
+      items: {
+        "input-servis": 'a[href="input-servis.html"]',
+        "data-servis": 'a[href="data-servis.html"]',
+        "laporan-servis": 'a[href="laporan-servis.html"]',
+      },
+    },
+    promosi: {
+      container: "#promosiSubmenu",
+      items: {
+        "setting-promosi": 'a[href="promosi.html"]',
+        "display-promosi": 'a[href="promosi-display.html"]',
+      },
+    },
+  };
+
+  const config = submenuMap[menuName];
+  if (!config) return;
+
+  Object.entries(config.items).forEach(([permKey, selector]) => {
+    const hasAccess = submenuPermissions[permKey] === true;
+    if (!hasAccess) {
+      const element = document.querySelector(selector);
+      if (element) {
+        element.closest(".nav-item").style.display = "none";
+      }
+    }
+  });
 }
 
 // Set active menu berdasarkan current page
