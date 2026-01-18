@@ -13,7 +13,7 @@ import {
   Timestamp,
   orderBy,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
-import { firestore } from "./configFirebase.js";
+import { firestore } from "../configFirebase.js";
 
 import StockService from "../services/stockService.js";
 

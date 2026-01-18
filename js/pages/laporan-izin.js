@@ -197,17 +197,28 @@ function cleanupOldReportCache() {
   saveReportCacheToStorage();
 }
 
-// Fungsi untuk memaksa refresh data
-function forceRefreshData() {
-  // Tampilkan konfirmasi
-  if (confirm("Apakah Anda yakin ingin menyegarkan data dari server?")) {
-    // Panggil generateReport dengan forceRefresh=true
-    generateReport(true);
+// Fungsi untuk check akses admin/supervisor
+function checkAdminAccess() {
+  try {
+    const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+    const isAdmin = currentUser.username === "supervisor" || currentUser.role === "supervisor";
 
-    // Tampilkan pesan
-    showAlert("info", "Data sedang disegarkan dari server...");
+    if (!isAdmin) {
+      // Sembunyikan tombol hapus data bulan
+      const deleteDataBtn = document.getElementById("deleteDataBtn");
+      if (deleteDataBtn) {
+        deleteDataBtn.style.display = "none";
+      }
+
+      // Sembunyikan kolom aksi di tabel
+      const aksiHeaders = document.querySelectorAll(".aksi");
+      aksiHeaders.forEach((header) => (header.style.display = "none"));
+    }
+  } catch (error) {
+    console.error("Error checking admin access:", error);
   }
 }
+
 // Initialize page
 document.addEventListener("DOMContentLoaded", () => {
   try {
@@ -217,11 +228,8 @@ document.addEventListener("DOMContentLoaded", () => {
     restorePageState();
     // Bersihkan cache lama
     cleanupOldReportCache();
-    // Tambahkan event listener untuk tombol refresh jika ada
-    const refreshButton = document.getElementById("refreshData");
-    if (refreshButton) {
-      refreshButton.addEventListener("click", forceRefreshData);
-    }
+    // Check admin access untuk tombol hapus
+    checkAdminAccess();
 
     // Set current date and time
     function updateDateTime() {
@@ -812,7 +820,7 @@ async function generateReport(forceRefresh = false) {
       // Tidak ada cache, tampilkan pesan error
       showAlert(
         "danger",
-        '<i class="fas fa-exclamation-circle me-2"></i> Terjadi kesalahan saat memuat data: ' + error.message
+        '<i class="fas fa-exclamation-circle me-2"></i> Terjadi kesalahan saat memuat data: ' + error.message,
       );
       hideReportElements();
       document.getElementById("noDataMessage").style.display = "block";
@@ -1238,13 +1246,13 @@ function updateSummaryCards() {
 
     // Count by status
     const approvedCount = currentLeaveData.filter(
-      (leave) => leave.status === "Approved" || leave.status === "Disetujui"
+      (leave) => leave.status === "Approved" || leave.status === "Disetujui",
     ).length;
     const rejectedCount = currentLeaveData.filter(
-      (leave) => leave.status === "Rejected" || leave.status === "Ditolak"
+      (leave) => leave.status === "Rejected" || leave.status === "Ditolak",
     ).length;
     const pendingCount = currentLeaveData.filter(
-      (leave) => leave.status === "Pending" || leave.status === "Menunggu Persetujuan"
+      (leave) => leave.status === "Pending" || leave.status === "Menunggu Persetujuan",
     ).length;
 
     const approvedLeaves = document.getElementById("approvedLeaves");
@@ -1417,16 +1425,16 @@ function populateLeaveTable() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
 
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
 
           // Format tanggal dalam format Indonesia
@@ -1469,15 +1477,15 @@ function populateLeaveTable() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
           const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -2024,16 +2032,16 @@ function exportToExcel() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
 
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
 
           // Format tanggal dalam format Indonesia
@@ -2072,15 +2080,15 @@ function exportToExcel() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
           const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -2156,7 +2164,7 @@ function exportToExcel() {
     XLSX.utils.sheet_add_aoa(
       ws,
       [[`LAPORAN IZIN KARYAWAN`], [`MELATI GOLD SHOP`], [`BULAN ${monthName.toUpperCase()} ${year}`]],
-      { origin: "A1" }
+      { origin: "A1" },
     );
 
     // Set column widths
@@ -2408,16 +2416,16 @@ function exportToPDF() {
           leave.status === "Disetujui"
             ? "statusApproved"
             : leave.status === "Ditolak"
-            ? "statusRejected"
-            : "statusPending";
+              ? "statusRejected"
+              : "statusPending";
 
         // Determine replacement status style
         const replacementStatusStyle =
           leave.replacementStatus === "Sudah Diganti"
             ? "replacementDone"
             : leave.replacementStatus === "Tidak Perlu Diganti"
-            ? "replacementNotNeeded"
-            : "replacementPending";
+              ? "replacementNotNeeded"
+              : "replacementPending";
 
         // Add row to table
         docDefinition.content[0].table.body.push([
@@ -2441,16 +2449,16 @@ function exportToPDF() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
 
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
 
           // Format tanggal dalam format Indonesia
@@ -2474,8 +2482,8 @@ function exportToPDF() {
             leave.status === "Disetujui"
               ? "statusApproved"
               : leave.status === "Ditolak"
-              ? "statusRejected"
-              : "statusPending";
+                ? "statusRejected"
+                : "statusPending";
 
           // Add row to table
           docDefinition.content[0].table.body.push([
@@ -2497,15 +2505,15 @@ function exportToPDF() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
           const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -2547,15 +2555,15 @@ function exportToPDF() {
               leave.status === "Disetujui"
                 ? "statusApproved"
                 : leave.status === "Ditolak"
-                ? "statusRejected"
-                : "statusPending";
+                  ? "statusRejected"
+                  : "statusPending";
 
             const replacementStatusStyle =
               dayStatus === "Sudah Diganti"
                 ? "replacementDone"
                 : dayStatus === "Tidak Perlu Diganti"
-                ? "replacementNotNeeded"
-                : "replacementPending";
+                  ? "replacementNotNeeded"
+                  : "replacementPending";
 
             // Tampilkan informasi penggantian untuk hari ini
             let replacementInfo = baseReplacementInfo;
@@ -2746,7 +2754,12 @@ function attachSingleDeleteHandlers() {
   const oldPopulate = populateLeaveTable;
   populateLeaveTable = function () {
     oldPopulate.apply(this, arguments);
-    // setelah tabel ter-render, tambahkan tombol hapus ke setiap baris (kecuali header)
+
+    // Check if user is admin
+    const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+    const isAdmin = currentUser.username === "supervisor" || currentUser.role === "supervisor";
+
+    // setelah tabel ter-render, tambahkan tombol hapus ke setiap baris (kecuali header) hanya jika admin
     const tbody = document.getElementById("leaveReportList");
     if (tbody) {
       Array.from(tbody.rows).forEach((tr, i) => {
@@ -2756,19 +2769,23 @@ function attachSingleDeleteHandlers() {
           // Jika kolom aksi belum ada, tambahkan td
           if (tr.cells.length < 10) {
             const td = document.createElement("td");
-            td.innerHTML = idRef
-              ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
-              : "-";
+            td.innerHTML =
+              isAdmin && idRef
+                ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
+                : "-";
             tr.appendChild(td);
           } else {
             // overwrite kolom aksi
-            tr.cells[9].innerHTML = idRef
-              ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
-              : "-";
+            tr.cells[9].innerHTML =
+              isAdmin && idRef
+                ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
+                : "-";
           }
         }
       });
-      attachSingleDeleteHandlers();
+      if (isAdmin) {
+        attachSingleDeleteHandlers();
+      }
     }
   };
 })();
@@ -2862,8 +2879,5 @@ window.debugFunctions = {
         };
       }),
     };
-  },
-  forceRefresh: function () {
-    generateReport(true);
   },
 };

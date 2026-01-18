@@ -1,4 +1,4 @@
-import { firestore } from "./configFirebase.js";
+import { firestore } from "../configFirebase.js";
 import {
   collection,
   getDocs,
@@ -162,6 +162,7 @@ export const aksesorisSaleHandler = {
   // Fungsi inisialisasi
   async init() {
     this.initDomElements();
+    this.checkAdminAccess();
     await this.loadKodeAksesorisData();
     this.initModals();
     this.attachEventListeners();
@@ -170,6 +171,20 @@ export const aksesorisSaleHandler = {
     this.handleCategoryChange(selectKategori.value, tbody);
     this.setTodayDate();
     this.renderStockAdditionHistory([]);
+  },
+
+  // Fungsi untuk check akses admin/supervisor
+  checkAdminAccess() {
+    try {
+      const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+      const isAdmin = currentUser.username === "supervisor" || currentUser.role === "supervisor";
+      if (isAdmin) {
+        const btnHapusData = document.getElementById("btnHapusData");
+        if (btnHapusData) btnHapusData.style.display = "";
+      }
+    } catch (error) {
+      console.error("Error checking admin access:", error);
+    }
   },
 
   // Fungsi untuk mengisi tanggal hari ini
