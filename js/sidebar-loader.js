@@ -69,18 +69,18 @@ function showSettingMenu() {
 
 // Show supervisor submenu
 function showSupervisorSubmenu() {
-  const supervisorMenu = document.querySelector(".supervisor-menu");
   const supervisorToggle = document.querySelector(".supervisor-toggle");
-  if (supervisorMenu) supervisorMenu.style.display = "block";
-  if (supervisorToggle) supervisorToggle.style.display = "flex";
+  if (supervisorToggle) {
+    supervisorToggle.closest(".nav-item").style.display = "block";
+  }
 }
 
 // Hide supervisor submenu
 function hideSupervisorSubmenu() {
-  const supervisorMenu = document.querySelector(".supervisor-menu");
   const supervisorToggle = document.querySelector(".supervisor-toggle");
-  if (supervisorMenu) supervisorMenu.closest(".nav-item").style.display = "none";
-  if (supervisorToggle) supervisorToggle.style.display = "none";
+  if (supervisorToggle) {
+    supervisorToggle.closest(".nav-item").style.display = "none";
+  }
 }
 
 // Hide specific menu

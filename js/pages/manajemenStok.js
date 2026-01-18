@@ -80,7 +80,7 @@ async function saveStockLog(logData) {
         date: dateStr,
         logs: arrayUnion(logEntry),
       },
-      { merge: true }
+      { merge: true },
     );
   } catch (error) {
     console.error("Error saving stock log:", error);
@@ -643,48 +643,54 @@ export async function populateTables(options = {}) {
           </td>
         `;
 
+        // Kolom Rincian (hanya untuk kategori tertentu)
+        let rincianColumn = "";
+        if (
+          mainCat.includes("HALA") ||
+          mainCat.includes("KENDARI") ||
+          mainCat.includes("BERLIAN") ||
+          mainCat.includes("SDW") ||
+          mainCat.includes("EMAS") ||
+          mainCat === "BERLIAN"
+        ) {
+          rincianColumn = `
+            <td class="text-center">
+              <button class="btn btn-outline-primary btn-sm detail-hala-btn" 
+                      data-main="${mainCat}" data-category="${categoryKey}" 
+                      title="Detail ${mainCat}">
+                <i class="fas fa-eye"></i>
+              </button>
+            </td>
+          `;
+        } else if (mainCat === "KALUNG" || mainCat.includes("KALUNG")) {
+          rincianColumn = `
+            <td class="text-center">
+              <button class="btn btn-outline-primary btn-sm detail-kalung-btn" 
+                      data-main="KALUNG" data-category="${categoryKey}" 
+                      title="Detail Kalung">
+                <i class="fas fa-eye"></i>
+              </button>
+            </td>
+          `;
+        } else if (mainCat === "LIONTIN" || mainCat.includes("LIONTIN")) {
+          rincianColumn = `
+            <td class="text-center">
+              <button class="btn btn-outline-primary btn-sm detail-liontin-btn" 
+                      data-main="LIONTIN" data-category="${categoryKey}" 
+                      title="Detail Liontin">
+                <i class="fas fa-eye"></i>
+              </button>
+            </td>
+          `;
+        } else {
+          // Untuk kategori lain (ANTING, CINCIN, GELANG, GIWANG) tidak ada kolom rincian
+          rincianColumn = "";
+        }
+
         tr.innerHTML = `
           <td class="fw-bold">${idx + 1}</td>
-          <td class="fw-bold jenis-column" style="font-size: 0.9rem; color: #35393d;">
-            <div class="d-flex justify-content-between align-items-center w-100">
-              ${subCat} 
-              ${
-                // Old logic (exact match):
-                // mainCat === "HALA" || mainCat === "KENDARI" || mainCat === "BERLIAN" || mainCat === "SDW" || mainCat === "EMAS_BALI"
-                // New logic: support new names like "HALA & SDW" and "KENDARI & EMAS BALI"
-                mainCat.includes("HALA") ||
-                mainCat.includes("KENDARI") ||
-                mainCat.includes("BERLIAN") ||
-                mainCat.includes("SDW") ||
-                mainCat.includes("EMAS") ||
-                mainCat === "BERLIAN"
-                  ? `<button class="btn btn-outline-primary btn-sm detail-hala-btn btn-hala" 
-                              data-main="${mainCat}" data-category="${categoryKey}" 
-                              title="Detail ${mainCat}">
-                      <i class="fas fa-eye"></i>
-                    </button>`
-                  : ""
-              }
-              ${
-                mainCat === "KALUNG" || mainCat.includes("KALUNG")
-                  ? `<button class="btn btn-outline-primary btn-sm detail-kalung-btn ms-1" 
-                              data-main="KALUNG" data-category="${categoryKey}" 
-                              title="Detail Kalung">
-                      <i class="fas fa-eye"></i>
-                    </button>`
-                  : ""
-              }
-              ${
-                mainCat === "LIONTIN" || mainCat.includes("LIONTIN")
-                  ? `<button class="btn btn-outline-primary btn-sm detail-liontin-btn ms-1" 
-                              data-main="LIONTIN" data-category="${categoryKey}" 
-                              title="Detail Liontin">
-                      <i class="fas fa-eye"></i>
-                    </button>`
-                  : ""
-              }
-            </div>
-          </td>
+          <td class="fw-bold" style="font-size: 0.9rem; color: #35393d;">${subCat}</td>
+          ${rincianColumn}
           <td class="text-center">
             <span class="badge bg-success fs-6 px-2 py-2">${stockItem.quantity}</span>
           </td>
@@ -1009,7 +1015,7 @@ function showHalaDetail(category, mainCat) {
   tbody.innerHTML = "";
 
   if (!stockData[category] || !stockData[category][mainCat] || !stockData[category][mainCat].details) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Tidak ada data detail</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted">Tidak ada data detail</td></tr>`;
     totalEl.textContent = "0";
     return modal.show();
   }
@@ -1025,7 +1031,6 @@ function showHalaDetail(category, mainCat) {
     tr.innerHTML = `
       <td>${index + 1}</td>
       <td>${halaJewelryMapping[type]}</td>
-      <td><span class="badge bg-primary">${type}</span></td>
       <td class="text-center"><strong>${quantity}</strong></td>
     `;
     tbody.appendChild(tr);
@@ -1034,9 +1039,8 @@ function showHalaDetail(category, mainCat) {
   totalEl.textContent = total;
 
   // Update modal title dengan kategori
-  document.getElementById(
-    "modalDetailHalaLabel"
-  ).textContent = `Detail Stok ${mainCat} - ${reverseCategoryMapping[category]}`;
+  document.getElementById("modalDetailHalaLabel").textContent =
+    `Detail Stok ${mainCat} - ${reverseCategoryMapping[category]}`;
 
   modal.show();
 }
@@ -1050,7 +1054,7 @@ function showKalungDetail(category, mainCat) {
   tbody.innerHTML = "";
 
   if (!stockData[category] || !stockData[category][mainCat] || !stockData[category][mainCat].details) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Tidak ada data detail</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted">Tidak ada data detail</td></tr>`;
     totalEl.textContent = "0";
     return modal.show();
   }
@@ -1066,7 +1070,6 @@ function showKalungDetail(category, mainCat) {
     tr.innerHTML = `
       <td>${index + 1}</td>
       <td>${kalungColorMapping[type]}</td>
-      <td><span class="badge bg-primary">${type}</span></td>
       <td class="text-center"><strong>${quantity}</strong></td>
     `;
     tbody.appendChild(tr);
@@ -1075,9 +1078,8 @@ function showKalungDetail(category, mainCat) {
   totalEl.textContent = total;
 
   // Update modal title dengan kategori
-  document.getElementById(
-    "modalDetailKalungLabel"
-  ).textContent = `Detail Stok KALUNG - ${reverseCategoryMapping[category]}`;
+  document.getElementById("modalDetailKalungLabel").textContent =
+    `Detail Stok KALUNG - ${reverseCategoryMapping[category]}`;
 
   modal.show();
 }
@@ -1091,7 +1093,7 @@ function showLiontinDetail(category, mainCat) {
   tbody.innerHTML = "";
 
   if (!stockData[category] || !stockData[category][mainCat] || !stockData[category][mainCat].details) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Tidak ada data detail</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted">Tidak ada data detail</td></tr>`;
     totalEl.textContent = "0";
     return modal.show();
   }
@@ -1107,7 +1109,6 @@ function showLiontinDetail(category, mainCat) {
     tr.innerHTML = `
       <td>${index + 1}</td>
       <td>${liontinColorMapping[type]}</td>
-      <td><span class="badge bg-primary">${type}</span></td>
       <td class="text-center"><strong>${quantity}</strong></td>
     `;
     tbody.appendChild(tr);
@@ -1115,9 +1116,8 @@ function showLiontinDetail(category, mainCat) {
 
   totalEl.textContent = total;
 
-  document.getElementById(
-    "modalDetailLiontinLabel"
-  ).textContent = `Detail Stok LIONTIN - ${reverseCategoryMapping[category]}`;
+  document.getElementById("modalDetailLiontinLabel").textContent =
+    `Detail Stok LIONTIN - ${reverseCategoryMapping[category]}`;
   modal.show();
 }
 
@@ -1258,6 +1258,23 @@ document.body.addEventListener("click", function (e) {
         ensureTypedStructure(stockData[categoryKey], mainCat, kalungColorTypes);
       } catch {}
       showKalungDetail(categoryKey, mainCat);
+    })();
+    return;
+  }
+
+  // Detail LIONTIN
+  if (e.target.classList.contains("detail-liontin-btn") || e.target.closest(".detail-liontin-btn")) {
+    e.preventDefault();
+    const btn = e.target.classList.contains("detail-liontin-btn") ? e.target : e.target.closest(".detail-liontin-btn");
+    const mainCat = btn.dataset.main; // "LIONTIN"
+    const categoryKey = btn.dataset.category;
+    (async () => {
+      try {
+        await fetchStockData();
+        if (!stockData[categoryKey]) stockData[categoryKey] = {};
+        ensureTypedStructure(stockData[categoryKey], mainCat, liontinColorTypes);
+      } catch {}
+      showLiontinDetail(categoryKey, mainCat);
     })();
     return;
   }
