@@ -41,7 +41,7 @@ function setCacheWithTimestamp(key, data, ttl = CACHE_TTL_STANDARD) {
         data: data,
         timestamp: Date.now(),
         ttl: ttl,
-      }),
+      })
     );
   } catch (error) {
     // Silent fail
@@ -124,7 +124,7 @@ function signalKodeUpdate(kode, nama, kategori, action) {
   window.dispatchEvent(
     new CustomEvent("stockDataChanged", {
       detail: changeInfo,
-    }),
+    })
   );
 
   console.log(`🔄 Signaled kode ${action}:`, kode);
@@ -138,7 +138,7 @@ function invalidateStockMasterCache() {
     JSON.stringify({
       timestamp: Date.now(),
       action: "full_refresh",
-    }),
+    })
   );
 
   invalidateCache("kodeAksesoris");
@@ -594,10 +594,10 @@ export const aksesorisSaleHandler = {
       kategori === "1"
         ? this.OPSI_KOTAK
         : kategori === "2"
-          ? this.OPSI_AKSESORIS
-          : kategori === "3"
-            ? this.OPSI_SILVER
-            : [];
+        ? this.OPSI_AKSESORIS
+        : kategori === "3"
+        ? this.OPSI_SILVER
+        : [];
     this.updateAllKodeBarangOptions(options);
     if (options.length) {
       this.tambahBaris(kategori, tbody);
@@ -666,7 +666,7 @@ export const aksesorisSaleHandler = {
                           ${options
                             .map(
                               (option) =>
-                                `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`,
+                                `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`
                             )
                             .join("")}
                       </select>
@@ -846,8 +846,8 @@ export const aksesorisSaleHandler = {
           this.elements.selectKategori.value === "1"
             ? "kotak"
             : this.elements.selectKategori.value === "2"
-              ? "aksesoris"
-              : "silver",
+            ? "aksesoris"
+            : "silver",
       });
     });
     return isValid ? items : null;
@@ -886,7 +886,19 @@ export const aksesorisSaleHandler = {
     try {
       invalidateCache("stockData");
 
-      const tanggal = document.getElementById("tanggal").value;
+      const tanggalInput = document.getElementById("tanggal").value;
+
+      // ✅ FIX: Konversi format dd/mm/yyyy ke ISO string
+      let tanggalISO;
+      if (tanggalInput) {
+        const parts = tanggalInput.split("/");
+        if (parts.length === 3) {
+          // parts[0] = day, parts[1] = month, parts[2] = year
+          const date = new Date(parts[2], parts[1] - 1, parts[0]);
+          tanggalISO = date.toISOString();
+        }
+      }
+
       const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
       const salesName = currentUser.username || "System";
 
@@ -899,7 +911,7 @@ export const aksesorisSaleHandler = {
           jumlah: parseInt(item.jumlah) || 0,
           keterangan: `Tambah stok: ${item.nama}`,
           sales: salesName,
-          tanggal: tanggal,
+          tanggal: tanggalISO, // ✅ Kirim ISO format
         });
       }
 
@@ -990,7 +1002,7 @@ export const aksesorisSaleHandler = {
       // Generate filename dengan tanggal
       const filename = `Laporan_Tambah_Stok_${filterDateStart.value.replace(
         /\//g,
-        "-",
+        "-"
       )}_sd_${filterDateEnd.value.replace(/\//g, "-")}.xlsx`;
 
       // Download file
@@ -1020,7 +1032,7 @@ export const aksesorisSaleHandler = {
 
     const confirmed = await this.showConfirmation(
       `Apakah Anda yakin ingin menghapus <strong>${this.laporanData.length} data</strong> pada rentang tanggal <strong>${filterDateStart.value}</strong> s/d <strong>${filterDateEnd.value}</strong>?<br><br><span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Tindakan ini tidak dapat dibatalkan!</span>`,
-      "Konfirmasi Hapus Data",
+      "Konfirmasi Hapus Data"
     );
 
     if (!confirmed) return;
@@ -1042,7 +1054,7 @@ export const aksesorisSaleHandler = {
         transactionsRef,
         where("jenis", "==", "stockAddition"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate))
       );
 
       const snapshot = await getDocs(q);
@@ -1256,7 +1268,7 @@ export const aksesorisSaleHandler = {
         where("jenis", "==", "stockAddition"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
         where("timestamp", "<=", Timestamp.fromDate(endDate)),
-        orderBy("timestamp", "desc"),
+        orderBy("timestamp", "desc")
       );
 
       const snapshot = await getDocs(q);
@@ -1997,7 +2009,7 @@ export const aksesorisSaleHandler = {
       this.showSuccessNotification(
         `Transaksi berhasil diupdate<br>Kode: ${kode}<br>Jumlah: ${jumlahLama} → ${jumlahBaru} pcs<br>Delta: ${
           delta > 0 ? "+" : ""
-        }${delta} pcs`,
+        }${delta} pcs`
       );
     } catch (error) {
       console.error("Error saving edit transaction:", error);
@@ -2075,7 +2087,7 @@ export const aksesorisSaleHandler = {
       bootstrap.Modal.getInstance(document.getElementById("modalDeleteTransaksi")).hide();
 
       this.showSuccessNotification(
-        `Transaksi berhasil dihapus<br>Kode: ${kode}<br>Jumlah: ${jumlah} pcs<br>Stok telah dikurangi`,
+        `Transaksi berhasil dihapus<br>Kode: ${kode}<br>Jumlah: ${jumlah} pcs<br>Stok telah dikurangi`
       );
     } catch (error) {
       console.error("Error deleting transaction:", error);
