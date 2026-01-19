@@ -110,13 +110,14 @@ const returnHandler = {
       console.log(`🔍 Query return data from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
 
       // Query dari stokAksesorisTransaksi dengan jenis = "return"
+      // ✅ FIX: Query berdasarkan field 'tanggal' (user input) bukan 'timestamp' (server time)
       const transactionRef = collection(firestore, "stokAksesorisTransaksi");
       const returnQuery = query(
         transactionRef,
         where("jenis", "==", "return"),
-        where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-        where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-        orderBy("timestamp", "desc"),
+        where("tanggal", ">=", startOfDay.toISOString()),
+        where("tanggal", "<=", endOfDay.toISOString()),
+        orderBy("tanggal", "desc")
       );
 
       const snapshot = await getDocs(returnQuery);
@@ -348,9 +349,13 @@ const returnHandler = {
       return;
     }
 
-    // Konversi ke format ISO untuk query
-    const startISO = startDate.toISOString().split("T")[0];
-    const endISO = endDate.toISOString().split("T")[0];
+    // ✅ FIX: Format tanggal manual untuk avoid timezone issue
+    const startISO = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(
+      startDate.getDate()
+    ).padStart(2, "0")}`;
+    const endISO = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(
+      endDate.getDate()
+    ).padStart(2, "0")}`;
 
     this.loadRiwayatReturn(startISO, endISO);
   },
@@ -479,10 +484,10 @@ const returnHandler = {
           type === "kotak"
             ? itemKategori.includes("kotak")
             : type === "aksesoris"
-              ? itemKategori.includes("aksesoris")
-              : type === "silver"
-                ? itemKategori.includes("silver")
-                : false;
+            ? itemKategori.includes("aksesoris")
+            : type === "silver"
+            ? itemKategori.includes("silver")
+            : false;
 
         const hasStock = item.stok > 0;
 
@@ -726,8 +731,13 @@ const returnHandler = {
         const startDate = parseDate(startDateStr);
         const endDate = parseDate(endDateStr);
         if (startDate && endDate) {
-          const startISO = startDate.toISOString().split("T")[0];
-          const endISO = endDate.toISOString().split("T")[0];
+          // ✅ FIX: Format tanggal manual untuk avoid timezone issue
+          const startISO = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(
+            startDate.getDate()
+          ).padStart(2, "0")}`;
+          const endISO = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(
+            endDate.getDate()
+          ).padStart(2, "0")}`;
           await this.loadRiwayatReturn(startISO, endISO);
         }
       }
@@ -829,8 +839,13 @@ const returnHandler = {
         const startDate = parseDate(startDateStr);
         const endDate = parseDate(endDateStr);
         if (startDate && endDate) {
-          const startISO = startDate.toISOString().split("T")[0];
-          const endISO = endDate.toISOString().split("T")[0];
+          // ✅ FIX: Format tanggal manual untuk avoid timezone issue
+          const startISO = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(
+            startDate.getDate()
+          ).padStart(2, "0")}`;
+          const endISO = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(
+            endDate.getDate()
+          ).padStart(2, "0")}`;
           await this.loadRiwayatReturn(startISO, endISO);
         }
       }
