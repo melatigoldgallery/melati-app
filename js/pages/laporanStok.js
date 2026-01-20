@@ -445,7 +445,7 @@ class OptimizedStockReport {
         transactionRef,
         where("jenis", "==", "return"),
         where("tanggal", ">=", startOfDay.toISOString()),
-        where("tanggal", "<=", endOfDay.toISOString())
+        where("tanggal", "<=", endOfDay.toISOString()),
       );
 
       const snapshot = await getDocs(q);
@@ -570,7 +570,7 @@ class OptimizedStockReport {
     const transQuery = query(
       collection(firestore, "stokAksesorisTransaksi"),
       where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-      where("timestamp", "<=", Timestamp.fromDate(endOfDay))
+      where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
     );
 
     const unsubscribeTrans = onSnapshot(transQuery, (snapshot) => {
@@ -631,7 +631,7 @@ class OptimizedStockReport {
           return: returnAmount,
           stokAkhir: Math.max(
             0,
-            item.stokAwal + item.tambahStok - item.laku - item.free - item.gantiLock - returnAmount
+            item.stokAwal + item.tambahStok - item.laku - item.free - item.gantiLock - returnAmount,
           ),
         };
       });
@@ -763,13 +763,12 @@ class OptimizedStockReport {
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // ✅ FIX: Query berdasarkan 'tanggal' (user input) bukan 'timestamp' (server time)
-    // Agar data return yang disimpan dengan tanggal user input ter-query dengan benar
+    // ✅ Query berdasarkan 'timestamp' (single source of truth untuk semua jenis transaksi)
     const transaksiQuery = query(
       collection(firestore, "stokAksesorisTransaksi"),
-      where("tanggal", ">=", startOfDay.toISOString()),
-      where("tanggal", "<=", endOfDay.toISOString()),
-      orderBy("tanggal", "asc")
+      where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
+      where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+      orderBy("timestamp", "asc"),
     );
 
     const transaksiSnapshot = await getDocs(transaksiQuery);
@@ -1077,7 +1076,7 @@ class OptimizedStockReport {
             const currentStock = stockMap.get(kode) || 0;
             const newStock = Math.max(
               0,
-              currentStock + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - (trans.return || 0)
+              currentStock + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - (trans.return || 0),
             );
             stockMap.set(kode, newStock);
 
@@ -1127,7 +1126,7 @@ class OptimizedStockReport {
       const transQuery = query(
         collection(firestore, "stokAksesorisTransaksi"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
       );
 
       const transSnapshot = await getDocs(transQuery);
@@ -1213,7 +1212,7 @@ class OptimizedStockReport {
       const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
       const silverItems = this.filteredStockData.filter((item) => item.kategori === "silver");
       const otherItems = this.filteredStockData.filter(
-        (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris" && item.kategori !== "silver"
+        (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris" && item.kategori !== "silver",
       );
 
       // Create HTML for table
@@ -1262,7 +1261,7 @@ class OptimizedStockReport {
           item.laku > 0 ||
           item.free > 0 ||
           item.gantiLock > 0 ||
-          item.return > 0
+          item.return > 0,
       );
     } catch (error) {
       this.showError("Terjadi kesalahan saat menampilkan data");
@@ -1688,12 +1687,11 @@ class OptimizedStockReport {
   // Helper: Get ALL transactions for date in one query
   async getTransactionsForDateBatch(startDate, endDate) {
     try {
-      // ✅ FIX: Query berdasarkan 'tanggal' (user input) bukan 'timestamp' (server time)
-      // Agar data return yang disimpan dengan tanggal user input ter-query dengan benar
+      // ✅ Query berdasarkan 'timestamp' (single source of truth untuk semua jenis transaksi)
       const transQuery = query(
         collection(firestore, "stokAksesorisTransaksi"),
-        where("tanggal", ">=", startDate.toISOString()),
-        where("tanggal", "<=", endDate.toISOString())
+        where("timestamp", ">=", Timestamp.fromDate(startDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
       );
 
       const snapshot = await getDocs(transQuery);
