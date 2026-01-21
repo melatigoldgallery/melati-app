@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -311,13 +311,23 @@
                     <label for="jenisManual" class="form-label">
                       Jenis Manual
                       <span class="text-danger">*</span>
+                      <i
+                        class="fas fa-info-circle text-primary ms-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="Pilih jenis manual sesuai kebutuhan mutasi kode barang"
+                        style="cursor: help; font-size: 0.9rem"
+                      ></i>
                     </label>
                     <select class="form-select" id="jenisManual" required>
                       <option value="">Pilih Jenis Manual</option>
                       <option value="perlu-mutasi">Perlu Mutasi</option>
                       <option value="tidak-perlu-mutasi">Tidak Perlu Mutasi</option>
                     </select>
-                    <div class="invalid-feedback">Jenis manual harus dipilih</div>
+                    <small class="form-text text-muted" id="jenisManualHelp" style="display: none">
+                      <i class="fas fa-lightbulb"></i>
+                      <span id="jenisManualHelpText"></span>
+                    </small>
                   </div>
                   <div class="col-md-2">
                     <label for="sales" class="form-label">

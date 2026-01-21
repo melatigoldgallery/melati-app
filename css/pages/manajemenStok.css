@@ -185,11 +185,11 @@
 }
 
 .card-header {
-  background: linear-gradient(135deg, #657de7 0%, #3f37c9 100%);
-  color: white;
+  /* background: linear-gradient(135deg, #657de7 0%, #3f37c9 100%); */
   border: none;
   padding: 20px 25px;
   font-weight: 600;
+  border-bottom: #c6c6c6 1px solid;
 }
 
 .card-header h2,
