@@ -365,7 +365,7 @@ async function fetchByMonthAndStatus(monthStr, status) {
       collRef,
       where("tanggal", ">=", startDate),
       where("tanggal", "<=", endDate),
-      where("status", "==", status)
+      where("status", "==", status),
     );
     const snap = await getDocs(q);
     const items = [];
@@ -425,7 +425,7 @@ function renderRowsPerlu(items, tbody) {
         </div>
       </td>
     </tr>
-  `
+  `,
     )
     .join("");
 
@@ -459,7 +459,7 @@ function renderRowsSudah(items, tbody) {
         </button>
       </td>
     </tr>
-  `
+  `,
     )
     .join("");
 
@@ -831,26 +831,30 @@ async function generatePDF(rows) {
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Add logo if loaded
+  let logoBottomY = 2; // padding top logo lebih kecil
   if (logoImg.complete && logoImg.naturalHeight !== 0) {
     try {
-      doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 10, 30, 30);
+      doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 2, 30, 30); // y=2
+      logoBottomY = 2 + 30;
     } catch (e) {
       console.warn("Gagal menambahkan logo");
+      logoBottomY = 4;
     }
   }
 
   // Title
+  const titleY = logoBottomY + 3; // lebih dekat ke logo
   doc.setFontSize(18);
   doc.setFont(undefined, "bold");
-  doc.text("MELATI GOLD SHOP", pageWidth / 2, 45, { align: "center" });
+  doc.text("MELATI GOLD SHOP", pageWidth / 2, titleY, { align: "center" });
 
   doc.setFontSize(14);
-  doc.text("Daftar Barang Perlu Restok", pageWidth / 2, 55, { align: "center" });
+  doc.text("Daftar Barang Perlu Restok", pageWidth / 2, titleY + 7, { align: "center" }); // line height lebih kecil
 
   // Date
   doc.setFontSize(10);
   doc.setFont(undefined, "normal");
-  doc.text(`Tanggal: ${dateStr}`, 10, 65);
+  doc.text(`Tanggal: ${dateStr}`, 10, titleY + 15);
 
   // Prepare table data
   const tableData = [];
@@ -863,9 +867,9 @@ async function generatePDF(rows) {
 
   // Table
   doc.autoTable({
-    startY: 72,
+    startY: 54,
     margin: { left: 10, right: 10 },
-    head: [["No", "Tanggal", "Jenis", "Nama Barang", "Kadar", "Berat", "Panjang/Lebar/Size"]],
+    head: [["No", "Tanggal", "Jenis", "Nama Barang", "Kadar", "Berat", "Panjang/\nLebar/Size"]],
     body: tableData,
     theme: "grid",
     headStyles: {
@@ -878,10 +882,10 @@ async function generatePDF(rows) {
       0: { cellWidth: 10, halign: "center" },
       1: { cellWidth: 24, halign: "center" },
       2: { cellWidth: 20, halign: "center" },
-      3: { cellWidth: 54 },
+      3: { cellWidth: 68 }, // Nama Barang diperbesar
       4: { cellWidth: 18, halign: "center" },
-      5: { cellWidth: 18, halign: "center" },
-      6: { cellWidth: 42, halign: "center" },
+      5: { cellWidth: 25, halign: "center" },
+      6: { cellWidth: 25, halign: "center", cellWidthAuto: false, cellPadding: 1, overflow: "linebreak" }, // Panjang/Lebar/Size diperkecil dan word wrap
     },
     styles: {
       fontSize: 9,
@@ -1007,8 +1011,11 @@ if (btnTambahBarang) {
 }
 
 // WhatsApp Setting Event Listeners
+// Sembunyikan tombol setting WA jika bukan supervisor
 if (btnSettingWA) {
-  btnSettingWA.addEventListener("click", openWhatsAppSettingModal);
+  const user = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+  if (user.username !== "supervisor") btnSettingWA.style.display = "none";
+  else btnSettingWA.addEventListener("click", openWhatsAppSettingModal);
 }
 
 if (savePhoneBtn) {
