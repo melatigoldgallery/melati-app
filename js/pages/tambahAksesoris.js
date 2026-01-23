@@ -41,7 +41,7 @@ function setCacheWithTimestamp(key, data, ttl = CACHE_TTL_STANDARD) {
         data: data,
         timestamp: Date.now(),
         ttl: ttl,
-      })
+      }),
     );
   } catch (error) {
     // Silent fail
@@ -124,7 +124,7 @@ function signalKodeUpdate(kode, nama, kategori, action) {
   window.dispatchEvent(
     new CustomEvent("stockDataChanged", {
       detail: changeInfo,
-    })
+    }),
   );
 
   console.log(`🔄 Signaled kode ${action}:`, kode);
@@ -138,7 +138,7 @@ function invalidateStockMasterCache() {
     JSON.stringify({
       timestamp: Date.now(),
       action: "full_refresh",
-    })
+    }),
   );
 
   invalidateCache("kodeAksesoris");
@@ -570,6 +570,8 @@ export const aksesorisSaleHandler = {
           id: doc.id,
           text: data.text,
           nama: data.nama,
+          kadar: data.kadar || 0,
+          berat: data.berat || 0,
         });
       });
 
@@ -594,10 +596,10 @@ export const aksesorisSaleHandler = {
       kategori === "1"
         ? this.OPSI_KOTAK
         : kategori === "2"
-        ? this.OPSI_AKSESORIS
-        : kategori === "3"
-        ? this.OPSI_SILVER
-        : [];
+          ? this.OPSI_AKSESORIS
+          : kategori === "3"
+            ? this.OPSI_SILVER
+            : [];
     this.updateAllKodeBarangOptions(options);
     if (options.length) {
       this.tambahBaris(kategori, tbody);
@@ -627,6 +629,11 @@ export const aksesorisSaleHandler = {
         if (kategori === "kotak" && cachedData.harga !== undefined) {
           document.getElementById("hargaKode").value = cachedData.harga || "";
         }
+        // Load kadar & berat jika kategori silver
+        if (kategori === "silver") {
+          document.getElementById("kadarKode").value = cachedData.kadar || "";
+          document.getElementById("beratKode").value = cachedData.berat || "";
+        }
         return;
       }
 
@@ -640,6 +647,11 @@ export const aksesorisSaleHandler = {
         // Load harga jika kategori kotak
         if (kategori === "kotak" && data.harga !== undefined) {
           document.getElementById("hargaKode").value = data.harga || "";
+        }
+        // Load kadar & berat jika kategori silver
+        if (kategori === "silver") {
+          document.getElementById("kadarKode").value = data.kadar || "";
+          document.getElementById("beratKode").value = data.berat || "";
         }
         setCacheWithTimestamp(cacheKey, data, CACHE_TTL_STANDARD);
       } else {
@@ -666,7 +678,7 @@ export const aksesorisSaleHandler = {
                           ${options
                             .map(
                               (option) =>
-                                `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`
+                                `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`,
                             )
                             .join("")}
                       </select>
@@ -846,8 +858,8 @@ export const aksesorisSaleHandler = {
           this.elements.selectKategori.value === "1"
             ? "kotak"
             : this.elements.selectKategori.value === "2"
-            ? "aksesoris"
-            : "silver",
+              ? "aksesoris"
+              : "silver",
       });
     });
     return isValid ? items : null;
@@ -1002,7 +1014,7 @@ export const aksesorisSaleHandler = {
       // Generate filename dengan tanggal
       const filename = `Laporan_Tambah_Stok_${filterDateStart.value.replace(
         /\//g,
-        "-"
+        "-",
       )}_sd_${filterDateEnd.value.replace(/\//g, "-")}.xlsx`;
 
       // Download file
@@ -1032,7 +1044,7 @@ export const aksesorisSaleHandler = {
 
     const confirmed = await this.showConfirmation(
       `Apakah Anda yakin ingin menghapus <strong>${this.laporanData.length} data</strong> pada rentang tanggal <strong>${filterDateStart.value}</strong> s/d <strong>${filterDateEnd.value}</strong>?<br><br><span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Tindakan ini tidak dapat dibatalkan!</span>`,
-      "Konfirmasi Hapus Data"
+      "Konfirmasi Hapus Data",
     );
 
     if (!confirmed) return;
@@ -1054,7 +1066,7 @@ export const aksesorisSaleHandler = {
         transactionsRef,
         where("jenis", "==", "stockAddition"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
       );
 
       const snapshot = await getDocs(q);
@@ -1268,7 +1280,7 @@ export const aksesorisSaleHandler = {
         where("jenis", "==", "stockAddition"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
         where("timestamp", "<=", Timestamp.fromDate(endDate)),
-        orderBy("timestamp", "desc")
+        orderBy("timestamp", "desc"),
       );
 
       const snapshot = await getDocs(q);
@@ -1535,12 +1547,21 @@ export const aksesorisSaleHandler = {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        kodeData.push({
+        const item = {
           id: doc.id,
           text: data.text,
           nama: data.nama,
-          harga: data.harga || 0, // ✅ Tambahkan field harga
-        });
+        };
+        // Tambahkan field harga untuk kotak
+        if (kategori === "kotak") {
+          item.harga = data.harga || 0;
+        }
+        // Tambahkan field kadar & berat untuk silver
+        if (kategori === "silver") {
+          item.kadar = data.kadar || 0;
+          item.berat = data.berat || 0;
+        }
+        kodeData.push(item);
       });
 
       // Debug: Log data untuk memastikan harga dimuat
@@ -1565,8 +1586,7 @@ export const aksesorisSaleHandler = {
     let no = 1;
 
     kodeData.forEach((item) => {
-      // 🔥 PERBAIKAN: Hanya tampilkan "-" jika harga benar-benar tidak ada (undefined/null)
-      // Jika harga = 0, tetap tampilkan Rp 0
+      // Column untuk harga (hanya kotak)
       const hargaColumn =
         kategori === "kotak"
           ? `<td>${
@@ -1576,10 +1596,14 @@ export const aksesorisSaleHandler = {
             }</td>`
           : "";
 
-      // Debug log per item
-      if (kategori === "kotak") {
-        console.log(`Item ${item.text}: harga =`, item.harga);
-      }
+      // Columns untuk kadar & berat (hanya silver)
+      const kadarBeratColumns =
+        kategori === "silver"
+          ? `
+          <td class="text-center">${item.kadar || "-"}</td>
+          <td class="text-center">${item.berat ? `${item.berat} gr` : "-"}</td>
+        `
+          : "";
 
       html += `
         <tr>
@@ -1587,6 +1611,7 @@ export const aksesorisSaleHandler = {
           <td>${item.text}</td>
           <td>${item.nama}</td>
           ${hargaColumn}
+          ${kadarBeratColumns}
           <td>
             <button class="btn btn-warning btn-sm me-1 btn-edit" data-id="${item.id}">
               <i class="fas fa-edit"></i>
@@ -1627,10 +1652,20 @@ export const aksesorisSaleHandler = {
     document.getElementById("kategoriKode").value = kategori;
     const modalTitle = document.getElementById("modalFormKodeLabel");
     const hargaContainer = document.getElementById("hargaKodeContainer");
+    const kadarContainer = document.getElementById("kadarKodeContainer");
+    const beratContainer = document.getElementById("beratKodeContainer");
 
     // Tampilkan input harga hanya untuk kategori kotak
     if (hargaContainer) {
       hargaContainer.style.display = kategori === "kotak" ? "block" : "none";
+    }
+
+    // Tampilkan input kadar & berat hanya untuk silver
+    if (kadarContainer) {
+      kadarContainer.style.display = kategori === "silver" ? "block" : "none";
+    }
+    if (beratContainer) {
+      beratContainer.style.display = kategori === "silver" ? "block" : "none";
     }
 
     if (modalTitle) {
@@ -1663,6 +1698,15 @@ export const aksesorisSaleHandler = {
     // Tambahkan field harga hanya untuk kategori kotak
     if (kategori === "kotak" && harga) {
       data.harga = parseInt(harga) || 0;
+    }
+
+    // Tambahkan field kadar & berat untuk kategori silver
+    if (kategori === "silver") {
+      const kadar = document.getElementById("kadarKode").value;
+      const berat = document.getElementById("beratKode").value;
+
+      data.kadar = parseInt(kadar) || 0;
+      data.berat = parseFloat(berat) || 0;
     }
 
     try {
@@ -1702,6 +1746,7 @@ export const aksesorisSaleHandler = {
   validateKodeBarangForm() {
     const textKode = document.getElementById("textKode");
     const namaKode = document.getElementById("namaKode");
+    const kategori = document.getElementById("kategoriKode").value;
 
     if (!textKode || !namaKode) {
       console.error("Form elements not found");
@@ -1713,8 +1758,26 @@ export const aksesorisSaleHandler = {
     const nama = namaKode.value;
 
     if (!text || !nama) {
-      this.showErrorNotification("Semua field harus diisi!");
+      this.showErrorNotification("Kode dan Nama harus diisi!");
       return false;
+    }
+
+    // Validasi khusus untuk silver
+    if (kategori === "silver") {
+      const kadarKode = document.getElementById("kadarKode");
+      const beratKode = document.getElementById("beratKode");
+
+      if (!kadarKode.value) {
+        this.showErrorNotification("Kadar harus diisi untuk kategori Silver!");
+        kadarKode.focus();
+        return false;
+      }
+
+      if (!beratKode.value || parseFloat(beratKode.value) <= 0) {
+        this.showErrorNotification("Berat harus diisi dan lebih dari 0 untuk kategori Silver!");
+        beratKode.focus();
+        return false;
+      }
     }
 
     return true;
@@ -1735,6 +1798,12 @@ export const aksesorisSaleHandler = {
       // ✅ Sync harga untuk kategori kotak
       if (kategori === "kotak" && data.harga !== undefined) {
         stokData.harga = parseInt(data.harga) || 0;
+      }
+
+      // ✅ Sync kadar & berat untuk kategori silver
+      if (kategori === "silver") {
+        stokData.kadar = parseInt(data.kadar) || 0;
+        stokData.berat = parseFloat(data.berat) || 0;
       }
 
       await addDoc(collection(firestore, "stokAksesoris"), stokData);
@@ -1767,6 +1836,12 @@ export const aksesorisSaleHandler = {
         // ✅ Sync harga untuk kategori kotak
         if (kategori === "kotak" && data.harga !== undefined) {
           updateData.harga = parseInt(data.harga) || 0;
+        }
+
+        // ✅ Sync kadar & berat untuk kategori silver
+        if (kategori === "silver") {
+          updateData.kadar = parseInt(data.kadar) || 0;
+          updateData.berat = parseFloat(data.berat) || 0;
         }
 
         const stockDocRef = doc(firestore, "stokAksesoris", stockSnapshot.docs[0].id);
@@ -2009,7 +2084,7 @@ export const aksesorisSaleHandler = {
       this.showSuccessNotification(
         `Transaksi berhasil diupdate<br>Kode: ${kode}<br>Jumlah: ${jumlahLama} → ${jumlahBaru} pcs<br>Delta: ${
           delta > 0 ? "+" : ""
-        }${delta} pcs`
+        }${delta} pcs`,
       );
     } catch (error) {
       console.error("Error saving edit transaction:", error);
@@ -2087,7 +2162,7 @@ export const aksesorisSaleHandler = {
       bootstrap.Modal.getInstance(document.getElementById("modalDeleteTransaksi")).hide();
 
       this.showSuccessNotification(
-        `Transaksi berhasil dihapus<br>Kode: ${kode}<br>Jumlah: ${jumlah} pcs<br>Stok telah dikurangi`
+        `Transaksi berhasil dihapus<br>Kode: ${kode}<br>Jumlah: ${jumlah} pcs<br>Stok telah dikurangi`,
       );
     } catch (error) {
       console.error("Error deleting transaction:", error);

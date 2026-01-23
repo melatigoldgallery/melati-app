@@ -1054,8 +1054,12 @@ const penjualanHandler = {
           const stok = item.stokAkhir !== undefined ? item.stokAkhir : 0;
           const stockBadge = stok <= 0 ? '<span class="badge bg-danger ms-2">Habis</span>' : "";
 
+          // Include kadar & berat for silver category
+          const kadarAttr = category === "silver" && item.kadar ? `data-kadar="${item.kadar}"` : "";
+          const beratAttr = category === "silver" && item.berat ? `data-berat="${item.berat}"` : "";
+
           const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${hargaValue}" data-stok="${stok}">
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${hargaValue}" data-stok="${stok}" ${kadarAttr} ${beratAttr}>
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}${stockBadge}</td>
             <td class="text-end">${stok}</td>
@@ -1178,6 +1182,8 @@ const penjualanHandler = {
           kode: $(this).data("kode"),
           nama: $(this).data("nama"),
           harga: $(this).data("harga"),
+          kadar: $(this).data("kadar") || 0,
+          berat: $(this).data("berat") || 0,
         };
         penjualanHandler.addSilverToTable(data);
         $("#modalPilihSilver").modal("hide");
@@ -1307,7 +1313,12 @@ const penjualanHandler = {
 
   // Add silver to table
   addSilverToTable(data) {
-    const { kode, nama, harga } = data;
+    const { kode, nama, harga, kadar, berat } = data;
+
+    // Auto-fill kadar & berat dari master data
+    const kadarValue = kadar || "";
+    const beratValue = berat || "";
+
     const newRow = `
       <tr>
         <td>${kode}</td>
@@ -1316,10 +1327,10 @@ const penjualanHandler = {
           <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1">
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Masukkan kadar" required>
+          <input type="text" class="form-control form-control-sm kadar-input" value="${kadarValue}" placeholder="Masukkan kadar" required ${kadarValue ? "readonly" : ""}>
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm berat-input" value="" placeholder="0.00" required>
+          <input type="text" class="form-control form-control-sm berat-input" value="${beratValue}" placeholder="0.00" required ${beratValue ? "readonly" : ""}>
         </td>
         <td>
           <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
@@ -1337,7 +1348,12 @@ const penjualanHandler = {
 
     $("#tableSilverDetail tbody").append(newRow);
     const $newRow = $("#tableSilverDetail tbody tr:last-child");
-    $newRow.find(".kadar-input").focus();
+    // Focus ke total harga jika kadar & berat sudah terisi
+    if (kadarValue && beratValue) {
+      $newRow.find(".total-harga-input").focus();
+    } else {
+      $newRow.find(".kadar-input").focus();
+    }
     this.attachRowEventHandlers($newRow);
     this.updateGrandTotal("silver");
   },
@@ -2076,12 +2092,16 @@ const penjualanHandler = {
         }
 
         if (rowValid) {
+          // Hitung totalBerat untuk silver
+          const totalBerat = berat * jumlah;
+
           items.push({
             kodeText: kode,
             nama: nama,
             jumlah: jumlah,
             kadar: kadar,
             berat: berat,
+            totalBerat: totalBerat,
             hargaPerGram: hargaPerGram,
             totalHarga: totalHarga,
           });
@@ -2249,8 +2269,8 @@ const penjualanHandler = {
     }
 
     try {
-      // ✅ Gunakan StockService - single source of truth
-      await StockService.updateStock({
+      // Prepare stock update data
+      const stockUpdateData = {
         kode,
         jenis: jenisTransaksi,
         jumlah,
@@ -2258,7 +2278,17 @@ const penjualanHandler = {
         sales: $("#sales").val(),
         currentStock,
         newStock,
-      });
+      };
+
+      // Add kadar, berat, totalBerat for silver
+      if (salesType === "silver" && item.kadar && item.berat) {
+        stockUpdateData.kadar = item.kadar;
+        stockUpdateData.berat = item.berat;
+        stockUpdateData.totalBerat = item.totalBerat || item.berat * jumlah;
+      }
+
+      // ✅ Gunakan StockService - single source of truth
+      await StockService.updateStock(stockUpdateData);
 
       readsMonitor.increment("Stock Transaction Write", 1);
     } catch (error) {

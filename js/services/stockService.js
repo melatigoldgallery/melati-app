@@ -36,6 +36,9 @@ const StockService = {
       kategori = "",
       namaBarang = "",
       jenisReturn = "",
+      kadar = null,
+      berat = null,
+      totalBerat = null,
     } = stockData;
 
     try {
@@ -56,6 +59,11 @@ const StockService = {
       if (tanggal) transactionData.tanggal = tanggal;
       if (currentStock !== null) transactionData.stokSebelum = currentStock;
       if (newStock !== null) transactionData.stokSesudah = newStock;
+
+      // Add kadar, berat, totalBerat for silver
+      if (kadar) transactionData.kadar = kadar;
+      if (berat) transactionData.berat = parseFloat(berat);
+      if (totalBerat) transactionData.totalBerat = parseFloat(totalBerat);
 
       const transactionRef = await addDoc(collection(firestore, "stokAksesorisTransaksi"), transactionData);
 

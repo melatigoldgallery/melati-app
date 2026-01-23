@@ -462,10 +462,12 @@
                   <table class="table table-hover" id="tableKodeSilver">
                     <thead class="table-light">
                       <tr>
-                        <th>No</th>
-                        <th>Kode</th>
-                        <th>Nama</th>
-                        <th>Aksi</th>
+                        <th width="5%">No</th>
+                        <th width="20%">Kode</th>
+                        <th width="35%">Nama</th>
+                        <th width="12%">Kadar</th>
+                        <th width="13%">Berat (gr)</th>
+                        <th width="15%">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -496,12 +498,41 @@
               <input type="hidden" id="docId" />
               <input type="hidden" id="kategoriKode" />
               <div class="mb-3">
-                <label for="textKode" class="form-label">Kode</label>
-                <input type="text" class="form-control" id="textKode" placeholder="Masukkan kode" />
+                <label for="textKode" class="form-label">
+                  Kode
+                  <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control" id="textKode" placeholder="Masukkan kode" required />
               </div>
               <div class="mb-3">
-                <label for="namaKode" class="form-label">Nama</label>
-                <input type="text" class="form-control" id="namaKode" placeholder="Masukkan nama" />
+                <label for="namaKode" class="form-label">
+                  Nama
+                  <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control" id="namaKode" placeholder="Masukkan nama" required />
+              </div>
+              <div class="mb-3" id="kadarKodeContainer" style="display: none">
+                <label for="kadarKode" class="form-label">
+                  Kadar
+                  <span class="text-danger">*</span>
+                  <small class="text-muted">(contoh: 925, 950, 999)</small>
+                </label>
+                <input type="number" class="form-control" id="kadarKode" placeholder="Masukkan kadar silver" min="1" />
+              </div>
+
+              <div class="mb-3" id="beratKodeContainer" style="display: none">
+                <label for="beratKode" class="form-label">
+                  Berat per pcs (gram)
+                  <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="beratKode"
+                  placeholder="Masukkan berat"
+                  min="0"
+                  step="0.01"
+                />
               </div>
               <div class="mb-3" id="hargaKodeContainer" style="display: none">
                 <label for="hargaKode" class="form-label">Harga</label>

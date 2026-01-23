@@ -420,6 +420,18 @@ class OptimizedStockReport {
     if (resetBtn) {
       resetBtn.addEventListener("click", () => this.resetFilters());
     }
+
+    // Event listener untuk jenis laporan
+    const jenisLaporanSelect = document.getElementById("jenisLaporan");
+    if (jenisLaporanSelect) {
+      jenisLaporanSelect.addEventListener("change", () => {
+        this.toggleTableView();
+        // Re-render jika data sudah dimuat
+        if (this.isDataLoaded && this.filteredStockData.length > 0) {
+          this.renderStockTable();
+        }
+      });
+    }
   }
 
   // Reset filters
@@ -693,11 +705,13 @@ class OptimizedStockReport {
     const cacheKey = "kodeAksesorisData";
 
     if (this.isCacheValid(cacheKey)) {
+      console.log("Using cached kodeAksesoris data"); // Debug log
       const cachedData = this.cache.get(cacheKey);
       this.mergeKodeAksesoris(cachedData);
       return;
     }
 
+    console.log("Fetching fresh kodeAksesoris data from Firebase"); // Debug log
     try {
       const kodeAksesorisData = [];
 
@@ -727,7 +741,9 @@ class OptimizedStockReport {
       // Process silver data
       silverSnapshot.forEach((doc) => {
         const data = doc.data();
+        console.log("Silver doc data:", data); // Debug log
         const kodeItem = this.createKodeItem(data, "silver");
+        console.log("Created kode item:", kodeItem); // Debug log
         kodeAksesorisData.push(kodeItem);
         this.mergeStockItem(kodeItem);
       });
@@ -1183,8 +1199,37 @@ class OptimizedStockReport {
     }
   }
 
+  // Toggle table view berdasarkan jenis laporan
+  toggleTableView() {
+    const jenisLaporan = document.getElementById("jenisLaporan").value;
+    const tableKotakAksesoris = document.getElementById("tableKotakAksesorisContainer");
+    const tableSilver = document.getElementById("tableSilverContainer");
+    const tableTitle = document.getElementById("tableTitle");
+
+    if (jenisLaporan === "silver") {
+      tableKotakAksesoris.style.display = "none";
+      tableSilver.style.display = "block";
+      tableTitle.textContent = "Data Stok Silver";
+    } else {
+      tableKotakAksesoris.style.display = "block";
+      tableSilver.style.display = "none";
+      tableTitle.textContent = "Data Stok Aksesoris";
+    }
+  }
+
   // Render stock table
   renderStockTable() {
+    const jenisLaporan = document.getElementById("jenisLaporan").value;
+
+    if (jenisLaporan === "silver") {
+      this.renderSilverStockTable();
+    } else {
+      this.renderKotakAksesorisStockTable();
+    }
+  }
+
+  // Render Kotak & Aksesoris Stock Table
+  renderKotakAksesorisStockTable() {
     try {
       // Destroy existing DataTable
       if ($.fn.DataTable.isDataTable("#stockTable")) {
@@ -1207,10 +1252,9 @@ class OptimizedStockReport {
         return;
       }
 
-      // Group data by category
+      // Filter hanya kotak & aksesoris
       const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
       const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
-      const silverItems = this.filteredStockData.filter((item) => item.kategori === "silver");
       const otherItems = this.filteredStockData.filter(
         (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris" && item.kategori !== "silver",
       );
@@ -1219,18 +1263,7 @@ class OptimizedStockReport {
       let html = "";
       let rowIndex = 1;
 
-      [...kotakItems, ...aksesorisItems, ...silverItems, ...otherItems].forEach((item) => {
-        // Debug: Log items with all zero values
-        if (
-          item.stokAwal === 0 &&
-          item.tambahStok === 0 &&
-          item.laku === 0 &&
-          item.free === 0 &&
-          item.gantiLock === 0 &&
-          item.return === 0
-        ) {
-        }
-
+      [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
         html += `
           <tr>
             <td class="text-center">${rowIndex++}</td>
@@ -1252,20 +1285,166 @@ class OptimizedStockReport {
       // Initialize DataTable
       const selectedDateStr = document.getElementById("startDate").value;
       this.initDataTableWithExport(selectedDateStr);
-
-      // Debug: Log summary of rendered data
-      const nonZeroItems = this.filteredStockData.filter(
-        (item) =>
-          item.stokAwal > 0 ||
-          item.tambahStok > 0 ||
-          item.laku > 0 ||
-          item.free > 0 ||
-          item.gantiLock > 0 ||
-          item.return > 0,
-      );
     } catch (error) {
       this.showError("Terjadi kesalahan saat menampilkan data");
     }
+  }
+
+  // Render Silver Stock Table with Weight
+  renderSilverStockTable() {
+    try {
+      // Destroy existing DataTable
+      if ($.fn.DataTable.isDataTable("#silverStockTable")) {
+        $("#silverStockTable").DataTable().destroy();
+      }
+
+      const tableBody = document.querySelector("#silverStockTable tbody");
+      if (!tableBody) {
+        return;
+      }
+
+      // Check if there's data to display
+      if (!this.filteredStockData || this.filteredStockData.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
+          </tr>
+        `;
+        this.initSilverDataTable();
+        return;
+      }
+
+      // Filter hanya silver
+      const silverItems = this.filteredStockData.filter((item) => item.kategori === "silver");
+
+      if (silverItems.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center">Tidak ada data silver</td>
+          </tr>
+        `;
+        this.initSilverDataTable();
+        return;
+      }
+
+      // Create HTML for table dengan format single-row (berat di dalam cell yang sama)
+      let html = "";
+      let rowIndex = 1;
+
+      console.log("Silver items data:", silverItems); // Debug log
+
+      silverItems.forEach((item) => {
+        const berat = item.berat || 0;
+
+        // Debug log untuk setiap item
+        console.log(`Item ${item.kode}: kadar=${item.kadar}, berat=${item.berat}, parsed berat=${berat}`);
+
+        // Hitung total berat untuk setiap kolom
+        const beratStokAwal = (item.stokAwal || 0) * berat;
+        const beratTambah = (item.tambahStok || 0) * berat;
+        const beratLaku = (item.laku || 0) * berat;
+        const beratLock = (item.gantiLock || 0) * berat;
+        const beratReturn = (item.return || 0) * berat;
+        const beratStokAkhir = (item.stokAkhir || 0) * berat;
+
+        html += `
+          <tr>
+            <td class="text-center">${rowIndex++}</td>
+            <td class="text-center">${item.kode || "-"}</td>
+            <td class="text-start">${item.nama || "-"}</td>
+            <td class="text-center">${item.stokAwal || 0}<br><small class="text-muted">${beratStokAwal.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.tambahStok || 0}<br><small class="text-muted">${beratTambah.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.laku || 0}<br><small class="text-muted">${beratLaku.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.gantiLock || 0}<br><small class="text-muted">${beratLock.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.return || 0}<br><small class="text-muted">${beratReturn.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.stokAkhir || 0}<br><small class="text-muted">${beratStokAkhir.toFixed(2)} gr</small></td>
+          </tr>
+        `;
+      });
+
+      tableBody.innerHTML = html;
+
+      // Initialize DataTable for silver
+      this.initSilverDataTable();
+    } catch (error) {
+      console.error("Error rendering silver stock table:", error);
+      this.showError("Terjadi kesalahan saat menampilkan data silver");
+    }
+  }
+
+  // Initialize DataTable for Silver
+  initSilverDataTable() {
+    $("#silverStockTable").DataTable({
+      responsive: true,
+      dom: "Bfrtip",
+      ordering: false,
+      pageLength: 25,
+      autoWidth: false,
+      buttons: [
+        {
+          extend: "excel",
+          text: '<i class="fas fa-file-excel me-2"></i>Excel',
+          className: "btn btn-success btn-sm me-1",
+          title: "Laporan Stok Silver",
+          exportOptions: {
+            format: {
+              body: function (data, row, column, node) {
+                // Strip HTML tags dan replace <br> dengan newline untuk Excel
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
+            },
+          },
+        },
+        {
+          extend: "pdf",
+          text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+          className: "btn btn-danger btn-sm me-1",
+          title: "Laporan Stok Silver",
+          orientation: "portrait",
+          pageSize: "A4",
+          exportOptions: {
+            format: {
+              body: function (data, row, column, node) {
+                // Strip HTML tags dan replace <br> dengan newline untuk PDF
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
+            },
+          },
+          customize: function (doc) {
+            doc.defaultStyle.fontSize = 7;
+            doc.styles.tableHeader.fontSize = 8;
+            doc.styles.tableHeader.fillColor = "#4CAF50";
+            doc.styles.tableHeader.color = "white";
+            doc.styles.tableHeader.alignment = "center";
+            // Center align all body cells
+            doc.content[1].table.body.forEach(function (row) {
+              row.forEach(function (cell) {
+                cell.alignment = "center";
+              });
+            });
+          },
+        },
+      ],
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+        infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
+        infoFiltered: "(disaring dari _MAX_ total data)",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Selanjutnya",
+          previous: "Sebelumnya",
+        },
+      },
+    });
   }
 
   // Initialize DataTable with export - VERSI RINGKAS
@@ -1343,7 +1522,7 @@ class OptimizedStockReport {
 
   // Helper methods for kode aksesoris
   createKodeItem(data, kategori) {
-    return {
+    const item = {
       id: null,
       kode: data.text,
       nama: data.nama,
@@ -1357,6 +1536,14 @@ class OptimizedStockReport {
       stokAkhir: 0,
       lastUpdate: new Date(),
     };
+
+    // Add kadar & berat for silver category
+    if (kategori === "silver") {
+      item.kadar = data.kadar || null;
+      item.berat = data.berat ? parseFloat(data.berat) : 0;
+    }
+
+    return item;
   }
 
   mergeStockItem(kodeItem) {
@@ -1366,6 +1553,11 @@ class OptimizedStockReport {
     } else {
       this.stockData[existingIndex].kategori = kodeItem.kategori;
       this.stockData[existingIndex].nama = kodeItem.nama;
+      // Preserve kadar & berat for silver
+      if (kodeItem.kategori === "silver") {
+        this.stockData[existingIndex].kadar = kodeItem.kadar;
+        this.stockData[existingIndex].berat = kodeItem.berat;
+      }
     }
   }
 
