@@ -217,7 +217,7 @@ Pilihan:
 
 #### Kolom yang DIGANTI
 
-* Free → **Lock**
+* Ganti Lock**
 
 ---
 
@@ -225,7 +225,7 @@ Pilihan:
 
 Misal:
 
-* Berat per pcs = 100
+* kode SBN100 field berat berisi = 100 (diambil dari field berat dari masing-masing kode di koleksi stockAksesoris/kodeAksesoris)
 * Jumlah stok awal = 10
 
 Maka tampilan:
@@ -274,7 +274,7 @@ Untuk laporan silver, semua kolom berikut menampilkan:
 Rumus umum:
 
 ```
-totalBerat = beratKode * jumlahPcs
+totalBerat = berat * jumlahPcs
 ```
 
 ---
@@ -283,21 +283,12 @@ totalBerat = beratKode * jumlahPcs
 
 Data berat diambil dari:
 
-* `stokAksesoris.kategori.silver.berat`
+* `stokAksesoris.berat`
 
 Digunakan untuk semua perhitungan laporan
 
 ---
 
-# Catatan Implementasi Lanjutan (Nanti)
-
-Setelah rencana ini dikonfirmasi:
-
-* Tahap berikutnya:
-
-  1. Update struktur database
-  2. Update UI form
-  3. Update logic JS / backend
-  4. Testing khusus laporan silver
+## tambahkan tfoot di bawah tabel untuk menjumlahkan jumlah pcs dan jumlah berat di setiap kolom.
 
 ---

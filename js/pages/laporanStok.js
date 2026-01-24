@@ -847,9 +847,7 @@ class OptimizedStockReport {
       const stokAkhir = stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - trans.return;
 
       result.push({
-        kode: item.kode,
-        nama: item.nama,
-        kategori: item.kategori,
+        ...item,
         stokAwal,
         stokAkhir,
         tambahStok: trans.tambahStok,
@@ -1331,6 +1329,20 @@ class OptimizedStockReport {
       let html = "";
       let rowIndex = 1;
 
+      // Variabel untuk menghitung total
+      let totalStokAwalPcs = 0,
+        totalStokAwalBerat = 0;
+      let totalTambahPcs = 0,
+        totalTambahBerat = 0;
+      let totalLakuPcs = 0,
+        totalLakuBerat = 0;
+      let totalLockPcs = 0,
+        totalLockBerat = 0;
+      let totalReturnPcs = 0,
+        totalReturnBerat = 0;
+      let totalStokAkhirPcs = 0,
+        totalStokAkhirBerat = 0;
+
       console.log("Silver items data:", silverItems); // Debug log
 
       silverItems.forEach((item) => {
@@ -1346,6 +1358,20 @@ class OptimizedStockReport {
         const beratLock = (item.gantiLock || 0) * berat;
         const beratReturn = (item.return || 0) * berat;
         const beratStokAkhir = (item.stokAkhir || 0) * berat;
+
+        // Akumulasi total
+        totalStokAwalPcs += item.stokAwal || 0;
+        totalStokAwalBerat += beratStokAwal;
+        totalTambahPcs += item.tambahStok || 0;
+        totalTambahBerat += beratTambah;
+        totalLakuPcs += item.laku || 0;
+        totalLakuBerat += beratLaku;
+        totalLockPcs += item.gantiLock || 0;
+        totalLockBerat += beratLock;
+        totalReturnPcs += item.return || 0;
+        totalReturnBerat += beratReturn;
+        totalStokAkhirPcs += item.stokAkhir || 0;
+        totalStokAkhirBerat += beratStokAkhir;
 
         html += `
           <tr>
@@ -1363,6 +1389,20 @@ class OptimizedStockReport {
       });
 
       tableBody.innerHTML = html;
+
+      // Update tfoot dengan total
+      document.getElementById("totalStokAwal").innerHTML =
+        `${totalStokAwalPcs}<br><small class="text-muted">${totalStokAwalBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalTambah").innerHTML =
+        `${totalTambahPcs}<br><small class="text-muted">${totalTambahBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalLaku").innerHTML =
+        `${totalLakuPcs}<br><small class="text-muted">${totalLakuBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalLock").innerHTML =
+        `${totalLockPcs}<br><small class="text-muted">${totalLockBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalReturn").innerHTML =
+        `${totalReturnPcs}<br><small class="text-muted">${totalReturnBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalStokAkhir").innerHTML =
+        `${totalStokAkhirPcs}<br><small class="text-muted">${totalStokAkhirBerat.toFixed(2)} gr</small>`;
 
       // Initialize DataTable for silver
       this.initSilverDataTable();
@@ -1395,17 +1435,32 @@ class OptimizedStockReport {
                   .replace(/<[^>]+>/g, "")
                   .trim();
               },
+              footer: function (data, row, column, node) {
+                // Strip HTML tags dan replace <br> dengan newline untuk footer
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
             },
           },
+          footer: true,
         },
         {
           extend: "pdf",
           text: '<i class="fas fa-file-pdf me-2"></i>PDF',
           className: "btn btn-danger btn-sm me-1",
-          title: "Laporan Stok Silver",
+          title: function () {
+            const today = new Date();
+            const options = { day: "2-digit", month: "long", year: "numeric" };
+            const formattedDate = today.toLocaleDateString("id-ID", options);
+            return "Laporan Stok Silver\nMelati Gold Shop\n" + formattedDate;
+          },
           orientation: "portrait",
           pageSize: "A4",
           exportOptions: {
+            orthogonal: "export",
+            columns: ":visible",
             format: {
               body: function (data, row, column, node) {
                 // Strip HTML tags dan replace <br> dengan newline untuk PDF
@@ -1414,18 +1469,74 @@ class OptimizedStockReport {
                   .replace(/<[^>]+>/g, "")
                   .trim();
               },
+              footer: function (data, row, column, node) {
+                // Strip HTML untuk semua cell
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
             },
           },
+          footer: true,
           customize: function (doc) {
-            doc.defaultStyle.fontSize = 7;
-            doc.styles.tableHeader.fontSize = 8;
-            doc.styles.tableHeader.fillColor = "#4CAF50";
-            doc.styles.tableHeader.color = "white";
+            // Set font sizes
+            doc.defaultStyle.fontSize = 8;
+            doc.styles.tableHeader.fontSize = 9;
+            doc.styles.tableHeader.fillColor = "#e0e0e0";
+            doc.styles.tableHeader.color = "black";
             doc.styles.tableHeader.alignment = "center";
-            // Center align all body cells
-            doc.content[1].table.body.forEach(function (row) {
-              row.forEach(function (cell) {
-                cell.alignment = "center";
+
+            // Style title - multi line dengan ukuran berbeda
+            const titleText = doc.content[0].text;
+            doc.content[0] = {
+              stack: [
+                { text: "Laporan Stok Silver", fontSize: 14, bold: true },
+                { text: "Melati Gold Shop", fontSize: 12, bold: true },
+                { text: titleText.split("\n")[2], fontSize: 9, margin: [0, 2, 0, 0] }, // Tanggal dengan font lebih kecil
+              ],
+              alignment: "center",
+              margin: [0, 0, 0, 10],
+            };
+
+            // Style footer
+            doc.styles.tableFooter = {
+              fontSize: 8,
+              bold: true,
+              fillColor: "#e0e0e0",
+              alignment: "center",
+            };
+
+            // Set column widths
+            doc.content[1].table.widths = [15, 40, 90, 50, 50, 50, 50, 50, 60];
+
+            // Manipulasi footer row untuk menghapus duplikasi TOTAL
+            const tableBody = doc.content[1].table.body;
+            const lastRow = tableBody[tableBody.length - 1]; // Footer row
+
+            // Cek dan perbaiki footer row - hapus TOTAL di kolom 0 dan 1, biarkan hanya di kolom 2
+            if (lastRow && lastRow.length > 0) {
+              lastRow.forEach(function (cell, index) {
+                if (cell.text && cell.text.toString().includes("TOTAL")) {
+                  if (index === 0 || index === 1) {
+                    cell.text = ""; // Hapus TOTAL dari kolom 0 dan 1
+                  } else if (index === 2) {
+                    cell.text = "TOTAL:"; // Pastikan hanya ada di kolom 2
+                  }
+                }
+              });
+            }
+
+            // Center align all cells
+            doc.content[1].table.body.forEach(function (row, rowIndex) {
+              row.forEach(function (cell, cellIndex) {
+                if (cellIndex === 2) {
+                  // Nama column - align left (kecuali footer)
+                  cell.alignment = rowIndex === tableBody.length - 1 ? "right" : "left";
+                } else {
+                  // Other columns - center
+                  cell.alignment = "center";
+                }
               });
             });
           },
@@ -1494,7 +1605,7 @@ class OptimizedStockReport {
           customize: function (doc) {
             doc.defaultStyle.fontSize = 8;
             doc.styles.tableHeader.fontSize = 9;
-            doc.content[1].table.widths = ["5%", "9%", "28%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
+            doc.content[1].table.widths = ["5%", "9%", "30%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
             // Center align all columns except name column (3rd column)
             doc.content[1].table.body.forEach((row) => {
               row.forEach((cell, index) => {
