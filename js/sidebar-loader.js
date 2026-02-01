@@ -35,7 +35,8 @@ async function filterMenuByPermissions() {
       // Mobile: Servis only
       hideAllMenusExcept(["dashboard", "servis"]);
     } else {
-      // Desktop: All except maintenance, supervisor submenu, and setting
+      // Desktop: Show all menus first, then hide restricted ones
+      showAllMenus();
       hideMenu("maintenance");
       hideSupervisorSubmenu();
       // Hide setting menu (only for Super Admin)
@@ -83,6 +84,29 @@ function hideSupervisorSubmenu() {
   }
 }
 
+// Show specific menu
+function showMenu(menuName) {
+  const menuMap = {
+    maintenance: 'a[href="maintenance.html"]',
+    dashboard: 'a[href="dashboard.html"]',
+    "inventory-barang": '[data-bs-target="#barangSubmenu"]',
+    layanan: '[data-bs-target="#orderSubmenu"]',
+    aksesoris: '[data-bs-target="#aksesorisSubmenu"]',
+    antrian: '[data-bs-target="#antrianSubmenu"]',
+    absensi: '[data-bs-target="#absensiSubmenu"]',
+    servis: '[data-bs-target="#servisSubmenu"]',
+    promosi: '[data-bs-target="#promosiSubmenu"]',
+  };
+
+  const selector = menuMap[menuName];
+  if (selector) {
+    const menuElement = document.querySelector(selector);
+    if (menuElement) {
+      menuElement.closest(".nav-item").style.display = "block";
+    }
+  }
+}
+
 // Hide specific menu
 function hideMenu(menuName) {
   const menuMap = {
@@ -104,6 +128,24 @@ function hideMenu(menuName) {
       menuElement.closest(".nav-item").style.display = "none";
     }
   }
+}
+
+// Show all menus (except maintenance by default)
+function showAllMenus() {
+  const allMenus = [
+    "dashboard",
+    "inventory-barang",
+    "layanan",
+    "aksesoris",
+    "antrian",
+    "absensi",
+    "servis",
+    "promosi",
+  ];
+
+  allMenus.forEach((menu) => {
+    showMenu(menu);
+  });
 }
 
 // Hide all menus except specified ones
