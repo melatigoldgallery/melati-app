@@ -6,9 +6,11 @@ import { ensureDailySnapshotExists } from "./pages/laporanStok.js";
 // Authentication functions
 async function checkLoginStatus() {
   // Skip jika di halaman login
-  if (window.location.pathname.includes('index.html') || 
-      window.location.pathname === '/' || 
-      window.location.pathname.endsWith('/')) {
+  if (
+    window.location.pathname.includes("index.html") ||
+    window.location.pathname === "/" ||
+    window.location.pathname.endsWith("/")
+  ) {
     return true;
   }
 
@@ -23,9 +25,9 @@ async function checkLoginStatus() {
 
     // Cek Firebase Auth sebagai validasi tambahan
     try {
-      const { authService } = await import('./configFirebase.js');
+      const { authService } = await import("./configFirebase.js");
       const user = await authService.getCurrentUser();
-      
+
       // Jika Firebase Auth mengembalikan null tapi sessionStorage ada
       if (!user) {
         console.log("Firebase auth user not found, but session exists");
@@ -35,12 +37,15 @@ async function checkLoginStatus() {
         // Sinkronisasi data jika Firebase Auth berhasil
         const parsedSessionUser = JSON.parse(sessionUser);
         if (!parsedSessionUser.uid && user.uid) {
-          sessionStorage.setItem('currentUser', JSON.stringify({
-            uid: user.uid,
-            email: user.email,
-            role: user.role || user.displayName || parsedSessionUser.role || 'user',
-            username: parsedSessionUser.username || user.email
-          }));
+          sessionStorage.setItem(
+            "currentUser",
+            JSON.stringify({
+              uid: user.uid,
+              email: user.email,
+              role: user.role || user.displayName || parsedSessionUser.role || "user",
+              username: parsedSessionUser.username || user.email,
+            }),
+          );
         }
       }
     } catch (firebaseError) {
@@ -59,17 +64,22 @@ async function checkLoginStatus() {
 function handleLogout() {
   // Clear session immediately
   sessionStorage.removeItem("currentUser");
-  
+
   // Try Firebase logout
-  import('./configFirebase.js').then(({ authService }) => {
-    authService.logout().then(() => {
-      window.location.href = "index.html";
-    }).catch(() => {
+  import("./configFirebase.js")
+    .then(({ authService }) => {
+      authService
+        .logout()
+        .then(() => {
+          window.location.href = "index.html";
+        })
+        .catch(() => {
+          window.location.href = "index.html";
+        });
+    })
+    .catch(() => {
       window.location.href = "index.html";
     });
-  }).catch(() => {
-    window.location.href = "index.html";
-  });
 }
 
 function checkSupervisorAuth() {
@@ -92,11 +102,11 @@ try {
   document.addEventListener("DOMContentLoaded", async function () {
     // Auth check pertama dan terpenting
     const isAuthenticated = await checkLoginStatus();
-    
+
     if (!isAuthenticated) {
       return; // Stop execution jika tidak terautentikasi
     }
-    
+
     // Setup UI components setelah auth berhasil
     const appContainer = document.querySelector(".app-container");
     const sidebar = document.querySelector(".sidebar");
@@ -117,8 +127,23 @@ try {
 
     checkSupervisorAuth();
     setupMenuVisibility();
-  });
+    setupPasswordVerification();
 
+    // Dashboard-specific initialization
+    if (window.location.pathname.includes("dashboard.html") || window.location.pathname.endsWith("/")) {
+      ensureDailySnapshotExists()
+        .then((result) => {
+          if (result.created) {
+            console.log("✅ Daily snapshot created successfully");
+          } else if (result.success) {
+            console.log("✅ Daily snapshot already exists or being processed");
+          }
+        })
+        .catch((error) => {
+          console.error("⚠️ Snapshot creation failed (non-critical):", error);
+        });
+    }
+  });
 } catch (error) {
   console.error("Error initializing UI components:", error);
 }
@@ -206,23 +231,5 @@ function createPasswordModal() {
   passwordModal.show();
 }
 
-$(document).ready(function () {
-  checkLoginStatus();
-  setupPasswordVerification();
-
-  if (window.location.pathname.includes("dashboard.html") || window.location.pathname.endsWith("/")) {
-    ensureDailySnapshotExists()
-      .then((result) => {
-        if (result.created) {
-          console.log("✅ Daily snapshot created successfully");
-        } else if (result.success) {
-          console.log("✅ Daily snapshot already exists or being processed");
-        }
-      })
-      .catch((error) => {
-        console.error("⚠️ Snapshot creation failed (non-critical):", error);
-      });
-  }
-});
 // Export global functions
 window.handleLogout = handleLogout;
