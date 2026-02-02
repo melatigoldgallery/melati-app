@@ -49,15 +49,13 @@ const SETTINGS_COLLECTION = "settings";
 const THRESHOLD_DOC_ID = "attendanceThresholds";
 
 // Tambahkan variabel global untuk verifikasi wajah
-let isFaceVerificationEnabled = true; // Dapat diubah menjadi false untuk menonaktifkan fitur
+let isFaceVerificationEnabled = false; // Default OFF - akan di-load dari Firestore
 let isFaceVerificationReady = false;
 let faceVerificationTimeout = null;
 // Tambahkan variabel global untuk face-api
 let isFaceApiInitialized = false;
 let videoStream = null;
 let isFaceVerificationInitialized = false;
-// Tambahkan flag untuk manual override oleh supervisor
-let isManualToggleOverride = false;
 
 // Initialize data
 let attendanceRecords = [];
@@ -300,34 +298,50 @@ function setRadioButtonsByTime() {
 
 // FUNGSI BARU: Fungsi untuk mengatur status verifikasi wajah berdasarkan scan type dan shift
 function updateFaceVerificationBasedOnScanAndShift() {
-  // Jika ada manual override dari supervisor, jangan ubah status toggle
-  if (isManualToggleOverride) {
+  // Get settings from Firestore cache
+  const fvSettings = window.faceVerificationSettings;
+
+  // If no settings or master toggle OFF, disable everything
+  if (!fvSettings || !fvSettings.enabled) {
+    isFaceVerificationEnabled = false;
+    updateFaceVerificationUI(false);
+    console.log("Face verification: DISABLED by admin settings");
     return;
   }
 
-  // Dapatkan status radio button
+  // Get current scan type and shift
   const isScanIn = document.getElementById("scanTypeIn")?.checked || false;
+  const isScanOut = document.getElementById("scanTypeOut")?.checked || false;
   const isMorningShift = document.getElementById("shiftMorning")?.checked || false;
+  const isAfternoonShift = document.getElementById("shiftAfternoon")?.checked || false;
 
-  // Aktifkan verifikasi wajah hanya jika scan masuk DAN shift pagi
-  const shouldEnableFaceVerification = isScanIn && isMorningShift;
+  // Check rules from settings
+  let shouldEnable = false;
 
-  // Dapatkan elemen toggle
-  const faceVerificationToggle = document.getElementById("faceVerificationToggle");
-
-  if (faceVerificationToggle) {
-    // Atur status toggle berdasarkan kondisi
-    faceVerificationToggle.checked = shouldEnableFaceVerification;
-
-    // Update variabel global
-    isFaceVerificationEnabled = shouldEnableFaceVerification;
-
-    // Simpan preferensi ke localStorage
-    localStorage.setItem("faceVerificationEnabled", shouldEnableFaceVerification ? "true" : "false");
-
-    // Update UI terkait verifikasi wajah
-    updateFaceVerificationUI(shouldEnableFaceVerification);
+  if (isScanIn && fvSettings.rules && fvSettings.rules.checkIn) {
+    if (isMorningShift && fvSettings.rules.checkIn.morning) {
+      shouldEnable = true;
+    } else if (isAfternoonShift && fvSettings.rules.checkIn.afternoon) {
+      shouldEnable = true;
+    }
+  } else if (isScanOut && fvSettings.rules && fvSettings.rules.checkOut) {
+    if (isMorningShift && fvSettings.rules.checkOut.morning) {
+      shouldEnable = true;
+    } else if (isAfternoonShift && fvSettings.rules.checkOut.afternoon) {
+      shouldEnable = true;
+    }
   }
+
+  // Update status
+  isFaceVerificationEnabled = shouldEnable;
+  updateFaceVerificationUI(shouldEnable);
+
+  // Save to localStorage for reference
+  localStorage.setItem("faceVerificationEnabled", shouldEnable ? "true" : "false");
+
+  console.log(
+    `Face verification: ${shouldEnable ? "ENABLED" : "DISABLED"} (Scan: ${isScanIn ? "IN" : "OUT"}, Shift: ${isMorningShift ? "Morning" : "Afternoon"})`,
+  );
 }
 
 // FUNGSI BARU: Fungsi untuk memperbarui UI verifikasi wajah
@@ -343,38 +357,26 @@ function updateFaceVerificationUI(isEnabled) {
   if (initCameraButton) {
     initCameraButton.style.display = isEnabled ? "inline-block" : "none";
   }
+
+  // Update indicator badge
+  updateFaceVerificationIndicator();
 }
 
-// Tambahkan fungsi baru untuk mengatur toggle verifikasi wajah berdasarkan tipe scan
-function updateFaceVerificationToggleBasedOnScanType(isCheckIn) {
-  // Dapatkan status shift
-  const isMorningShift = document.getElementById("shiftMorning")?.checked || false;
+/**
+ * Update face verification indicator badge
+ */
+function updateFaceVerificationIndicator() {
+  const indicator = document.getElementById("fvIndicator");
+  if (!indicator) return;
 
-  // Aktifkan verifikasi wajah hanya jika scan masuk DAN shift pagi
-  const shouldEnableFaceVerification = isCheckIn && isMorningShift;
-
-  // Dapatkan elemen toggle
-  const faceVerificationToggle = document.getElementById("faceVerificationToggle");
-
-  if (faceVerificationToggle) {
-    // Atur status toggle berdasarkan kondisi
-    faceVerificationToggle.checked = shouldEnableFaceVerification;
-
-    // Update variabel global
-    isFaceVerificationEnabled = shouldEnableFaceVerification;
-
-    // Simpan preferensi ke localStorage
-    localStorage.setItem("faceVerificationEnabled", shouldEnableFaceVerification ? "true" : "false");
-
-    // Update UI terkait verifikasi wajah
-    updateFaceVerificationUI(shouldEnableFaceVerification);
-
-    // Log perubahan status
-    console.log(
-      `Verifikasi wajah ${shouldEnableFaceVerification ? "diaktifkan" : "dinonaktifkan"} karena ${
-        isCheckIn ? "scan masuk" : "scan pulang"
-      } dan shift ${isMorningShift ? "pagi" : "sore"}`,
-    );
+  if (isFaceVerificationEnabled) {
+    indicator.className = "badge bg-success ms-2";
+    indicator.innerHTML = '<i class="fas fa-check-circle"></i> Verifikasi Aktif';
+    indicator.style.cssText = "font-size: 0.7em; vertical-align: middle;";
+  } else {
+    indicator.className = "badge bg-secondary ms-2";
+    indicator.innerHTML = '<i class="fas fa-times-circle"></i> Verifikasi Nonaktif';
+    indicator.style.cssText = "font-size: 0.7em; vertical-align: middle;";
   }
 }
 
@@ -677,34 +679,7 @@ async function processScannedBarcode(barcode) {
       return;
     }
 
-    // PERBAIKAN: Cek status toggle manual terlebih dahulu
-    if (!isManualToggleOverride) {
-      // Jika tidak ada manual override, atur berdasarkan scan type dan shift
-      const isScanIn = document.getElementById("scanTypeIn")?.checked || false;
-      const isMorningShift = document.getElementById("shiftMorning")?.checked || false;
-
-      // Aktifkan verifikasi wajah hanya jika scan masuk DAN shift pagi
-      isFaceVerificationEnabled = isScanIn && isMorningShift;
-
-      // Update UI verifikasi wajah
-      updateFaceVerificationUI(isFaceVerificationEnabled);
-    } else {
-      // Jika ada manual override, gunakan status toggle saat ini
-      const toggleElement = document.getElementById("faceVerificationToggle");
-      if (toggleElement) {
-        isFaceVerificationEnabled = toggleElement.checked;
-      }
-      console.log(
-        `Menggunakan pengaturan manual supervisor: verifikasi wajah ${isFaceVerificationEnabled ? "ON" : "OFF"}`,
-      );
-    }
-
-    // Inisialisasi verifikasi wajah jika diperlukan
-    if (isFaceVerificationEnabled) {
-      initFaceVerificationIfNeeded();
-    }
-
-    // Verifikasi wajah jika diaktifkan (akan di-bypass jika toggle OFF)
+    // Verifikasi wajah jika diaktifkan (berdasarkan settings dari admin)
     const verificationPassed = await performFaceVerification(employee);
     if (!verificationPassed) return;
 
@@ -2103,140 +2078,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // TAMBAHAN: Inisialisasi verifikasi wajah jika fitur diaktifkan
     if (isFaceVerificationEnabled) {
-      // PERBAIKAN: Cek apakah user adalah supervisor sebelum menampilkan toggle
-      const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
-      const isSupervisor = currentUser.username === "supervisor";
+      // Add status indicator for face verification (read-only)
+      const scannerHeader = document.querySelector(".scanner-card .card-header h2");
+      if (scannerHeader) {
+        const indicator = document.createElement("span");
+        indicator.id = "fvIndicator";
+        indicator.className = "badge ms-2";
+        indicator.style.cssText = "font-size: 0.7em; vertical-align: middle;";
+        scannerHeader.appendChild(indicator);
 
-      // Tambahkan toggle switch hanya untuk supervisor
-      if (isSupervisor) {
-        const scannerHeader = document.querySelector(".scanner-card .card-header");
-        if (scannerHeader) {
-          const faceVerificationToggle = document.createElement("div");
-          faceVerificationToggle.className = "face-verification-toggle ms-2";
-          faceVerificationToggle.innerHTML = `
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="faceVerificationToggle" ${
-                isFaceVerificationEnabled ? "checked" : ""
-              }>
-              <label class="form-check-label" for="faceVerificationToggle">Verifikasi Wajah</label>
-            </div>
-          `;
-          scannerHeader.appendChild(faceVerificationToggle);
-
-          // Tambahkan event listener untuk toggle dengan perbaikan
-          const toggleElement = document.getElementById("faceVerificationToggle");
-          if (toggleElement) {
-            toggleElement.addEventListener("change", function () {
-              // Set flag manual override dari supervisor
-              isManualToggleOverride = true;
-
-              // Update variabel global
-              isFaceVerificationEnabled = this.checked;
-
-              // Simpan preferensi ke localStorage agar tetap konsisten setelah refresh
-              localStorage.setItem("faceVerificationEnabled", isFaceVerificationEnabled ? "true" : "false");
-              localStorage.setItem("manualToggleOverride", "true");
-
-              // Tampilkan pesan konfirmasi dengan indikator manual mode
-              showScanResult(
-                "info",
-                `Verifikasi wajah telah ${isFaceVerificationEnabled ? "diaktifkan" : "dinonaktifkan"} (Mode Manual)`,
-                false,
-                true,
-                2000,
-              );
-
-              // Sembunyikan/tampilkan UI terkait verifikasi wajah
-              const faceVerificationContainer = document.querySelector(".face-verification-container");
-              if (faceVerificationContainer) {
-                faceVerificationContainer.style.display = isFaceVerificationEnabled ? "block" : "none";
-              }
-
-              // Sembunyikan/tampilkan tombol inisialisasi kamera
-              const initCameraButton = document.getElementById("initCamera");
-              if (initCameraButton) {
-                initCameraButton.style.display = isFaceVerificationEnabled ? "inline-block" : "none";
-              }
-
-              // Jika verifikasi wajah diaktifkan, coba inisialisasi di background
-              if (isFaceVerificationEnabled && !isFaceVerificationInitialized) {
-                initializeFaceVerification().then((success) => {
-                  console.log("Background face verification initialization:", success ? "success" : "failed");
-                });
-              }
-
-              // Jika verifikasi wajah dinonaktifkan, hentikan kamera jika sedang aktif
-              if (!isFaceVerificationEnabled && videoStream) {
-                stopCamera();
-              }
-
-              // Log status manual override
-              console.log(
-                `Supervisor mengatur verifikasi wajah secara manual: ${isFaceVerificationEnabled ? "ON" : "OFF"}`,
-              );
-            });
-
-            // Inisialisasi toggle berdasarkan nilai yang tersimpan di localStorage
-            const savedPreference = localStorage.getItem("faceVerificationEnabled");
-            const savedManualOverride = localStorage.getItem("manualToggleOverride");
-
-            // Restore manual override status
-            if (savedManualOverride === "true") {
-              isManualToggleOverride = true;
-              console.log("Manual override mode restored from localStorage");
-            }
-
-            if (savedPreference !== null) {
-              const isEnabled = savedPreference === "true";
-              // Hanya update jika berbeda dari nilai default
-              if (isEnabled !== isFaceVerificationEnabled) {
-                toggleElement.checked = isEnabled;
-                isFaceVerificationEnabled = isEnabled;
-
-                // Update UI tanpa trigger event untuk menghindari duplikasi
-                updateFaceVerificationUI(isEnabled);
-              }
-            }
-          }
-        }
-      } else {
-        // Jika bukan supervisor, force enable verifikasi wajah secara permanen
-        isFaceVerificationEnabled = true;
-        isManualToggleOverride = true;
-
-        // Simpan ke localStorage untuk konsistensi
-        localStorage.setItem("faceVerificationEnabled", "true");
-        localStorage.setItem("manualToggleOverride", "true");
-
-        console.log("Face verification toggle hidden: User is not supervisor");
-        console.log("Face verification forced ON for non-supervisor user");
+        // Update indicator
+        updateFaceVerificationIndicator();
       }
-
-      // Sembunyikan UI verifikasi wajah jika fitur dinonaktifkan
-      const faceVerificationContainer = document.querySelector(".face-verification-container");
-      if (faceVerificationContainer) {
-        faceVerificationContainer.style.display = isFaceVerificationEnabled ? "block" : "none";
-      }
-
-      // // TAMBAHAN: Tambahkan event listener untuk radio button scan type
-      // const scanTypeIn = document.getElementById("scanTypeIn");
-      // const scanTypeOut = document.getElementById("scanTypeOut");
-
-      // if (scanTypeIn) {
-      //   scanTypeIn.addEventListener("change", function () {
-      //     if (this.checked) {
-      //       updateFaceVerificationToggleBasedOnScanType(true);
-      //     }
-      //   });
-      // }
-
-      // if (scanTypeOut) {
-      //   scanTypeOut.addEventListener("change", function () {
-      //     if (this.checked) {
-      //       updateFaceVerificationToggleBasedOnScanType(false);
-      //     }
-      //   });
-      // }
 
       // Coba inisialisasi model di background
       try {
@@ -2513,13 +2366,41 @@ function initThresholdSettingsListener() {
       const defaults = {
         staff: { morning: "09:00", afternoon: "14:21" },
         ob: { morning: "07:31", afternoon: "13:46" },
+        faceVerification: {
+          enabled: true,
+          rules: {
+            checkIn: { morning: true, afternoon: false },
+            checkOut: { morning: false, afternoon: false },
+          },
+        },
       };
-      cachedThresholdSettings = docSnap.exists()
-        ? {
-            staff: docSnap.data().staff || defaults.staff,
-            ob: docSnap.data().ob || defaults.ob,
-          }
-        : defaults;
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        cachedThresholdSettings = {
+          staff: data.staff || defaults.staff,
+          ob: data.ob || defaults.ob,
+        };
+
+        // Load face verification settings
+        if (data.faceVerification) {
+          window.faceVerificationSettings = data.faceVerification;
+          console.log("✅ Face verification settings loaded:", data.faceVerification);
+
+          // Update face verification based on new settings
+          updateFaceVerificationBasedOnScanAndShift();
+        } else {
+          // Use default if not present
+          window.faceVerificationSettings = defaults.faceVerification;
+          console.log("⚠️ Using default face verification settings");
+        }
+      } else {
+        cachedThresholdSettings = {
+          staff: defaults.staff,
+          ob: defaults.ob,
+        };
+        window.faceVerificationSettings = defaults.faceVerification;
+      }
     },
     (error) => {
       console.error("❌ Settings listener error:", error);
