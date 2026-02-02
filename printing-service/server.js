@@ -1,0 +1,169 @@
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const path = require("path");
+const logger = require("./utils/logger");
+const printController = require("./controllers/printController");
+const printerService = require("./services/printerService");
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// ✅ CORS Configuration untuk GitHub Pages
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    // Or from file:// protocol (local HTML files)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      "https://melatigoldgallery.github.io", // ⚠️ GANTI dengan GitHub Pages URL Anda!
+      "http://localhost:8080", // Local development
+      "http://127.0.0.1:8080",
+      "http://localhost:5500", // Live Server VSCode
+      "http://127.0.0.1:5500",
+      "http://localhost:5501",
+      "http://127.0.0.1:5501",
+    ];
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // Allow file:// protocol for local testing
+      callback(null, true);
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
+
+// Middleware
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // Preflight requests
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
+
+// Request logging
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.path} - ${req.ip}`);
+  next();
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date(),
+    uptime: process.uptime(),
+    version: "1.0.0",
+  });
+});
+
+// List available printers
+app.get("/api/printers", async (req, res) => {
+  try {
+    const printers = await printerService.listPrinters();
+    const config = require("./config/printers.json");
+
+    res.json({
+      success: true,
+      printers: printers,
+      config: config,
+    });
+  } catch (error) {
+    logger.error("Error listing printers:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update printer configuration
+app.post("/api/printers/config", async (req, res) => {
+  try {
+    const { type, printerName } = req.body;
+
+    if (!type || !printerName) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: type, printerName",
+      });
+    }
+
+    // Validate printer exists
+    const printers = printerService.listPrinters();
+    const exists = printers.find((p) => p.name === printerName);
+
+    if (!exists) {
+      return res.status(400).json({
+        success: false,
+        error: "Printer not found",
+      });
+    }
+
+    // Update config
+    const fs = require("fs");
+    const configPath = path.join(__dirname, "config", "printers.json");
+    const config = require("./config/printers.json");
+    config[type] = printerName;
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+    logger.info(`Printer config updated: ${type} -> ${printerName}`);
+    res.json({ success: true, message: "Configuration updated" });
+  } catch (error) {
+    logger.error("Error updating printer config:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Print receipt endpoint
+app.post("/api/print/receipt", printController.printReceipt.bind(printController));
+
+// Print invoice endpoint
+app.post("/api/print/invoice", printController.printInvoice.bind(printController));
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  logger.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+    message: err.message,
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "Endpoint not found",
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  logger.info("=".repeat(50));
+  logger.info("🖨️  Melati Print Service Started");
+  logger.info(`📡 Server running on http://localhost:${PORT}`);
+  logger.info(`📋 API Endpoints:`);
+  logger.info(`   GET  /api/health          - Health check`);
+  logger.info(`   GET  /api/printers        - List printers`);
+  logger.info(`   POST /api/printers/config - Update config`);
+  logger.info(`   POST /api/print/receipt   - Print receipt`);
+  logger.info(`   POST /api/print/invoice   - Print invoice`);
+  logger.info("=".repeat(50));
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received, shutting down gracefully...");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  logger.info("SIGINT received, shutting down gracefully...");
+  process.exit(0);
+});
+
+module.exports = app;

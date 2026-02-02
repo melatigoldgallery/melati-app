@@ -265,7 +265,38 @@ const penjualanHandler = {
     this.updateUIForSalesType("aksesoris");
     this.toggleJenisManualField("aksesoris");
     this.initializeTooltips();
+
+    // Initialize print service
+    if (window.printService) {
+      try {
+        await window.printService.init();
+        this.updatePrintServiceStatus();
+        // Update status every 30 seconds
+        setInterval(() => this.updatePrintServiceStatus(), 30000);
+      } catch (error) {
+        console.warn("Print service initialization failed:", error);
+      }
+    }
+
     $("#sales").focus();
+  },
+
+  // Update print service status indicator
+  updatePrintServiceStatus() {
+    if (!window.printService) return;
+
+    const statusEl = document.getElementById("printServiceStatus");
+    if (!statusEl) return;
+
+    const isOnline = window.printService.isOnline;
+
+    if (isOnline) {
+      statusEl.className = "print-service-status online";
+      statusEl.innerHTML = '<i class="fas fa-print"></i> Print Service: Online';
+    } else {
+      statusEl.className = "print-service-status offline";
+      statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Print Service: Fallback Mode';
+    }
   },
 
   // Setup inactivity monitoring
@@ -2372,9 +2403,64 @@ const penjualanHandler = {
     }
   },
 
-  // Print receipt
+  // Print receipt - Try print service first, fallback to browser
+  async printReceipt() {
+    if (!currentTransactionData) {
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    // Try print service if available
+    if (window.printService && window.printService.isOnline) {
+      try {
+        const transaction = currentTransactionData;
+
+        // Format jam dari timestamp saat ini
+        const now = new Date();
+        const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+        // Prepare receipt data for print service
+        const receiptData = {
+          transactionType: transaction.salesType.toUpperCase(),
+          tanggal: transaction.tanggal,
+          jam: jam,
+          sales: transaction.sales,
+          items: transaction.items.map((item) => ({
+            nama: item.nama || "-",
+            kode: item.kodeText || "-",
+            kadar: item.kadar || "-",
+            berat: item.berat || "-",
+            totalHarga: parseInt(item.totalHarga) || 0,
+            keterangan: item.keterangan || "",
+          })),
+          totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
+          jumlahBayar:
+            transaction.metodeBayar !== "free" ? parseInt(transaction.totalHarga.replace(/\./g, "")) || 0 : 0,
+          kembalian: 0,
+          metodeBayar: transaction.metodeBayar,
+          nominalDP: transaction.metodeBayar === "dp" ? parseInt(transaction.nominalDP.replace(/\./g, "")) || 0 : 0,
+          sisaPembayaran:
+            transaction.metodeBayar === "dp" ? parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0 : 0,
+        };
+
+        const result = await window.printService.printReceipt(receiptData);
+
+        if (result.success && result.method !== "browser") {
+          utils.showAlert("Struk berhasil dicetak ke printer thermal!", "Sukses", "success");
+          return;
+        }
+      } catch (error) {
+        console.warn("Print service failed, falling back to browser:", error);
+      }
+    }
+
+    // Fallback to browser print
+    this.printReceiptBrowser();
+  },
+
+  // Print receipt - Browser fallback
   // Print receipt - PERBAIKAN LOGIKA DP > TOTAL
-  printReceipt() {
+  printReceiptBrowser() {
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
@@ -2600,8 +2686,67 @@ const penjualanHandler = {
     printWindow.document.close();
   },
 
-  // Print invoice
-  printInvoice() {
+  // Print invoice - Try print service first, fallback to browser
+  async printInvoice() {
+    if (!currentTransactionData) {
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    // Try print service if available
+    if (window.printService && window.printService.isOnline) {
+      try {
+        const transaction = currentTransactionData;
+
+        // Prepare tanggal dan jam
+        let tanggal = transaction.tanggal;
+        const now = new Date();
+        const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+        if (transaction.timestamp && transaction.timestamp.toDate) {
+          tanggal = utils.formatDate(transaction.timestamp);
+        }
+
+        // Collect keterangan from items
+        const keteranganList = transaction.items
+          .filter((item) => item.keterangan && item.keterangan.trim() !== "")
+          .map((item) => item.keterangan);
+        const notes = keteranganList.length > 0 ? keteranganList.join(" ") : "";
+
+        // Prepare invoice data for print service
+        const invoiceData = {
+          tanggal: tanggal + " " + jam,
+          sales: transaction.sales || "-",
+          customerName: transaction.customerName || "",
+          customerPhone: transaction.customerPhone || "",
+          items: transaction.items.map((item) => ({
+            nama: item.nama || "-",
+            kode: item.kodeText || "-",
+            kadar: item.kadar || "-",
+            berat: item.berat || "-",
+            jumlah: 1,
+            totalHarga: parseInt(item.totalHarga) || 0,
+          })),
+          totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
+          notes: notes,
+        };
+
+        const result = await window.printService.printInvoice(invoiceData);
+
+        if (result.success && result.method !== "browser") {
+          utils.showAlert("Invoice berhasil dicetak ke printer A4!", "Sukses", "success");
+          return;
+        }
+      } catch (error) {
+        console.warn("Print service failed, falling back to browser:", error);
+      }
+    }
+
+    // Fallback to browser print
+    this.printInvoiceBrowser();
+  },
+
+  // Print invoice - Browser fallback
+  printInvoiceBrowser() {
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
@@ -2717,7 +2862,9 @@ const penjualanHandler = {
   },
 
   // Print separate invoices per item for manual sales
-  printInvoicePerItem() {
+  async printInvoicePerItem() {
+    console.log("🖨️ === DEBUG: printInvoicePerItem called ===");
+
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
@@ -2726,11 +2873,165 @@ const penjualanHandler = {
     const tx = currentTransactionData;
     const items = Array.isArray(tx.items) ? tx.items : [];
 
+    console.log("📋 Transaction data:", {
+      items: items.length,
+      tanggal: tx.tanggal,
+      sales: tx.sales,
+    });
+
     // Fallback jika hanya 1 item
     if (items.length <= 1) {
+      console.log("ℹ️ Single item detected, using printInvoice()");
       this.printInvoice();
       return;
     }
+
+    // Check if print service exists
+    if (!window.printService) {
+      console.warn("⚠️ window.printService not initialized, using browser fallback");
+      this.printInvoicePerItemBrowser();
+      return;
+    }
+
+    console.log("🔍 Attempting print service...");
+
+    // Try print service directly (don't rely on isOnline flag)
+    try {
+      utils.showLoading(true);
+
+      // Format jam
+      const now = new Date();
+      const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+      console.log("🕐 Formatted time:", jam);
+      console.log(`📤 Sending ${items.length} items to print service...`);
+
+      let printedCount = 0;
+
+      // Print each item sequentially
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        console.log(`  └─ Item ${i + 1}/${items.length}:`, {
+          nama: item.nama || item.namaBarang,
+          kode: item.kode || item.kodeText || item.kodeLock,
+          total: item.totalHarga,
+        });
+
+        // Prepare invoice data for single item
+        const invoiceData = {
+          tanggal: tx.tanggal + " " + jam,
+          sales: tx.sales || "-",
+          customerName: tx.customerName || "",
+          customerPhone: tx.customerPhone || "",
+          items: [
+            {
+              nama: item.nama || item.namaBarang || "-",
+              kode: item.kode || item.kodeText || item.kodeLock || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || item.gr || 0,
+              jumlah: 1,
+              totalHarga: parseInt(item.totalHarga) || 0,
+            },
+          ],
+          totalHarga: parseInt(item.totalHarga) || 0,
+          notes: item.keterangan || "",
+        };
+
+        console.log(`  └─ Sending invoice data to service...`);
+
+        // Direct fetch to print service with retry logic
+        let retryCount = 0;
+        const maxRetries = 3;
+        let lastError = null;
+
+        while (retryCount <= maxRetries) {
+          try {
+            const response = await fetch("http://localhost:3001/api/print/invoice", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(invoiceData),
+              mode: "cors",
+              credentials: "omit",
+            });
+
+            console.log(`  └─ Response status:`, response.status, response.statusText);
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log(`  └─ Print result:`, result);
+
+            if (!result.success) {
+              throw new Error(result.error || "Print failed");
+            }
+
+            printedCount++;
+            console.log(`  ✅ Item ${i + 1} printed successfully (Job ID: ${result.jobID})`);
+            break; // Success, exit retry loop
+          } catch (fetchError) {
+            lastError = fetchError;
+            retryCount++;
+
+            if (retryCount <= maxRetries) {
+              console.warn(`  ⚠️ Attempt ${retryCount} failed: ${fetchError.message}`);
+              console.log(`  🔄 Retrying in ${retryCount * 1000}ms...`);
+              await new Promise((resolve) => setTimeout(resolve, retryCount * 1000));
+            }
+          }
+        }
+
+        // If all retries failed, throw error
+        if (retryCount > maxRetries) {
+          console.error(`  ❌ Failed after ${maxRetries} retries`);
+          throw lastError;
+        }
+
+        // Longer delay between prints (1500ms to ensure backend finishes)
+        if (i < items.length - 1) {
+          console.log(`  └─ Waiting 1500ms before next print...`);
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+      }
+
+      utils.showLoading(false);
+      console.log(`✅ All ${printedCount} invoices sent successfully!`);
+      utils.showAlert(`${printedCount} invoice berhasil dikirim ke printer!`, "Sukses", "success");
+      return;
+    } catch (error) {
+      console.error("❌ Print service error:", error);
+      console.error("  - Error name:", error.name);
+      console.error("  - Error message:", error.message);
+      utils.showLoading(false);
+
+      // Ask user if they want to use browser fallback
+      const useFallback = await utils.showConfirm(
+        "Print service tidak tersedia. Gunakan browser print sebagai alternatif?",
+        "Print Service Offline",
+      );
+
+      if (useFallback) {
+        console.log("🌐 User chose browser fallback");
+        this.printInvoicePerItemBrowser();
+      } else {
+        console.log("❌ User cancelled print");
+      }
+    }
+  },
+
+  // Browser fallback for printing per item
+  printInvoicePerItemBrowser() {
+    if (!currentTransactionData) {
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    const tx = currentTransactionData;
+    const items = Array.isArray(tx.items) ? tx.items : [];
 
     const parseHarga = (val) => {
       if (val == null) return 0;

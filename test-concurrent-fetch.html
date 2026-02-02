@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Test Concurrent Fetch</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+      }
+      .log {
+        background: #000;
+        color: #0f0;
+        padding: 15px;
+        max-height: 500px;
+        overflow-y: auto;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔬 Concurrent Fetch Diagnostic</h1>
+
+    <button onclick="testSequential()">Test Sequential (Safe)</button>
+    <button onclick="testWithDelay()">Test with 1.5s Delay</button>
+    <button onclick="clearLog()">Clear</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+      const log = document.getElementById("log");
+
+      function addLog(msg) {
+        const time = new Date().toLocaleTimeString();
+        log.innerHTML += `[${time}] ${msg}\n`;
+        log.scrollTop = log.scrollHeight;
+        console.log(msg);
+      }
+
+      function clearLog() {
+        log.innerHTML = "";
+      }
+
+      async function testSequential() {
+        addLog("🧪 Testing SEQUENTIAL requests (2 items)...\n");
+        const startTime = Date.now();
+
+        try {
+          for (let i = 1; i <= 2; i++) {
+            addLog(`\n📤 Request ${i}/2 starting...`);
+            const reqStart = Date.now();
+
+            const response = await fetch("http://localhost:3001/api/print/invoice", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tanggal: "25/01/2026 15:00",
+                sales: "Test",
+                customerName: "Test Customer",
+                customerPhone: "08123456789",
+                items: [
+                  {
+                    nama: `Test Item ${i}`,
+                    kode: `TEST${i}`,
+                    kadar: "24K",
+                    berat: 10,
+                    jumlah: 1,
+                    totalHarga: 1000000,
+                  },
+                ],
+                totalHarga: 1000000,
+                notes: `Test ${i}`,
+              }),
+              mode: "cors",
+            });
+
+            const reqDuration = Date.now() - reqStart;
+            addLog(`📥 Request ${i} response: ${response.status} (${reqDuration}ms)`);
+
+            const result = await response.json();
+            addLog(`✅ Request ${i} success: Job ${result.jobID}`);
+
+            // NO DELAY - immediately proceed to next
+          }
+
+          const totalTime = Date.now() - startTime;
+          addLog(`\n🎉 SEQUENTIAL TEST PASSED!`);
+          addLog(`⏱️ Total time: ${totalTime}ms`);
+        } catch (error) {
+          addLog(`\n❌ TEST FAILED: ${error.message}`);
+          console.error(error);
+        }
+      }
+
+      async function testWithDelay() {
+        addLog("🧪 Testing with 1500ms DELAY (2 items)...\n");
+        const startTime = Date.now();
+
+        try {
+          for (let i = 1; i <= 2; i++) {
+            addLog(`\n📤 Request ${i}/2 starting...`);
+            const reqStart = Date.now();
+
+            const response = await fetch("http://localhost:3001/api/print/invoice", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tanggal: "25/01/2026 15:00",
+                sales: "Test",
+                customerName: "Test Customer",
+                customerPhone: "08123456789",
+                items: [
+                  {
+                    nama: `Test Item ${i}`,
+                    kode: `TEST${i}`,
+                    kadar: "24K",
+                    berat: 10,
+                    jumlah: 1,
+                    totalHarga: 1000000,
+                  },
+                ],
+                totalHarga: 1000000,
+                notes: `Test ${i}`,
+              }),
+              mode: "cors",
+            });
+
+            const reqDuration = Date.now() - reqStart;
+            addLog(`📥 Request ${i} response: ${response.status} (${reqDuration}ms)`);
+
+            const result = await response.json();
+            addLog(`✅ Request ${i} success: Job ${result.jobID}`);
+
+            if (i < 2) {
+              addLog(`⏳ Waiting 1500ms...`);
+              await new Promise((r) => setTimeout(r, 1500));
+              addLog(`✓ Delay complete`);
+            }
+          }
+
+          const totalTime = Date.now() - startTime;
+          addLog(`\n🎉 DELAY TEST PASSED!`);
+          addLog(`⏱️ Total time: ${totalTime}ms`);
+        } catch (error) {
+          addLog(`\n❌ TEST FAILED: ${error.message}`);
+          console.error(error);
+        }
+      }
+    </script>
+  </body>
+</html>
