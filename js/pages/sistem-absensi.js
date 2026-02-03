@@ -1,6 +1,5 @@
-// 📦 Caching Logic for Attendance Data
 const CACHE_KEY = "cachedAttendanceData";
-const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_EXPIRATION = 5 * 60 * 1000;
 
 function saveAttendanceToCache(data) {
   const cache = {
@@ -38,9 +37,7 @@ import {
   getAllLeaveRequestsForDate,
   clearLeaveCacheForDate,
 } from "../services/leave-service.js";
-// Import modul verifikasi wajah
 import { initCamera, detectAndVerifyFace } from "../face-verification.js";
-// Import Firestore untuk settings
 import { db } from "../configFirebase.js";
 import { doc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
@@ -49,7 +46,10 @@ const SETTINGS_COLLECTION = "settings";
 const THRESHOLD_DOC_ID = "attendanceThresholds";
 
 // Tambahkan variabel global untuk verifikasi wajah
-let isFaceVerificationEnabled = false; // Default OFF - akan di-load dari Firestore
+// isFaceVerificationSystemEnabled: Master toggle (ON = scanner mode, OFF = manual mode)
+let isFaceVerificationSystemEnabled = false;
+// isFaceVerificationRequired: Per-scan/shift requirement (ON = wajib verifikasi, OFF = skip verifikasi)
+let isFaceVerificationRequired = false;
 let isFaceVerificationReady = false;
 let faceVerificationTimeout = null;
 // Tambahkan variabel global untuk face-api
@@ -63,35 +63,31 @@ let employees = [];
 let leaveRequests = [];
 
 // Tambahkan cache untuk employees
-const employeeCache = new Map(); // Cache untuk karyawan berdasarkan barcode
-const attendanceCache = new Map(); // Cache untuk data kehadiran berdasarkan tanggal
-const cacheMeta = new Map(); // Cache metadata for timestamps
-// Variabel global untuk menyimpan suara Indonesia
+const employeeCache = new Map();
+const attendanceCache = new Map();
+const cacheMeta = new Map();
 let indonesianVoice = null;
-// Variabel global untuk status suara
 let soundEnabled = true;
-// Variabel global untuk menyimpan status ketersediaan audio
 let isOpeningAudioAvailable = true;
-// Tambahkan variabel global untuk mendeteksi scanner barcode
 let barcodeBuffer = "";
 let lastKeyTime = 0;
 let isBarcodeScanner = false;
-const SCANNER_CHARACTER_DELAY_THRESHOLD = 50; // Maksimum delay antar karakter (ms) untuk scanner
-const SCANNER_COMPLETE_DELAY = 500; // Waktu tunggu setelah input selesai (ms)
+const SCANNER_CHARACTER_DELAY_THRESHOLD = 50;
+const SCANNER_COMPLETE_DELAY = 500;
 let scannerTimeoutId = null;
 
 // Tambahkan variabel global untuk mencegah pemrosesan barcode duplikat
 let lastProcessedBarcode = "";
 let lastProcessedTime = 0;
-const BARCODE_COOLDOWN_MS = 3000; // Waktu tunggu 3 detik sebelum barcode yang sama bisa diproses lagi
+const BARCODE_COOLDOWN_MS = 3000;
 
 // Cache untuk threshold settings (real-time)
 let cachedThresholdSettings = null;
 let thresholdSettingsListener = null;
 
 // Tambahkan konstanta untuk TTL
-const CACHE_TTL_STANDARD = 60 * 60 * 1000; // 1 jam
-const CACHE_TTL_TODAY = 5 * 60 * 1000; // 5 menit untuk data hari ini
+const CACHE_TTL_STANDARD = 60 * 60 * 1000;
+const CACHE_TTL_TODAY = 5 * 60 * 1000;
 
 // Tambahkan variabel untuk menyimpan timestamp cache stats
 let statsLastUpdated = 0;
@@ -301,82 +297,127 @@ function updateFaceVerificationBasedOnScanAndShift() {
   // Get settings from Firestore cache
   const fvSettings = window.faceVerificationSettings;
 
-  // If no settings or master toggle OFF, disable everything
-  if (!fvSettings || !fvSettings.enabled) {
-    isFaceVerificationEnabled = false;
-    updateFaceVerificationUI(false);
-    console.log("Face verification: DISABLED by admin settings");
+  // 1. Update system status (master toggle) - mengatur mode input
+  isFaceVerificationSystemEnabled = fvSettings?.enabled || false;
+
+  // 2. Update input mode berdasarkan master toggle
+  updateInputMode(isFaceVerificationSystemEnabled);
+
+  // 3. Jika sistem OFF, tidak perlu cek rules
+  if (!isFaceVerificationSystemEnabled) {
+    isFaceVerificationRequired = false;
+    updateFaceVerificationRequirement(false);
+    console.log("Face verification system: OFF (Mode Manual Aktif)");
     return;
   }
 
-  // Get current scan type and shift
+  // 4. Sistem ON, cek rules untuk requirement per scan/shift
   const isScanIn = document.getElementById("scanTypeIn")?.checked || false;
   const isScanOut = document.getElementById("scanTypeOut")?.checked || false;
   const isMorningShift = document.getElementById("shiftMorning")?.checked || false;
   const isAfternoonShift = document.getElementById("shiftAfternoon")?.checked || false;
 
   // Check rules from settings
-  let shouldEnable = false;
+  let shouldRequire = false;
 
-  if (isScanIn && fvSettings.rules && fvSettings.rules.checkIn) {
-    if (isMorningShift && fvSettings.rules.checkIn.morning) {
-      shouldEnable = true;
-    } else if (isAfternoonShift && fvSettings.rules.checkIn.afternoon) {
-      shouldEnable = true;
-    }
-  } else if (isScanOut && fvSettings.rules && fvSettings.rules.checkOut) {
-    if (isMorningShift && fvSettings.rules.checkOut.morning) {
-      shouldEnable = true;
-    } else if (isAfternoonShift && fvSettings.rules.checkOut.afternoon) {
-      shouldEnable = true;
+  if (fvSettings.rules) {
+    if (isScanIn && fvSettings.rules.checkIn) {
+      if (isMorningShift && fvSettings.rules.checkIn.morning) {
+        shouldRequire = true;
+      } else if (isAfternoonShift && fvSettings.rules.checkIn.afternoon) {
+        shouldRequire = true;
+      }
+    } else if (isScanOut && fvSettings.rules.checkOut) {
+      if (isMorningShift && fvSettings.rules.checkOut.morning) {
+        shouldRequire = true;
+      } else if (isAfternoonShift && fvSettings.rules.checkOut.afternoon) {
+        shouldRequire = true;
+      }
     }
   }
 
-  // Update status
-  isFaceVerificationEnabled = shouldEnable;
-  updateFaceVerificationUI(shouldEnable);
+  // Update requirement status
+  isFaceVerificationRequired = shouldRequire;
+  updateFaceVerificationRequirement(shouldRequire);
 
   // Save to localStorage for reference
-  localStorage.setItem("faceVerificationEnabled", shouldEnable ? "true" : "false");
+  localStorage.setItem("faceVerificationRequired", shouldRequire ? "true" : "false");
 
   console.log(
-    `Face verification: ${shouldEnable ? "ENABLED" : "DISABLED"} (Scan: ${isScanIn ? "IN" : "OUT"}, Shift: ${isMorningShift ? "Morning" : "Afternoon"})`,
+    `Face verification system: ON (Mode Scanner), Requirement: ${shouldRequire ? "REQUIRED" : "SKIP"} (Scan: ${isScanIn ? "IN" : "OUT"}, Shift: ${isMorningShift ? "Morning" : "Afternoon"})`,
   );
 }
 
-// FUNGSI BARU: Fungsi untuk memperbarui UI verifikasi wajah
-function updateFaceVerificationUI(isEnabled) {
-  // Update UI terkait verifikasi wajah
-  const faceVerificationContainer = document.querySelector(".face-verification-container");
-  if (faceVerificationContainer) {
-    faceVerificationContainer.style.display = isEnabled ? "block" : "none";
+/**
+ * Update mode input berdasarkan master toggle
+ * @param {boolean} systemEnabled - Status master toggle dari admin
+ */
+function updateInputMode(systemEnabled) {
+  const barcodeInput = document.getElementById("barcodeInput");
+  const inputModeInfo = document.getElementById("inputModeInfo");
+
+  if (systemEnabled) {
+    // Mode Scanner: Hanya scanner hardware
+    if (barcodeInput) {
+      barcodeInput.placeholder = "Scan barcode disini...";
+      barcodeInput.dataset.inputMode = "scanner";
+    }
+    if (inputModeInfo) {
+      inputModeInfo.style.display = "none";
+    }
+  } else {
+    // Mode Manual: Allow manual typing
+    if (barcodeInput) {
+      barcodeInput.placeholder = "Ketik barcode manual atau scan dengan scanner...";
+      barcodeInput.dataset.inputMode = "manual";
+    }
+    if (inputModeInfo) {
+      inputModeInfo.style.display = "block";
+    }
   }
 
-  // Update tombol terkait verifikasi wajah
-  const initCameraButton = document.getElementById("initCamera");
-  if (initCameraButton) {
-    initCameraButton.style.display = isEnabled ? "inline-block" : "none";
-  }
-
-  // Update indicator badge
-  updateFaceVerificationIndicator();
+  // Update badge indicator
+  updateInputModeIndicator(systemEnabled);
 }
 
 /**
- * Update face verification indicator badge
+ * Update requirement verifikasi wajah berdasarkan rules per scan/shift
+ * @param {boolean} isRequired - Apakah verifikasi wajah diminta
  */
-function updateFaceVerificationIndicator() {
+function updateFaceVerificationRequirement(isRequired) {
+  // Update UI terkait verifikasi wajah (camera button, container, dll)
+  const faceVerificationContainer = document.querySelector(".face-verification-container");
+  if (faceVerificationContainer) {
+    faceVerificationContainer.style.display = isRequired ? "block" : "none";
+  }
+
+  const initCameraButton = document.getElementById("initCamera");
+  if (initCameraButton) {
+    initCameraButton.style.display = isRequired ? "inline-block" : "none";
+  }
+
+  console.log(`Face verification requirement UI updated: ${isRequired ? "Required" : "Skip"}`);
+}
+
+/**
+ * Update input mode indicator badge
+ */
+function updateInputModeIndicator(systemEnabled) {
   const indicator = document.getElementById("fvIndicator");
   if (!indicator) return;
 
-  if (isFaceVerificationEnabled) {
-    indicator.className = "badge bg-success ms-2";
-    indicator.innerHTML = '<i class="fas fa-check-circle"></i> Verifikasi Aktif';
+  if (systemEnabled) {
+    // Mode Scanner
+    indicator.className = "badge bg-primary ms-2";
+    indicator.innerHTML = '<i class="fas fa-qrcode"></i> Mode Scanner';
     indicator.style.cssText = "font-size: 0.7em; vertical-align: middle;";
+    indicator.title = "Input hanya dari barcode scanner";
   } else {
-    indicator.className = "badge bg-secondary ms-2";
-    indicator.innerHTML = '<i class="fas fa-times-circle"></i> Verifikasi Nonaktif';
+    // Mode Manual
+    indicator.className = "badge bg-success ms-2";
+    indicator.innerHTML = '<i class="fas fa-keyboard"></i> Mode Manual';
     indicator.style.cssText = "font-size: 0.7em; vertical-align: middle;";
+    indicator.title = "Dapat input manual atau scan barcode";
   }
 }
 
@@ -393,11 +434,14 @@ function setupBarcodeScanner() {
   barcodeInput.dataset.isScanner = "false";
   barcodeBuffer = "";
 
-  // Nonaktifkan paste untuk mencegah input manual dengan copy-paste
+  // Nonaktifkan paste hanya jika sistem verifikasi wajah aktif (scanner mode)
   barcodeInput.addEventListener("paste", function (e) {
-    e.preventDefault();
-    showScanResult("error", "Gunakan scanner barcode! Paste tidak diizinkan.");
-    playNotificationSound("error");
+    if (isFaceVerificationSystemEnabled) {
+      e.preventDefault();
+      showScanResult("error", "Gunakan scanner barcode! Paste tidak diizinkan.");
+      playNotificationSound("error");
+    }
+    // Jika sistem nonaktif, allow paste (mode manual)
   });
 
   // Tambahkan event listener untuk keydown untuk mendeteksi scanner
@@ -429,12 +473,13 @@ function setupBarcodeScanner() {
       isBarcodeScanner = false;
       barcodeInput.dataset.isScanner = "false";
 
-      // Jika ada input tapi tidak ada Enter, kemungkinan input manual
-      if (barcodeInput.value.length > 0) {
+      // Jika ada input tapi tidak ada Enter dan sistem scanner aktif, kemungkinan input manual
+      if (isFaceVerificationSystemEnabled && barcodeInput.value.length > 0) {
         showScanResult("error", "Gunakan scanner barcode! Input manual tidak diizinkan.");
         playNotificationSound("error");
         barcodeInput.value = "";
       }
+      // Jika sistem nonaktif (mode manual), biarkan user melanjutkan input manual
     }, SCANNER_COMPLETE_DELAY);
   });
 
@@ -455,18 +500,18 @@ function setupBarcodeScanner() {
 
       lastEnterTime = currentTime;
 
-      // Cek apakah input berasal dari scanner
-      if (this.dataset.isScanner === "true") {
+      // Cek mode input berdasarkan status sistem
+      if (this.dataset.isScanner === "true" || !isFaceVerificationSystemEnabled) {
         // Simpan nilai barcode sebelum diproses
         const barcode = this.value.trim();
 
         // Reset input
         this.value = "";
 
-        // Proses barcode dari scanner
+        // Proses barcode (dari scanner atau manual)
         await processScannedBarcode(barcode);
       } else {
-        // Tampilkan pesan error untuk input manual
+        // Tampilkan pesan error hanya jika sistem scanner mode aktif
         showScanResult("error", "Gunakan scanner barcode! Input manual tidak diizinkan.");
         playNotificationSound("error");
         this.value = "";
@@ -702,35 +747,36 @@ async function processScannedBarcode(barcode) {
  * @returns {boolean} - True jika valid, false jika tidak
  */
 function validateBarcodeInput(barcode) {
-  // Normalisasi barcode terlebih dahulu
-  const normalizedBarcode = normalizeBarcode(barcode);
+  // Trim barcode tanpa mengubah case
+  const trimmedBarcode = barcode ? barcode.trim() : "";
 
-  if (!normalizedBarcode) {
-    showScanResult("error", "Format barcode tidak valid!");
+  if (!trimmedBarcode) {
+    showScanResult("error", "Barcode tidak boleh kosong!");
     playNotificationSound("error", "");
     focusBarcodeInput();
     return false;
   }
 
   // Validasi panjang barcode (minimal 3 karakter)
-  if (normalizedBarcode.length < 3) {
-    showScanResult("error", "Barcode terlalu pendek!");
+  if (trimmedBarcode.length < 3) {
+    showScanResult("error", "Barcode terlalu pendek! Minimal 3 karakter.");
     playNotificationSound("error", "");
     focusBarcodeInput();
     return false;
   }
 
-  // Cek apakah barcode ini baru saja diproses (dalam 3 detik terakhir)
+  // Cek apakah barcode ini baru saja diproses (dalam 3 detik terakhir) - case insensitive
   const currentTime = Date.now();
-  if (normalizedBarcode === lastProcessedBarcode && currentTime - lastProcessedTime < BARCODE_COOLDOWN_MS) {
-    console.log(`Barcode ${normalizedBarcode} diabaikan - sudah diproses dalam ${BARCODE_COOLDOWN_MS}ms terakhir`);
+  const upperBarcode = trimmedBarcode.toUpperCase();
+  if (upperBarcode === lastProcessedBarcode.toUpperCase() && currentTime - lastProcessedTime < BARCODE_COOLDOWN_MS) {
+    console.log(`Barcode ${trimmedBarcode} diabaikan - sudah diproses dalam ${BARCODE_COOLDOWN_MS}ms terakhir`);
     showScanResult("warning", "Scan terlalu cepat, harap tunggu beberapa detik");
     focusBarcodeInput();
     return false;
   }
 
   // Update variabel tracking barcode
-  lastProcessedBarcode = normalizedBarcode;
+  lastProcessedBarcode = trimmedBarcode;
   lastProcessedTime = currentTime;
 
   return true;
@@ -743,33 +789,44 @@ function validateBarcodeInput(barcode) {
  */
 async function getEmployeeData(barcode) {
   try {
-    // Normalisasi barcode
-    const normalizedBarcode = normalizeBarcode(barcode);
+    // Trim barcode tanpa mengubah case
+    const trimmedBarcode = barcode ? barcode.trim() : "";
 
-    if (!normalizedBarcode) {
-      console.error("Barcode tidak valid setelah normalisasi:", barcode);
+    if (!trimmedBarcode) {
+      console.error("Barcode kosong atau tidak valid:", barcode);
       return null;
     }
 
-    console.log("Mencari karyawan dengan barcode:", normalizedBarcode);
+    console.log("Mencari karyawan dengan barcode:", trimmedBarcode);
 
-    // 1. Cek cache lokal terlebih dahulu
-    let employee = employeeCache.get(normalizedBarcode);
+    // 1. Cek cache lokal terlebih dahulu dengan case-insensitive
+    const cacheKey = trimmedBarcode.toUpperCase();
+    let employee = employeeCache.get(cacheKey);
 
     if (employee) {
       console.log("Karyawan ditemukan di cache lokal:", employee.name);
       return employee;
     }
 
-    // 2. Cek cache dari employee-service
+    // 2. Cek cache dari employee-service dengan case-insensitive
     try {
       const employees = await getEmployees(false); // Gunakan cache jika valid
-      employee = employees.find((emp) => normalizeBarcode(emp.barcode) === normalizedBarcode);
+      employee = employees.find((emp) => {
+        // Check barcode field
+        if (emp.barcode && emp.barcode.trim().toUpperCase() === trimmedBarcode.toUpperCase()) {
+          return true;
+        }
+        // Check employeeId field
+        if (emp.employeeId && emp.employeeId.trim().toUpperCase() === trimmedBarcode.toUpperCase()) {
+          return true;
+        }
+        return false;
+      });
 
       if (employee) {
         console.log("Karyawan ditemukan di cache employee-service:", employee.name);
         // Update cache lokal
-        employeeCache.set(normalizedBarcode, employee);
+        employeeCache.set(cacheKey, employee);
         return employee;
       }
     } catch (cacheError) {
@@ -783,12 +840,13 @@ async function getEmployeeData(barcode) {
     while (retryCount <= maxRetries) {
       try {
         console.log(`Mencoba dari Firestore (attempt ${retryCount + 1})`);
-        employee = await findEmployeeByBarcode(normalizedBarcode);
+        // Coba dengan barcode original
+        employee = await findEmployeeByBarcode(trimmedBarcode);
 
         if (employee) {
           console.log("Karyawan ditemukan di Firestore:", employee.name);
-          // Update cache lokal dan employee-service cache
-          employeeCache.set(normalizedBarcode, employee);
+          // Update cache lokal
+          employeeCache.set(cacheKey, employee);
 
           // Refresh employee cache untuk memastikan sinkronisasi
           try {
@@ -798,16 +856,6 @@ async function getEmployeeData(barcode) {
           }
 
           return employee;
-        }
-
-        // Jika tidak ditemukan, coba dengan barcode yang tidak dinormalisasi
-        if (retryCount === 0 && normalizedBarcode !== barcode) {
-          employee = await findEmployeeByBarcode(barcode);
-          if (employee) {
-            console.log("Karyawan ditemukan dengan barcode asli:", employee.name);
-            employeeCache.set(normalizedBarcode, employee);
-            return employee;
-          }
         }
 
         break; // Keluar dari loop jika tidak ditemukan
@@ -824,24 +872,38 @@ async function getEmployeeData(barcode) {
       }
     }
 
-    // 4. Jika masih tidak ditemukan, coba cari dengan partial match
+    // 4. Jika masih tidak ditemukan, coba cari dengan partial match (case-insensitive)
     try {
       const employees = await getEmployees(true); // Force refresh
+      const upperBarcode = trimmedBarcode.toUpperCase();
       employee = employees.find((emp) => {
-        const empBarcode = normalizeBarcode(emp.barcode);
-        return (empBarcode && empBarcode.includes(normalizedBarcode)) || normalizedBarcode.includes(empBarcode);
+        // Check barcode field
+        if (emp.barcode) {
+          const empBarcode = emp.barcode.trim().toUpperCase();
+          if (empBarcode.includes(upperBarcode) || upperBarcode.includes(empBarcode)) {
+            return true;
+          }
+        }
+        // Check employeeId field
+        if (emp.employeeId) {
+          const empId = emp.employeeId.trim().toUpperCase();
+          if (empId.includes(upperBarcode) || upperBarcode.includes(empId)) {
+            return true;
+          }
+        }
+        return false;
       });
 
       if (employee) {
         console.log("Karyawan ditemukan dengan partial match:", employee.name);
-        employeeCache.set(normalizedBarcode, employee);
+        employeeCache.set(cacheKey, employee);
         return employee;
       }
     } catch (partialError) {
       console.warn("Error mencari dengan partial match:", partialError);
     }
 
-    console.log("Karyawan tidak ditemukan untuk barcode:", normalizedBarcode);
+    console.log("Karyawan tidak ditemukan untuk barcode:", trimmedBarcode);
     return null;
   } catch (error) {
     console.error("Error dalam getEmployeeData:", error);
@@ -877,7 +939,7 @@ function normalizeBarcode(barcode) {
  * Inisialisasi sistem verifikasi wajah jika diperlukan
  */
 function initFaceVerificationIfNeeded() {
-  if (!isFaceVerificationInitialized && isFaceVerificationEnabled) {
+  if (!isFaceVerificationInitialized && isFaceVerificationRequired) {
     // Inisialisasi di background tanpa menunggu
     initializeFaceVerification().then((success) => {
       console.log("Background face verification initialization:", success ? "success" : "failed");
@@ -894,7 +956,7 @@ async function performFaceVerification(employee) {
   // Default jika verifikasi wajah dinonaktifkan
   let verificationPassed = true;
 
-  if (isFaceVerificationEnabled) {
+  if (isFaceVerificationRequired) {
     try {
       // Import fungsi verifikasi wajah jika belum diimpor
       await importFaceVerificationIfNeeded();
@@ -1080,7 +1142,7 @@ async function processLatePermission(employee, existingRecord, now, today, selec
         verificationCode: verificationCode,
         // Tidak menyertakan field reason
       },
-      faceVerified: isFaceVerificationEnabled,
+      faceVerified: isFaceVerificationRequired,
     };
 
     console.log("Saving attendance record with late permission:", attendance);
@@ -1160,7 +1222,7 @@ async function processCheckIn(employee, existingRecord, now, timeString, today, 
     lateMinutes: isLate ? lateMinutes : 0,
     date: today,
     // TAMBAHAN: Tambahkan flag verifikasi wajah
-    faceVerified: isFaceVerificationEnabled,
+    faceVerified: isFaceVerificationRequired,
   };
 
   const savedRecord = await recordAttendance(attendance);
@@ -2076,9 +2138,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Initialize real-time listener untuk threshold settings
     initThresholdSettingsListener();
 
-    // TAMBAHAN: Inisialisasi verifikasi wajah jika fitur diaktifkan
-    if (isFaceVerificationEnabled) {
-      // Add status indicator for face verification (read-only)
+    // TAMBAHAN: Inisialisasi badge indicator untuk mode input
+    if (isFaceVerificationSystemEnabled) {
+      // Add status indicator for input mode (read-only)
       const scannerHeader = document.querySelector(".scanner-card .card-header h2");
       if (scannerHeader) {
         const indicator = document.createElement("span");
@@ -2088,7 +2150,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         scannerHeader.appendChild(indicator);
 
         // Update indicator
-        updateFaceVerificationIndicator();
+        updateInputModeIndicator(isFaceVerificationSystemEnabled);
       }
 
       // Coba inisialisasi model di background
@@ -2099,7 +2161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         showScanResult("error", "Gagal memuat model verifikasi wajah. Fitur dinonaktifkan.");
 
         // Nonaktifkan fitur jika gagal memuat model
-        isFaceVerificationEnabled = false;
+        isFaceVerificationSystemEnabled = false;
 
         // Update toggle switch
         const faceVerificationToggle = document.getElementById("faceVerificationToggle");
@@ -2126,7 +2188,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         // TAMBAHAN: Sembunyikan UI verifikasi wajah saat refresh
-        if (isFaceVerificationEnabled) {
+        if (isFaceVerificationRequired) {
           const faceVerificationContainer = document.querySelector(".face-verification-container");
           if (faceVerificationContainer) {
             faceVerificationContainer.style.display = "none";
@@ -2138,15 +2200,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Setup manual submit button
     const manualSubmit = document.getElementById("manualSubmit");
     if (manualSubmit) {
-      manualSubmit.addEventListener("click", function () {
+      manualSubmit.addEventListener("click", async function () {
         const barcodeInput = document.getElementById("barcodeInput");
-        if (barcodeInput && barcodeInput.dataset.isScanner === "true") {
-          processScannedBarcode(barcodeInput.value.trim());
+        const barcode = barcodeInput?.value?.trim();
+
+        if (!barcode) {
+          showScanResult("error", "Barcode tidak boleh kosong!");
+          playNotificationSound("error");
+          return;
+        }
+
+        // Allow submit jika scanner atau mode manual (sistem nonaktif)
+        if (barcodeInput.dataset.isScanner === "true" || !isFaceVerificationSystemEnabled) {
+          await processScannedBarcode(barcode);
           barcodeInput.value = "";
         } else {
           showScanResult("error", "Gunakan scanner barcode! Input manual tidak diizinkan.");
           playNotificationSound("error");
-          if (barcodeInput) barcodeInput.value = "";
+          barcodeInput.value = "";
         }
       });
     }
@@ -2173,8 +2244,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       barcodeInput.focus();
     }
 
-    // TAMBAHAN: Inisialisasi kamera jika verifikasi wajah diaktifkan
-    if (isFaceVerificationEnabled) {
+    // TAMBAHAN: Inisialisasi kamera jika verifikasi wajah required
+    if (isFaceVerificationRequired) {
       // Inisialisasi kamera hanya saat diperlukan untuk menghemat sumber daya
       const initCameraButton = document.createElement("button");
       initCameraButton.id = "initCamera";
@@ -2462,13 +2533,21 @@ async function loadEmployees() {
         try {
           employees = await getEmployees(retryCount > 0); // Force refresh setelah retry pertama
 
-          // Cache employees by barcode for faster lookup
+          // Cache employees by barcode AND employeeId for faster lookup (case-insensitive key)
           employeeCache.clear(); // Clear cache lama
           employees.forEach((employee) => {
+            // Cache by barcode
             if (employee.barcode) {
-              const normalizedBarcode = normalizeBarcode(employee.barcode);
-              if (normalizedBarcode) {
-                employeeCache.set(normalizedBarcode, employee);
+              const barcodeKey = employee.barcode.trim().toUpperCase();
+              if (barcodeKey) {
+                employeeCache.set(barcodeKey, employee);
+              }
+            }
+            // Cache by employeeId as alternative key
+            if (employee.employeeId) {
+              const empIdKey = employee.employeeId.trim().toUpperCase();
+              if (empIdKey) {
+                employeeCache.set(empIdKey, employee);
               }
             }
           });
