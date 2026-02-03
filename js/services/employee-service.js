@@ -9,12 +9,12 @@ import {
   query,
   where,
   setDoc,
-  getDoc
+  getDoc,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Cache constants
-const CACHE_KEY = 'employees_cache';
-const CACHE_TIMESTAMP_KEY = 'employees_cache_timestamp';
+const CACHE_KEY = "employees_cache";
+const CACHE_TIMESTAMP_KEY = "employees_cache_timestamp";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 jam dalam milidetik
 // Tambahkan fungsi-fungsi untuk mengelola data wajah karyawan
 
@@ -23,16 +23,16 @@ export async function saveFaceDescriptor(employeeId, descriptor) {
   try {
     // Konversi Float32Array ke array biasa untuk disimpan di Firestore
     const descriptorArray = Array.from(descriptor);
-    
+
     // Simpan ke Firestore
     const faceRef = doc(db, "employeeFaces", employeeId);
     await setDoc(faceRef, {
       employeeId: employeeId,
       faceDescriptor: descriptorArray,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
-    
+
     return true;
   } catch (error) {
     console.error("Error saving face descriptor:", error);
@@ -45,13 +45,13 @@ export async function getFaceDescriptor(employeeId) {
   try {
     const faceRef = doc(db, "employeeFaces", employeeId);
     const faceDoc = await getDoc(faceRef);
-    
+
     if (faceDoc.exists() && faceDoc.data().faceDescriptor) {
       // Konversi array biasa kembali ke Float32Array
       const descriptorData = faceDoc.data().faceDescriptor;
       return new Float32Array(descriptorData);
     }
-    
+
     return null;
   } catch (error) {
     console.error("Error getting face descriptor:", error);
@@ -75,9 +75,9 @@ export async function deleteFaceDescriptor(employeeId) {
 function isCacheValid() {
   const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
   if (!timestamp) return false;
-  
+
   const now = new Date().getTime();
-  return (now - parseInt(timestamp)) < CACHE_DURATION;
+  return now - parseInt(timestamp) < CACHE_DURATION;
 }
 
 // Helper function to save data to cache
@@ -116,21 +116,21 @@ export async function getEmployees(forceRefresh = false) {
       id: doc.id,
       ...doc.data(),
     }));
-    
+
     // Save to cache
     saveToCache(employees);
-    
+
     return employees;
   } catch (error) {
     console.error("Error getting employees:", error);
-    
+
     // If error occurs but we have cached data, return that as fallback
     const cachedEmployees = getFromCache();
     if (cachedEmployees) {
       console.log("Using cached data as fallback after error");
       return cachedEmployees;
     }
-    
+
     throw error;
   }
 }
@@ -140,31 +140,31 @@ export async function addEmployee(employee) {
   try {
     // Get employees from cache if possible to reduce reads
     const employees = await getEmployees();
-    
+
     // Check if employee ID already exists
-    const existingWithId = employees.find(emp => emp.employeeId === employee.employeeId);
+    const existingWithId = employees.find((emp) => emp.employeeId === employee.employeeId);
     if (existingWithId) {
       throw new Error("ID Karyawan sudah digunakan!");
     }
-    
+
     // Check if barcode already exists
-    const existingWithBarcode = employees.find(emp => emp.barcode === employee.barcode);
+    const existingWithBarcode = employees.find((emp) => emp.barcode === employee.barcode);
     if (existingWithBarcode) {
       throw new Error("Barcode sudah digunakan!");
     }
-    
+
     // Add timestamp
     employee.createdAt = new Date();
-    
+
     // Add to Firestore
     const employeesCollection = collection(db, "employees");
     const docRef = await addDoc(employeesCollection, employee);
     const newEmployee = { id: docRef.id, ...employee };
-    
+
     // Update cache with new employee
     const updatedEmployees = [...employees, newEmployee];
     saveToCache(updatedEmployees);
-    
+
     return newEmployee;
   } catch (error) {
     console.error("Error adding employee:", error);
@@ -177,15 +177,15 @@ export async function getNextEmployeeId() {
   try {
     // Use cached data to avoid additional Firestore read
     const employees = await getEmployees();
-    
+
     // Jika belum ada karyawan, mulai dari ID awal
     if (employees.length === 0) {
       return "EMP001";
     }
-    
+
     // Cari ID karyawan terbesar
     let maxId = 0;
-    employees.forEach(employee => {
+    employees.forEach((employee) => {
       const employeeId = employee.employeeId;
       if (employeeId && employeeId.startsWith("EMP")) {
         const idNumber = parseInt(employeeId.substring(3), 10);
@@ -194,10 +194,10 @@ export async function getNextEmployeeId() {
         }
       }
     });
-    
+
     // Increment dan format ID berikutnya
     const nextId = maxId + 1;
-    return `EMP${nextId.toString().padStart(3, '0')}`;
+    return `EMP${nextId.toString().padStart(3, "0")}`;
   } catch (error) {
     console.error("Error getting next employee ID:", error);
     throw error;
@@ -209,15 +209,15 @@ export async function getNextBarcode() {
   try {
     // Use cached data to avoid additional Firestore read
     const employees = await getEmployees();
-    
+
     // Jika belum ada karyawan, mulai dari barcode awal
     if (employees.length === 0) {
       return "MLT001";
     }
-    
+
     // Cari barcode terbesar
     let maxBarcode = 0;
-    employees.forEach(employee => {
+    employees.forEach((employee) => {
       const barcode = employee.barcode;
       if (barcode && barcode.startsWith("MLT")) {
         const barcodeNumber = parseInt(barcode.substring(3), 10);
@@ -226,10 +226,10 @@ export async function getNextBarcode() {
         }
       }
     });
-    
+
     // Increment dan format barcode berikutnya
     const nextBarcode = maxBarcode + 1;
-    return `MLT${nextBarcode.toString().padStart(3, '0')}`;
+    return `MLT${nextBarcode.toString().padStart(3, "0")}`;
   } catch (error) {
     console.error("Error getting next barcode:", error);
     throw error;
@@ -240,12 +240,12 @@ export async function getNextBarcode() {
 export async function deleteEmployee(id) {
   try {
     await deleteDoc(doc(db, "employees", id));
-    
+
     // Update cache after successful deletion
     const employees = await getEmployees();
-    const updatedEmployees = employees.filter(emp => emp.id !== id);
+    const updatedEmployees = employees.filter((emp) => emp.id !== id);
     saveToCache(updatedEmployees);
-    
+
     return true;
   } catch (error) {
     console.error("Error deleting employee:", error);
@@ -258,38 +258,32 @@ export async function updateEmployee(id, updatedEmployee) {
   try {
     // Get employees from cache if possible
     const employees = await getEmployees();
-    
+
     // Check if employee ID already exists (except for this employee)
-    const existingWithId = employees.find(emp => 
-      emp.employeeId === updatedEmployee.employeeId && emp.id !== id
-    );
-    
+    const existingWithId = employees.find((emp) => emp.employeeId === updatedEmployee.employeeId && emp.id !== id);
+
     if (existingWithId) {
       throw new Error("ID Karyawan sudah digunakan!");
     }
-    
+
     // Check if barcode already exists (except for this employee)
-    const existingWithBarcode = employees.find(emp => 
-      emp.barcode === updatedEmployee.barcode && emp.id !== id
-    );
-    
+    const existingWithBarcode = employees.find((emp) => emp.barcode === updatedEmployee.barcode && emp.id !== id);
+
     if (existingWithBarcode) {
       throw new Error("Barcode sudah digunakan!");
     }
-    
+
     // Add timestamp
     updatedEmployee.updatedAt = new Date();
-    
+
     // Update in Firestore
     const employeeRef = doc(db, "employees", id);
     await updateDoc(employeeRef, updatedEmployee);
-    
+
     // Update cache
-    const updatedEmployees = employees.map(emp => 
-      emp.id === id ? { id, ...updatedEmployee } : emp
-    );
+    const updatedEmployees = employees.map((emp) => (emp.id === id ? { id, ...updatedEmployee } : emp));
     saveToCache(updatedEmployees);
-    
+
     return { id, ...updatedEmployee };
   } catch (error) {
     console.error("Error updating employee:", error);
@@ -301,59 +295,86 @@ export async function updateEmployee(id, updatedEmployee) {
 export async function findEmployeeByBarcode(barcode) {
   try {
     // Normalisasi barcode
-    const normalizedBarcode = barcode ? barcode.trim().toUpperCase() : '';
-    
+    const normalizedBarcode = barcode ? barcode.trim().toUpperCase() : "";
+
     if (!normalizedBarcode) {
       console.error("Barcode kosong atau tidak valid");
       return null;
     }
 
-    console.log("Mencari karyawan dengan barcode:", normalizedBarcode);
+    console.log("Mencari karyawan dengan barcode/employeeId:", normalizedBarcode);
 
     // Use cached data to avoid Firestore read
     const employees = await getEmployees();
-    
-    // Cari dengan exact match
-    let employee = employees.find(emp => {
-      if (!emp.barcode) return false;
-      const empBarcode = emp.barcode.trim().toUpperCase();
-      return empBarcode === normalizedBarcode;
+
+    // Cari dengan exact match di field barcode ATAU employeeId
+    let employee = employees.find((emp) => {
+      // Check barcode field
+      if (emp.barcode) {
+        const empBarcode = emp.barcode.trim().toUpperCase();
+        if (empBarcode === normalizedBarcode) return true;
+      }
+      // Check employeeId field
+      if (emp.employeeId) {
+        const empId = emp.employeeId.trim().toUpperCase();
+        if (empId === normalizedBarcode) return true;
+      }
+      return false;
     });
-    
+
     if (employee) {
       console.log("Karyawan ditemukan dengan exact match:", employee.name);
       return employee;
     }
-    
-    // Jika tidak ditemukan, coba dengan partial match
-    employee = employees.find(emp => {
-      if (!emp.barcode) return false;
-      const empBarcode = emp.barcode.trim().toUpperCase();
-      return empBarcode.includes(normalizedBarcode) || normalizedBarcode.includes(empBarcode);
+
+    // Jika tidak ditemukan, coba dengan partial match di barcode ATAU employeeId
+    employee = employees.find((emp) => {
+      // Check barcode field
+      if (emp.barcode) {
+        const empBarcode = emp.barcode.trim().toUpperCase();
+        if (empBarcode.includes(normalizedBarcode) || normalizedBarcode.includes(empBarcode)) {
+          return true;
+        }
+      }
+      // Check employeeId field
+      if (emp.employeeId) {
+        const empId = emp.employeeId.trim().toUpperCase();
+        if (empId.includes(normalizedBarcode) || normalizedBarcode.includes(empId)) {
+          return true;
+        }
+      }
+      return false;
     });
-    
+
     if (employee) {
       console.log("Karyawan ditemukan dengan partial match:", employee.name);
       return employee;
     }
-    
-    console.log("Karyawan tidak ditemukan untuk barcode:", normalizedBarcode);
+
+    console.log("Karyawan tidak ditemukan untuk barcode/employeeId:", normalizedBarcode);
     return null;
-    
   } catch (error) {
     console.error("Error finding employee by barcode:", error);
-    
+
     // Coba gunakan cache sebagai fallback
     try {
       const cachedEmployees = getFromCache();
       if (cachedEmployees) {
-        const normalizedBarcode = barcode ? barcode.trim().toUpperCase() : '';
-        const employee = cachedEmployees.find(emp => {
-          if (!emp.barcode) return false;
-          const empBarcode = emp.barcode.trim().toUpperCase();
-          return empBarcode === normalizedBarcode;
+        const normalizedBarcode = barcode ? barcode.trim().toUpperCase() : "";
+        const employee = cachedEmployees.find((emp) => {
+          // Check barcode field
+          if (emp.barcode) {
+            const empBarcode = emp.barcode.trim().toUpperCase();
+            if (empBarcode === normalizedBarcode) return true;
+          }
+          // Check employeeId field
+          if (emp.employeeId) {
+            const empId = emp.employeeId.trim().toUpperCase();
+            if (empId === normalizedBarcode) return true;
+          }
+          return false;
         });
-        
+
         if (employee) {
           console.log("Karyawan ditemukan di cache fallback:", employee.name);
           return employee;
@@ -362,7 +383,7 @@ export async function findEmployeeByBarcode(barcode) {
     } catch (cacheError) {
       console.warn("Error mengakses cache fallback:", cacheError);
     }
-    
+
     throw error;
   }
 }
@@ -372,7 +393,7 @@ export async function findEmployeeById(employeeId) {
   try {
     // Use cached data to avoid Firestore read
     const employees = await getEmployees();
-    return employees.find(emp => emp.employeeId === employeeId) || null;
+    return employees.find((emp) => emp.employeeId === employeeId) || null;
   } catch (error) {
     console.error("Error finding employee by ID:", error);
     throw error;

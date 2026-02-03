@@ -1232,9 +1232,9 @@ class OptimizedDataPenjualanApp {
     }
 
     let formHtml = `
-      <div class="alert alert-warning mb-3">
-        <i class="fas fa-exclamation-triangle me-2"></i>
-        <strong>Perhatian:</strong> Kode barang dan jumlah tidak dapat diubah. Untuk mengubah stok, hapus transaksi ini dan buat transaksi baru.
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Informasi:</strong> Kode barang tidak dapat diubah. Perubahan jumlah hanya mempengaruhi data laporan penjualan dan tidak mengubah stok inventory.
       </div>
       <div class="row mb-3">
         <div class="col-md-6">
@@ -1272,11 +1272,15 @@ class OptimizedDataPenjualanApp {
                 </div>
               </div>
               <div class="row mt-2">
-                <div class="col-md-6">
+                <div class="col-md-4">
+                  <label for="editJumlah_${index}" class="form-label">Jumlah (Pcs): <span class="badge bg-info">Editable</span></label>
+                  <input type="number" class="form-control" id="editJumlah_${index}" value="${item.jumlah || 1}" min="1">
+                </div>
+                <div class="col-md-4">
                   <label for="editNama_${index}" class="form-label">Nama Barang:</label>
                   <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <label for="editKadar_${index}" class="form-label">Kadar:</label>
                   <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ""}">
                 </div>
@@ -1307,15 +1311,19 @@ class OptimizedDataPenjualanApp {
           // Aksesoris & Kotak: Kode, Nama, Kadar, Berat, Harga
           formHtml += `
             <div class="border p-3 mb-3 rounded">
-              <h6>Item ${index + 1} ${item.jumlah > 1 ? `(${item.jumlah} pcs)` : ""}</h6>
+              <h6>Item ${index + 1}</h6>
               <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <label for="editKode_${index}" class="form-label">Kode: <span class="badge bg-secondary">Tidak dapat diubah</span></label>
                   <input type="text" class="form-control" id="editKode_${index}" value="${
                     item.kodeText || item.kode || ""
                   }" readonly>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                  <label for="editJumlah_${index}" class="form-label">Jumlah (Pcs): <span class="badge bg-info">Editable</span></label>
+                  <input type="number" class="form-control" id="editJumlah_${index}" value="${item.jumlah || 1}" min="1">
+                </div>
+                <div class="col-md-4">
                   <label for="editNama_${index}" class="form-label">Nama Barang:</label>
                   <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
                 </div>
@@ -1421,12 +1429,15 @@ class OptimizedDataPenjualanApp {
         updateData.items = this.currentTransaction.items.map((item, index) => {
           const updatedItem = { ...item };
 
-          // ✅ OPSI B: Kode, kodeLock, jumlah TIDAK dapat diubah
-          // Pertahankan nilai original untuk field yang mempengaruhi stok
+          // Kode dan kodeLock TIDAK dapat diubah (pertahankan nilai original)
           updatedItem.kodeText = item.kodeText || "";
           updatedItem.kode = item.kode || item.kodeText || "";
           updatedItem.kodeLock = item.kodeLock || "";
-          updatedItem.jumlah = item.jumlah || 1;
+
+          // Jumlah DAPAT diubah (baca dari input field)
+          const jumlahInput = document.getElementById(`editJumlah_${index}`);
+          const newJumlah = jumlahInput ? parseInt(jumlahInput.value) || 1 : item.jumlah || 1;
+          updatedItem.jumlah = Math.max(1, newJumlah); // Minimal 1
 
           // Allow edit: nama, kadar, berat, harga, keterangan
           const namaInput = document.getElementById(`editNama_${index}`);

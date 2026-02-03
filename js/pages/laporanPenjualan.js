@@ -155,7 +155,7 @@ const cacheManager = {
             return new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString();
           }
           return value;
-        })
+        }),
       );
 
       const jsonString = JSON.stringify(processedData);
@@ -258,7 +258,7 @@ const laporanPenjualanHandler = {
       collection(firestore, "penjualanAksesoris"),
       where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
       where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-      orderBy("timestamp", "desc")
+      orderBy("timestamp", "desc"),
     );
 
     this.currentListener = onSnapshot(salesQuery, (snapshot) => {
@@ -280,14 +280,17 @@ const laporanPenjualanHandler = {
 
   // Handle real-time updates
   async handleRealtimeUpdate() {
-    if (!this.currentSelectedDate) return;
+    if (!this.currentDateRange || !this.currentDateRange.start || !this.currentDateRange.end) return;
 
     try {
-      // Clear cache for current date
-      cacheManager.clearCacheForDate(this.currentSelectedDate);
+      // Clear cache for current date range
+      const startStr = formatDate(this.currentDateRange.start).replace(/\//g, "-");
+      const endStr = formatDate(this.currentDateRange.end).replace(/\//g, "-");
+      const cacheKey = `salesData_${startStr}_to_${endStr}`;
+      cacheManager.clear(cacheKey);
 
-      // Reload data for current date
-      await this.loadSalesDataByDate(this.currentSelectedDate, true);
+      // Reload data for current date range
+      await this.loadSalesDataByDateRange(this.currentDateRange.start, this.currentDateRange.end, true);
 
       // Filter and render
       this.filterSalesData();
@@ -299,43 +302,51 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // Load sales data by specific date
-  async loadSalesDataByDate(selectedDate, forceRefresh = false) {
+  // Load sales data by date range
+  async loadSalesDataByDateRange(startDate, endDate, forceRefresh = false) {
     try {
-      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
-      const cacheKey = `salesData_${dateStr}`;
+      // Validation
+      if (endDate < startDate) {
+        throw new Error("Tanggal akhir harus lebih besar atau sama dengan tanggal mulai");
+      }
 
-      this.currentSelectedDate = selectedDate;
+      // Create cache key from date range
+      const startStr = formatDate(startDate).replace(/\//g, "-");
+      const endStr = formatDate(endDate).replace(/\//g, "-");
+      const cacheKey = `salesData_${startStr}_to_${endStr}`;
 
-      // Setup real-time listener
-      this.setupRealtimeListener(selectedDate);
+      this.currentSelectedDate = startDate;
+      this.currentDateRange = { start: startDate, end: endDate };
+
+      // Setup real-time listener for today
+      this.setupRealtimeListener(endDate);
 
       // Check cache first (except for forced refresh)
       if (!forceRefresh) {
         const cachedData = cacheManager.get(cacheKey);
         if (cachedData) {
-          console.log(`📦 Using cached data for ${dateStr}`);
+          console.log(`📦 Using cached data for ${startStr} to ${endStr}`);
           this.salesData = cachedData;
-          this.showCacheIndicator(`Menggunakan data cache (${formatDate(selectedDate)})`);
+          this.showCacheIndicator(`Menggunakan data cache (${startStr} - ${endStr})`);
           this.populateSalesPersonFilter();
           return;
         }
       }
 
-      console.log(`🔄 Loading fresh data for ${dateStr}`);
+      console.log(`🔄 Loading fresh data from ${startStr} to ${endStr}`);
       this.hideCacheIndicator();
 
-      // Query for specific date
-      const startOfDay = new Date(selectedDate);
+      // Query for date range
+      const startOfDay = new Date(startDate);
       startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
+      const endOfDay = new Date(endDate);
       endOfDay.setHours(23, 59, 59, 999);
 
       const salesQuery = query(
         collection(firestore, "penjualanAksesoris"),
         where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
         where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-        orderBy("timestamp", "desc")
+        orderBy("timestamp", "desc"),
       );
 
       const salesSnapshot = await getDocs(salesQuery);
@@ -355,13 +366,14 @@ const laporanPenjualanHandler = {
 
       this.salesData = salesData;
       this.populateSalesPersonFilter();
-      console.log(`✅ Loaded ${salesData.length} sales records for ${dateStr}`);
+      console.log(`✅ Loaded ${salesData.length} sales records for ${startStr} to ${endStr}`);
     } catch (error) {
-      console.error("Error loading sales data by date:", error);
+      console.error("Error loading sales data by date range:", error);
 
       // Try fallback to cache
-      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
-      const cacheKey = `salesData_${dateStr}`;
+      const startStr = formatDate(startDate).replace(/\//g, "-");
+      const endStr = formatDate(endDate).replace(/\//g, "-");
+      const cacheKey = `salesData_${startStr}_to_${endStr}`;
       const cachedData = cacheManager.get(cacheKey);
 
       if (cachedData) {
@@ -369,7 +381,7 @@ const laporanPenjualanHandler = {
         this.showAlert(
           "Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.",
           "Peringatan",
-          "warning"
+          "warning",
         );
         this.showCacheIndicator("Menggunakan data cache (fallback)");
         this.salesData = cachedData;
@@ -511,104 +523,26 @@ const laporanPenjualanHandler = {
           $(api.column(7).footer()).html(`Rp ${totalHarga.toLocaleString("id-ID")}`);
         },
 
-        dom: "Bfrtip",
+        dom: "Bfrtip", // Menggunakan buttons DataTables dengan custom action
         buttons: [
           {
-            extend: "excel",
+            extend: "excelHtml5",
             text: '<i class="fas fa-file-excel"></i> Excel',
             className: "btn btn-success btn-sm",
-            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Bawah",
-            filename: function () {
-              const selectedDate = document.getElementById("startDate").value || "semua";
-              return `Laporan_Penjualan_Bawah_${selectedDate.replace(/\//g, "-")}`;
-            },
-            exportOptions: {
-              columns: ":visible",
-            },
-            customize: function (xlsx) {
-              const sheet = xlsx.xl.worksheets["sheet1.xml"];
-
-              const footerPcs = $(laporanPenjualanHandler.dataTable.column(4).footer()).text() || "0";
-              const footerBerat = $(laporanPenjualanHandler.dataTable.column(5).footer()).text() || "-";
-              const footerHarga = $(laporanPenjualanHandler.dataTable.column(7).footer()).text() || "Rp 0";
-
-              const footerRow = `
-        <row>
-          <c t="inlineStr"><is><t>TOTAL:</t></is></c>
-          <c t="inlineStr"><is><t></t></is></c>
-          <c t="inlineStr"><is><t></t></is></c>
-          <c t="inlineStr"><is><t></t></is></c>
-          <c t="inlineStr"><is><t>${footerPcs}</t></is></c>
-          <c t="inlineStr"><is><t>${footerBerat}</t></is></c>
-          <c t="inlineStr"><is><t></t></is></c>
-          <c t="inlineStr"><is><t>${footerHarga}</t></is></c>
-          <c t="inlineStr"><is><t></t></is></c>
-          <c t="inlineStr"><is><t></t></is></c>
-        </row>
-      `;
-
-              const sheetDataEnd = sheet.indexOf("</sheetData>");
-              if (sheetDataEnd > -1) {
-                const newSheet = sheet.substring(0, sheetDataEnd) + footerRow + sheet.substring(sheetDataEnd);
-                xlsx.xl.worksheets["sheet1.xml"] = newSheet;
-              }
+            action: function (e, dt, button, config) {
+              // Override dengan logic custom (agregasi data)
+              e.preventDefault();
+              laporanPenjualanHandler.exportToExcel();
             },
           },
           {
-            extend: "pdf",
+            extend: "pdfHtml5",
             text: '<i class="fas fa-file-pdf"></i> PDF',
             className: "btn btn-danger btn-sm",
-            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Bawah",
-            filename: function () {
-              const selectedDate = document.getElementById("startDate").value || "semua";
-              return `Laporan_Penjualan_Bawah_${selectedDate.replace(/\//g, "-")}`;
-            },
-            orientation: "landscape",
-            pageSize: "A4",
-            exportOptions: {
-              columns: ":visible",
-            },
-            customize: function (doc) {
-              const footerPcs = $(laporanPenjualanHandler.dataTable.column(4).footer()).text() || "0";
-              const footerBerat = $(laporanPenjualanHandler.dataTable.column(5).footer()).text() || "-";
-              const footerHarga = $(laporanPenjualanHandler.dataTable.column(7).footer()).text() || "Rp 0";
-
-              const footerRow = ["TOTAL:", "", "", "", footerPcs, footerBerat, "", footerHarga, "", ""];
-
-              // PERBAIKAN: Mengatur ukuran font yang lebih kecil
-              doc.defaultStyle.fontSize = 10; // Font default lebih kecil
-              doc.styles.tableHeader.fontSize = 11; // Header tabel
-              doc.styles.tableBodyEven.fontSize = 10; // Baris genap
-              doc.styles.tableBodyOdd.fontSize = 10; // Baris ganjil
-              doc.styles.title.fontSize = 13; // Judul dokumen
-
-              // Mengatur margin untuk memberikan lebih banyak ruang
-              doc.pageMargins = [20, 60, 20, 40]; // [left, top, right, bottom]
-
-              if (doc.content[1].table && doc.content[1].table.body) {
-                doc.content[1].table.body.push(footerRow);
-
-                const footerIndex = doc.content[1].table.body.length - 1;
-                doc.content[1].table.body[footerIndex].forEach((cell, index) => {
-                  if (typeof cell === "object") {
-                    cell.fillColor = "#e3f2fd";
-                    cell.bold = true;
-                    cell.fontSize = 10; // Font footer
-                  } else {
-                    doc.content[1].table.body[footerIndex][index] = {
-                      text: cell,
-                      fillColor: "#e3f2fd",
-                      bold: true,
-                      fontSize: 10, // Font footer
-                    };
-                  }
-                });
-              }
-
-              // Mengatur lebar kolom agar lebih proporsional
-              if (doc.content[1].table) {
-                doc.content[1].table.widths = ["9%", "8%", "7%", "20%", "5%", "6%", "7%", "12%", "14%", "12%"];
-              }
+            action: function (e, dt, button, config) {
+              // Override dengan logic custom (agregasi data)
+              e.preventDefault();
+              laporanPenjualanHandler.exportToPDF();
             },
           },
         ],
@@ -951,15 +885,9 @@ const laporanPenjualanHandler = {
     const year = today.getFullYear();
     const todayFormatted = `${day}/${month}/${year}`;
 
-    // Set value directly to the input
+    // Set both start and end date to today by default
     document.getElementById("startDate").value = todayFormatted;
-
-    // Set default month to current month
-    const currentMonthStr = today.toISOString().slice(0, 7);
-    const exportMonthInput = document.getElementById("exportMonthInput");
-    if (exportMonthInput) {
-      exportMonthInput.value = currentMonthStr;
-    }
+    document.getElementById("endDate").value = todayFormatted;
   },
 
   // Attach event listeners
@@ -967,22 +895,34 @@ const laporanPenjualanHandler = {
     // Main filter button
     document.getElementById("filterSalesBtn")?.addEventListener("click", () => {
       const startDateStr = document.getElementById("startDate").value;
-      if (!startDateStr) {
-        this.showAlert("Silakan pilih tanggal terlebih dahulu", "Peringatan", "warning");
+      const endDateStr = document.getElementById("endDate").value;
+
+      if (!startDateStr || !endDateStr) {
+        this.showAlert("Silakan pilih tanggal mulai dan tanggal akhir", "Peringatan", "warning");
         return;
       }
 
-      const selectedDate = parseDate(startDateStr);
-      if (!selectedDate) {
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
+
+      if (!startDate || !endDate) {
         this.showAlert("Format tanggal tidak valid", "Error", "error");
         return;
       }
 
+      if (endDate < startDate) {
+        this.showAlert("Tanggal akhir harus lebih besar atau sama dengan tanggal mulai", "Peringatan", "warning");
+        return;
+      }
+
       this.showLoading(true);
-      this.loadSalesDataByDate(selectedDate)
+      this.loadSalesDataByDateRange(startDate, endDate)
         .then(() => {
           this.filterSalesData();
           this.isDataLoaded = true;
+        })
+        .catch((error) => {
+          this.showAlert("Gagal memuat data: " + error.message, "Error", "error");
         })
         .finally(() => {
           this.showLoading(false);
@@ -1003,104 +943,118 @@ const laporanPenjualanHandler = {
       }
     });
 
-    // Date change handler
+    // Date change handlers - reset when date changes
     document.getElementById("startDate")?.addEventListener("change", () => {
-      // Reset data when date changes
       this.isDataLoaded = false;
       this.salesData = [];
       this.filteredSalesData = [];
-
-      // Clear table
-      const tableBody = document.querySelector("#penjualanTable tbody");
-      if (tableBody) {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="10" class="text-center">Klik tombol "Tampilkan" untuk melihat data tanggal yang dipilih</td>
-          </tr>
-        `;
-      }
+      this.clearTable();
     });
 
-    // Export monthly button
-    document.getElementById("btnExportPenjualanBulanan")?.addEventListener("click", () => {
-      this.handleExportMonthly();
+    document.getElementById("endDate")?.addEventListener("change", () => {
+      this.isDataLoaded = false;
+      this.salesData = [];
+      this.filteredSalesData = [];
+      this.clearTable();
     });
   },
 
-  // ==================== MONTHLY EXPORT METHODS ====================
-
-  /**
-   * Handle export monthly button click
-   */
-  async handleExportMonthly() {
-    const monthInput = document.getElementById("exportMonthInput");
-    if (!monthInput || !monthInput.value) {
-      this.showAlert("Pilih bulan yang akan diexport", "Peringatan", "warning");
-      return;
-    }
-
-    try {
-      this.showLoading(true);
-      await this.generateMonthlyExcel(monthInput.value);
-      this.showAlert("Export berhasil!", "Sukses", "success");
-    } catch (error) {
-      console.error("Error exporting monthly data:", error);
-      this.showAlert("Gagal mengexport data: " + error.message, "Error", "error");
-    } finally {
-      this.showLoading(false);
+  clearTable() {
+    const tableBody = document.querySelector("#penjualanTable tbody");
+    if (tableBody) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="7" class="text-center">
+            Klik tombol "Tampilkan" untuk melihat data rentang tanggal yang dipilih
+          </td>
+        </tr>
+      `;
     }
   },
 
+  // ==================== DATA AGGREGATION METHODS ====================
+
   /**
-   * Fetch sales data for a specific month
+   * Aggregate data by kode + nama + kadar
+   * This reduces redundancy in export (10 transactions of same item → 1 aggregated row)
    */
-  async fetchMonthlyData(monthStr) {
-    const [year, month] = monthStr.split("-");
-    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(month), 1);
+  aggregateItemsByCode() {
+    const aggregationMap = new Map();
 
-    const q = query(
-      collection(firestore, "penjualanAksesoris"),
-      where("timestamp", ">=", Timestamp.fromDate(startDate)),
-      where("timestamp", "<", Timestamp.fromDate(endDate)),
-      orderBy("timestamp", "asc")
-    );
+    this.filteredSalesData.forEach((sale) => {
+      if (!sale.items || !Array.isArray(sale.items)) return;
 
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      sale.items.forEach((item) => {
+        const kode = item.kodeText || item.barcode || "-";
+        const nama = item.nama || "-";
+        const kadar = item.kadar || "-";
+        const jenis = (sale.jenisPenjualan || "aksesoris").toUpperCase();
+        const isKotak = sale.jenisPenjualan === "kotak";
+
+        // Create unique key for grouping - aggregate by kode only (same as web display)
+        const key = kode;
+
+        // Calculate item harga (handle DP, free, etc)
+        const harga = this.calculateItemHarga(item, sale);
+        const pcs = parseInt(item.jumlah) || 1;
+        const gr = isKotak ? 0 : parseFloat(item.berat) || 0;
+
+        // Aggregate or create new entry
+        if (aggregationMap.has(key)) {
+          const existing = aggregationMap.get(key);
+          existing.totalPcs += pcs;
+          existing.totalGr += gr;
+          existing.totalHarga += harga;
+
+          // Collect unique keterangan
+          const itemKeterangan = item.keterangan || sale.keterangan || "";
+          if (itemKeterangan && !existing.keteranganList.includes(itemKeterangan)) {
+            existing.keteranganList.push(itemKeterangan);
+          }
+        } else {
+          aggregationMap.set(key, {
+            jenis: jenis,
+            kode: kode,
+            nama: nama,
+            kadar: kadar,
+            totalPcs: pcs,
+            totalGr: gr,
+            totalHarga: harga,
+            keteranganList: [item.keterangan || sale.keterangan || ""].filter((k) => k),
+          });
+        }
+      });
+    });
+
+    // Convert Map to Array and sort by kode
+    return Array.from(aggregationMap.values()).sort((a, b) => {
+      return a.kode.localeCompare(b.kode);
+    });
   },
 
   /**
-   * Group data by date and sales type
+   * Calculate item harga with proper DP handling
    */
-  groupDataByDateAndType(transactions) {
-    const dailyData = new Map();
+  calculateItemHarga(item, sale) {
+    let harga = parseInt(item.totalHarga) || 0;
 
-    transactions.forEach((transaction) => {
-      const date = this.getDateStringFromTransaction(transaction);
-      const jenis = transaction.jenisPenjualan || "aksesoris";
+    // Handle DP calculation
+    if (sale.metodeBayar === "dp") {
+      const nominalDP = parseFloat(sale.nominalDP) || 0;
+      const totalHargaTransaksi = parseFloat(sale.totalHarga) || 0;
 
-      if (!dailyData.has(date)) {
-        dailyData.set(date, {
-          aksesoris: [],
-          kotak: [],
-          silver: [],
-          manual: [],
-        });
+      if (nominalDP >= totalHargaTransaksi) {
+        harga = 0;
+      } else {
+        const sisaPembayaran = totalHargaTransaksi - nominalDP;
+        const proporsi = harga / totalHargaTransaksi;
+        harga = Math.round(proporsi * sisaPembayaran);
       }
+    } else if (sale.metodeBayar === "free") {
+      harga = 0;
+    }
 
-      const dayData = dailyData.get(date);
-
-      // Flatten items and add to appropriate group
-      if (transaction.items && Array.isArray(transaction.items)) {
-        transaction.items.forEach((item) => {
-          const processedItem = this.processItemForExport(item, transaction);
-          dayData[jenis].push(processedItem);
-        });
-      }
-    });
-
-    return dailyData;
+    return harga;
   },
 
   /**
@@ -1110,238 +1064,276 @@ const laporanPenjualanHandler = {
     if (transaction.timestamp && transaction.timestamp.seconds) {
       const date = new Date(transaction.timestamp.seconds * 1000);
       return formatDate(date);
+    } else if (transaction.timestamp && typeof transaction.timestamp.toDate === "function") {
+      return formatDate(transaction.timestamp.toDate());
     }
     return "-";
   },
 
   /**
-   * Process item for export
+   * Format aggregated item for export based on jenis
    */
-  processItemForExport(item, transaction) {
-    const jumlah = parseInt(item.jumlah) || 1;
-    let harga = parseInt(item.totalHarga) || 0;
+  formatAggregatedItemForExport(item, jenisPenjualan) {
+    const keterangan = item.keteranganList.join("; ");
 
-    // Handle DP calculation
-    if (transaction.metodeBayar === "dp") {
-      const nominalDP = parseFloat(transaction.nominalDP) || 0;
-      const totalHargaTransaksi = parseFloat(transaction.totalHarga) || 0;
-
-      if (nominalDP >= totalHargaTransaksi) {
-        harga = 0;
-      } else {
-        const sisaPembayaran = totalHargaTransaksi - nominalDP;
-        const proporsi = harga / totalHargaTransaksi;
-        harga = Math.round(proporsi * sisaPembayaran);
-      }
-    } else if (transaction.metodeBayar === "free") {
-      harga = 0;
+    if (jenisPenjualan === "kotak") {
+      return [
+        item.jenis,
+        item.kode || "-",
+        item.nama,
+        item.totalPcs,
+        "-",
+        "-",
+        `Rp ${item.totalHarga.toLocaleString("id-ID")}`,
+      ];
+    } else if (jenisPenjualan === "all") {
+      return [
+        item.jenis,
+        item.kode,
+        item.nama,
+        item.totalPcs,
+        item.totalGr > 0 ? item.totalGr.toFixed(2) : "-",
+        item.kadar,
+        `Rp ${item.totalHarga.toLocaleString("id-ID")}`,
+        keterangan,
+      ];
+    } else {
+      return [
+        item.jenis,
+        item.kode,
+        item.nama,
+        item.totalPcs,
+        item.totalGr > 0 ? item.totalGr.toFixed(2) : "-",
+        item.kadar,
+        `Rp ${item.totalHarga.toLocaleString("id-ID")}`,
+      ];
     }
-
-    return {
-      kode: item.kodeText || item.barcode || "-",
-      nama: item.nama || "-",
-      jumlah: jumlah,
-      berat: parseFloat(item.berat) || 0,
-      kadar: item.kadar || "-",
-      harga: harga,
-      keterangan: item.keterangan || transaction.keterangan || "",
-    };
   },
 
+  // ==================== EXPORT METHODS ====================
+
   /**
-   * Calculate subtotals for a group
+   * Export to Excel with aggregated data
    */
-  calculateSubtotals(items, jenis) {
+  exportToExcel() {
+    if (!this.filteredSalesData || this.filteredSalesData.length === 0) {
+      this.showAlert("Tidak ada data untuk diexport", "Peringatan", "warning");
+      return;
+    }
+
+    // Get filter info
+    const startDate = document.getElementById("startDate").value;
+    const endDate = document.getElementById("endDate").value;
+    const jenisPenjualan = document.getElementById("salesType").value;
+
+    // Determine jenis label
+    const jenisLabel =
+      {
+        all: "SEMUA JENIS",
+        aksesoris: "AKSESORIS",
+        kotak: "KOTAK",
+        silver: "SILVER",
+        manual: "PENJUALAN MANUAL",
+      }[jenisPenjualan] || "SEMUA JENIS";
+
+    // Aggregate data per kode barang
+    const aggregatedData = this.aggregateItemsByCode();
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+
+    // Header
+    wsData.push(["LAPORAN PENJUALAN MELATI BAWAH"]);
+    wsData.push([jenisLabel]);
+    wsData.push([`${startDate} - ${endDate}`]);
+    wsData.push([]);
+
+    // Column headers based on jenis
+    let columns;
+    if (jenisPenjualan === "kotak") {
+      columns = ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total"];
+    } else if (jenisPenjualan === "all") {
+      columns = ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total", "Keterangan"];
+    } else {
+      columns = ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total"];
+    }
+    wsData.push(columns);
+
+    // Data rows (aggregated)
     let totalPcs = 0;
     let totalGr = 0;
     let totalHarga = 0;
 
-    items.forEach((item) => {
-      totalPcs += item.jumlah || 0;
+    aggregatedData.forEach((item) => {
+      const row = this.formatAggregatedItemForExport(item, jenisPenjualan);
+      wsData.push(row);
 
-      if (jenis !== "kotak") {
-        totalGr += item.berat || 0;
-      }
-
-      totalHarga += item.harga || 0;
+      // Calculate totals
+      totalPcs += item.totalPcs;
+      totalGr += item.totalGr;
+      totalHarga += item.totalHarga;
     });
 
-    return {
-      pcs: totalPcs,
-      gr: jenis === "kotak" ? null : totalGr,
-      harga: totalHarga,
-    };
-  },
-
-  /**
-   * Format item row for Excel based on type
-   */
-  formatItemRow(item, jenis) {
-    if (jenis === "kotak") {
-      return ["  ", item.nama, item.jumlah, item.harga];
-    } else if (jenis === "manual") {
-      return ["  ", item.kode, item.nama, item.jumlah, item.berat.toFixed(2), item.kadar, item.harga, item.keterangan];
-    } else {
-      // aksesoris and silver
-      return ["  ", item.kode, item.nama, item.jumlah, item.berat.toFixed(2), item.kadar, item.harga];
-    }
-  },
-
-  /**
-   * Format subtotal text
-   */
-  formatSubtotal(subtotal, jenis) {
-    if (jenis === "kotak") {
-      return `${subtotal.pcs} pcs, Rp ${subtotal.harga.toLocaleString("id-ID")}`;
-    } else {
-      return `${subtotal.pcs} pcs, ${subtotal.gr.toFixed(2)} gr, Rp ${subtotal.harga.toLocaleString("id-ID")}`;
-    }
-  },
-
-  /**
-   * Get month name in Indonesian
-   */
-  getMonthName(monthStr) {
-    const [year, month] = monthStr.split("-");
-    const monthNames = [
-      "Januari",
-      "Februari",
-      "Maret",
-      "April",
-      "Mei",
-      "Juni",
-      "Juli",
-      "Agustus",
-      "September",
-      "Oktober",
-      "November",
-      "Desember",
-    ];
-    const monthIndex = parseInt(month) - 1;
-    return `${monthNames[monthIndex]} ${year}`;
-  },
-
-  /**
-   * Generate monthly Excel report
-   */
-  async generateMonthlyExcel(monthStr) {
-    // 1. Fetch data
-    const transactions = await this.fetchMonthlyData(monthStr);
-
-    if (transactions.length === 0) {
-      throw new Error("Tidak ada data untuk bulan yang dipilih");
-    }
-
-    // 2. Group by date and type
-    const dailyData = this.groupDataByDateAndType(transactions);
-
-    // 3. Create workbook
-    const wb = XLSX.utils.book_new();
-    const wsData = [];
-
-    // 4. Add header
-    wsData.push(["LAPORAN PENJUALAN MELATI BAWAH"]);
-    wsData.push([`Bulan ${this.getMonthName(monthStr)}`]);
+    // Total row
     wsData.push([]);
+    if (jenisPenjualan === "kotak") {
+      wsData.push(["TOTAL", "", "", totalPcs, "-", "-", `Rp ${totalHarga.toLocaleString("id-ID")}`]);
+    } else {
+      wsData.push(["TOTAL", "", "", totalPcs, totalGr.toFixed(2), "", `Rp ${totalHarga.toLocaleString("id-ID")}`, ""]);
+    }
 
-    let grandTotalPcs = 0;
-    let grandTotalGr = 0;
-    let grandTotalHarga = 0;
-
-    // 5. Add data per date
-    const sortedDates = Array.from(dailyData.keys()).sort((a, b) => {
-      const dateA = parseDate(a);
-      const dateB = parseDate(b);
-      return dateA - dateB;
-    });
-
-    sortedDates.forEach((dateStr) => {
-      const groups = dailyData.get(dateStr);
-
-      wsData.push([`TANGGAL: ${dateStr}`]);
-      wsData.push([]);
-
-      let dailyTotalPcs = 0;
-      let dailyTotalGr = 0;
-      let dailyTotalHarga = 0;
-
-      // Add each group (aksesoris, kotak, silver, manual)
-      ["aksesoris", "kotak", "silver", "manual"].forEach((jenis) => {
-        const items = groups[jenis];
-        if (items.length > 0) {
-          // Add group header
-          wsData.push([`  ${jenis.toUpperCase()}`]);
-
-          // Add column headers based on type
-          if (jenis === "kotak") {
-            wsData.push(["", "Nama Barang", "Pcs", "Harga"]);
-          } else if (jenis === "manual") {
-            wsData.push(["", "Kode", "Nama", "Pcs", "Gr", "Kadar", "Harga", "Keterangan"]);
-          } else {
-            wsData.push(["", "Kode", "Nama", "Pcs", "Gr", "Kadar", "Harga"]);
-          }
-
-          // Add items
-          items.forEach((item) => {
-            const row = this.formatItemRow(item, jenis);
-            wsData.push(row);
-          });
-
-          // Add subtotal
-          const subtotal = this.calculateSubtotals(items, jenis);
-          wsData.push([`  Subtotal ${jenis}: ${this.formatSubtotal(subtotal, jenis)}`]);
-          wsData.push([]);
-
-          // Add to daily total
-          dailyTotalPcs += subtotal.pcs;
-          dailyTotalGr += subtotal.gr || 0;
-          dailyTotalHarga += subtotal.harga;
-        }
-      });
-
-      // Add daily total
-      wsData.push([
-        `TOTAL ${dateStr}: ${dailyTotalPcs} pcs, ${dailyTotalGr.toFixed(2)} gr, Rp ${dailyTotalHarga.toLocaleString(
-          "id-ID"
-        )}`,
-      ]);
-      wsData.push([]);
-      wsData.push([]);
-
-      // Add to grand total
-      grandTotalPcs += dailyTotalPcs;
-      grandTotalGr += dailyTotalGr;
-      grandTotalHarga += dailyTotalHarga;
-    });
-
-    // 6. Add grand total
-    wsData.push(["═══════════════════════════════════════════════════════════════════"]);
-    wsData.push([
-      `GRAND TOTAL BULAN: ${grandTotalPcs} pcs, ${grandTotalGr.toFixed(2)} gr, Rp ${grandTotalHarga.toLocaleString(
-        "id-ID"
-      )}`,
-    ]);
-    wsData.push(["═══════════════════════════════════════════════════════════════════"]);
-
-    // 7. Create worksheet and download
+    // Create worksheet
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
     // Set column widths
     ws["!cols"] = [
-      { wch: 5 },
-      { wch: 15 },
-      { wch: 25 },
-      { wch: 8 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 20 },
+      { wch: 12 }, // Jenis
+      { wch: 15 }, // Kode
+      { wch: 30 }, // Nama
+      { wch: 8 }, // Pcs
+      { wch: 10 }, // Gr
+      { wch: 10 }, // Kadar
+      { wch: 15 }, // Harga
+      { wch: 20 }, // Keterangan
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Laporan Penjualan");
 
-    const filename = `Laporan_Penjualan_${this.getMonthName(monthStr).replace(/ /g, "_")}.xlsx`;
+    // Download
+    const filename = `Laporan_Penjualan_${startDate.replace(/\//g, "-")}_${endDate.replace(/\//g, "-")}.xlsx`;
     XLSX.writeFile(wb, filename);
+
+    this.showAlert("Export Excel berhasil!", "Sukses", "success");
+  },
+
+  /**
+   * Export to PDF with aggregated data
+   */
+  exportToPDF() {
+    if (!this.filteredSalesData || this.filteredSalesData.length === 0) {
+      this.showAlert("Tidak ada data untuk diexport", "Peringatan", "warning");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) {
+      this.showAlert("jsPDF library tidak tersedia", "Error", "error");
+      return;
+    }
+
+    const doc = new jsPDF("landscape", "mm", "a4");
+
+    // Get filter info
+    const startDate = document.getElementById("startDate").value;
+    const endDate = document.getElementById("endDate").value;
+    const jenisPenjualan = document.getElementById("salesType").value;
+
+    // Determine jenis label
+    const jenisLabel =
+      {
+        all: "SEMUA JENIS",
+        aksesoris: "AKSESORIS",
+        kotak: "KOTAK",
+        silver: "SILVER",
+        manual: "PENJUALAN MANUAL",
+      }[jenisPenjualan] || "SEMUA JENIS";
+
+    // Header
+    doc.setFontSize(16);
+    doc.setFont(undefined, "bold");
+    doc.text("LAPORAN PENJUALAN MELATI BAWAH", 148.5, 15, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.text(jenisLabel, 148.5, 22, { align: "center" });
+    doc.text(`${startDate} - ${endDate}`, 148.5, 28, { align: "center" });
+
+    // Aggregate data per kode barang
+    const aggregatedData = this.aggregateItemsByCode();
+
+    // Prepare table data (aggregated)
+    const tableData = [];
+    let totalPcs = 0;
+    let totalGr = 0;
+    let totalHarga = 0;
+
+    aggregatedData.forEach((item) => {
+      const row = this.formatAggregatedItemForExport(item, jenisPenjualan);
+      tableData.push(row);
+
+      totalPcs += item.totalPcs;
+      totalGr += item.totalGr;
+      totalHarga += item.totalHarga;
+    });
+
+    // Add total row
+    if (jenisPenjualan === "kotak") {
+      tableData.push(["TOTAL", "", "", totalPcs, "-", "-", `Rp ${totalHarga.toLocaleString("id-ID")}`]);
+    } else {
+      tableData.push([
+        "TOTAL",
+        "",
+        "",
+        totalPcs,
+        totalGr.toFixed(2),
+        "",
+        `Rp ${totalHarga.toLocaleString("id-ID")}`,
+        "",
+      ]);
+    }
+
+    // Column headers based on jenis
+    let columns;
+    if (jenisPenjualan === "kotak") {
+      columns = ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total"];
+    } else if (jenisPenjualan === "all") {
+      columns = ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total", "Keterangan"];
+    } else {
+      columns = ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total"];
+    }
+
+    // Generate table
+    doc.autoTable({
+      head: [columns],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [41, 128, 185], fontStyle: "bold" },
+      footStyles: { fillColor: [236, 240, 241], fontStyle: "bold" },
+      columnStyles: {
+        3: { halign: "center" }, // Pcs
+        4: { halign: "center" }, // Gr
+        5: { halign: "center" }, // Kadar
+        6: { halign: "center" }, // Harga Total
+      },
+      didParseCell: function (data) {
+        // Center-align header cells for Pcs, Gr, Kadar, and Harga Total
+        if (data.section === "head") {
+          if (jenisPenjualan === "kotak") {
+            // For kotak: Pcs (index 2), Harga Total (index 3)
+            if (data.column.index === 2 || data.column.index === 3) {
+              data.cell.styles.halign = "center";
+            }
+          } else {
+            // For others: Pcs (3), Gr (4), Kadar (5), Harga Total (6)
+            if (data.column.index >= 3 && data.column.index <= 6) {
+              data.cell.styles.halign = "center";
+            }
+          }
+        }
+      },
+      didDrawPage: function (data) {
+        // Footer
+        doc.setFontSize(8);
+        doc.text(`Halaman ${data.pageNumber}`, data.settings.margin.left, doc.internal.pageSize.height - 10);
+      },
+    });
+
+    // Download
+    const filename = `Laporan_Penjualan_${startDate.replace(/\//g, "-")}_${endDate.replace(/\//g, "-")}.pdf`;
+    doc.save(filename);
+
+    this.showAlert("Export PDF berhasil!", "Sukses", "success");
   },
 
   // Utility function to check if two dates are the same
@@ -1386,15 +1378,18 @@ const laporanPenjualanHandler = {
     if (tableBody) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="10" class="text-center">Silakan pilih tanggal dan klik tombol "Tampilkan" untuk melihat data</td>
+          <td colspan="7" class="text-center">Silakan pilih tanggal dan klik tombol "Tampilkan" untuk melihat data</td>
         </tr>
       `;
     }
 
     // Clear old cache periodically (every 30 minutes)
-    setInterval(() => {
-      cacheManager.clearOldCache();
-    }, 30 * 60 * 1000);
+    setInterval(
+      () => {
+        cacheManager.clearOldCache();
+      },
+      30 * 60 * 1000,
+    );
 
     // Clear today's cache when page is about to unload (to ensure fresh data on next visit)
     window.addEventListener("beforeunload", () => {
