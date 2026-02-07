@@ -1,12 +1,13 @@
 const printerService = require("../services/printerService");
 const escposService = require("../services/escposService");
 const pdfService = require("../services/pdfService");
+const printQueue = require("../services/printQueue");
 const logger = require("../utils/logger");
 const fs = require("fs").promises;
 
 class PrintController {
   /**
-   * Print thermal receipt
+   * Print thermal receipt (with queue)
    */
   async printReceipt(req, res) {
     try {
@@ -23,9 +24,6 @@ class PrintController {
       logger.info(`Receipt print request: ${receiptData.items.length} items`);
       logger.info(`Receipt data received:`, JSON.stringify(receiptData, null, 2));
 
-      // Generate ESC/POS commands
-      const commands = escposService.generateReceiptCommands(receiptData);
-
       // Get thermal printer
       const printerName = printerService.getPrinterForType("receipt");
 
@@ -38,16 +36,34 @@ class PrintController {
         });
       }
 
-      // Print
-      const jobID = await printerService.printRaw(printerName, commands);
+      // Generate ESC/POS commands
+      const commands = escposService.generateReceiptCommands(receiptData);
 
-      logger.info(`✅ Receipt printed successfully: Job ${jobID}`);
+      // Add to queue instead of direct print (returns jobID immediately)
+      const jobID = printQueue.addJob(
+        printerName,
+        async () => {
+          return await printerService.printRaw(printerName, commands);
+        },
+        {
+          type: "receipt",
+          itemCount: receiptData.items.length,
+        },
+      );
 
+      // Get job info immediately
+      const queueStatus = printQueue.getQueueStatus(printerName);
+
+      logger.info(`✅ Receipt job ${jobID} queued for ${printerName}`);
+      logger.info(`📊 Queue status: ${queueStatus.queueLength} job(s) waiting, printer is ${queueStatus.status}`);
+
+      // Return immediately with job info (don't wait for print to complete)
       res.json({
         success: true,
-        jobID,
+        jobID: jobID,
         printer: printerName,
-        message: "Receipt sent to printer",
+        queueStatus: queueStatus,
+        message: "Receipt queued for printing",
       });
     } catch (error) {
       logger.error("Print receipt error:", error);
@@ -59,7 +75,7 @@ class PrintController {
   }
 
   /**
-   * Print A4 invoice
+   * Print A4 invoice (with queue)
    */
   async printInvoice(req, res) {
     try {
@@ -80,45 +96,72 @@ class PrintController {
         invoiceData.invoiceNumber = `INV-${Date.now()}`;
       }
 
-      // Generate PDF
-      const pdfPath = await pdfService.generateInvoicePDF(invoiceData);
-
       // Get inkjet printer
       const printerName = printerService.getPrinterForType("invoice");
 
       // Check if printer is available
       const isAvailable = await printerService.isPrinterAvailable(printerName);
       if (!isAvailable) {
-        // Cleanup PDF
-        await fs.unlink(pdfPath).catch(() => {});
-
         return res.status(404).json({
           success: false,
           error: `Printer not found: ${printerName}`,
         });
       }
 
-      // Print PDF
-      const jobID = await printerService.printPDF(printerName, pdfPath);
+      // Generate PDF first (outside queue to avoid delay)
+      const pdfPath = await pdfService.generateInvoicePDF(invoiceData);
+      logger.info(`📄 PDF generated: ${pdfPath}`);
 
-      // Schedule PDF cleanup (5 seconds after printing)
-      setTimeout(async () => {
-        try {
-          await fs.unlink(pdfPath);
-          logger.info(`Cleaned up PDF: ${pdfPath}`);
-        } catch (error) {
-          logger.error("Error cleaning up PDF:", error);
-        }
-      }, 5000);
+      // Add to queue (returns jobID immediately)
+      const jobID = printQueue.addJob(
+        printerName,
+        async () => {
+          try {
+            // Print PDF
+            const printJobID = await printerService.printPDF(printerName, pdfPath);
 
-      logger.info(`✅ Invoice printed successfully: Job ${jobID}`);
+            // Schedule PDF cleanup after successful print (10 seconds delay for safety)
+            setTimeout(async () => {
+              try {
+                await fs.unlink(pdfPath);
+                logger.info(`🧹 Cleaned up PDF: ${pdfPath}`);
+              } catch (error) {
+                logger.error("Error cleaning up PDF:", error);
+              }
+            }, 10000);
+
+            return { printJobID, pdfPath };
+          } catch (error) {
+            // Cleanup PDF on error
+            try {
+              await fs.unlink(pdfPath);
+            } catch (cleanupError) {
+              logger.error("Error cleaning up PDF after error:", cleanupError);
+            }
+            throw error;
+          }
+        },
+        {
+          type: "invoice",
+          invoiceNumber: invoiceData.invoiceNumber,
+          itemCount: invoiceData.items.length,
+          pdfPath: pdfPath,
+        },
+      );
+
+      // Get queue status
+      const queueStatus = printQueue.getQueueStatus(printerName);
+
+      logger.info(`✅ Invoice job ${jobID} queued for ${printerName}`);
+      logger.info(`📊 Queue status: ${queueStatus.queueLength} job(s) waiting, printer is ${queueStatus.status}`);
 
       res.json({
         success: true,
-        jobID,
+        jobID: jobID,
         printer: printerName,
         invoiceNumber: invoiceData.invoiceNumber,
-        message: "Invoice sent to printer",
+        queueStatus: queueStatus,
+        message: "Invoice queued for printing",
       });
     } catch (error) {
       logger.error("Print invoice error:", error);

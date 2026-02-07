@@ -9,7 +9,8 @@ Automated printing service untuk Melati App yang menangani pencetakan thermal re
 - ✅ **ESC/POS Support** - Native thermal printer commands
 - ✅ **PDF Generation** - Invoice A4 dengan Puppeteer
 - ✅ **Windows Service** - Auto-start saat boot
-- ✅ **CORS Ready** - Support GitHub Pages hosting
+- ✅ **Queue Management** - Automatic job queueing dengan retry
+- ✅ **CORS Ready** - Support localhost & Live Server
 - ✅ **Fallback** - Web app tetap bisa pakai window.print()
 
 ## 📋 Requirements
@@ -19,35 +20,38 @@ Automated printing service untuk Melati App yang menangani pencetakan thermal re
 - Printer thermal (80mm) untuk receipt
 - Printer A4 (inkjet/laser) untuk invoice
 
-## 🚀 Instalasi
+## 🚀 Quick Start
 
-### Cara 1: Installer Otomatis (Recommended)
+```powershell
+# 1. Klik kanan → Run as Administrator
+install-auto-start.bat
 
-1. Buka Command Prompt sebagai **Administrator**
-2. Jalankan:
-   ```batch
-   cd d:\Project\melati-app\printing-service
-   install.bat
-   ```
-3. Tunggu hingga selesai
-4. Service otomatis running di `http://localhost:3000`
+# 2. Konfigurasi printer
+notepad config\printers.json
 
-### Cara 2: Manual
+# 3. Restart service
+net restart MelatiPrintService
 
-```bash
-# Install dependencies
-npm install
-
-# Test run (development)
-npm run dev
-
-# Install Windows Service
-npm run install-service
+# 4. Test
+curl http://localhost:3001/api/health
 ```
 
-## ⚙️ Konfigurasi
+**✅ Done!** Service siap digunakan.
 
-### 1. Update GitHub Pages URL
+## 📖 Dokumentasi Lengkap
+
+**[📘 INSTALL.md](INSTALL.md)** - Panduan instalasi lengkap step-by-step
+
+Berisi:
+
+- Instalasi detail untuk komputer baru
+- Deploy ke multiple PC
+- Konfigurasi printer
+- Troubleshooting lengkap
+- Management commands
+- Best practices
+
+## ⚙️ Konfigurasi
 
 Edit `server.js` line 10:
 

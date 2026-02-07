@@ -5,6 +5,7 @@ const path = require("path");
 const logger = require("./utils/logger");
 const printController = require("./controllers/printController");
 const printerService = require("./services/printerService");
+const printQueue = require("./services/printQueue");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -123,6 +124,71 @@ app.post("/api/print/receipt", printController.printReceipt.bind(printController
 // Print invoice endpoint
 app.post("/api/print/invoice", printController.printInvoice.bind(printController));
 
+// Get job status endpoint
+app.get("/api/job/:jobID", (req, res) => {
+  try {
+    const { jobID } = req.params;
+    const jobStatus = printQueue.getJobStatus(jobID);
+
+    if (!jobStatus) {
+      return res.status(404).json({
+        success: false,
+        error: "Job not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      job: jobStatus,
+    });
+  } catch (error) {
+    logger.error("Error getting job status:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Get queue status endpoint
+app.get("/api/queue/status", (req, res) => {
+  try {
+    const statuses = printQueue.getAllQueueStatuses();
+    const stats = printQueue.getStats();
+
+    res.json({
+      success: true,
+      queues: statuses,
+      stats: stats,
+    });
+  } catch (error) {
+    logger.error("Error getting queue status:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Get specific printer queue status
+app.get("/api/queue/:printerName", (req, res) => {
+  try {
+    const { printerName } = req.params;
+    const queueStatus = printQueue.getQueueStatus(printerName);
+
+    res.json({
+      success: true,
+      queue: queueStatus,
+    });
+  } catch (error) {
+    logger.error("Error getting printer queue status:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   logger.error("Unhandled error:", err);
@@ -147,11 +213,14 @@ app.listen(PORT, () => {
   logger.info("🖨️  Melati Print Service Started");
   logger.info(`📡 Server running on http://localhost:${PORT}`);
   logger.info(`📋 API Endpoints:`);
-  logger.info(`   GET  /api/health          - Health check`);
-  logger.info(`   GET  /api/printers        - List printers`);
-  logger.info(`   POST /api/printers/config - Update config`);
-  logger.info(`   POST /api/print/receipt   - Print receipt`);
-  logger.info(`   POST /api/print/invoice   - Print invoice`);
+  logger.info(`   GET  /api/health            - Health check`);
+  logger.info(`   GET  /api/printers          - List printers`);
+  logger.info(`   POST /api/printers/config   - Update config`);
+  logger.info(`   POST /api/print/receipt     - Print receipt`);
+  logger.info(`   POST /api/print/invoice     - Print invoice`);
+  logger.info(`   GET  /api/job/:jobID        - Get job status`);
+  logger.info(`   GET  /api/queue/status      - Get all queue statuses`);
+  logger.info(`   GET  /api/queue/:printer    - Get printer queue status`);
   logger.info("=".repeat(50));
 });
 
