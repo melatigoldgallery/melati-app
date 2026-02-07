@@ -645,22 +645,48 @@ class OptimizedDataPenjualanApp {
   // Setup event listeners
   setupEventListeners() {
     const events = {
-      btnTambahTransaksi: () => (window.location.href = "penjualanAksesoris.html"),
-      btnRefreshData: () => this.refreshData(),
-      btnPrintReceipt: async () => await this.printDocument("receipt"),
-      btnPrintInvoice: async () => await this.printDocument("invoice"),
-      btnSaveEdit: () => this.saveEditTransaction(),
+      btnTambahTransaksi: (e) => {
+        e.preventDefault();
+        window.location.href = "penjualanAksesoris.html";
+      },
+      btnRefreshData: async (e) => {
+        e.preventDefault();
+        await this.refreshData();
+      },
+      btnPrintReceipt: async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await this.printDocument("receipt");
+      },
+      btnPrintInvoice: async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await this.printDocument("invoice");
+      },
+      btnSaveEdit: (e) => {
+        e.preventDefault();
+        this.saveEditTransaction();
+      },
     };
 
     // Event listener untuk confirm delete
     const btnConfirmDelete = document.getElementById("btnConfirmDelete");
     if (btnConfirmDelete) {
-      btnConfirmDelete.addEventListener("click", () => this.confirmDeleteTransaction());
+      btnConfirmDelete.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.confirmDeleteTransaction();
+      });
     }
 
     Object.entries(events).forEach(([id, handler]) => {
       const element = document.getElementById(id);
-      if (element) element.addEventListener("click", handler);
+      if (element) {
+        element.addEventListener("click", handler);
+        // Ensure button type is button, not submit
+        if (element.tagName === "BUTTON" && !element.hasAttribute("type")) {
+          element.setAttribute("type", "button");
+        }
+      }
     });
 
     this.setupAutoFilter();
@@ -1791,33 +1817,23 @@ class OptimizedDataPenjualanApp {
 
   // Print document (receipt or invoice)
   async printDocument(type) {
-    console.log("🖨️ === printDocument called ===");
-    console.log("  - Type:", type);
-    console.log("  - Current transaction:", this.currentTransaction);
-
     if (!this.currentTransaction) {
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
     }
 
     const transaction = this.currentTransaction;
-    console.log("  - Transaction items:", transaction.items?.length);
 
     // Khusus invoice dengan >1 item: cetak per item satu-satu
     if (type === "invoice" && transaction && Array.isArray(transaction.items) && transaction.items.length > 1) {
-      console.log("  ✅ Multi-item invoice detected, calling printInvoicePerItem");
       try {
         $("#printModal").modal("hide");
       } catch (_) {}
       return await this.printInvoicePerItem(transaction);
     }
 
-    console.log("  → Single item or receipt, continuing with normal flow");
-
     // Try print service if available and online
     if (window.printService && window.printService.isOnline) {
       try {
-        console.log("🖨️ Using print service for", type);
-
         // Prepare data for print service
         const printData = this.preparePrintData(transaction);
 
@@ -2184,44 +2200,33 @@ class OptimizedDataPenjualanApp {
 
     // Fallback jika hanya 1 item - just print directly without recursion
     if (items.length <= 1) {
-      console.log("  ℹ️ Only 1 item, this shouldn't be called. Using browser fallback");
       return this.printInvoicePerItemBrowser(transaction);
     }
 
     // Try print service first
     if (!window.printService) {
-      console.warn("  ⚠️ window.printService not initialized, using browser fallback");
+      console.warn("Print service not initialized, using browser fallback");
       return this.printInvoicePerItemBrowser(transaction);
     }
 
-    console.log("🔍 Attempting print service for multi-invoice...");
-    console.log("  - Print service exists:", !!window.printService);
-    console.log("  - Items to print:", items.length);
+    // ✅ REMOVED: Anti-reload protection not needed with simple sequential approach
+    // utils.liveServerProtection.activate();
 
     try {
       utils.showLoading(true);
 
       // Get timestamp and format date/time
       const printData = this.preparePrintData(transaction);
-      console.log("  - Print data prepared:", printData);
-
       const tanggal = printData.tanggal.split(" ")[0]; // Get date part
       const jam = printData.jam || new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-      console.log(`📤 Starting to send ${items.length} items to print service...`);
-      console.log("  - Date:", tanggal);
-      console.log("  - Time:", jam);
-
       let printedCount = 0;
+      let failedCount = 0;
+      const failedItems = [];
 
-      // Print each item sequentially
+      // ✅ SIMPLIFIED: Print each item sequentially
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-
-        console.log(`\n📄 === Processing Item ${i + 1}/${items.length} ===`);
-        console.log(`  - Item name: ${item.nama || item.namaBarang}`);
-        console.log(`  - Item code: ${item.kodeText || item.kode}`);
-        console.log(`  - Item price: ${item.totalHarga}`);
 
         // Prepare invoice data for single item
         const invoiceData = {
@@ -2243,104 +2248,63 @@ class OptimizedDataPenjualanApp {
           notes: item.keterangan || "",
         };
 
-        console.log(`  📤 Sending item ${i + 1} to print service...`);
-        console.log(`  - Invoice data:`, JSON.stringify(invoiceData, null, 2));
+        try {
+          // ✅ SIMPLIFIED: Direct request
+          const response = await fetch("http://localhost:3001/api/print/invoice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(invoiceData),
+          });
 
-        // Direct fetch with retry logic
-        let retryCount = 0;
-        const maxRetries = 3;
-        let lastError = null;
-
-        while (retryCount <= maxRetries) {
-          try {
-            console.log(`  🔄 Attempt ${retryCount + 1}/${maxRetries + 1}...`);
-
-            // Create AbortController for timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-              console.warn(`  ⏰ Request timeout after 30 seconds, aborting...`);
-              controller.abort();
-            }, 30000); // 30 second timeout
-
-            const response = await fetch("http://localhost:3001/api/print/invoice", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(invoiceData),
-              mode: "cors",
-              credentials: "omit",
-              signal: controller.signal,
-            });
-
-            clearTimeout(timeoutId);
-            console.log(`  📥 Response received - Status: ${response.status} ${response.statusText}`);
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`  ❌ Server error response:`, errorText);
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            console.log(`  📥 Parse result:`, result);
-
-            if (!result.success) {
-              throw new Error(result.error || "Print failed");
-            }
-
-            printedCount++;
-            console.log(`  ✅ Item ${i + 1} printed successfully!`);
-            console.log(`  - Job ID: ${result.jobID}`);
-            console.log(`  - Total printed so far: ${printedCount}/${items.length}`);
-            break; // Success, exit retry loop
-          } catch (fetchError) {
-            lastError = fetchError;
-            retryCount++;
-
-            // Detailed error logging
-            console.error(`  ❌ Fetch error details:`);
-            console.error(`     - Type: ${fetchError.name}`);
-            console.error(`     - Message: ${fetchError.message}`);
-            console.error(`     - Is AbortError: ${fetchError.name === "AbortError"}`);
-            console.error(`     - Is TypeError: ${fetchError.name === "TypeError"}`);
-
-            if (retryCount <= maxRetries) {
-              const waitTime = retryCount * 1000;
-              console.warn(`  ⚠️ Attempt ${retryCount} failed: ${fetchError.message}`);
-              console.log(`  🔄 Retrying in ${waitTime}ms...`);
-              await new Promise((resolve) => setTimeout(resolve, waitTime));
-            }
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
+
+          const result = await response.json();
+
+          if (result.success && result.jobID) {
+            printedCount++;
+          } else {
+            throw new Error(result.error || "Print request failed");
+          }
+        } catch (itemError) {
+          failedCount++;
+          failedItems.push({ item: i + 1, name: item.nama, reason: itemError.message });
+          console.error(`  ❌ Item ${i + 1} failed: ${itemError.message}`);
         }
 
-        // If all retries failed, throw error
-        if (retryCount > maxRetries) {
-          console.error(`  ❌ All ${maxRetries} retries failed for item ${i + 1}`);
-          throw lastError;
-        }
-
-        // Longer delay between prints (1500ms)
+        // ✅ SIMPLIFIED: Reduced delay (500ms instead of 2000ms)
         if (i < items.length - 1) {
-          console.log(`  ⏳ Waiting 1500ms before next print...`);
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-          console.log(`  ✅ Delay complete, moving to next item`);
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
 
       utils.showLoading(false);
-      console.log(`\n🎉 === ALL PRINTS COMPLETED ===`);
-      console.log(`✅ Successfully printed ${printedCount} out of ${items.length} invoices!`);
 
-      utils.showAlert(`${printedCount} invoice berhasil dikirim ke printer!`, "Sukses", "success");
+      if (printedCount > 0) {
+        let message = "";
+        if (failedCount > 0) {
+          const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+          message = `${printedCount} invoice berhasil dicetak, ${failedCount} gagal:\n\n${failedList}`;
+        } else {
+          message = `Semua ${printedCount} invoice berhasil dicetak!`;
+        }
+
+        utils.showAlert(
+          message,
+          printedCount === items.length ? "Sukses" : "Sebagian Berhasil",
+          printedCount === items.length ? "success" : "warning",
+        );
+      } else {
+        const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+        utils.showAlert(`Semua invoice gagal dicetak:\n\n${failedList}`, "Error", "error");
+      }
+
       $("#printModal").modal("hide");
       return;
     } catch (error) {
-      console.error("\n❌ === PRINT SERVICE ERROR ===");
-      console.error("  - Error type:", error.constructor.name);
-      console.error("  - Error name:", error.name);
-      console.error("  - Error message:", error.message);
-      console.error("  - Error stack:", error.stack);
+      console.error("Print service error:", error.message);
       utils.showLoading(false);
 
       // Ask user if they want to use browser fallback
@@ -2350,18 +2314,16 @@ class OptimizedDataPenjualanApp {
       );
 
       if (useFallback) {
-        console.log("🌐 User chose browser fallback");
         return this.printInvoicePerItemBrowser(transaction);
-      } else {
-        console.log("❌ User cancelled print");
       }
+    } finally {
+      // ✅ REMOVED: Anti-reload protection not needed
+      // utils.liveServerProtection.deactivate();
     }
   }
 
   // Browser fallback for multi-invoice print
   printInvoicePerItemBrowser(transaction) {
-    console.log("📄 Using browser print fallback for multi-invoice");
-
     if (!transaction?.items || transaction.items.length === 0) {
       return utils.showAlert("Tidak ada item untuk dicetak.", "Info", "info");
     }

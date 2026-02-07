@@ -206,6 +206,7 @@ const penjualanHandler = {
   salesData: [],
   stockCache: new Map(),
   isSaving: false,
+  isPrinting: false, // ✅ Flag untuk prevent double-click print
 
   // Real-time listeners
   stockListener: null,
@@ -2405,57 +2406,83 @@ const penjualanHandler = {
 
   // Print receipt - Try print service first, fallback to browser
   async printReceipt() {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
     if (!currentTransactionData) {
+      this.isPrinting = false;
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
     }
 
-    // Try print service if available
-    if (window.printService && window.printService.isOnline) {
-      try {
-        const transaction = currentTransactionData;
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: "Mohon tunggu, sedang mencetak struk...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
 
-        // Format jam dari timestamp saat ini
-        const now = new Date();
-        const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    try {
+      // Try print service if available
+      if (window.printService && window.printService.isOnline) {
+        try {
+          const transaction = currentTransactionData;
 
-        // Prepare receipt data for print service
-        const receiptData = {
-          transactionType: transaction.salesType.toUpperCase(),
-          tanggal: transaction.tanggal,
-          jam: jam,
-          sales: transaction.sales,
-          items: transaction.items.map((item) => ({
-            nama: item.nama || "-",
-            kode: item.kodeText || "-",
-            kadar: item.kadar || "-",
-            berat: item.berat || "-",
-            totalHarga: parseInt(item.totalHarga) || 0,
-            keterangan: item.keterangan || "",
-          })),
-          totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
-          jumlahBayar:
-            transaction.metodeBayar !== "free" ? parseInt(transaction.totalHarga.replace(/\./g, "")) || 0 : 0,
-          kembalian: 0,
-          metodeBayar: transaction.metodeBayar,
-          nominalDP: transaction.metodeBayar === "dp" ? parseInt(transaction.nominalDP.replace(/\./g, "")) || 0 : 0,
-          sisaPembayaran:
-            transaction.metodeBayar === "dp" ? parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0 : 0,
-        };
+          // Format jam dari timestamp saat ini
+          const now = new Date();
+          const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-        const result = await window.printService.printReceipt(receiptData);
+          // Prepare receipt data for print service
+          const receiptData = {
+            transactionType: transaction.salesType.toUpperCase(),
+            tanggal: transaction.tanggal,
+            jam: jam,
+            sales: transaction.sales,
+            items: transaction.items.map((item) => ({
+              nama: item.nama || "-",
+              kode: item.kodeText || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || "-",
+              totalHarga: parseInt(item.totalHarga) || 0,
+              keterangan: item.keterangan || "",
+            })),
+            totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
+            jumlahBayar:
+              transaction.metodeBayar !== "free" ? parseInt(transaction.totalHarga.replace(/\./g, "")) || 0 : 0,
+            kembalian: 0,
+            metodeBayar: transaction.metodeBayar,
+            nominalDP: transaction.metodeBayar === "dp" ? parseInt(transaction.nominalDP.replace(/\./g, "")) || 0 : 0,
+            sisaPembayaran:
+              transaction.metodeBayar === "dp" ? parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0 : 0,
+          };
 
-        if (result.success && result.method !== "browser") {
-          utils.showAlert("Struk berhasil dicetak ke printer thermal!", "Sukses", "success");
-          return;
+          const result = await window.printService.printReceipt(receiptData);
+
+          if (result.success && result.method !== "browser") {
+            Swal.fire({
+              icon: "success",
+              title: "Sukses",
+              text: "Struk berhasil dicetak ke printer thermal!",
+              timer: 2000,
+              showConfirmButton: false,
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn("Print service failed, falling back to browser:", error);
         }
-      } catch (error) {
-        console.warn("Print service failed, falling back to browser:", error);
       }
-    }
 
-    // Fallback to browser print
-    this.printReceiptBrowser();
+      // Fallback to browser print
+      Swal.close();
+      this.printReceiptBrowser();
+    } finally {
+      this.isPrinting = false;
+    }
   },
 
   // Print receipt - Browser fallback
@@ -2688,61 +2715,97 @@ const penjualanHandler = {
 
   // Print invoice - Try print service first, fallback to browser
   async printInvoice() {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
     if (!currentTransactionData) {
+      this.isPrinting = false;
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
     }
 
-    // Try print service if available
-    if (window.printService && window.printService.isOnline) {
-      try {
-        const transaction = currentTransactionData;
-
-        // Prepare tanggal dan jam
-        let tanggal = transaction.tanggal;
-        const now = new Date();
-        const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-        if (transaction.timestamp && transaction.timestamp.toDate) {
-          tanggal = utils.formatDate(transaction.timestamp);
-        }
-
-        // Collect keterangan from items
-        const keteranganList = transaction.items
-          .filter((item) => item.keterangan && item.keterangan.trim() !== "")
-          .map((item) => item.keterangan);
-        const notes = keteranganList.length > 0 ? keteranganList.join(" ") : "";
-
-        // Prepare invoice data for print service
-        const invoiceData = {
-          tanggal: tanggal + " " + jam,
-          sales: transaction.sales || "-",
-          customerName: transaction.customerName || "",
-          customerPhone: transaction.customerPhone || "",
-          items: transaction.items.map((item) => ({
-            nama: item.nama || "-",
-            kode: item.kodeText || "-",
-            kadar: item.kadar || "-",
-            berat: item.berat || "-",
-            jumlah: 1,
-            totalHarga: parseInt(item.totalHarga) || 0,
-          })),
-          totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
-          notes: notes,
-        };
-
-        const result = await window.printService.printInvoice(invoiceData);
-
-        if (result.success && result.method !== "browser") {
-          utils.showAlert("Invoice berhasil dicetak ke printer A4!", "Sukses", "success");
-          return;
-        }
-      } catch (error) {
-        console.warn("Print service failed, falling back to browser:", error);
-      }
+    // Khusus manual dengan >1 item, cetak per item
+    if (
+      currentTransactionData.salesType === "manual" &&
+      currentTransactionData.items &&
+      currentTransactionData.items.length > 1
+    ) {
+      this.isPrinting = false; // Reset before calling other function
+      return await this.printInvoicePerItem();
     }
 
-    // Fallback to browser print
-    this.printInvoiceBrowser();
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: "Mohon tunggu, sedang mencetak invoice...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      // Try print service if available
+      if (window.printService && window.printService.isOnline) {
+        try {
+          const transaction = currentTransactionData;
+
+          // Prepare tanggal dan jam
+          let tanggal = transaction.tanggal;
+          const now = new Date();
+          const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+          if (transaction.timestamp && transaction.timestamp.toDate) {
+            tanggal = utils.formatDate(transaction.timestamp);
+          }
+
+          // Collect keterangan from items
+          const keteranganList = transaction.items
+            .filter((item) => item.keterangan && item.keterangan.trim() !== "")
+            .map((item) => item.keterangan);
+          const notes = keteranganList.length > 0 ? keteranganList.join(" ") : "";
+
+          // Prepare invoice data for print service
+          const invoiceData = {
+            tanggal: tanggal + " " + jam,
+            sales: transaction.sales || "-",
+            customerName: transaction.customerName || "",
+            customerPhone: transaction.customerPhone || "",
+            items: transaction.items.map((item) => ({
+              nama: item.nama || "-",
+              kode: item.kodeText || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || "-",
+              jumlah: 1,
+              totalHarga: parseInt(item.totalHarga) || 0,
+            })),
+            totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
+            notes: notes,
+          };
+
+          const result = await window.printService.printInvoice(invoiceData);
+
+          if (result.success && result.method !== "browser") {
+            Swal.fire({
+              icon: "success",
+              title: "Sukses",
+              text: "Invoice berhasil dicetak ke printer A4!",
+              timer: 2000,
+              showConfirmButton: false,
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn("Print service failed, falling back to browser:", error);
+        }
+      }
+
+      // Fallback to browser print
+      Swal.close();
+      this.printInvoiceBrowser();
+    } finally {
+      this.isPrinting = false;
+    }
   },
 
   // Print invoice - Browser fallback
@@ -2863,60 +2926,60 @@ const penjualanHandler = {
 
   // Print separate invoices per item for manual sales
   async printInvoicePerItem() {
-    console.log("🖨️ === DEBUG: printInvoicePerItem called ===");
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
 
     if (!currentTransactionData) {
+      this.isPrinting = false;
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
     }
 
-    const tx = currentTransactionData;
-    const items = Array.isArray(tx.items) ? tx.items : [];
-
-    console.log("📋 Transaction data:", {
-      items: items.length,
-      tanggal: tx.tanggal,
-      sales: tx.sales,
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: "Mohon tunggu, sedang mencetak invoice per item...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
     });
 
-    // Fallback jika hanya 1 item
-    if (items.length <= 1) {
-      console.log("ℹ️ Single item detected, using printInvoice()");
-      this.printInvoice();
-      return;
-    }
-
-    // Check if print service exists
-    if (!window.printService) {
-      console.warn("⚠️ window.printService not initialized, using browser fallback");
-      this.printInvoicePerItemBrowser();
-      return;
-    }
-
-    console.log("🔍 Attempting print service...");
-
-    // Try print service directly (don't rely on isOnline flag)
     try {
+      const tx = currentTransactionData;
+      const items = Array.isArray(tx.items) ? tx.items : [];
+
+      // Fallback jika hanya 1 item
+      if (items.length <= 1) {
+        Swal.close();
+        this.isPrinting = false;
+        this.printInvoice();
+        return;
+      }
+
+      // Check if print service exists
+      if (!window.printService) {
+        console.warn("Print service not initialized, using browser fallback");
+        Swal.close();
+        this.isPrinting = false;
+        this.printInvoicePerItemBrowser();
+        return;
+      }
+
       utils.showLoading(true);
 
       // Format jam
       const now = new Date();
       const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-      console.log("🕐 Formatted time:", jam);
-      console.log(`📤 Sending ${items.length} items to print service...`);
-
       let printedCount = 0;
+      let failedCount = 0;
+      const failedItems = [];
 
-      // Print each item sequentially
+      // ✅ SIMPLIFIED: Print each item sequentially
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-
-        console.log(`  └─ Item ${i + 1}/${items.length}:`, {
-          nama: item.nama || item.namaBarang,
-          kode: item.kode || item.kodeText || item.kodeLock,
-          total: item.totalHarga,
-        });
 
         // Prepare invoice data for single item
         const invoiceData = {
@@ -2938,74 +3001,68 @@ const penjualanHandler = {
           notes: item.keterangan || "",
         };
 
-        console.log(`  └─ Sending invoice data to service...`);
+        try {
+          // ✅ SIMPLIFIED: Direct request
+          const response = await fetch("http://localhost:3001/api/print/invoice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(invoiceData),
+          });
 
-        // Direct fetch to print service with retry logic
-        let retryCount = 0;
-        const maxRetries = 3;
-        let lastError = null;
-
-        while (retryCount <= maxRetries) {
-          try {
-            const response = await fetch("http://localhost:3001/api/print/invoice", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(invoiceData),
-              mode: "cors",
-              credentials: "omit",
-            });
-
-            console.log(`  └─ Response status:`, response.status, response.statusText);
-
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            console.log(`  └─ Print result:`, result);
-
-            if (!result.success) {
-              throw new Error(result.error || "Print failed");
-            }
-
-            printedCount++;
-            console.log(`  ✅ Item ${i + 1} printed successfully (Job ID: ${result.jobID})`);
-            break; // Success, exit retry loop
-          } catch (fetchError) {
-            lastError = fetchError;
-            retryCount++;
-
-            if (retryCount <= maxRetries) {
-              console.warn(`  ⚠️ Attempt ${retryCount} failed: ${fetchError.message}`);
-              console.log(`  🔄 Retrying in ${retryCount * 1000}ms...`);
-              await new Promise((resolve) => setTimeout(resolve, retryCount * 1000));
-            }
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
+
+          const result = await response.json();
+
+          if (result.success && result.jobID) {
+            printedCount++;
+          } else {
+            throw new Error(result.error || "Print request failed");
+          }
+        } catch (itemError) {
+          failedCount++;
+          failedItems.push({ item: i + 1, name: item.nama || item.namaBarang, reason: itemError.message });
+          console.error(`  ❌ Item ${i + 1} failed: ${itemError.message}`);
         }
 
-        // If all retries failed, throw error
-        if (retryCount > maxRetries) {
-          console.error(`  ❌ Failed after ${maxRetries} retries`);
-          throw lastError;
-        }
-
-        // Longer delay between prints (1500ms to ensure backend finishes)
+        // ✅ SIMPLIFIED: Reduced delay (500ms instead of 1500ms)
         if (i < items.length - 1) {
-          console.log(`  └─ Waiting 1500ms before next print...`);
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
 
       utils.showLoading(false);
-      console.log(`✅ All ${printedCount} invoices sent successfully!`);
-      utils.showAlert(`${printedCount} invoice berhasil dikirim ke printer!`, "Sukses", "success");
+
+      if (printedCount > 0) {
+        let message = "";
+        if (failedCount > 0) {
+          const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+          message = `${printedCount} invoice berhasil dicetak, ${failedCount} gagal:\n\n${failedList}`;
+        } else {
+          message = `Semua ${printedCount} invoice berhasil dicetak!`;
+        }
+
+        Swal.fire({
+          icon: printedCount === items.length ? "success" : "warning",
+          title: printedCount === items.length ? "Sukses" : "Sebagian Berhasil",
+          text: message,
+          confirmButtonText: "OK",
+        });
+      } else {
+        const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: `Semua invoice gagal dicetak:\n\n${failedList}`,
+          confirmButtonText: "OK",
+        });
+      }
+
       return;
     } catch (error) {
-      console.error("❌ Print service error:", error);
-      console.error("  - Error name:", error.name);
-      console.error("  - Error message:", error.message);
+      console.error("Print service error:", error.message);
       utils.showLoading(false);
 
       // Ask user if they want to use browser fallback
@@ -3015,11 +3072,13 @@ const penjualanHandler = {
       );
 
       if (useFallback) {
-        console.log("🌐 User chose browser fallback");
+        Swal.close();
         this.printInvoicePerItemBrowser();
       } else {
-        console.log("❌ User cancelled print");
+        Swal.close();
       }
+    } finally {
+      this.isPrinting = false;
     }
   },
 
