@@ -35,6 +35,7 @@ const STAFF_NAMES = [
   "HANDY",
   "HAPPY",
   "IKA",
+  "KASIR",
   "KRISNA",
   "LIA",
   "LINDA",

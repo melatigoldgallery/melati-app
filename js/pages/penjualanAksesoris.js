@@ -1318,6 +1318,7 @@ const penjualanHandler = {
     // Auto-fill kadar & berat dari master data
     const kadarValue = kadar || "";
     const beratValue = berat || "";
+    const beratSatuan = berat || 0; // Simpan berat per unit untuk perhitungan
 
     const newRow = `
       <tr>
@@ -1330,7 +1331,7 @@ const penjualanHandler = {
           <input type="text" class="form-control form-control-sm kadar-input" value="${kadarValue}" placeholder="Masukkan kadar" required ${kadarValue ? "readonly" : ""}>
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm berat-input" value="${beratValue}" placeholder="0.00" required ${beratValue ? "readonly" : ""}>
+          <input type="text" class="form-control form-control-sm berat-input" value="${beratValue}" placeholder="0.00" required ${beratValue ? "readonly" : ""}">
         </td>
         <td>
           <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
@@ -1348,6 +1349,10 @@ const penjualanHandler = {
 
     $("#tableSilverDetail tbody").append(newRow);
     const $newRow = $("#tableSilverDetail tbody tr:last-child");
+    // Simpan berat satuan sebagai data attribute
+    if (beratSatuan) {
+      $newRow.data("berat-satuan", beratSatuan);
+    }
     // Focus ke total harga jika kadar & berat sudah terisi
     if (kadarValue && beratValue) {
       $newRow.find(".total-harga-input").focus();
@@ -1419,7 +1424,23 @@ const penjualanHandler = {
     };
 
     $totalHargaInput.add($beratInput).on("input", calculateHargaPerGram);
-    $jumlahInput.on("input", () => this.updateGrandTotal(salesType));
+
+    // Untuk silver: update berat otomatis saat jumlah berubah
+    if (salesType === "silver") {
+      const beratSatuan = parseFloat($row.data("berat-satuan")) || 0;
+      if (beratSatuan > 0) {
+        $jumlahInput.on("input", function () {
+          const jumlah = parseInt($(this).val()) || 1;
+          const beratTotal = beratSatuan * jumlah;
+          $beratInput.val(beratTotal.toFixed(2));
+          calculateHargaPerGram();
+        });
+      } else {
+        $jumlahInput.on("input", () => this.updateGrandTotal(salesType));
+      }
+    } else {
+      $jumlahInput.on("input", () => this.updateGrandTotal(salesType));
+    }
 
     $totalHargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
