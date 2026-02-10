@@ -9,6 +9,11 @@ echo   Melati Print Service Auto Installer
 echo ========================================
 echo.
 
+REM Change to script directory (FIX for Administrator mode)
+cd /d "%~dp0"
+echo Working directory: %cd%
+echo.
+
 REM Check if running as Administrator
 net session >nul 2>&1
 if %errorLevel% NEQ 0 (
@@ -36,13 +41,25 @@ node --version
 
 echo.
 echo [2/5] Installing npm dependencies...
-call npm install
-if %errorLevel% NEQ 0 (
-    echo [ERROR] npm install gagal!
-    pause
-    exit /b 1
+if exist "node_modules\express" (
+    echo [OK] Dependencies already installed
+    goto SKIP_INSTALL
 )
-echo [OK] Dependencies installed
+set NODE_OPTIONS=--max-old-space-size=4096
+call npm install --no-audit --no-fund
+if %errorLevel% NEQ 0 (
+    echo [WARN] Retrying with cache clean...
+    call npm cache clean --force
+    call npm install --no-audit --no-fund
+    if %errorLevel% NEQ 0 (
+        echo [ERROR] npm install gagal!
+        pause
+        exit /b 1
+    )
+)
+:SKIP_INSTALL
+set NODE_OPTIONS=
+echo [OK] Dependencies ready
 
 echo.
 echo [3/5] Installing node-windows globally...

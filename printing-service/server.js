@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const path = require("path");
 const logger = require("./utils/logger");
 const printController = require("./controllers/printController");
+const servisPrintController = require("./controllers/servisPrintController");
 const printerService = require("./services/printerService");
 const printQueue = require("./services/printQueue");
 
@@ -124,6 +125,12 @@ app.post("/api/print/receipt", printController.printReceipt.bind(printController
 // Print invoice endpoint
 app.post("/api/print/invoice", printController.printInvoice.bind(printController));
 
+// Print nota servis endpoint
+app.post("/api/print/nota-servis", servisPrintController.printNotaServis.bind(servisPrintController));
+
+// Print nota custom endpoint
+app.post("/api/print/nota-custom", servisPrintController.printNotaCustom.bind(servisPrintController));
+
 // Get job status endpoint
 app.get("/api/job/:jobID", (req, res) => {
   try {
@@ -218,6 +225,8 @@ app.listen(PORT, () => {
   logger.info(`   POST /api/printers/config   - Update config`);
   logger.info(`   POST /api/print/receipt     - Print receipt`);
   logger.info(`   POST /api/print/invoice     - Print invoice`);
+  logger.info(`   POST /api/print/nota-servis - Print nota servis`);
+  logger.info(`   POST /api/print/nota-custom - Print nota custom`);
   logger.info(`   GET  /api/job/:jobID        - Get job status`);
   logger.info(`   GET  /api/queue/status      - Get all queue statuses`);
   logger.info(`   GET  /api/queue/:printer    - Get printer queue status`);

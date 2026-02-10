@@ -324,6 +324,7 @@ class OptimizedDataPenjualanApp {
     this.currentSelectedDate = null;
     this.currentListeningDate = null;
     this.currentDeleteAction = null;
+    this.isPrinting = false; // ✅ Double-click prevention flag
 
     // ✅ PERBAIKAN: Tambahkan properties untuk inactivity timer
     this.inactivityTimer = null;
@@ -1817,7 +1818,12 @@ class OptimizedDataPenjualanApp {
 
   // Print document (receipt or invoice)
   async printDocument(type) {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
     if (!this.currentTransaction) {
+      this.isPrinting = false;
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
     }
 
@@ -1825,46 +1831,63 @@ class OptimizedDataPenjualanApp {
 
     // Khusus invoice dengan >1 item: cetak per item satu-satu
     if (type === "invoice" && transaction && Array.isArray(transaction.items) && transaction.items.length > 1) {
+      this.isPrinting = false; // Reset sebelum panggil method lain
       try {
         $("#printModal").modal("hide");
       } catch (_) {}
       return await this.printInvoicePerItem(transaction);
     }
 
-    // Try print service if available and online
-    if (window.printService && window.printService.isOnline) {
-      try {
-        // Prepare data for print service
-        const printData = this.preparePrintData(transaction);
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: type === "receipt" ? "Mohon tunggu, sedang mencetak struk..." : "Mohon tunggu, sedang mencetak invoice...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
 
-        let result;
-        if (type === "receipt") {
-          result = await window.printService.printReceipt(printData);
-        } else {
-          result = await window.printService.printInvoice(printData);
-        }
+    try {
+      // Try print service if available and online
+      if (window.printService && window.printService.isOnline) {
+        try {
+          // Prepare data for print service
+          const printData = this.preparePrintData(transaction);
 
-        if (result.success) {
-          console.log(`✅ ${type} printed via service:`, result.jobID);
-          try {
-            $("#printModal").modal("hide");
-          } catch (_) {}
-          return;
+          let result;
+          if (type === "receipt") {
+            result = await window.printService.printReceipt(printData);
+          } else {
+            result = await window.printService.printInvoice(printData);
+          }
+
+          if (result.success) {
+            console.log(`✅ ${type} printed via service:`, result.jobID);
+            try {
+              $("#printModal").modal("hide");
+            } catch (_) {}
+            return;
+          }
+        } catch (error) {
+          console.error("❌ Print service error, falling back to browser:", error);
         }
-      } catch (error) {
-        console.error("❌ Print service error, falling back to browser:", error);
       }
-    }
 
-    // Fallback: gunakan window.open untuk struk atau invoice biasa (single)
-    console.log("📄 Using browser print (fallback)");
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
+      // Fallback: gunakan window.open untuk struk atau invoice biasa (single)
+      Swal.close();
+      console.log("📄 Using browser print (fallback)");
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
+      }
+      const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } finally {
+      this.isPrinting = false;
+      Swal.close();
     }
-    const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
-    printWindow.document.write(html);
-    printWindow.document.close();
   }
 
   // Prepare print data for print service
@@ -2186,35 +2209,41 @@ class OptimizedDataPenjualanApp {
 
   // Cetak invoice per item (khusus penjualan manual > 1 item)
   async printInvoicePerItem(transaction) {
-    console.log("🖨️ === DEBUG: printInvoicePerItem called (dataPenjualan) ===");
-    console.log("  - Transaction ID:", transaction.id);
-    console.log("  - Transaction items:", transaction.items);
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
 
     if (!transaction?.items || transaction.items.length === 0) {
-      console.error("  ❌ No items found!");
+      this.isPrinting = false;
       return utils.showAlert("Tidak ada item untuk dicetak.", "Info", "info");
     }
 
     const items = transaction.items;
-    console.log(`📋 Transaction has ${items.length} items`);
 
     // Fallback jika hanya 1 item - just print directly without recursion
     if (items.length <= 1) {
+      this.isPrinting = false;
       return this.printInvoicePerItemBrowser(transaction);
     }
 
     // Try print service first
     if (!window.printService) {
       console.warn("Print service not initialized, using browser fallback");
+      this.isPrinting = false;
       return this.printInvoicePerItemBrowser(transaction);
     }
 
-    // ✅ REMOVED: Anti-reload protection not needed with simple sequential approach
-    // utils.liveServerProtection.activate();
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: `Mohon tunggu, sedang mencetak ${items.length} invoice...`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
 
     try {
-      utils.showLoading(true);
-
       // Get timestamp and format date/time
       const printData = this.preparePrintData(transaction);
       const tanggal = printData.tanggal.split(" ")[0]; // Get date part
@@ -2280,7 +2309,7 @@ class OptimizedDataPenjualanApp {
         }
       }
 
-      utils.showLoading(false);
+      Swal.close();
 
       if (printedCount > 0) {
         let message = "";
@@ -2305,7 +2334,7 @@ class OptimizedDataPenjualanApp {
       return;
     } catch (error) {
       console.error("Print service error:", error.message);
-      utils.showLoading(false);
+      Swal.close();
 
       // Ask user if they want to use browser fallback
       const useFallback = await utils.showConfirm(
@@ -2314,11 +2343,12 @@ class OptimizedDataPenjualanApp {
       );
 
       if (useFallback) {
+        Swal.close();
         return this.printInvoicePerItemBrowser(transaction);
       }
     } finally {
-      // ✅ REMOVED: Anti-reload protection not needed
-      // utils.liveServerProtection.deactivate();
+      this.isPrinting = false;
+      Swal.close();
     }
   }
 
