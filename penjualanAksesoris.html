@@ -216,6 +216,35 @@
         font-size: 0.875em;
         color: #dc3545;
       }
+
+      /* Print Service Status Indicator */
+      .print-service-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-left: 1rem;
+        transition: all 0.3s ease;
+      }
+
+      .print-service-status.online {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        border: 1px solid #badbcc;
+      }
+
+      .print-service-status.offline {
+        background-color: #fff3cd;
+        color: #997404;
+        border: 1px solid #ffe69c;
+      }
+
+      .print-service-status i {
+        font-size: 1rem;
+      }
     </style>
     <title>Penjualan - Melati Gold Shop</title>
   </head>
@@ -272,6 +301,13 @@
                 <li class="breadcrumb-item active" aria-current="page">Penjualan</li>
               </ol>
             </nav>
+          </div>
+
+          <!-- Print Service Status Indicator -->
+          <div id="printServiceStatus" class="alert alert-dismissible fade show" role="alert" style="display: none">
+            <i class="fas fa-print me-2"></i>
+            <span id="printServiceStatusText"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
 
           <div class="content-wrapper">
@@ -850,6 +886,7 @@
     </div>
     <script src="js/sidebar-loader.js"></script>
     <script src="js/pages/staffHelper.js"></script>
+    <script src="js/services/print-service.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/pages/penjualanAksesoris.js"></script>
   </body>
