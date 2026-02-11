@@ -41,7 +41,31 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 };
 
-// Middleware
+// Middleware untuk Chrome Private Network Access
+// Fix CORS block dari HTTPS → HTTP localhost
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Set CORS headers
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  // Chrome Private Network Access headers
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    res.status(200).end();
+    return;
+  }
+
+  next();
+});
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // Preflight requests
 app.use(bodyParser.json({ limit: "10mb" }));

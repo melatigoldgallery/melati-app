@@ -17,10 +17,41 @@ Automated printing service untuk Melati App yang menangani pencetakan thermal re
 
 - Windows 10/11
 - Node.js 16+ ([Download](https://nodejs.org/))
+- **Google Chrome** ATAU **Microsoft Edge** (untuk generate PDF)
 - Printer thermal (80mm) untuk receipt
 - Printer A4 (inkjet/laser) untuk invoice
 
+### 🌐 Browser Requirement
+
+Service ini memerlukan browser berbasis Chromium untuk generate PDF:
+
+- ✅ **Google Chrome** (Recommended) - [Download](https://www.google.com/chrome/)
+- ✅ **Microsoft Edge** (Biasanya sudah terinstall di Windows 10/11)
+- ✅ **Chromium via Puppeteer** (Fallback jika tidak ada Chrome/Edge)
+
 ## 🚀 Quick Start
+
+### For New Device Setup
+
+```bash
+# 1. Test browser compatibility FIRST
+npm run test:browser
+# atau double-click: test-browser.bat
+
+# 2. If test passed, install dependencies
+npm install
+
+# 3. Configure printers
+notepad config\printer-config.json
+
+# 4. Start service
+npm start
+
+# 5. Test endpoint
+curl http://localhost:3001/api/health
+```
+
+### For Existing Installation
 
 ```powershell
 # 1. Klik kanan → Run as Administrator
@@ -42,14 +73,54 @@ curl http://localhost:3001/api/health
 
 **[📘 INSTALL.md](INSTALL.md)** - Panduan instalasi lengkap step-by-step
 
+**[🚀 DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)** - Panduan deploy ke multiple devices
+
+**[✅ DEVICE_SETUP_CHECKLIST.md](DEVICE_SETUP_CHECKLIST.md)** - Checklist untuk setiap device baru
+
 Berisi:
 
 - Instalasi detail untuk komputer baru
 - Deploy ke multiple PC
+- Browser compatibility test
 - Konfigurasi printer
 - Troubleshooting lengkap
 - Management commands
 - Best practices
+
+## 🧪 Testing
+
+### Test Browser Compatibility
+
+Sebelum deploy ke device baru, **WAJIB** jalankan test ini:
+
+```bash
+# Via npm
+npm run test:browser
+
+# Atau via batch file
+test-browser.bat
+
+# Atau langsung
+node test-browser.js
+```
+
+Test ini akan:
+
+- ✅ Detect Chrome/Edge installation
+- ✅ Launch Puppeteer browser
+- ✅ Generate test PDF
+- ✅ Verify all requirements met
+
+**Expected Output:**
+
+```
+✅ Chrome found at: C:\Program Files\Google\Chrome\Application\chrome.exe
+✅ Browser launched successfully!
+✅ PDF generated successfully
+✅ ALL TESTS PASSED!
+```
+
+**Jika test GAGAL, service TIDAK akan bisa print invoice!**
 
 ## ⚙️ Konfigurasi
 

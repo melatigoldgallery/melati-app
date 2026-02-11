@@ -118,10 +118,62 @@ class ServisPrinter {
   }
 
   async generatePDF(html, pageSize) {
-    const browser = await puppeteer.launch({
+    // 🔍 Find Chrome/Edge from system
+    const launchOptions = {
       headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    };
+
+    // Try Chrome paths
+    const chromePaths = [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      process.env.LOCALAPPDATA + "\\Google\\Chrome\\Application\\chrome.exe",
+      process.env.PROGRAMFILES + "\\Google\\Chrome\\Application\\chrome.exe",
+    ];
+
+    let browserFound = false;
+    for (const chromePath of chromePaths) {
+      try {
+        const fs = require("fs");
+        if (fs.existsSync(chromePath)) {
+          launchOptions.executablePath = chromePath;
+          logger.info(`Found Chrome at: ${chromePath}`);
+          browserFound = true;
+          break;
+        }
+      } catch (err) {
+        // Continue to next path
+      }
+    }
+
+    // Try Edge if Chrome not found
+    if (!browserFound) {
+      const edgePaths = [
+        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+        "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      ];
+
+      for (const edgePath of edgePaths) {
+        try {
+          const fs = require("fs");
+          if (fs.existsSync(edgePath)) {
+            launchOptions.executablePath = edgePath;
+            logger.info(`Found Edge at: ${edgePath}`);
+            browserFound = true;
+            break;
+          }
+        } catch (err) {
+          // Continue
+        }
+      }
+    }
+
+    if (!browserFound) {
+      logger.warn("Chrome/Edge not found, using Puppeteer's bundled Chromium");
+    }
+
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
       const page = await browser.newPage();

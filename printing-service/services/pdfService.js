@@ -34,20 +34,88 @@ class PDFService {
 
   /**
    * Initialize Puppeteer browser
+   * Fallback strategy:
+   * 1. Try Chrome from system paths
+   * 2. Try Chromium bundled with Puppeteer
+   * 3. Try Microsoft Edge (Chromium-based)
    */
   async init() {
     try {
       if (!this.browser) {
         logger.info("Initializing Puppeteer browser...");
-        this.browser = await puppeteer.launch({
+
+        const launchOptions = {
           headless: "new",
           args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-        });
-        logger.info("✅ Puppeteer browser initialized");
+        };
+
+        // 🔍 STEP 1: Try Chrome from system
+        const chromePaths = [
+          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+          process.env.LOCALAPPDATA + "\\Google\\Chrome\\Application\\chrome.exe",
+          process.env.PROGRAMFILES + "\\Google\\Chrome\\Application\\chrome.exe",
+        ];
+
+        let chromeFound = false;
+        for (const chromePath of chromePaths) {
+          try {
+            const fs = require("fs");
+            if (fs.existsSync(chromePath)) {
+              launchOptions.executablePath = chromePath;
+              logger.info(`✅ Found Chrome at: ${chromePath}`);
+              chromeFound = true;
+              break;
+            }
+          } catch (err) {
+            // Continue to next path
+          }
+        }
+
+        // 🔍 STEP 2: If Chrome not found, try Edge (Chromium-based)
+        if (!chromeFound) {
+          const edgePaths = [
+            "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+            "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+          ];
+
+          for (const edgePath of edgePaths) {
+            try {
+              const fs = require("fs");
+              if (fs.existsSync(edgePath)) {
+                launchOptions.executablePath = edgePath;
+                logger.info(`✅ Found Edge (Chromium) at: ${edgePath}`);
+                chromeFound = true;
+                break;
+              }
+            } catch (err) {
+              // Continue
+            }
+          }
+        }
+
+        // 🔍 STEP 3: If still not found, let Puppeteer use bundled Chromium (if available)
+        if (!chromeFound) {
+          logger.warn("⚠️ Chrome/Edge not found in system. Attempting to use Puppeteer's bundled Chromium...");
+          logger.warn(
+            "💡 If this fails, please install Google Chrome or run: cd printing-service && npm install puppeteer",
+          );
+          // Don't set executablePath, let Puppeteer use default
+        }
+
+        this.browser = await puppeteer.launch(launchOptions);
+        logger.info("✅ Puppeteer browser initialized successfully");
       }
     } catch (error) {
-      logger.error("Failed to initialize Puppeteer:", error);
-      throw error;
+      logger.error("❌ Failed to initialize Puppeteer browser");
+      logger.error("Error details:", error.message);
+      logger.error("");
+      logger.error("🔧 TROUBLESHOOTING:");
+      logger.error("   1. Install Google Chrome: https://www.google.com/chrome/");
+      logger.error("   2. OR install Puppeteer with Chromium: cd printing-service && npm install puppeteer");
+      logger.error("   3. Restart the print service after installation");
+      logger.error("");
+      throw new Error(`Browser initialization failed: ${error.message}`);
     }
   }
 
