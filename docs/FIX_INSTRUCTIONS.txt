@@ -1,0 +1,182 @@
+🔧 INSTRUKSI PERBAIKAN CORS - DEVICE YANG BERMASALAH
+================================================================
+
+MASALAH TERIDENTIFIKASI:
+❌ CORS blocking dari Chrome Private Network Access policy
+❌ Error: "Access to fetch at 'http://localhost:3001/api/health' blocked"
+
+PENYEBAB:
+Chrome versi terbaru memblok akses dari HTTPS (GitHub Pages) ke HTTP localhost
+sebagai security measure.
+
+================================================================
+LANGKAH PERBAIKAN - IKUTI DENGAN TELITI
+================================================================
+
+STEP 1: UPDATE CODE
+-------------------
+Di device yang bermasalah, jalankan:
+
+Option A - Jika pakai Git:
+  git pull
+
+Option B - Jika manual copy:
+  1. Copy file terbaru dari device yang working:
+     - printing-service/server.js
+     - js/services/print-service.js
+     - printing-service/restart-service.bat
+  
+  2. Pastikan semua file tercopy dengan benar
+
+
+STEP 2: RESTART SERVICE
+-----------------------
+Pilih salah satu cara:
+
+Cara 1 (Paling Mudah):
+  - Double-click file: printing-service/restart-service.bat
+  
+Cara 2 (Manual):
+  1. Buka PowerShell
+  2. Jalankan:
+     cd D:\sistemAntrian\melati-app\printing-service
+     
+     # Stop service lama
+     netstat -ano | findstr :3001
+     taskkill /PID <PID> /F
+     
+     # Start service baru
+     node server.js
+
+
+STEP 3: VERIFY FIX
+------------------
+1. Test service running:
+   - Buka PowerShell
+   - Jalankan: curl http://localhost:3001/api/health
+   - Expected: {"status":"ok", ...}
+
+2. Test dari browser:
+   - Buka aplikasi (GitHub Pages URL)
+   - Tekan F12 (DevTools)
+   - Go to Console tab
+   - Cari: "✅ Print service online"
+   - TIDAK ADA CORS error lagi
+
+3. Test print:
+   - Coba print receipt atau invoice
+   - Harus keluar tanpa error
+
+
+================================================================
+JIKA MASIH ADA MASALAH
+================================================================
+
+TROUBLESHOOTING CHECKLIST:
+
+□ Service benar-benar running?
+  Check: curl http://localhost:3001/api/health
+  
+□ Code sudah update?
+  Check: printing-service/server.js harus ada baris:
+  "Access-Control-Allow-Private-Network"
+  
+□ Browser cache sudah di-clear?
+  Tekan: Ctrl + Shift + R (hard refresh)
+  
+□ Chrome version berapa?
+  Check: chrome://settings/help
+  Jika versi 117+, policy lebih ketat
+  
+□ Windows Firewall blocking?
+  Check: Windows Firewall settings
+  Allow: Node.js
+  Allow: Port 3001
+
+
+QUICK FIX TEMPORARY (Untuk Testing):
+------------------------------------
+Jika urgent dan belum bisa fix permanent:
+
+1. Chrome → chrome://flags/
+2. Search: "block-insecure-private-network-requests"
+3. Set to: Disabled
+4. Restart Chrome
+
+⚠️ WARNING: Ini hanya untuk testing!
+   Security akan berkurang, jangan pakai permanent!
+
+
+================================================================
+EXPECTED RESULT SETELAH FIX
+================================================================
+
+✅ Service running: http://localhost:3001
+✅ Browser console: "✅ Print service online"
+✅ No CORS error di console
+✅ Print berfungsi normal
+✅ Response header include: Access-Control-Allow-Private-Network: true
+
+
+================================================================
+CONTACT & SUPPORT
+================================================================
+
+Jika semua langkah sudah diikuti tapi masih error:
+
+1. Screenshot FULL console error
+2. Screenshot Network tab (F12 → Network)
+3. Copy isi file: printing-service/logs/error.log
+4. Share ke IT support / developer
+
+
+================================================================
+FILES YANG SUDAH DIUPDATE (Reference)
+================================================================
+
+1. printing-service/server.js
+   - Added: Access-Control-Allow-Private-Network header
+   - Added: Enhanced CORS middleware
+
+2. js/services/print-service.js
+   - Added: Better CORS error detection
+   - Added: Helpful troubleshooting messages
+   - Increased timeout: 3s → 5s
+
+3. printing-service/restart-service.bat (NEW)
+   - Auto restart script
+
+4. printing-service/CORS_FIX.md (NEW)
+   - Detailed documentation
+
+
+================================================================
+QUICK COMMAND REFERENCE
+================================================================
+
+# Check service status
+curl http://localhost:3001/api/health
+
+# Check port usage
+netstat -ano | findstr :3001
+
+# Kill process on port
+taskkill /PID <PID> /F
+
+# Start service
+cd printing-service
+node server.js
+
+# Check logs
+notepad printing-service\logs\error.log
+
+# Browser test
+npm run test:browser
+
+
+================================================================
+ESTIMATED FIX TIME: 5-10 MINUTES
+================================================================
+
+Ikuti step by step, don't skip any step!
+Good luck! 🚀

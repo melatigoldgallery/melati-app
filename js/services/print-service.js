@@ -54,13 +54,17 @@ class PrintService {
   async checkServiceStatus() {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Increase timeout
 
       const response = await fetch(`${this.serviceURL}/health`, {
         method: "GET",
         signal: controller.signal,
         mode: "cors",
         credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
       });
 
       clearTimeout(timeoutId);
@@ -76,7 +80,11 @@ class PrintService {
       return this.isOnline;
     } catch (error) {
       if (error.name === "AbortError") {
-        console.warn("⚠️ Print service timeout");
+        console.warn("⚠️ Print service timeout (service may be starting...)");
+      } else if (error.message.includes("CORS") || error.message.includes("loopback")) {
+        console.error("❌ CORS blocked - Chrome Private Network Access policy");
+        console.error("🔧 Fix: Add 'Access-Control-Allow-Private-Network: true' header to print service");
+        console.error("📖 Docs: https://developer.chrome.com/blog/private-network-access-preflight/");
       } else {
         console.warn("⚠️ Print service offline:", error.message);
       }
