@@ -38,16 +38,27 @@ async function filterMenuByPermissions() {
       // Desktop: Show all menus first, then hide restricted ones
       showAllMenus();
       hideMenu("maintenance");
-      hideSupervisorSubmenu();
-      // Hide setting menu (only for Super Admin)
-      const settingMenu = document.querySelector(".setting-menu");
-      if (settingMenu) settingMenu.style.display = "none";
     }
+    // Hide supervisor submenu (only for supervisor username)
+    hideSupervisorSubmenu();
+    // Hide Kelola Sales menu (only for supervisor username)
+    hideKelolaSalesMenu();
+    // Hide setting menu (only for Super Admin)
+    const settingMenu = document.querySelector(".setting-menu");
+    if (settingMenu) settingMenu.style.display = "none";
     return;
   }
 
   // Staff: Filter by permissions
   if (currentUser.role === "staf") {
+    // Always hide supervisor submenu for staff
+    hideSupervisorSubmenu();
+    // Hide Kelola Sales menu for staff
+    hideKelolaSalesMenu();
+    // Hide setting menu for staff
+    const settingMenu = document.querySelector(".setting-menu");
+    if (settingMenu) settingMenu.style.display = "none";
+
     if (currentUser.permissions) {
       filterStaffMenus(currentUser.permissions);
     } else {
@@ -56,8 +67,12 @@ async function filterMenuByPermissions() {
     return;
   }
 
-  // Default: Only dashboard
+  // Default: Only dashboard and hide supervisor submenu
   hideAllMenusExcept(["dashboard"]);
+  hideSupervisorSubmenu();
+  hideKelolaSalesMenu();
+  const settingMenu = document.querySelector(".setting-menu");
+  if (settingMenu) settingMenu.style.display = "none";
 }
 
 // Show setting menu
@@ -81,6 +96,14 @@ function hideSupervisorSubmenu() {
   const supervisorToggle = document.querySelector(".supervisor-toggle");
   if (supervisorToggle) {
     supervisorToggle.closest(".nav-item").style.display = "none";
+  }
+}
+
+// Hide Kelola Sales menu
+function hideKelolaSalesMenu() {
+  const kelolaSalesLink = document.querySelector('a[href="kelolaSales.html"]');
+  if (kelolaSalesLink) {
+    kelolaSalesLink.closest(".nav-item").style.display = "none";
   }
 }
 
@@ -132,16 +155,7 @@ function hideMenu(menuName) {
 
 // Show all menus (except maintenance by default)
 function showAllMenus() {
-  const allMenus = [
-    "dashboard",
-    "inventory-barang",
-    "layanan",
-    "aksesoris",
-    "antrian",
-    "absensi",
-    "servis",
-    "promosi",
-  ];
+  const allMenus = ["dashboard", "inventory-barang", "layanan", "aksesoris", "antrian", "absensi", "servis", "promosi"];
 
   allMenus.forEach((menu) => {
     showMenu(menu);

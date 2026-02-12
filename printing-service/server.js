@@ -241,8 +241,8 @@ app.use((req, res) => {
 // Start server
 app.listen(PORT, () => {
   logger.info("=".repeat(50));
-  logger.info("🖨️  Melati Print Service Started");
   logger.info("🖨️  Program Print Otomatis Melati App - Jangan Ditutup!");
+  logger.info("🖨️  Melati Print Service Started");
   logger.info(`📡 Server running on http://localhost:${PORT}`);
   logger.info(`📋 API Endpoints:`);
   logger.info(`   GET  /api/health            - Health check`);
