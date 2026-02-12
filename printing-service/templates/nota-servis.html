@@ -29,7 +29,7 @@
         position: absolute;
         top: 4.5cm;
         left: 0.5cm;
-        right: 0.5cm;
+        right: -0.5cm;
       }
       table {
         width: 100%;
@@ -58,7 +58,7 @@
         width: 50px;
       }
       td:nth-child(6) {
-        width: 70px;
+        width: 90px;
       }
       .signature-section {
         position: absolute;
@@ -100,7 +100,7 @@
           {{#each items}}
           <tr>
             <td>{{jumlah}} pcs</td>
-            <td>{{namaBarang}}{{#if rincianServis}} - {{rincianServis}}{{/if}} [{{statusLabel}}]</td>
+            <td>{{namaBarang}}{{#if rincianServis}} - {{rincianServis}}{{/if}} [{{statusLabel statusPembayaran}}]</td>
             <td>{{berat}}</td>
             <td>{{karat}}</td>
             <td style="text-align: center">{{formatRupiah ongkos}}</td>

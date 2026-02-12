@@ -19,10 +19,10 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     const allowedOrigins = [
-      "https://melatigoldgallery.github.io", // ⚠️ GANTI dengan GitHub Pages URL Anda!
-      "http://localhost:8080", // Local development
+      "https://melatigoldgallery.github.io", 
+      "http://localhost:8080",
       "http://127.0.0.1:8080",
-      "http://localhost:5500", // Live Server VSCode
+      "http://localhost:5500", 
       "http://127.0.0.1:5500",
       "http://localhost:5501",
       "http://127.0.0.1:5501",
@@ -242,6 +242,7 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   logger.info("=".repeat(50));
   logger.info("🖨️  Melati Print Service Started");
+  logger.info("🖨️  Program Print Otomatis Melati App - Jangan Ditutup!");
   logger.info(`📡 Server running on http://localhost:${PORT}`);
   logger.info(`📋 API Endpoints:`);
   logger.info(`   GET  /api/health            - Health check`);
