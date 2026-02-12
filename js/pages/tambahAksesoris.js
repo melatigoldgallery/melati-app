@@ -900,17 +900,6 @@ export const aksesorisSaleHandler = {
 
       const tanggalInput = document.getElementById("tanggal").value;
 
-      // ✅ FIX: Konversi format dd/mm/yyyy ke ISO string
-      let tanggalISO;
-      if (tanggalInput) {
-        const parts = tanggalInput.split("/");
-        if (parts.length === 3) {
-          // parts[0] = day, parts[1] = month, parts[2] = year
-          const date = new Date(parts[2], parts[1] - 1, parts[0]);
-          tanggalISO = date.toISOString();
-        }
-      }
-
       const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
       const salesName = currentUser.username || "System";
 
@@ -923,7 +912,7 @@ export const aksesorisSaleHandler = {
           jumlah: parseInt(item.jumlah) || 0,
           keterangan: `Tambah stok: ${item.nama}`,
           sales: salesName,
-          tanggal: tanggalISO, // ✅ Kirim ISO format
+          tanggal: tanggalInput, // ✅ Simpan format dd/mm/yyyy langsung
         });
       }
 
@@ -1247,24 +1236,29 @@ export const aksesorisSaleHandler = {
         return;
       }
 
-      const startParts = filterDateStart.value.split("/");
-      const endParts = filterDateEnd.value.split("/");
+      // Helper function to normalize date format (d/m/yyyy or dd/mm/yyyy → dd/mm/yyyy)
+      const normalizeDate = (dateStr) => {
+        const parts = dateStr.split("/");
+        if (parts.length !== 3) return dateStr;
 
-      if (startParts.length !== 3 || endParts.length !== 3) {
+        const day = parts[0].padStart(2, "0");
+        const month = parts[1].padStart(2, "0");
+        const year = parts[2];
+
+        return `${day}/${month}/${year}`;
+      };
+
+      const startDateStr = normalizeDate(filterDateStart.value);
+      const endDateStr = normalizeDate(filterDateEnd.value);
+
+      // Validate format (flexible - accepts d/m/yyyy or dd/mm/yyyy)
+      const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+      if (!datePattern.test(filterDateStart.value) || !datePattern.test(filterDateEnd.value)) {
         throw new Error("Format tanggal tidak valid");
       }
 
-      const startDate = new Date(startParts[2], startParts[1] - 1, startParts[0]);
-      const endDate = new Date(endParts[2], endParts[1] - 1, endParts[0]);
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        throw new Error("Tanggal tidak valid");
-      }
-
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-
       // Create cache key
-      const cacheKey = `stockAdditionHistory_${filterDateStart.value}_${filterDateEnd.value}`;
+      const cacheKey = `stockAdditionHistory_${startDateStr}_${endDateStr}`;
 
       const cachedData = getCacheWithValidation(cacheKey);
       if (cachedData) {
@@ -1273,21 +1267,45 @@ export const aksesorisSaleHandler = {
         return;
       }
 
-      // ✅ Query dari stokAksesorisTransaksi dengan filter jenis stockAddition
+      // ✅ Query semua data stockAddition, filter by tanggal string di client-side
       const transactionsRef = collection(firestore, "stokAksesorisTransaksi");
-      const q = query(
-        transactionsRef,
-        where("jenis", "==", "stockAddition"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate)),
-        orderBy("timestamp", "desc"),
-      );
+      const q = query(transactionsRef, where("jenis", "==", "stockAddition"), orderBy("timestamp", "desc"));
 
       const snapshot = await getDocs(q);
       const historyData = [];
 
+      // Helper function untuk compare tanggal string (dd/mm/yyyy)
+      const isDateInRange = (dateStr, startStr, endStr) => {
+        if (!dateStr || dateStr === "-") return false;
+
+        // Normalize input tanggal juga
+        const normalizedDate = normalizeDate(dateStr);
+
+        // Convert dd/mm/yyyy → yyyymmdd untuk comparison
+        const toComparable = (str) => {
+          const parts = str.split("/");
+          if (parts.length !== 3) return "";
+          // parts sudah normalized, tapi tetap pastikan
+          const d = parts[0].padStart(2, "0");
+          const m = parts[1].padStart(2, "0");
+          const y = parts[2];
+          return y + m + d;
+        };
+
+        const date = toComparable(normalizedDate);
+        const start = toComparable(startStr);
+        const end = toComparable(endStr);
+
+        return date && start && end && date >= start && date <= end;
+      };
+
       snapshot.forEach((doc) => {
         const data = doc.data();
+
+        // ✅ Filter by tanggal string - zero timezone issues!
+        if (!isDateInRange(data.tanggal, startDateStr, endDateStr)) {
+          return; // Skip data di luar range
+        }
 
         // Determine kategori untuk jenisText
         let jenisText = "Lainnya";

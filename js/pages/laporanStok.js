@@ -354,6 +354,7 @@ class OptimizedStockReport {
   setDefaultDates() {
     const today = new Date();
     document.getElementById("startDate").value = this.formatDate(today);
+    document.getElementById("endDate").value = this.formatDate(today);
   }
 
   // Initialize DataTable
@@ -432,12 +433,39 @@ class OptimizedStockReport {
         }
       });
     }
+
+    // Auto-fill end date when start date changes (if end date is empty)
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
+    if (startDateInput && endDateInput) {
+      startDateInput.addEventListener("change", () => {
+        const startValue = startDateInput.value;
+        const endValue = endDateInput.value;
+
+        // Auto-fill end date if empty or if end date < start date
+        if (!endValue || endValue < startValue) {
+          endDateInput.value = startValue;
+        }
+      });
+
+      // Validate end date is not before start date
+      endDateInput.addEventListener("change", () => {
+        const startValue = startDateInput.value;
+        const endValue = endDateInput.value;
+
+        if (endValue && startValue && endValue < startValue) {
+          this.showError("Tanggal akhir tidak boleh lebih kecil dari tanggal awal");
+          endDateInput.value = startValue;
+        }
+      });
+    }
   }
 
   // Reset filters
   resetFilters() {
     const today = new Date();
     document.getElementById("startDate").value = this.formatDate(today);
+    document.getElementById("endDate").value = this.formatDate(today);
     this.loadAndFilterStockData();
   }
 
@@ -491,18 +519,42 @@ class OptimizedStockReport {
       this.showLoading(true);
 
       const startDateStr = document.getElementById("startDate").value;
+      const endDateStr = document.getElementById("endDate").value;
+
       if (!startDateStr) {
-        this.showError("Tanggal harus diisi");
+        this.showError("Tanggal awal harus diisi");
         return;
       }
 
-      const selectedDate = this.parseDate(startDateStr);
-      if (!selectedDate) {
-        this.showError("Format tanggal tidak valid");
+      const startDate = this.parseDate(startDateStr);
+      if (!startDate) {
+        this.showError("Format tanggal awal tidak valid");
         return;
       }
+
+      // Check if range mode
+      if (endDateStr && endDateStr !== startDateStr) {
+        const endDate = this.parseDate(endDateStr);
+
+        if (!endDate) {
+          this.showError("Format tanggal akhir tidak valid");
+          return;
+        }
+
+        if (startDate > endDate) {
+          this.showError("Tanggal awal tidak boleh lebih besar dari tanggal akhir");
+          return;
+        }
+
+        // Range mode
+        return this.loadAndFilterStockDataRange(startDate, endDate);
+      }
+
+      // Single date mode (existing logic)
+      const selectedDate = startDate;
 
       this.currentSelectedDate = selectedDate;
+      this.currentDateRange = null; // Clear range info for single date mode
 
       // Setup real-time listener for today's data
       this.setupRealtimeListener(selectedDate);
@@ -547,6 +599,190 @@ class OptimizedStockReport {
       this.showError("Terjadi kesalahan saat memuat data: " + error.message);
     } finally {
       this.showLoading(false);
+    }
+  }
+
+  // Load and filter stock data for date range (OPSI 1: Aggregate Query Range)
+  async loadAndFilterStockDataRange(startDate, endDate) {
+    try {
+      this.showLoading(true);
+
+      // Store range info for table title
+      this.currentDateRange = {
+        start: startDate,
+        end: endDate,
+      };
+
+      // Load master data
+      await this.loadStockMasterData(false);
+
+      // Calculate stock for range
+      await this.calculateStockForDateRange(startDate, endDate);
+
+      // Render table with range title
+      this.renderStockTable();
+      this.isDataLoaded = true;
+
+      console.log(`✅ Loaded stock data for range: ${this.formatDate(startDate)} - ${this.formatDate(endDate)}`);
+    } catch (error) {
+      this.showError("Terjadi kesalahan: " + error.message);
+      console.error("Error loadAndFilterStockDataRange:", error);
+    } finally {
+      this.showLoading(false);
+    }
+  }
+
+  // Calculate stock for date range (OPSI 1: Single query + client-side aggregation)
+  async calculateStockForDateRange(startDate, endDate) {
+    try {
+      console.log(`📊 Calculating stock for range: ${this.formatDate(startDate)} - ${this.formatDate(endDate)}`);
+
+      // 1. Get Stok Awal from startDate (beginning of day)
+      const stokAwalMap = await this.getStokAwal(startDate);
+      console.log(`✅ Got stok awal for ${stokAwalMap.size} items`);
+
+      // 2. Get transactions in range [startDate 00:00 - endDate 23:59]
+      const startOfDay = new Date(startDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const transactions = await getDocs(
+        query(
+          collection(firestore, "stokAksesorisTransaksi"),
+          where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
+          where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+          orderBy("timestamp", "asc"),
+        ),
+      );
+
+      console.log(`✅ Fetched ${transactions.size} transactions in range`);
+
+      // 3. Aggregate transactions by kode
+      const aggregateMap = new Map();
+
+      transactions.forEach((doc) => {
+        const data = doc.data();
+        const kode = data.kode;
+        const jumlah = data.jumlah || 0;
+        const jenis = data.jenis;
+
+        if (!aggregateMap.has(kode)) {
+          aggregateMap.set(kode, {
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            return: 0,
+          });
+        }
+
+        const agg = aggregateMap.get(kode);
+
+        switch (jenis) {
+          case "tambah":
+          case "stockAddition":
+          case "initialStock":
+            agg.tambahStok += jumlah;
+            break;
+          case "laku":
+            agg.laku += jumlah;
+            break;
+          case "free":
+            agg.free += jumlah;
+            break;
+          case "gantiLock":
+            agg.gantiLock += jumlah;
+            break;
+          case "return":
+            agg.return += jumlah;
+            break;
+        }
+      });
+
+      console.log(`✅ Aggregated transactions for ${aggregateMap.size} unique kode`);
+
+      // 4. Combine with master data and calculate Stok Akhir
+      this.filteredStockData = this.stockData.map((item) => {
+        const kode = item.kode;
+        const stokAwal = stokAwalMap.get(kode) || 0;
+        const agg = aggregateMap.get(kode) || {
+          tambahStok: 0,
+          laku: 0,
+          free: 0,
+          gantiLock: 0,
+          return: 0,
+        };
+
+        const stokAkhir = Math.max(0, stokAwal + agg.tambahStok - agg.laku - agg.free - agg.gantiLock - agg.return);
+
+        // ✅ FIX: Preserve ALL fields from master data (including kadar, berat for silver)
+        return {
+          ...item, // Preserve all fields (kode, nama, kategori, kadar, berat, etc)
+          stokAwal: stokAwal,
+          tambahStok: agg.tambahStok,
+          laku: agg.laku,
+          free: agg.free,
+          gantiLock: agg.gantiLock,
+          return: agg.return,
+          stokAkhir: stokAkhir,
+        };
+      });
+
+      // Sort by kategori and kode
+      this.filteredStockData.sort((a, b) => {
+        if (a.kategori !== b.kategori) return a.kategori === "kotak" ? -1 : 1;
+        return a.kode.localeCompare(b.kode);
+      });
+
+      console.log(`✅ Final filtered data: ${this.filteredStockData.length} items`);
+    } catch (error) {
+      console.error("❌ Error calculateStockForDateRange:", error);
+      throw error;
+    }
+  }
+
+  // Get stok awal for a specific date (beginning of day)
+  async getStokAwal(date) {
+    try {
+      // 🔧 FIX: Untuk mendapatkan stok AWAL tanggal X, kita perlu stok AKHIR tanggal X-1
+      // Contoh: Stok awal 11 Feb = Stok akhir 10 Feb
+      const previousDate = new Date(date);
+      previousDate.setDate(previousDate.getDate() - 1);
+
+      // Try to get snapshot from PREVIOUS day
+      const snapshotMap = await this.getDailySnapshot(previousDate);
+
+      if (snapshotMap && snapshotMap.size > 0) {
+        // Snapshot exists for previous day, use its stokAkhir as our stokAwal
+        console.log(
+          `✅ Using snapshot from ${this.formatDate(previousDate)} for stok awal (${snapshotMap.size} items)`,
+        );
+        const stokMap = new Map();
+        snapshotMap.forEach((data, kode) => {
+          // snapshot's stokAwal field contains the stokAkhir from that day
+          stokMap.set(kode, data.stokAwal || 0);
+        });
+        return stokMap;
+      } else {
+        // No snapshot, calculate up to END of previous day
+        console.log(`⚠️ No snapshot found for ${this.formatDate(previousDate)}, calculating from transactions`);
+        const endOfPreviousDay = new Date(date);
+        endOfPreviousDay.setDate(endOfPreviousDay.getDate() - 1);
+        endOfPreviousDay.setHours(23, 59, 59, 999);
+
+        // Calculate stock up to end of previous day
+        const kodeList = this.stockData.map((item) => item.kode);
+        const stockMap = await StockService.calculateAllStocksBatch(endOfPreviousDay, kodeList);
+
+        console.log(
+          `✅ Calculated stok awal from transactions up to ${this.formatDate(previousDate)} (${stockMap.size} items)`,
+        );
+        return stockMap;
+      }
+    } catch (error) {
+      console.error("❌ Error getStokAwal:", error);
+      throw error;
     }
   }
 
@@ -725,7 +961,7 @@ class OptimizedStockReport {
       // Process kotak data
       kotakSnapshot.forEach((doc) => {
         const data = doc.data();
-        const kodeItem = this.createKodeItem(data, "kotak");
+        const kodeItem = this.createKodeItem({ text: doc.id, nama: data.nama }, "kotak");
         kodeAksesorisData.push(kodeItem);
         this.mergeStockItem(kodeItem);
       });
@@ -733,7 +969,7 @@ class OptimizedStockReport {
       // Process aksesoris data
       aksesorisSnapshot.forEach((doc) => {
         const data = doc.data();
-        const kodeItem = this.createKodeItem(data, "aksesoris");
+        const kodeItem = this.createKodeItem({ text: doc.id, nama: data.nama }, "aksesoris");
         kodeAksesorisData.push(kodeItem);
         this.mergeStockItem(kodeItem);
       });
@@ -742,7 +978,10 @@ class OptimizedStockReport {
       silverSnapshot.forEach((doc) => {
         const data = doc.data();
         console.log("Silver doc data:", data); // Debug log
-        const kodeItem = this.createKodeItem(data, "silver");
+        const kodeItem = this.createKodeItem(
+          { text: doc.id, nama: data.nama, kadar: data.kadar, berat: data.berat },
+          "silver",
+        );
         console.log("Created kode item:", kodeItem); // Debug log
         kodeAksesorisData.push(kodeItem);
         this.mergeStockItem(kodeItem);
@@ -1204,14 +1443,30 @@ class OptimizedStockReport {
     const tableSilver = document.getElementById("tableSilverContainer");
     const tableTitle = document.getElementById("tableTitle");
 
+    // Build title with date range (if applicable)
+    let baseTitle = "";
+    let dateRangeStr = "";
+
+    if (this.currentDateRange) {
+      // Range mode
+      const startStr = this.formatDate(this.currentDateRange.start);
+      const endStr = this.formatDate(this.currentDateRange.end);
+      dateRangeStr = ` (${startStr} - ${endStr})`;
+    } else if (this.currentSelectedDate) {
+      // Single date mode
+      dateRangeStr = ` (${this.formatDate(this.currentSelectedDate)})`;
+    }
+
     if (jenisLaporan === "silver") {
       tableKotakAksesoris.style.display = "none";
       tableSilver.style.display = "block";
-      tableTitle.textContent = "Data Stok Silver";
+      baseTitle = "Data Stok Silver";
+      tableTitle.textContent = baseTitle + dateRangeStr;
     } else {
       tableKotakAksesoris.style.display = "block";
       tableSilver.style.display = "none";
-      tableTitle.textContent = "Data Stok Aksesoris";
+      baseTitle = "Data Stok Aksesoris";
+      tableTitle.textContent = baseTitle + dateRangeStr;
     }
   }
 
@@ -1229,6 +1484,9 @@ class OptimizedStockReport {
   // Render Kotak & Aksesoris Stock Table
   renderKotakAksesorisStockTable() {
     try {
+      // Update table title with date range
+      this.toggleTableView();
+
       // Destroy existing DataTable
       if ($.fn.DataTable.isDataTable("#stockTable")) {
         $("#stockTable").DataTable().destroy();
@@ -1281,8 +1539,7 @@ class OptimizedStockReport {
       tableBody.innerHTML = html;
 
       // Initialize DataTable
-      const selectedDateStr = document.getElementById("startDate").value;
-      this.initDataTableWithExport(selectedDateStr);
+      this.initDataTableWithExport();
     } catch (error) {
       this.showError("Terjadi kesalahan saat menampilkan data");
     }
@@ -1291,6 +1548,9 @@ class OptimizedStockReport {
   // Render Silver Stock Table with Weight
   renderSilverStockTable() {
     try {
+      // Update table title with date range
+      this.toggleTableView();
+
       // Destroy existing DataTable
       if ($.fn.DataTable.isDataTable("#silverStockTable")) {
         $("#silverStockTable").DataTable().destroy();
@@ -1414,6 +1674,8 @@ class OptimizedStockReport {
 
   // Initialize DataTable for Silver
   initSilverDataTable() {
+    const dateRangeStr = this.getExportDateRangeString();
+
     $("#silverStockTable").DataTable({
       responsive: true,
       dom: "Bfrtip",
@@ -1425,7 +1687,7 @@ class OptimizedStockReport {
           extend: "excel",
           text: '<i class="fas fa-file-excel me-2"></i>Excel',
           className: "btn btn-success btn-sm me-1",
-          title: "Laporan Stok Silver",
+          title: `Laporan Stok Silver - ${dateRangeStr}`,
           exportOptions: {
             format: {
               body: function (data, row, column, node) {
@@ -1450,12 +1712,7 @@ class OptimizedStockReport {
           extend: "pdf",
           text: '<i class="fas fa-file-pdf me-2"></i>PDF',
           className: "btn btn-danger btn-sm me-1",
-          title: function () {
-            const today = new Date();
-            const options = { day: "2-digit", month: "long", year: "numeric" };
-            const formattedDate = today.toLocaleDateString("id-ID", options);
-            return "Laporan Stok Silver\nMelati Gold Shop\n" + formattedDate;
-          },
+          title: `Laporan Stok Silver\nMelati Gold Shop\n${dateRangeStr}`,
           orientation: "portrait",
           pageSize: "A4",
           exportOptions: {
@@ -1559,7 +1816,9 @@ class OptimizedStockReport {
   }
 
   // Initialize DataTable with export - VERSI RINGKAS
-  initDataTableWithExport(selectedDate) {
+  initDataTableWithExport() {
+    const dateRangeStr = this.getExportDateRangeString();
+
     // Add simple inline styles
     const tableStyle = `
       <style id="stockTableStyle">
@@ -1594,17 +1853,30 @@ class OptimizedStockReport {
           text: '<i class="fas fa-file-excel me-2"></i>Excel',
           className: "btn btn-success btn-sm me-1",
           exportOptions: { columns: ":visible" },
-          title: `Laporan Stok Kotak & Aksesoris Melati Bawah (${selectedDate})`,
+          title: `Laporan Stok Kotak & Aksesoris Melati Bawah - ${dateRangeStr}`,
         },
         {
           extend: "pdf",
           text: '<i class="fas fa-file-pdf me-2"></i>PDF',
           className: "btn btn-danger btn-sm me-1",
           exportOptions: { columns: ":visible" },
-          title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n(${selectedDate})`,
+          title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n${dateRangeStr}`,
           customize: function (doc) {
             doc.defaultStyle.fontSize = 8;
             doc.styles.tableHeader.fontSize = 9;
+
+            // Style title - multi line dengan ukuran berbeda
+            const titleText = doc.content[0].text;
+            const titleLines = titleText.split("\n");
+            doc.content[0] = {
+              stack: [
+                { text: titleLines[0], fontSize: 14, bold: true },
+                { text: titleLines[1] || "", fontSize: 10, margin: [0, 2, 0, 0] },
+              ],
+              alignment: "center",
+              margin: [0, 0, 0, 10],
+            };
+
             doc.content[1].table.widths = ["5%", "9%", "30%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
             // Center align all columns except name column (3rd column)
             doc.content[1].table.body.forEach((row) => {
@@ -1927,6 +2199,54 @@ class OptimizedStockReport {
       date1.getUTCMonth() === date2.getUTCMonth() &&
       date1.getUTCDate() === date2.getUTCDate()
     );
+  }
+
+  // Format date to Indonesian format (e.g., "10 Februari 2026")
+  formatDateIndonesia(date) {
+    if (!date) return "";
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      if (isNaN(d.getTime())) return "";
+
+      const months = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+
+      const day = d.getUTCDate();
+      const month = months[d.getUTCMonth()];
+      const year = d.getUTCFullYear();
+
+      return `${day} ${month} ${year}`;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  // Get formatted date range string for export titles
+  getExportDateRangeString() {
+    if (this.currentDateRange) {
+      // Range mode
+      const startStr = this.formatDateIndonesia(this.currentDateRange.start);
+      const endStr = this.formatDateIndonesia(this.currentDateRange.end);
+      return `${startStr} - ${endStr}`;
+    } else if (this.currentSelectedDate) {
+      // Single date mode
+      return this.formatDateIndonesia(this.currentSelectedDate);
+    } else {
+      // Fallback to today
+      return this.formatDateIndonesia(new Date());
+    }
   }
 
   // 🚀 NEW METHOD: Batch calculation (99% faster than loop per kode!)

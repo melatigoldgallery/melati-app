@@ -1,4 +1,6 @@
 import { saveServisData, getServisByDate } from "../services/servis-service.js";
+import { firestore } from "../configFirebase.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Global variables
 let todayData = [];
@@ -9,6 +11,7 @@ let verifikasiAction = null;
 let verifikasiData = null;
 let editingRiwayatId = null;
 let filterJenisRiwayat = "servis";
+let passwordCache = null; // Cache untuk passwords dari Firestore
 
 // Global variables untuk detail barang
 let jenisInput = "servis";
@@ -122,9 +125,37 @@ async function showConfirmDialog(title, message, confirmText = "Ya, Hapus!") {
   });
 }
 
+// Load passwords from Firestore
+async function loadPasswords() {
+  try {
+    const docRef = doc(firestore, "settings", "passwords");
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      passwordCache = docSnap.data();
+      console.log("✅ Passwords loaded from Firestore for servis verification");
+    } else {
+      // Default fallback
+      passwordCache = {
+        editServis: "admin123",
+        deleteServis: "smlt116",
+      };
+      console.log("⚠️ Using default passwords for servis");
+    }
+  } catch (error) {
+    console.error("Error loading passwords:", error);
+    // Use defaults on error
+    passwordCache = {
+      editServis: "admin123",
+      deleteServis: "smlt116",
+    };
+  }
+}
+
 // Initialize page
 document.addEventListener("DOMContentLoaded", function () {
   initializePage();
+  loadPasswords(); // Load passwords from Firestore
   setupEventListeners();
 
   // Check print service availability
@@ -1152,13 +1183,27 @@ window.deleteRiwayatItem = async function (id, index) {
 async function handleVerifikasi() {
   const kode = document.getElementById("kodeVerifikasi").value;
 
-  if (kode !== "smlt116") {
-    showErrorAlert("Verifikasi Gagal!", "Kode verifikasi yang Anda masukkan salah");
-    document.getElementById("kodeVerifikasi").focus();
-    return;
-  }
-
   try {
+    // Load passwords dari Firestore
+    const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+    const passwords = settingsDoc.exists() ? settingsDoc.data() : passwordCache;
+
+    // Determine which password to use based on action
+    let correctPassword;
+    if (verifikasiAction === "edit") {
+      correctPassword = passwords?.editServis || "admin123";
+    } else if (verifikasiAction === "delete") {
+      correctPassword = passwords?.deleteServis || "smlt116";
+    } else {
+      showErrorAlert("Error!", "Action tidak dikenali");
+      return;
+    }
+
+    if (kode !== correctPassword) {
+      showErrorAlert("Verifikasi Gagal!", "Kode verifikasi yang Anda masukkan salah");
+      document.getElementById("kodeVerifikasi").focus();
+      return;
+    }
     if (verifikasiAction === "edit") {
       const item = todayData[verifikasiData.index];
       editingRiwayatId = verifikasiData.id;

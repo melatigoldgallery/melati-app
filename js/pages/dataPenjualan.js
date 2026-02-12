@@ -3,6 +3,7 @@ import {
   collection,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -325,6 +326,8 @@ class OptimizedDataPenjualanApp {
     this.currentListeningDate = null;
     this.currentDeleteAction = null;
     this.isPrinting = false; // ✅ Double-click prevention flag
+    this.pendingEditTransactionId = null; // ✅ NEW: For edit verification
+    this.passwordCache = null; // ✅ NEW: Cache passwords from Firestore
 
     // ✅ PERBAIKAN: Tambahkan properties untuk inactivity timer
     this.inactivityTimer = null;
@@ -441,6 +444,9 @@ class OptimizedDataPenjualanApp {
     // Load initial data
     await this.loadInitialData();
 
+    // ✅ NEW: Load passwords from Firestore
+    await this.loadPasswords();
+
     this.initDataTable();
     this.populateSalesFilter();
     this.loadFilterFromURL();
@@ -511,6 +517,31 @@ class OptimizedDataPenjualanApp {
     } catch (error) {
       console.error("Error loading from Firestore:", error);
       throw error;
+    }
+  }
+
+  // ✅ NEW: Load passwords dari Firestore
+  async loadPasswords() {
+    try {
+      const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+      if (settingsDoc.exists()) {
+        this.passwordCache = settingsDoc.data();
+        console.log("✅ Passwords loaded from Firestore");
+      } else {
+        // Default passwords jika belum ada
+        this.passwordCache = {
+          editDataPenjualan: "admin123",
+          deleteDataPenjualan: "smlt116",
+        };
+        console.log("⚠️ Using default passwords (Firestore not initialized)");
+      }
+    } catch (error) {
+      console.error("Error loading passwords:", error);
+      // Fallback ke default
+      this.passwordCache = {
+        editDataPenjualan: "admin123",
+        deleteDataPenjualan: "smlt116",
+      };
     }
   }
 
@@ -676,6 +707,26 @@ class OptimizedDataPenjualanApp {
       btnConfirmDelete.addEventListener("click", (e) => {
         e.preventDefault();
         this.confirmDeleteTransaction();
+      });
+    }
+
+    // ✅ NEW: Event listener untuk verifikasi edit
+    const btnVerifikasiEdit = document.getElementById("btnVerifikasiEdit");
+    if (btnVerifikasiEdit) {
+      btnVerifikasiEdit.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.verifikasiKodeEdit();
+      });
+    }
+
+    // ✅ NEW: Handle Enter key di verifikasi modal
+    const kodeVerifikasiEdit = document.getElementById("kodeVerifikasiEdit");
+    if (kodeVerifikasiEdit) {
+      kodeVerifikasiEdit.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.verifikasiKodeEdit();
+        }
       });
     }
 
@@ -1216,13 +1267,68 @@ class OptimizedDataPenjualanApp {
     $("#printModal").modal("show");
   }
 
-  // Handle edit action
+  // Handle edit action (✅ MODIFIED: Add verification)
   handleEdit(transactionId) {
-    this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
-    if (!this.currentTransaction) {
-      return utils.showAlert("Transaksi tidak ditemukan", "Error", "error");
+    this.pendingEditTransactionId = transactionId;
+    this.showVerifikasiEditModal();
+  }
+
+  // ✅ NEW: Show modal verifikasi edit
+  showVerifikasiEditModal() {
+    $("#verifikasiEditModal").modal("show");
+    // Clear previous input
+    document.getElementById("kodeVerifikasiEdit").value = "";
+    // Auto focus
+    setTimeout(() => {
+      document.getElementById("kodeVerifikasiEdit").focus();
+    }, 500);
+  }
+
+  // ✅ NEW: Verifikasi kode edit
+  async verifikasiKodeEdit() {
+    const kode = document.getElementById("kodeVerifikasiEdit").value.trim();
+
+    if (!kode) {
+      utils.showAlert("Kode akses harus diisi!", "Error", "error");
+      return;
     }
+
+    try {
+      // Reload password untuk keamanan (cegah cache lama)
+      const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+      const passwords = settingsDoc.exists() ? settingsDoc.data() : this.passwordCache;
+      const correctPassword = passwords?.editDataPenjualan || "admin123";
+
+      if (kode !== correctPassword) {
+        utils.showAlert("Kode akses salah!", "Akses Ditolak", "error");
+        document.getElementById("kodeVerifikasiEdit").value = "";
+        document.getElementById("kodeVerifikasiEdit").focus();
+        return;
+      }
+
+      // Kode benar, close modal verifikasi
+      $("#verifikasiEditModal").modal("hide");
+      document.getElementById("kodeVerifikasiEdit").value = "";
+
+      // Lanjut ke edit modal
+      this.proceedToEdit();
+    } catch (error) {
+      console.error("Error verifikasi:", error);
+      utils.showAlert("Terjadi kesalahan saat verifikasi. Coba lagi.", "Error", "error");
+    }
+  }
+
+  // ✅ NEW: Proceed to edit modal
+  proceedToEdit() {
+    this.currentTransaction = this.salesData.find((t) => t.id === this.pendingEditTransactionId);
+
+    if (!this.currentTransaction) {
+      utils.showAlert("Data transaksi tidak ditemukan!", "Error", "error");
+      return;
+    }
+
     this.showEditModal();
+    this.pendingEditTransactionId = null;
   }
 
   // Handle delete action
@@ -1637,6 +1743,7 @@ class OptimizedDataPenjualanApp {
   }
 
   // Confirm delete with password verification
+  // Confirm delete with password verification (✅ MODIFIED: Use Firestore password)
   async confirmDeleteTransaction() {
     const password = document.getElementById("deleteVerificationPassword").value;
 
@@ -1644,11 +1751,25 @@ class OptimizedDataPenjualanApp {
       return utils.showAlert("Masukkan kata sandi verifikasi terlebih dahulu", "Peringatan", "warning");
     }
 
-    if (password !== VERIFICATION_PASSWORD) {
-      return utils.showAlert("Kata sandi verifikasi salah", "Error", "error");
-    }
+    try {
+      // ✅ MODIFIED: Get password from Firestore
+      const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+      const passwords = settingsDoc.exists() ? settingsDoc.data() : this.passwordCache;
+      const correctPassword = passwords?.deleteDataPenjualan || VERIFICATION_PASSWORD;
 
-    await this.deleteTransaction();
+      if (password !== correctPassword) {
+        return utils.showAlert("Kata sandi verifikasi salah", "Error", "error");
+      }
+
+      await this.deleteTransaction();
+    } catch (error) {
+      console.error("Error verifying delete password:", error);
+      // Fallback ke hardcoded password jika Firestore error
+      if (password !== VERIFICATION_PASSWORD) {
+        return utils.showAlert("Kata sandi verifikasi salah", "Error", "error");
+      }
+      await this.deleteTransaction();
+    }
   }
 
   // Smart deletion: auto-restore stock if possible

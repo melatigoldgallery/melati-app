@@ -198,6 +198,13 @@
                 </select>
               </div>
               <div class="col-md-2">
+                <label for="reportType" class="form-label">Jenis Laporan</label>
+                <select class="form-select" id="reportType">
+                  <option value="rekap" selected>Rekap (Per Kode)</option>
+                  <option value="detail">Detail (Per Transaksi)</option>
+                </select>
+              </div>
+              <div class="col-md-2">
                 <button type="button" class="btn btn-primary" id="filterSalesBtn">
                   <i class="fas fa-search me-1"></i>
                   Tampilkan
@@ -220,6 +227,8 @@
                   <thead>
                     <tr>
                       <th>Tanggal</th>
+                      <th>Jam</th>
+                      <th>Sales</th>
                       <th>Jenis</th>
                       <th>Kode</th>
                       <th>Nama Barang</th>
@@ -236,7 +245,7 @@
                   </tbody>
                   <tfoot>
                     <tr class="table-info fw-bold">
-                      <td colspan="4" class="text-end">TOTAL:</td>
+                      <td colspan="6" class="text-end">TOTAL:</td>
                       <td class="text-center"></td>
                       <td class="text-center"></td>
                       <td></td>
