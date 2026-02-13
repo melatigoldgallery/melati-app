@@ -327,6 +327,13 @@ class OptimizedStockReport {
   // Initialize the module
   init() {
     this.loadCacheFromStorage();
+
+    // 🔧 Clean up old cache that may contain duplicate data from kodeAksesoris
+    if (this.cache.has("kodeAksesorisData")) {
+      this.cache.delete("kodeAksesorisData");
+      this.cacheMeta.delete("kodeAksesorisData");
+    }
+
     this.initDatePickers();
     this.attachEventListeners();
     this.setDefaultDates();
@@ -914,9 +921,8 @@ class OptimizedStockReport {
         this.stockData.push({ id: doc.id, ...doc.data() });
       });
 
-      // Load all kode aksesoris
-
-      await this.loadAllKodeAksesoris();
+      // ✅ FIXED: Removed loadAllKodeAksesoris() to prevent duplicate data
+      // Data should only come from stokAksesoris collection (Single Source of Truth)
 
       // Cache the data
       this.setCache(cacheKey, [...this.stockData]);
@@ -936,67 +942,15 @@ class OptimizedStockReport {
     }
   }
 
-  // Load all kode aksesoris
+  // ⚠️ DEPRECATED: Method ini tidak digunakan lagi dan menyebabkan duplikasi data
+  // Semua data kode aksesoris sekarang diambil langsung dari stokAksesoris (Single Source of Truth)
+  // Method ini di-comment out untuk mencegah duplikasi data
+  /*
   async loadAllKodeAksesoris() {
-    const cacheKey = "kodeAksesorisData";
-
-    if (this.isCacheValid(cacheKey)) {
-      console.log("Using cached kodeAksesoris data"); // Debug log
-      const cachedData = this.cache.get(cacheKey);
-      this.mergeKodeAksesoris(cachedData);
-      return;
-    }
-
-    console.log("Fetching fresh kodeAksesoris data from Firebase"); // Debug log
-    try {
-      const kodeAksesorisData = [];
-
-      // Get kotak, aksesoris, and silver data
-      const [kotakSnapshot, aksesorisSnapshot, silverSnapshot] = await Promise.all([
-        getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak")),
-        getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris")),
-        getDocs(collection(firestore, "kodeAksesoris", "kategori", "silver")),
-      ]);
-
-      // Process kotak data
-      kotakSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kodeItem = this.createKodeItem({ text: doc.id, nama: data.nama }, "kotak");
-        kodeAksesorisData.push(kodeItem);
-        this.mergeStockItem(kodeItem);
-      });
-
-      // Process aksesoris data
-      aksesorisSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kodeItem = this.createKodeItem({ text: doc.id, nama: data.nama }, "aksesoris");
-        kodeAksesorisData.push(kodeItem);
-        this.mergeStockItem(kodeItem);
-      });
-
-      // Process silver data
-      silverSnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log("Silver doc data:", data); // Debug log
-        const kodeItem = this.createKodeItem(
-          { text: doc.id, nama: data.nama, kadar: data.kadar, berat: data.berat },
-          "silver",
-        );
-        console.log("Created kode item:", kodeItem); // Debug log
-        kodeAksesorisData.push(kodeItem);
-        this.mergeStockItem(kodeItem);
-      });
-
-      // Cache the data
-      this.setCache(cacheKey, kodeAksesorisData);
-    } catch (error) {
-      // Fallback to cache
-      if (this.cache.has(cacheKey)) {
-        const cachedData = this.cache.get(cacheKey);
-        this.mergeKodeAksesoris(cachedData);
-      }
-    }
+    // DEPRECATED: Causes duplicate data when merged with stokAksesoris
+    // All accessory codes should come from stokAksesoris collection only
   }
+  */
 
   // Calculate stock for specific date
   // 🚀 OPTIMIZATION: Calculate stock incrementally from snapshot
@@ -1903,52 +1857,21 @@ class OptimizedStockReport {
     });
   }
 
-  // Helper methods for kode aksesoris
+  // ⚠️ DEPRECATED: Helper methods untuk loadAllKodeAksesoris() yang sudah tidak digunakan
+  // Method-method ini menyebabkan duplikasi data
+  /*
   createKodeItem(data, kategori) {
-    const item = {
-      id: null,
-      kode: data.text,
-      nama: data.nama,
-      kategori: kategori,
-      stokAwal: 0,
-      tambahStok: 0,
-      laku: 0,
-      free: 0,
-      gantiLock: 0,
-      return: 0,
-      stokAkhir: 0,
-      lastUpdate: new Date(),
-    };
-
-    // Add kadar & berat for silver category
-    if (kategori === "silver") {
-      item.kadar = data.kadar || null;
-      item.berat = data.berat ? parseFloat(data.berat) : 0;
-    }
-
-    return item;
+    // DEPRECATED: Only used by loadAllKodeAksesoris() which is now disabled
   }
 
   mergeStockItem(kodeItem) {
-    const existingIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kodeItem.kode);
-    if (existingIndex === -1) {
-      this.stockData.push(kodeItem);
-    } else {
-      this.stockData[existingIndex].kategori = kodeItem.kategori;
-      this.stockData[existingIndex].nama = kodeItem.nama;
-      // Preserve kadar & berat for silver
-      if (kodeItem.kategori === "silver") {
-        this.stockData[existingIndex].kadar = kodeItem.kadar;
-        this.stockData[existingIndex].berat = kodeItem.berat;
-      }
-    }
+    // DEPRECATED: Causes duplicate data by merging kodeAksesoris with stokAksesoris
   }
 
   mergeKodeAksesoris(kodeAksesorisData) {
-    kodeAksesorisData.forEach((item) => {
-      this.mergeStockItem(item);
-    });
+    // DEPRECATED: Causes duplicate data by merging kodeAksesoris with stokAksesoris
   }
+  */
 
   // Cache management methods
   setCache(key, data, customTTL = null) {
