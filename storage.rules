@@ -1,10 +1,28 @@
 rules_version = '2';
 
-// Firebase Storage Security Rules for Bukti Pengambilan
+// Firebase Storage Security Rules
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Rules for bukti-pengambilan folder
+    // Medical Certificate Rules (Phase 1 - Cloudinary → Firebase Migration)
+    // Path structure: medical-certificates/{year}/{month}/{employeeId}_{timestamp}_{uuid}.{ext}
+    match /medical-certificates/{year}/{month}/{fileName} {
+      // Allow employees to read/download their own certificates
+      allow read: if request.auth != null 
+                  && (fileName.matches('.*' + request.auth.uid + '.*') 
+                      || request.auth.token.role in ['admin', 'hrd', 'supervisor']);
+      
+      // Allow employees to upload only their own certificates
+      allow write: if request.auth != null 
+                   && fileName.matches('.*' + request.auth.uid + '.*')
+                   && request.resource.size < 2 * 1024 * 1024 // Max 2MB
+                   && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
+      
+      // Only admin/hrd can delete medical certificates
+      allow delete: if request.auth != null && request.auth.token.role in ['admin', 'hrd'];
+    }
+
+    // Rules for bukti-pengambilan folder (existing service photos)
     match /bukti-pengambilan/{year}/{month}/{fileName} {
       // Allow authenticated users to read (more secure than public read)
       allow read: if request.auth != null;

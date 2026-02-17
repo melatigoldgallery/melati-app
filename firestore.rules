@@ -14,8 +14,39 @@ service cloud.firestore {
       allow update, delete: if false; // Disabled untuk security
     }
     
+    // Leave Requests collection with role-based access control
+    match /leaveRequests/{requestId} {
+      // Employees can create their own leave requests
+      allow create: if request.auth != null 
+                    && request.resource.data.employeeId == request.auth.uid;
+      
+      // Employees can read/update their own requests
+      allow read, update: if request.auth != null 
+                          && (resource.data.employeeId == request.auth.uid 
+                              || request.auth.token.role in ['admin', 'hrd', 'supervisor']);
+      
+      // Only admin/hrd can delete
+      allow delete: if request.auth != null && request.auth.token.role in ['admin', 'hrd'];
+    }
+    
+    // Medical Certificate metadata protection
+    // Medical certificate files are stored in Storage, metadata in Firestore
+    match /leaveRequests/{requestId} {
+      function hasMedicalCert() {
+        return resource.data.get('replacementDetails.medicalCertificateFile') != null;
+      }
+      
+      function certBelongsToUser() {
+        return resource.data.employeeId == request.auth.uid;
+      }
+      
+      // Medical certificate access: Employee (read own), Admin/HRD (read all)
+      allow read: if request.auth != null && hasMedicalCert() 
+                  && (certBelongsToUser() || request.auth.token.role in ['admin', 'hrd', 'supervisor']);
+    }
+    
     // Default: All other collections accessible by authenticated users
-    // Includes: leaveRequests, attendance, employees, services, etc.
+    // Includes: attendance, employees, services, etc.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

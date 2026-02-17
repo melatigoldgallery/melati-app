@@ -1,6 +1,6 @@
 import { getEmployees } from "../services/employee-service.js";
 import { submitLeaveRequest, getLeaveRequestsByEmployee } from "../services/leave-service.js";
-import { uploadFile, checkTemporaryFiles } from "../services/cloudinary-service.js";
+import { uploadMedicalCertificate, compressMedicalCertImage } from "../services/firebase-medical-cert-service.js";
 
 // Initialize data
 let employees = [];
@@ -226,7 +226,7 @@ document.getElementById("leaveType")?.addEventListener("change", function () {
         } else {
           // If not checked, disable "Tidak Perlu Diganti" option
           const noReplacementOption = Array.from(replacementTypeSelect.options).find(
-            (option) => option.value === "tidak"
+            (option) => option.value === "tidak",
           );
           if (noReplacementOption) {
             noReplacementOption.disabled = true;
@@ -245,7 +245,7 @@ document.getElementById("leaveType")?.addEventListener("change", function () {
       // For "Izin Lainnya", disable "Tidak Perlu Diganti" option
       if (replacementTypeSelect) {
         const noReplacementOption = Array.from(replacementTypeSelect.options).find(
-          (option) => option.value === "tidak"
+          (option) => option.value === "tidak",
         );
         if (noReplacementOption) {
           noReplacementOption.disabled = true;
@@ -452,84 +452,6 @@ document.getElementById("leaveEndDate")?.addEventListener("change", function () 
   }
 });
 
-// Function to compress image before upload
-async function compressImage(file, maxWidth = 1200, quality = 0.7) {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      resolve(file);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Canvas to Blob failed"));
-              return;
-            }
-
-            const compressedFile = new File([blob], file.name, {
-              type: file.type,
-              lastModified: Date.now(),
-            });
-
-            resolve(compressedFile);
-          },
-          file.type,
-          quality
-        );
-      };
-      img.onerror = (error) => {
-        reject(error);
-      };
-    };
-    reader.onerror = (error) => {
-      reject(error);
-    };
-  });
-}
-
-// Function to retry upload with exponential backoff
-async function retryUpload(file, path, maxRetries = 3) {
-  let lastError;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Percobaan upload ke-${attempt}...`);
-      return await uploadFile(file, path);
-    } catch (error) {
-      console.warn(`Percobaan ke-${attempt} gagal:`, error);
-      lastError = error;
-
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s, ...
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  throw lastError || new Error("Gagal mengunggah file setelah beberapa percobaan");
-}
-
 // Function to validate file
 function validateFile(file) {
   const maxSize = 2 * 1024 * 1024; // 2MB
@@ -551,35 +473,21 @@ function validateFile(file) {
   return { valid: true };
 }
 
+// Note: Internet connection checking simplified for Phase 1
+// Phase 2-B will implement comprehensive offline queue mechanism
 async function checkInternetConnection() {
-  try {
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    // Set timeout untuk request
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    // Gunakan mode 'no-cors' untuk menghindari masalah CORS
-    const response = await fetch("https://www.cloudinary.com/favicon.ico", {
-      method: "HEAD",
-      signal,
-      mode: "no-cors", // Tambahkan ini
-    });
-
-    clearTimeout(timeoutId);
-    return true; // Jika berhasil mencapai sini, berarti online
-  } catch (error) {
-    return false;
-  }
+  return navigator.onLine;
 }
 
-// Function to handle offline mode
+// Phase 2-B: Offline mode handling with queue mechanism
 function handleOfflineMode() {
+  // Placeholder for Phase 2-B offline support
+  // Future implementation: Queue uploads, show offline indicator, retry on reconnect
   const offlineAlert = document.createElement("div");
   offlineAlert.className = "alert alert-warning offline-alert";
   offlineAlert.innerHTML = `
     <i class="fas fa-wifi-slash me-2"></i>
-    <strong>Anda sedang offline.</strong> File akan disimpan sementara dan diunggah saat koneksi tersedia.
+    <strong>Anda sedang offline.</strong> Pengajuan izin akan diproses saat koneksi tersedia.
   `;
 
   const formFeedback = document.getElementById("formFeedback");
@@ -588,53 +496,13 @@ function handleOfflineMode() {
   }
 }
 
-// Function to check pending uploads
+// Phase 2-B: Offline queue management for pending uploads
 function checkPendingUploads() {
-  const tempFiles = checkTemporaryFiles();
-  if (tempFiles && tempFiles.length > 0) {
-    showFeedback(
-      "warning",
-      `Terdapat ${tempFiles.length} file yang belum terunggah karena masalah koneksi. 
-      <button class="btn btn-sm btn-outline-warning ms-2" id="uploadPendingBtn">
-        <i class="fas fa-cloud-upload-alt me-1"></i> Unggah Sekarang
-      </button>`,
-      false,
-      10000
-    );
-
-    document.getElementById("uploadPendingBtn")?.addEventListener("click", async function () {
-      this.disabled = true;
-      this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mengunggah...';
-
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const tempFile of tempFiles) {
-        try {
-          if (tempFile.dataUrl) {
-            const response = await fetch(tempFile.dataUrl);
-            const blob = await response.blob();
-            const file = new File([blob], tempFile.name, { type: tempFile.type });
-
-            await uploadFile(file, tempFile.path);
-            successCount++;
-          } else {
-            failCount++;
-          }
-        } catch (error) {
-          console.error("Error uploading pending file:", error);
-          failCount++;
-        }
-      }
-
-      if (successCount > 0) {
-        showFeedback("success", `Berhasil mengunggah ${successCount} file.`);
-      }
-      if (failCount > 0) {
-        showFeedback("error", `Gagal mengunggah ${failCount} file.`);
-      }
-    });
-  }
+  // TODO: Phase 2-B - Implement IndexedDB-based offline queue
+  // - Store failed uploads in IndexedDB
+  // - Retry when connection is restored
+  // - Show pending upload count and retry UI
+  console.log("Pending uploads check - Phase 2-B implementation pending");
 }
 
 // Submit form event listener
@@ -738,38 +606,30 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
             let fileToUpload = file;
             if (file.type.startsWith("image/") && file.size > 1024 * 1024) {
               try {
-                fileToUpload = await compressImage(file);
+                fileToUpload = await compressMedicalCertImage(file);
                 console.log(`File dikompresi dari ${file.size} menjadi ${fileToUpload.size} bytes`);
               } catch (compressError) {
                 console.warn("Gagal mengompresi gambar:", compressError);
               }
             }
 
-            // Upload file dengan retry mechanism
-            const uploadResult = await retryUpload(
-              fileToUpload,
-              `medical-certificates/${employeeId}`,
-              3 // maksimal 3 kali percobaan
-            );
+            // Upload file ke Firebase Storage dengan progress tracking
+            const uploadResult = await uploadMedicalCertificate(fileToUpload, employeeId, (progress) => {
+              const percent = progress.progress.toFixed(0);
+              console.log(`Upload progress: ${percent}%`);
+            });
 
             console.log("Upload result:", uploadResult); // Debugging
 
-            // Simpan informasi file
+            // Simpan informasi file dari Firebase
             medicalCertificateFileInfo = {
               url: uploadResult.url,
-              publicId: uploadResult.publicId,
-              name: file.name,
-              type: file.type,
-              size: file.size,
+              path: uploadResult.path,
+              name: uploadResult.name,
+              type: uploadResult.type,
+              size: uploadResult.size,
+              uploadedAt: uploadResult.uploadedAt,
             };
-
-            // Jika file disimpan sementara (offline)
-            if (uploadResult.isOffline) {
-              showFeedback(
-                "warning",
-                "File disimpan sementara karena Anda sedang offline. File akan diunggah otomatis saat koneksi tersedia."
-              );
-            }
           } catch (uploadError) {
             console.error("Error uploading file:", uploadError);
             showFeedback("error", `Gagal mengunggah file: ${uploadError.message}`);
@@ -1015,7 +875,7 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
       // Tetap tampilkan sukses karena data sudah tersimpan
       showFeedback(
         "warning",
-        "Pengajuan izin berhasil diajukan, namun notifikasi email gagal dikirim. HRD akan diberitahu secara manual."
+        "Pengajuan izin berhasil diajukan, namun notifikasi email gagal dikirim. HRD akan diberitahu secara manual.",
       );
     }
 
@@ -1069,10 +929,10 @@ function showFeedback(type, message, autoHide = true, duration = 5000) {
     type === "error"
       ? "5px solid #dc3545"
       : type === "warning"
-      ? "5px solid #ffc107"
-      : type === "info"
-      ? "5px solid #0dcaf0"
-      : "5px solid #198754";
+        ? "5px solid #ffc107"
+        : type === "info"
+          ? "5px solid #0dcaf0"
+          : "5px solid #198754";
 
   // Tambahkan animasi untuk menarik perhatian
   feedbackElement.style.animation = "feedbackPulse 0.5s ease-in-out";
@@ -1464,15 +1324,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadEmployees();
   initDateInputs();
 
-  // Periksa koneksi internet
-  checkInternetConnection().then((isOnline) => {
-    if (!isOnline) {
-      handleOfflineMode();
-    }
-  });
-
-  // Tambahkan pemeriksaan file yang belum terunggah
-  checkPendingUploads();
+  // Phase 2-B: Offline detection and queue management will be implemented here
+  // For now, Firebase SDK handles retries automatically
+  // TODO: Add IndexedDB-based offline queue in Phase 2-B
 
   // Check for saved employee ID
   const savedEmployeeId = localStorage.getItem("currentEmployeeId");

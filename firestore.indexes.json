@@ -17,6 +17,24 @@
       ]
     },
     {
+      "collectionGroup": "leaveRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "employeeId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "submitDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leaveRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "leaveType", "order": "ASCENDING" },
+        { "fieldPath": "submitDate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "servis",
       "queryScope": "COLLECTION",
       "fields": [

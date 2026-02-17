@@ -15,7 +15,7 @@ Migrasi dari Cloudinary ke Firebase Storage **DIREKOMENDASIKAN** untuk productio
 | **Security**            | ⚠️ Medium - Upload Preset exposed di client           |
 | **Integration**         | 🔴 Terpisah - API eksternal                           |
 | **Cost**                | 💰 Hemat untuk free tier, tapi berbayar setelah kuota |
-| **Offline Support**     | ✅ Manual implementation needed                       |
+| **Offline Support**     | ⚠️ Requires custom implementation (future phase)      |
 | **Real-time Database**  | ❌ Terpisah, sulit sync metadata                      |
 | **CDN Integration**     | ✅ Built-in global CDN                                |
 | **File Transformation** | ✅ Advanced image/video processing                    |
@@ -28,7 +28,7 @@ Migrasi dari Cloudinary ke Firebase Storage **DIREKOMENDASIKAN** untuk productio
 | **Security**            | ✅ Excellent - Firebase Auth + Rules     |
 | **Integration**         | ✅ Native - Satu ecosystem               |
 | **Cost**                | 💰 Gratis 5GB, pay-as-go setelah itu     |
-| **Offline Support**     | ✅ Web SDK built-in support              |
+| **Offline Support**     | ⚠️ Not included in this migration phase  |
 | **Real-time Database**  | ✅ Seamless dengan Firestore             |
 | **CDN Integration**     | ✅ Google Cloud CDN (otomatis)           |
 | **File Transformation** | ⚠️ Tidak native, gunakan Cloud Functions |
@@ -111,18 +111,18 @@ service firebase.storage {
 ### Complexity: Cloudinary ❌
 
 - Setup unsigned preset ✅
-- Offline handling ❌ Perlu custom localStorage
-- Error recovery ❌ Implement sendiri
-- Monitoring ❌ Terbatas
-- **Total Setup Time: ~2 jam**
+- Error recovery ❌ Custom implementation
+- Monitoring ❌ Limited
+- **Total Setup Time: ~1 jam**
 
 ### Complexity: Firebase ✅
 
 - Setup storage bucket ✅ (sudah ada)
-- Offline handling ✅ Native SDK support
 - Error recovery ✅ Built-in retry
 - Monitoring ✅ Firebase Console
-- **Total Setup Time: ~1 jam**
+- **Total Setup Time: ~45 menit**
+
+**Note:** Offline support (queue) akan ditambahkan sebagai **Phase 2 terpisah** di masa depan
 
 ---
 
@@ -143,6 +143,12 @@ service firebase.storage {
 - `supervisor.js` - Minimal, sudah compatible dengan Firebase URLs
 - `leave-service.js` - Minimal, sudah structure data dengan baik
 - Firebase Rules - Restrict access berdasarkan role
+
+### Offline Support: FUTURE PHASE ⏳
+
+- `offline-queue-service.js` - **TIDAK DIMASUKKAN** dalam migrasi ini
+- Custom offline handling akan diimplementasikan **SETELAH** Phase 1 migration selesai
+- Target: Phase 2 (sprint berikutnya)
 
 ---
 
@@ -614,29 +620,34 @@ Production Setup:
 - [ ] Create firestore metadata collection
 - [ ] Setup Firebase Storage emulator (local testing)
 
-### Phase 2: Development (2-3 jam)
+### Phase 2: Development (1.5 jam)
 
-- [ ] Create `firebase-storage-service.js`
-- [ ] Create `offline-queue-service.js`
+- [ ] Create `firebase-medical-cert-service.js`
 - [ ] Update `pengajuan.js` imports & functions
 - [ ] Add progress tracking UI
-- [ ] Add retry indicators
+- [ ] Add error handling & retry logic
 
-### Phase 3: Testing (2 jam)
+**NOT in this phase:**
+
+- ❌ Offline queue service (future Phase 2-B)
+- ❌ LocalStorage persistence (future)
+- ❌ Concurrent queue handling (future)
+
+### Phase 3: Testing (1.5 jam)
 
 - [ ] Unit tests untuk upload/download
-- [ ] Offline scenarios testing
 - [ ] Large file handling (PDF > 2MB)
-- [ ] Concurrent uploads
-- [ ] Error recovery flows
+- [ ] Firebase Rules validation
+- [ ] Error scenarios & recovery
+- [ ] Supervisor.js compatibility
 
-### Phase 4: Deployment (1 jam)
+### Phase 4: Deployment (30 menit)
 
 - [ ] Update Security Rules di Firebase Console
 - [ ] Enable Storage in project
 - [ ] Gradual rollout (beta users first)
 - [ ] Monitor performance & errors
-- [ ] Decommission Cloudinary (after 2 weeks validation)
+- [ ] Decommission Cloudinary
 
 ---
 
@@ -693,7 +704,7 @@ leaveRequests/PENDID01
 1. Already integrated ✅
 2. 80% cost reduction
 3. Better security model
-4. Native offline support
+4. Foundation for future offline support (Phase 2-B)
 5. Easier to maintain single platform
 
 #### File yang tetap digunakan:
@@ -761,7 +772,7 @@ const CLOUDINARY_API_URL = "...";
 - ✅ Reduce codebase by 270 lines
 - ✅ Remove security risk (exposed preset)
 - ✅ Simplify maintenance (single platform)
-- ✅ Better offline support (native)
+- ✅ Set foundation for future offline support
 - ✅ Cost reduction (eliminate Cloudinary subscription)
 
 ---
@@ -772,12 +783,14 @@ const CLOUDINARY_API_URL = "...";
 | --------------------------- | ------------ | ------ | -------------------------------------- |
 | Setup rules & structure     | 30m          | Low    | Security rules + Firestore schema      |
 | Create medical cert service | 1h           | Low    | Replace cloudinary-service.js          |
-| Update pengajuan.js         | 45m          | Medium | Swap imports, handle offline           |
+| Update pengajuan.js         | 45m          | Low    | Swap imports, basic error handling     |
 | Update supervisor.js        | 15m          | Low    | Minimal - already compatible           |
-| Testing                     | 1.5h         | Medium | Offline, large files, concurrent       |
+| Testing                     | 1.5h         | Low    | Upload, large files, supervisor compat |
 | Cleanup cloudinary          | 15m          | Low    | Delete cloudinary-service.js + configs |
-| Deployment                  | 30m          | High   | Gradual rollout with monitoring        |
-| **TOTAL**                   | **~4.5 jam** | -      | Manageable scope                       |
+| Deployment                  | 30m          | Medium | Gradual rollout with monitoring        |
+| **TOTAL**                   | **~3.5 jam** | -      | Fast & focused scope                   |
+
+**Note:** Offline Support (Queue) direncanakan Phase 2-B terpisah (8-10 jam)
 
 ---
 
@@ -861,19 +874,31 @@ Setelah migrasi, monitor:
 | **Supervisor**  | Kompatibel 100%, viewing files langsung dari Firestore metadata |
 | **Maintenance** | Satu platform = simpler debugging & monitoring                  |
 | **Scalability** | Google Cloud infrastructure = reliable & fast                   |
-| **Offline**     | Native Firebase SDK support (better UX)                         |
+| **Foundation**  | Siap untuk offline support Phase 2-B (future enhancement)       |
 
 ### Implementation Phases (Upon Approval):
 
 ```
-Phase 1 (30m):  Setup Firebase Security Rules + Storage structure
-Phase 2 (1h):   Create firebase-medical-cert-service.js
-Phase 3 (45m):  Update pengajuan.js with Firebase imports
-Phase 4 (15m):  Verify supervisor.js compatibility
-Phase 5 (1.5h): Testing (offline, errors, large files)
-Phase 6 (30m):  Gradual production rollout
-Phase 7 (15m):  Delete cloudinary-service.js & configs
-Phase 8 (2w):   Monitor & validate before full cutover
+PHASE 1-7: Core Migration (Fokus Utama)
+============================================
+Phase 1 (30m):   Setup Firebase Security Rules + Storage structure
+Phase 2 (1h):    Create firebase-medical-cert-service.js
+Phase 3 (45m):   Update pengajuan.js with Firebase imports
+Phase 4 (15m):   Verify supervisor.js compatibility
+Phase 5 (1.5h):  Testing (upload, errors, large files, compat)
+Phase 6 (30m):   Gradual production rollout
+Phase 7 (15m):   Delete cloudinary-service.js & configs
+
+Total: ~3.5 jam (est. 1 hari development)
+Monitoring: ~2 minggu production validation
+
+PHASE 2-B: Offline Support (Future Sprint)
+============================================
+Planned: Sprint berikutnya (8-10 jam)
+  - offline-queue-service.js
+  - IndexedDB file storage
+  - Auto-retry & sync logic
+  - Queue persistence & recovery
 ```
 
 ### Next Steps:
