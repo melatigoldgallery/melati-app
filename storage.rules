@@ -4,36 +4,71 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function isPrivileged() {
+      return hasRole('admin') || hasRole('hrd') || hasRole('supervisor');
+    }
+
     // Medical Certificate Rules (Phase 1 - Cloudinary → Firebase Migration)
     // Path structure: medical-certificates/{year}/{month}/{employeeId}_{timestamp}_{uuid}.{ext}
     match /medical-certificates/{year}/{month}/{fileName} {
       // Allow employees to read/download their own certificates
-      allow read: if request.auth != null 
-                  && (fileName.matches('.*' + request.auth.uid + '.*') 
-                      || request.auth.token.role in ['admin', 'hrd', 'supervisor']);
+      allow read: if isAuthenticated()
+                  && (
+                    resource.metadata.uploadedBy == request.auth.uid
+                    || resource.metadata.employeeId == request.auth.uid
+                    || fileName.matches('.*' + request.auth.uid + '.*')
+                    || isPrivileged()
+                  );
       
       // Allow employees to upload only their own certificates
-      allow write: if request.auth != null 
-                   && fileName.matches('.*' + request.auth.uid + '.*')
+      allow write: if isAuthenticated()
+                   && request.resource.metadata.uploadedBy == request.auth.uid
                    && request.resource.size < 2 * 1024 * 1024 // Max 2MB
                    && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
       
       // Only admin/hrd can delete medical certificates
-      allow delete: if request.auth != null && request.auth.token.role in ['admin', 'hrd'];
+      allow delete: if isAuthenticated() && (hasRole('admin') || hasRole('hrd'));
     }
 
     // Rules for bukti-pengambilan folder (existing service photos)
     match /bukti-pengambilan/{year}/{month}/{fileName} {
       // Allow authenticated users to read (more secure than public read)
-      allow read: if request.auth != null;
+      allow read: if isAuthenticated();
 
       // Allow authenticated users to write (upload)
-      allow write: if request.auth != null
+      allow write: if isAuthenticated()
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*'); // Images only
 
       // Allow authenticated users to delete
-      allow delete: if request.auth != null;
+      allow delete: if isAuthenticated();
+    }
+
+    // Rules for promotions folder (admin promosi uploads)
+    // Path structure: promotions/{year}/{month}/{contentType}/{fileName}
+    match /promotions/{year}/{month}/{contentType}/{fileName} {
+      // Admin pages are authenticated; allow signed URL generation and management
+      allow read: if isAuthenticated();
+
+      // Allow authenticated uploads for image/video content
+      allow write: if isAuthenticated()
+                   && request.resource.size < 50 * 1024 * 1024 // Max 50MB for video promo
+                   && (
+                     request.resource.contentType.matches('image/.*')
+                     || request.resource.contentType.matches('video/.*')
+                     || request.resource.contentType == 'application/octet-stream'
+                   );
+
+      // Allow authenticated delete (used by admin panel cleanup)
+      allow delete: if isAuthenticated();
     }
 
     // Deny all other paths by default

@@ -2401,7 +2401,7 @@ class OptimizedDataPenjualanApp {
               kode: item.kodeText || item.kode || "-",
               kadar: item.kadar || "-",
               berat: item.berat || 0,
-              jumlah: 1,
+              jumlah: item.jumlah || 1,
               totalHarga: parseInt(item.totalHarga) || 0,
             },
           ],
@@ -2678,7 +2678,7 @@ class OptimizedDataPenjualanApp {
     console.log("🧹 Destroying Optimized Data Penjualan");
 
     // Remove real-time listener
-    this.removeTodayListener();
+    this.removeRealtimeListener();
 
     // ✅ PERBAIKAN: Remove inactivity listeners
     this.removeInactivityListeners();

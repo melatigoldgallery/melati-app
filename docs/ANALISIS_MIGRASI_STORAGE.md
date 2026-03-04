@@ -135,7 +135,8 @@ service firebase.storage {
 
 ### Bisa Dihapus
 
-- `cloudinary-service.js` - **SEPENUHNYA TERGANTI** ❌ TIDAK DIPERLUKAN LAGI
+- Integrasi Cloudinary untuk **medical certificate** - **TERGANTI** ✅
+- `cloudinary-service.js` hanya bisa dihapus setelah modul lain (mis. promosi) ikut dimigrasi
 
 ### Perlu Diupdate
 
@@ -613,41 +614,37 @@ Production Setup:
 
 ## 8. MIGRATION ROADMAP
 
-### Phase 1: Preparation (1-2 jam)
+### Tujuan MVP (scope yang disederhanakan)
 
-- [ ] Review Firebase Security Rules
-- [ ] Create storage structure
-- [ ] Create firestore metadata collection
-- [ ] Setup Firebase Storage emulator (local testing)
+- Ganti upload medical certificate dari Cloudinary ke Firebase Storage
+- Simpan metadata hanya di `leaveRequests.replacementDetails.medicalCertificateFile`
+- Pastikan `supervisor.js` tetap bisa view/download file tanpa perubahan besar
 
-### Phase 2: Development (1.5 jam)
+### Phase 1: Setup & Security (45 menit)
 
-- [ ] Create `firebase-medical-cert-service.js`
-- [ ] Update `pengajuan.js` imports & functions
-- [ ] Add progress tracking UI
-- [ ] Add error handling & retry logic
+- [ ] Finalisasi Firebase Storage Rules (role + owner access)
+- [ ] Tetapkan struktur path: `medical-certificates/{year}/{month}/{fileName}`
+- [ ] Validasi batas file: max 2MB + MIME `jpg/png/pdf`
 
-**NOT in this phase:**
+### Phase 2: Implementasi Inti (2 jam)
 
-- ❌ Offline queue service (future Phase 2-B)
-- ❌ LocalStorage persistence (future)
-- ❌ Concurrent queue handling (future)
+- [ ] Buat `firebase-medical-cert-service.js` (upload + progress + retry default SDK)
+- [ ] Update `pengajuan.js` untuk pakai service baru
+- [ ] Simpan metadata file ke field existing di `leaveRequests` (tanpa koleksi baru)
+- [ ] Verifikasi `supervisor.js` membaca URL yang sama seperti sekarang
 
-### Phase 3: Testing (1.5 jam)
+### Phase 3: Uji Cepat & Rilis Bertahap (1 jam)
 
-- [ ] Unit tests untuk upload/download
-- [ ] Large file handling (PDF > 2MB)
-- [ ] Firebase Rules validation
-- [ ] Error scenarios & recovery
-- [ ] Supervisor.js compatibility
+- [ ] Uji 3 skenario utama: upload sukses, file > 2MB ditolak, role access valid
+- [ ] Smoke test alur supervisor (lihat surat dari data pending)
+- [ ] Rollout bertahap + monitoring error 1-2 minggu
+- [ ] Nonaktifkan pemakaian Cloudinary khusus alur medical certificate setelah stabil
 
-### Phase 4: Deployment (30 menit)
+### Out of Scope (fase berikutnya)
 
-- [ ] Update Security Rules di Firebase Console
-- [ ] Enable Storage in project
-- [ ] Gradual rollout (beta users first)
-- [ ] Monitor performance & errors
-- [ ] Decommission Cloudinary
+- ❌ Offline queue/persistence (Phase 2-B)
+- ❌ Concurrent queue handling
+- ❌ Advanced transformation/compression pipeline
 
 ---
 
@@ -765,11 +762,11 @@ const CLOUDINARY_API_URL = "...";
 | **Metadata Store**    | Cloudinary metadata API | Firestore document               | Replace |
 | **Progress Tracking** | uploadFile() listener   | uploadBytesResumable()           | Replace |
 
-### ✅ Conclusion: Cloudinary Service is 100% Replaceable
+### ✅ Conclusion: Cloudinary pada alur medical certificate 100% replaceable
 
 **Benefits of removal:**
 
-- ✅ Reduce codebase by 270 lines
+- ✅ Kurangi kompleksitas alur izin sakit (tanpa dependency Cloudinary)
 - ✅ Remove security risk (exposed preset)
 - ✅ Simplify maintenance (single platform)
 - ✅ Set foundation for future offline support
@@ -779,16 +776,16 @@ const CLOUDINARY_API_URL = "...";
 
 ## 11. Estimasi Effort (FINAL)
 
-| Task                        | Waktu        | Risk   | Notes                                  |
-| --------------------------- | ------------ | ------ | -------------------------------------- |
-| Setup rules & structure     | 30m          | Low    | Security rules + Firestore schema      |
-| Create medical cert service | 1h           | Low    | Replace cloudinary-service.js          |
-| Update pengajuan.js         | 45m          | Low    | Swap imports, basic error handling     |
-| Update supervisor.js        | 15m          | Low    | Minimal - already compatible           |
-| Testing                     | 1.5h         | Low    | Upload, large files, supervisor compat |
-| Cleanup cloudinary          | 15m          | Low    | Delete cloudinary-service.js + configs |
-| Deployment                  | 30m          | Medium | Gradual rollout with monitoring        |
-| **TOTAL**                   | **~3.5 jam** | -      | Fast & focused scope                   |
+| Task                        | Waktu        | Risk   | Notes                                      |
+| --------------------------- | ------------ | ------ | ------------------------------------------ |
+| Setup rules & structure     | 30m          | Low    | Security rules + Firestore schema          |
+| Create medical cert service | 1h           | Low    | Replace Cloudinary di alur izin sakit      |
+| Update pengajuan.js         | 45m          | Low    | Swap imports, basic error handling         |
+| Update supervisor.js        | 15m          | Low    | Minimal - already compatible               |
+| Testing                     | 1.5h         | Low    | Upload, large files, supervisor compat     |
+| Cleanup cloudinary          | 15m          | Low    | Remove usage Cloudinary di alur izin sakit |
+| Deployment                  | 30m          | Medium | Gradual rollout with monitoring            |
+| **TOTAL**                   | **~3.5 jam** | -      | Fast & focused scope                       |
 
 **Note:** Offline Support (Queue) direncanakan Phase 2-B terpisah (8-10 jam)
 
@@ -820,7 +817,7 @@ Setelah migrasi, monitor:
 
 ### Code Cleanup
 
-- ✅ Delete `cloudinary-service.js` (270 lines removed)
+- ✅ Remove Cloudinary usage untuk alur medical certificate
 - ✅ Remove Cloudinary API keys from code
 - ✅ Remove localStorage temp file logic
 - ✅ Simplify offline handling via Firebase SDK
@@ -858,11 +855,11 @@ Setelah migrasi, monitor:
    - Zero breaking changes diperlukan
    - Minimal atau tidak ada updates untuk supervisor.js
 
-3. **Cloudinary Service SEPENUHNYA TIDAK DIPERLUKAN** ✅
-   - Semua fiturnya diganti Firebase SDK native functions
-   - Hapus 270 lines of code yang sudah tidak digunakan
-   - Hapus security risk (exposed Cloudinary presets)
-   - Simplify maintenance dengan single platform
+3. **Cloudinary pada alur medical certificate TIDAK DIPERLUKAN** ✅
+
+- Alur upload surat sakit diganti Firebase SDK native functions
+- Hapus security risk di alur ini (exposed Cloudinary presets)
+- Simplify maintenance untuk modul izin
 
 ### Key Benefits:
 
@@ -879,36 +876,32 @@ Setelah migrasi, monitor:
 ### Implementation Phases (Upon Approval):
 
 ```
-PHASE 1-7: Core Migration (Fokus Utama)
-============================================
-Phase 1 (30m):   Setup Firebase Security Rules + Storage structure
-Phase 2 (1h):    Create firebase-medical-cert-service.js
-Phase 3 (45m):   Update pengajuan.js with Firebase imports
-Phase 4 (15m):   Verify supervisor.js compatibility
-Phase 5 (1.5h):  Testing (upload, errors, large files, compat)
-Phase 6 (30m):   Gradual production rollout
-Phase 7 (15m):   Delete cloudinary-service.js & configs
+PHASE A - Setup & Security (45m)
+- Finalisasi rules + path + validasi file
 
-Total: ~3.5 jam (est. 1 hari development)
-Monitoring: ~2 minggu production validation
+PHASE B - Core Implementation (2h)
+- Buat service upload Firebase
+- Update pengajuan.js
+- Simpan metadata ke leaveRequests (existing field)
+- Verifikasi supervisor.js tetap compatible
 
-PHASE 2-B: Offline Support (Future Sprint)
-============================================
-Planned: Sprint berikutnya (8-10 jam)
-  - offline-queue-service.js
-  - IndexedDB file storage
-  - Auto-retry & sync logic
-  - Queue persistence & recovery
+PHASE C - Test & Rollout (1h)
+- Uji skenario inti + smoke test supervisor
+- Rollout bertahap + monitor 1-2 minggu
+- Hentikan pemakaian Cloudinary di alur medical certificate setelah stabil
+
+Total eksekusi teknis: ~3.5 jam
+Monitoring: 1-2 minggu
+
+PHASE NEXT (separate sprint)
+- Offline queue + persistence (8-10 jam)
 ```
 
 ### Next Steps:
 
-**Tunggu konfirmasi untuk mulai implementation dengan order:**
-
-1. ✅ Confirm Firebase Security Rules design
-2. ✅ Confirm cloudinary-service.js deletion after migration
-3. ✅ Confirm supervisor.js compatibility is acceptable
-4. ✅ Authorize Phase 1 development start
+1. Final review rules (owner/role/file size/content type)
+2. Start Phase A → B → C sesuai roadmap sederhana di atas
+3. Decommission Cloudinary total hanya setelah modul lain (contoh: promosi) ikut migrasi
 
 ---
 
