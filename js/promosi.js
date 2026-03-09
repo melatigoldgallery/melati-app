@@ -9,7 +9,7 @@ import {
   remove,
   push,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-import { uploadFile, getCloudinaryUrl } from "./services/cloudinary-service.js";
+import { uploadPromotionFile, deletePromotionFile } from "./services/firebase-promotion-service.js";
 
 // Global variables
 let carouselInstance = null;
@@ -417,8 +417,8 @@ function createCustomSlide(slide) {
     return `
       <div class="fullscreen-image-slide">
         <img src="${imageUrl}" alt="${
-      slide.title || "Custom Image"
-    }" class="fullscreen-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          slide.title || "Custom Image"
+        }" class="fullscreen-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
         <div class="image-error-fallback" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px;">
           <h2>${slide.title || "Image Not Available"}</h2>
           <p>Image could not be loaded</p>
@@ -458,7 +458,7 @@ function createCustomSlide(slide) {
         <img src="${img.url}" alt="${img.caption || ""}" class="gallery-img" onerror="this.style.display='none';">
         ${img.caption ? `<div class="item-caption">${img.caption}</div>` : ""}
       </div>
-    `
+    `,
       )
       .join("");
 
@@ -551,22 +551,25 @@ async function handleCustomFormSubmit(e) {
     } else if (contentType === "Gambar") {
       const imageFile = form.contentFile.files[0];
       if (!imageFile) throw new Error("Pilih file gambar terlebih dahulu");
-      const fileUrl = await uploadFile(imageFile);
-      customData.fileUrl = fileUrl.url; // Store the full URL
+      const uploadedFile = await uploadPromotionFile(imageFile, "image");
+      customData.fileUrl = uploadedFile.url;
+      customData.filePath = uploadedFile.path;
     } else if (contentType === "Video") {
       const videoFile = form.contentFile.files[0];
       if (!videoFile) throw new Error("Pilih file video terlebih dahulu");
-      const fileUrl = await uploadFile(videoFile);
-      customData.fileUrl = fileUrl.url; // Store the full URL
+      const uploadedFile = await uploadPromotionFile(videoFile, "video");
+      customData.fileUrl = uploadedFile.url;
+      customData.filePath = uploadedFile.path;
     } else if (contentType === "Gallery") {
       const galleryImages = [];
       const galleryContainer = document.getElementById("galleryContainer");
       const imageItems = galleryContainer.querySelectorAll(".gallery-upload-item");
       for (const item of imageItems) {
         const imageUrl = item.dataset.url;
+        const imagePath = item.dataset.path;
         const caption = item.querySelector(".gallery-caption").value;
         if (imageUrl) {
-          galleryImages.push({ url: imageUrl, caption: caption });
+          galleryImages.push({ url: imageUrl, path: imagePath || "", caption: caption });
         }
       }
       if (galleryImages.length === 0) {
@@ -709,16 +712,16 @@ async function addGalleryImage(e) {
       '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
 
     // Upload file
-    const imageUrl = await uploadFile(file);
+    const uploadedFile = await uploadPromotionFile(file, "gallery");
 
     // Create gallery item
     const galleryContainer = document.getElementById("galleryContainer");
     const itemId = "gallery-item-" + Date.now();
 
     const itemHtml = `
-      <div class="gallery-upload-item" id="${itemId}" data-url="${imageUrl.url}">
+      <div class="gallery-upload-item" id="${itemId}" data-url="${uploadedFile.url}" data-path="${uploadedFile.path}">
         <div class="gallery-upload-preview">
-          <img src="${imageUrl.url}" alt="Gallery image">
+          <img src="${uploadedFile.url}" alt="Gallery image">
         </div>
         <div class="gallery-upload-controls">
           <input type="text" class="form-control form-control-sm gallery-caption" placeholder="Caption (optional)">
@@ -864,7 +867,7 @@ function editCustomItem(itemId) {
           item.images.forEach((image, index) => {
             const itemId = `gallery-item-edit-${index}`;
             const itemHtml = `
-            <div class="gallery-upload-item" id="${itemId}" data-url="${image.url}">
+            <div class="gallery-upload-item" id="${itemId}" data-url="${image.url}" data-path="${image.path || ""}">
               <div class="gallery-upload-preview">
                 <img src="${image.url}" alt="Gallery image">
               </div>
@@ -937,7 +940,33 @@ function performDelete(itemId) {
   const row = document.getElementById(`promo-row-${itemId}`);
   if (row) row.classList.add("table-danger");
 
-  remove(itemRef)
+  get(itemRef)
+    .then(async (snapshot) => {
+      const item = snapshot.val();
+
+      if (item && item.filePath) {
+        try {
+          await deletePromotionFile(item.filePath);
+        } catch (error) {
+          console.warn("Failed to delete main promotion file:", error.message);
+        }
+      }
+
+      if (item && Array.isArray(item.images)) {
+        const imagePaths = item.images.map((image) => image?.path).filter(Boolean);
+        await Promise.all(
+          imagePaths.map(async (path) => {
+            try {
+              await deletePromotionFile(path);
+            } catch (error) {
+              console.warn(`Failed to delete gallery file ${path}:`, error.message);
+            }
+          }),
+        );
+      }
+
+      await remove(itemRef);
+    })
     .then(() => {
       if (row) row.remove();
       // If table becomes empty add placeholder row

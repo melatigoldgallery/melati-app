@@ -1079,6 +1079,68 @@ tr:has(.badge.bg-info) {
   flex: 1;
   overflow-y: auto;
   padding: 10px 0;
+  /* Enable smooth scrolling */
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar untuk Sidebar - WebKit (Chrome, Safari, Edge) */
+.sidebar-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-menu::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  margin: 5px 0;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Custom Scrollbar untuk Firefox */
+.sidebar-menu {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar untuk Sidebar keseluruhan di mobile */
+.sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.sidebar::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .sidebar .nav-item {
@@ -1759,10 +1821,14 @@ tr:has(.badge.bg-info) {
   background: linear-gradient(135deg, #3fbe5d 0%, #075840 100%);
 }
 
-.btn-primary, .bg-primary {
+.btn-primary, .bg-primary  {
   background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
   color: white;
   border: none;
+}
+
+.card-attendance {
+  background: linear-gradient(135deg, #dedffa 0%, hsla(221, 100%, 64%, 0.548) 100%);
 }
 
 .btn-primary:hover {

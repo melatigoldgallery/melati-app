@@ -49,6 +49,8 @@ async function loginWithFirestore(username, password) {
       success: true,
       username: userData.username,
       role: userData.role,
+      displayName: userData.displayName || userData.username,
+      permissions: userData.permissions || null,
     };
   } catch (error) {
     console.error("Login error:", error);
@@ -93,6 +95,8 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
         JSON.stringify({
           username: result.username,
           role: result.role,
+          displayName: result.displayName,
+          permissions: result.permissions,
         })
       );
       sessionStorage.setItem("userRole", result.role);

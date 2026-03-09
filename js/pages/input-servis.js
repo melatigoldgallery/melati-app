@@ -1,4 +1,6 @@
 import { saveServisData, getServisByDate } from "../services/servis-service.js";
+import { firestore } from "../configFirebase.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Global variables
 let todayData = [];
@@ -9,6 +11,7 @@ let verifikasiAction = null;
 let verifikasiData = null;
 let editingRiwayatId = null;
 let filterJenisRiwayat = "servis";
+let passwordCache = null; // Cache untuk passwords dari Firestore
 
 // Global variables untuk detail barang
 let jenisInput = "servis";
@@ -17,6 +20,64 @@ let detailBarangCounter = 1;
 let detailBarangCustomItems = [];
 let detailBarangCustomCounter = 1;
 let modalClosedBySave = false;
+
+// Print Service Configuration
+const PRINT_SERVICE_URL = "http://localhost:3001";
+const PRINT_SERVICE_TIMEOUT = 5000;
+
+// Print Service Availability Checker
+window.printService = {
+  isOnline: false,
+  lastCheck: 0,
+  checkInterval: 30000, // Check every 30 seconds
+
+  async checkAvailability() {
+    const now = Date.now();
+    // Don't check too frequently
+    if (now - this.lastCheck < this.checkInterval) {
+      return this.isOnline;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PRINT_SERVICE_TIMEOUT);
+
+      const response = await fetch(`${PRINT_SERVICE_URL}/api/health`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+      this.isOnline = response.ok;
+      this.lastCheck = now;
+      return this.isOnline;
+    } catch (error) {
+      this.isOnline = false;
+      this.lastCheck = now;
+      return false;
+    }
+  },
+
+  async print(endpoint, data) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PRINT_SERVICE_TIMEOUT);
+
+      const response = await fetch(`${PRINT_SERVICE_URL}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+      return await response.json();
+    } catch (error) {
+      console.warn("Print service request failed:", error);
+      throw error;
+    }
+  },
+};
 
 // SweetAlert Helper Functions
 function showSuccessToast(message, timer = 2000) {
@@ -64,10 +125,43 @@ async function showConfirmDialog(title, message, confirmText = "Ya, Hapus!") {
   });
 }
 
+// Load passwords from Firestore
+async function loadPasswords() {
+  try {
+    const docRef = doc(firestore, "settings", "passwords");
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      passwordCache = docSnap.data();
+      console.log("✅ Passwords loaded from Firestore for servis verification");
+    } else {
+      // Default fallback
+      passwordCache = {
+        editServis: "admin123",
+        deleteServis: "smlt116",
+      };
+      console.log("⚠️ Using default passwords for servis");
+    }
+  } catch (error) {
+    console.error("Error loading passwords:", error);
+    // Use defaults on error
+    passwordCache = {
+      editServis: "admin123",
+      deleteServis: "smlt116",
+    };
+  }
+}
+
 // Initialize page
 document.addEventListener("DOMContentLoaded", function () {
   initializePage();
+  loadPasswords(); // Load passwords from Firestore
   setupEventListeners();
+
+  // Check print service availability
+  window.printService.checkAvailability().then((isOnline) => {
+    console.log("🖨️ Print service status:", isOnline ? "Online" : "Offline");
+  });
 });
 
 function initializePage() {
@@ -351,9 +445,10 @@ function updateDetailBarangTable() {
       <td>
         <select class="form-select form-select-sm"
                 onchange="updateDetailBarangItem(${item.id}, 'statusPembayaran', this.value)">
-          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>Lunas</option>
-          <option value="belum_lunas" ${statusPembayaran === "belum_lunas" ? "selected" : ""}>Belum Lunas</option>
-          <option value="free" ${statusPembayaran === "free" ? "selected" : ""}>Free</option>
+          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>LUNAS</option>
+          <option value="belum_lunas" ${statusPembayaran === "belum_lunas" ? "selected" : ""}>BELUM LUNAS</option>
+          <option value="free" ${statusPembayaran === "free" ? "selected" : ""}>GRATIS</option>
+          <option value="custom" ${statusPembayaran === "custom" ? "selected" : ""}>CUSTOM</option>
         </select>
       </td>
       <td>
@@ -430,8 +525,8 @@ function updateDetailBarangCustomTable() {
       <td><input type="text" class="form-control form-control-sm" value="${
         item.namaBarang
       }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'namaBarang', this.value)" placeholder="Nama barang" required /></td>
+        item.id
+      }, 'namaBarang', this.value)" placeholder="Nama barang" required /></td>
       <td><input type="text" class="form-control form-control-sm" value="${
         item.berat
       }" onchange="updateDetailBarangCustomItem(${item.id}, 'berat', this.value)" placeholder="Berat" /></td>
@@ -447,16 +542,16 @@ function updateDetailBarangCustomTable() {
       <td><input type="number" class="form-control form-control-sm" value="${
         item.totalDp || 0
       }" onchange="updateDetailBarangCustomItem(${
-      item.id
-    }, 'totalDp', this.value)" placeholder="Total DP" min="0" /></td>
+        item.id
+      }, 'totalDp', this.value)" placeholder="Total DP" min="0" /></td>
       <td><input type="number" class="form-control form-control-sm" value="${
         item.ongkos || 0
       }" onchange="updateDetailBarangCustomItem(${item.id}, 'ongkos', this.value)" placeholder="Ongkos" min="0" /></td>
       <td>
         <select class="form-select form-select-sm"
                 onchange="updateDetailBarangCustomItem(${item.id}, 'statusPembayaran', this.value)">
-          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>Lunas</option>
-          <option value="custom" ${statusPembayaran === "custom" ? "selected" : ""}>Custom</option>
+          <option value="nominal" ${statusPembayaran === "nominal" ? "selected" : ""}>LUNAS</option>
+          <option value="custom" ${statusPembayaran === "custom" ? "selected" : ""}>CUSTOM</option>
         </select>
       </td>
       <td><input type="text" class="form-control form-control-sm" value="${
@@ -525,7 +620,7 @@ function validateDetailBarang() {
       ) {
         showErrorModal(
           "Validasi Error",
-          `Ongkos pada baris ${i + 1} harus diisi untuk status ${getStatusLabel(itemStatus)}!`
+          `Ongkos pada baris ${i + 1} harus diisi untuk status ${getStatusLabel(itemStatus)}!`,
         );
         return false;
       }
@@ -663,7 +758,7 @@ function openServisModal(index = -1) {
     function () {
       document.getElementById("namaSales").focus();
     },
-    { once: true }
+    { once: true },
   );
 }
 
@@ -735,18 +830,22 @@ async function saveServisItem() {
   } else {
     const totalDp = detailBarangCustomItems.reduce((sum, item) => sum + (parseInt(item.totalDp) || 0), 0);
     const totalOngkos = detailBarangCustomItems.reduce((sum, item) => sum + (parseInt(item.ongkos) || 0), 0);
-    servisItem.detailBarangCustom = detailBarangCustomItems.map((item) => ({
-      jumlah: parseInt(item.jumlah) || 1,
-      namaBarang: item.namaBarang.trim(),
-      berat: item.berat.trim(),
-      panjang: item.panjang.trim(),
-      kadar: item.kadar.trim(),
-      warna: item.warna.trim(),
-      totalDP: parseInt(item.totalDp) || 0,
-      ongkos: parseInt(item.ongkos) || 0,
-      statusPembayaran: item.statusPembayaran || "nominal",
-      rincianServis: item.rincianServis.trim(),
-    }));
+    servisItem.detailBarangCustom = detailBarangCustomItems.map((item) => {
+      const statusPembayaran = item.statusPembayaran || "nominal";
+
+      return {
+        jumlah: parseInt(item.jumlah) || 1,
+        namaBarang: item.namaBarang.trim(),
+        berat: item.berat.trim(),
+        panjang: item.panjang.trim(),
+        kadar: item.kadar.trim(),
+        warna: item.warna.trim(),
+        totalDP: parseInt(item.totalDp) || 0,
+        ongkos: parseInt(item.ongkos) || 0,
+        statusPembayaran: statusPembayaran,
+        rincianServis: item.rincianServis.trim(),
+      };
+    });
     servisItem.totalDP = totalDp;
     servisItem.totalOngkos = totalOngkos;
     servisItem.namaBarang = detailBarangCustomItems[0]?.namaBarang || "";
@@ -771,7 +870,7 @@ async function saveServisItem() {
           day,
           originalDate.getHours(),
           originalDate.getMinutes(),
-          originalDate.getSeconds()
+          originalDate.getSeconds(),
         );
         servisItem.tanggal = updatedDate.toISOString();
       }
@@ -814,7 +913,7 @@ async function saveServisItem() {
       (item) =>
         item.namaCustomer.toLowerCase() === namaCustomer.toLowerCase() &&
         item.noHp === noHp &&
-        item.namaBarang.toLowerCase() === servisItem.namaBarang.toLowerCase()
+        item.namaBarang.toLowerCase() === servisItem.namaBarang.toLowerCase(),
     );
     if (isDuplicate) {
       showErrorModal("Duplikasi Data", "Data dengan kombinasi customer, no HP, dan barang yang sama sudah ada!");
@@ -1007,7 +1106,7 @@ window.deleteServisItem = async function (index) {
   const result = await showConfirmDialog(
     "Hapus Item?",
     "Item ini akan dihapus dari daftar (belum tersimpan ke database)",
-    "Ya, Hapus!"
+    "Ya, Hapus!",
   );
 
   if (result.isConfirmed) {
@@ -1026,7 +1125,7 @@ window.deleteCustomItem = async function (index) {
   const result = await showConfirmDialog(
     "Hapus Item?",
     "Item ini akan dihapus dari daftar (belum tersimpan ke database)",
-    "Ya, Hapus!"
+    "Ya, Hapus!",
   );
 
   if (result.isConfirmed) {
@@ -1050,7 +1149,7 @@ window.editRiwayatItem = function (id, index) {
     function () {
       document.getElementById("kodeVerifikasi").focus();
     },
-    { once: true }
+    { once: true },
   );
 };
 
@@ -1059,7 +1158,7 @@ window.deleteRiwayatItem = async function (id, index) {
   const result = await showConfirmDialog(
     "Hapus Data Riwayat?",
     "Data ini akan dihapus permanen dari database. Anda perlu memasukkan kode verifikasi.",
-    "Lanjutkan"
+    "Lanjutkan",
   );
 
   if (!result.isConfirmed) return;
@@ -1077,20 +1176,34 @@ window.deleteRiwayatItem = async function (id, index) {
     function () {
       document.getElementById("kodeVerifikasi").focus();
     },
-    { once: true }
+    { once: true },
   );
 };
 
 async function handleVerifikasi() {
   const kode = document.getElementById("kodeVerifikasi").value;
 
-  if (kode !== "smlt116") {
-    showErrorAlert("Verifikasi Gagal!", "Kode verifikasi yang Anda masukkan salah");
-    document.getElementById("kodeVerifikasi").focus();
-    return;
-  }
-
   try {
+    // Load passwords dari Firestore
+    const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+    const passwords = settingsDoc.exists() ? settingsDoc.data() : passwordCache;
+
+    // Determine which password to use based on action
+    let correctPassword;
+    if (verifikasiAction === "edit") {
+      correctPassword = passwords?.editServis || "admin123";
+    } else if (verifikasiAction === "delete") {
+      correctPassword = passwords?.deleteServis || "smlt116";
+    } else {
+      showErrorAlert("Error!", "Action tidak dikenali");
+      return;
+    }
+
+    if (kode !== correctPassword) {
+      showErrorAlert("Verifikasi Gagal!", "Kode verifikasi yang Anda masukkan salah");
+      document.getElementById("kodeVerifikasi").focus();
+      return;
+    }
     if (verifikasiAction === "edit") {
       const item = todayData[verifikasiData.index];
       editingRiwayatId = verifikasiData.id;
@@ -1193,7 +1306,7 @@ async function handleVerifikasi() {
           function () {
             document.getElementById("namaSales").focus();
           },
-          { once: true }
+          { once: true },
         );
       }, 300);
 
@@ -1294,8 +1407,11 @@ async function saveAllServisData() {
       const servisItems = savedItems.filter((item) => item.jenisInput === "servis");
       const customItems = savedItems.filter((item) => item.jenisInput === "custom");
 
+      console.log("\ud83d\udcbe Auto print after save - Servis:", servisItems.length, "Custom:", customItems.length);
+
       if (servisItems.length > 0 && customItems.length > 0) {
         // Jika ada keduanya, print servis dulu
+        console.log("\ud83d\udda8\ufe0f Auto printing both servis & custom nota...");
         printNotaServis(servisItems);
         // Delay print custom untuk menghindari konflik dengan popup servis
         setTimeout(() => {
@@ -1303,9 +1419,11 @@ async function saveAllServisData() {
         }, 1500);
       } else if (servisItems.length > 0) {
         // Hanya servis
+        console.log("\ud83d\udda8\ufe0f Auto printing servis nota...");
         printNotaServis(servisItems);
       } else if (customItems.length > 0) {
         // Hanya custom - langsung print tanpa delay panjang
+        console.log("\ud83d\udda8\ufe0f Auto printing custom nota...");
         printNotaCustom(customItems);
       }
     }, 500);
@@ -1766,42 +1884,8 @@ window.printSingleItem = function (id, index) {
     return;
   }
 
-  const printWindow = window.open("", "_blank");
-  const tanggalFormatted = new Date(item.tanggal).toLocaleDateString("id-ID");
-
-  const printContent = `
-    <html>
-      <head>
-        <title>Label Servis - ${item.namaCustomer}</title>
-        ${getPrintStyles()}
-      </head>
-      <body>
-        <div class="boxes-container">
-          ${generatePrintBox(item)}
-        </div>
-      </body>
-    </html>
-  `;
-
-  printWindow.document.write(printContent);
-  printWindow.document.close();
-
-  // Auto print 2x (double print) dengan auto-close
-  let printCount = 0;
-  const handleAfterPrint = () => {
-    printCount++;
-    if (printCount === 2) {
-      printWindow.removeEventListener("afterprint", handleAfterPrint);
-      setTimeout(() => printWindow.close(), 100);
-    }
-  };
-
-  printWindow.addEventListener("afterprint", handleAfterPrint);
-
-  printWindow.print();
-  setTimeout(() => {
-    printWindow.print();
-  }, 100);
+  console.log("🏷️ Print single label for:", item.namaCustomer);
+  printLabelServis([item]);
 };
 
 // Fungsi untuk reprint nota servis individual dari riwayat
@@ -1812,6 +1896,7 @@ window.printNotaServisItem = function (id, index) {
     alert("Data tidak ditemukan");
     return;
   }
+  console.log("🧾 Reprint nota servis for:", item.namaCustomer);
   printNotaServis([item]);
 };
 
@@ -1823,21 +1908,29 @@ window.printNotaCustomItem = function (id, index) {
     alert("Data tidak ditemukan");
     return;
   }
+
   printNotaCustom([item]);
 };
 
-function printReport() {
-  if (todayData.length === 0) {
-    alert("Tidak ada data untuk dicetak");
+// Print label servis - try service first, fallback to browser
+// Print label servis - always use browser print
+function printLabelServis(items) {
+  console.log("🖨️ Print label servis:", items.length, "item(s)");
+  printLabelServisBrowser(items);
+}
+
+// Browser print function for label servis (fallback)
+function printLabelServisBrowser(items) {
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    alert("Popup diblokir oleh browser. Silakan izinkan popup untuk mencetak.");
     return;
   }
 
-  const tanggalRiwayat = document.getElementById("tanggalRiwayat").value;
-  const printWindow = window.open("", "_blank");
-
   // Generate boxes menggunakan shared function
   let boxesContent = "";
-  todayData.forEach((item) => {
+  items.forEach((item) => {
     boxesContent += generatePrintBox(item);
   });
 
@@ -1858,12 +1951,31 @@ function printReport() {
   printWindow.document.write(printContent);
   printWindow.document.close();
 
-  // Auto-close setelah print selesai
+  // Show success message
+  Swal.fire({
+    icon: "info",
+    title: "Siap Cetak",
+    text: "Silakan konfirmasi di dialog print browser",
+    timer: 2000,
+    showConfirmButton: false,
+  });
+
+  // Auto print 1x dengan auto-close
   printWindow.addEventListener("afterprint", () => {
     setTimeout(() => printWindow.close(), 100);
   });
 
   printWindow.print();
+}
+
+function printReport() {
+  if (todayData.length === 0) {
+    alert("Tidak ada data untuk dicetak");
+    return;
+  }
+
+  console.log("🖨️ Print all labels, total:", todayData.length, "items");
+  printLabelServis(todayData);
 }
 
 // Helper function untuk format text dengan padding
@@ -1927,6 +2039,7 @@ function formatCurrency(amount) {
 function generateNotaHTML(servisData) {
   const today = new Date();
   const formattedDate = today.toLocaleDateString("id-ID");
+  const tanggalSelesai = getTanggalSelesai(3);
 
   if (servisData.length === 0) return "";
 
@@ -1976,8 +2089,9 @@ function generateNotaHTML(servisData) {
   return `
     <div class="customer-info">
       <div>${formattedDate}</div>
-      <div style="margin-top: 3mm;">${customerName}</div>
-      <div style="margin-top: 3mm;">${firstCustomer.noHp || firstCustomer.noTelepon || ""}</div>
+      <div>± ${tanggalSelesai}</div>
+      <div style="margin-top: 3mm; line-height: 1.8;">${customerName}</div>
+      <div style="margin-top: 3mm; line-height: 1.8;">${firstCustomer.noHp || firstCustomer.noTelepon || ""}</div>
     </div>
 
     <div class="nota-table">
@@ -1999,8 +2113,115 @@ function generateNotaHTML(servisData) {
   `;
 }
 
-// Fungsi utama untuk print nota servis dengan HTML table
-function printNotaServis(servisData) {
+// Helper function untuk menghitung tanggal selesai (tanggal + N hari)
+function getTanggalSelesai(daysToAdd) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysToAdd);
+  return date.toLocaleDateString("id-ID");
+}
+
+// Fungsi utama untuk print nota servis - try service first, fallback to browser
+async function printNotaServis(servisData) {
+  console.log("🔄 printNotaServis called for", servisData.length, "item(s)");
+
+  // Show loading alert
+  Swal.fire({
+    title: "Memproses Print...",
+    html: "Sedang mempersiapkan nota servis untuk dicetak",
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+
+  // Check if print service is available
+  const isServiceOnline = await window.printService.checkAvailability();
+  console.log("🖨️ Print service status:", isServiceOnline ? "✅ Online" : "❌ Offline");
+
+  if (isServiceOnline) {
+    try {
+      const firstCustomer = servisData[0];
+      const notaData = {
+        tanggal: new Date().toLocaleDateString("id-ID"),
+        tanggalSelesai: getTanggalSelesai(3),
+        customerName: firstCustomer.namaCustomer || "",
+        customerPhone: firstCustomer.noHp || firstCustomer.noTelepon || "",
+        salesName: firstCustomer.namaSales || "Admin",
+        items: [],
+        totalOngkos: 0,
+      };
+
+      // Flatten items from all servis data
+      servisData.forEach((servis) => {
+        const details =
+          servis.detailBarang && servis.detailBarang.length > 0
+            ? servis.detailBarang
+            : [
+                {
+                  jumlah: 1,
+                  namaBarang: servis.namaBarang || "",
+                  berat: servis.berat || "",
+                  karat: servis.karat || "",
+                  jenisServis: servis.jenisServis || "",
+                  rincianServis: servis.rincianServis || "",
+                  ongkos: servis.ongkos || 0,
+                  statusPembayaran: servis.statusPembayaran || "nominal",
+                },
+              ];
+
+        details.forEach((item) => {
+          notaData.items.push({
+            jumlah: item.jumlah || 1,
+            namaBarang: item.namaBarang.trim(),
+            berat: item.berat.trim(),
+            karat: item.karat.trim(),
+            jenisServis: item.jenisServis.trim(),
+            rincianServis: item.rincianServis?.trim() || "",
+            ongkos: parseInt(item.ongkos) || 0,
+            statusPembayaran: item.statusPembayaran || "nominal",
+          });
+          notaData.totalOngkos += parseInt(item.ongkos) || 0;
+        });
+      });
+
+      // Call print service API
+      const result = await window.printService.print("/api/print/nota-servis", notaData);
+
+      if (result.success) {
+        console.log("✅ Nota servis queued for printing:", result.jobID);
+
+        // Update loading message
+        Swal.update({
+          title: "Sedang Mencetak...",
+          html: "Printer sedang memproses 2 salinan nota servis",
+        });
+
+        // Wait a bit then show success
+        setTimeout(() => {
+          Swal.close();
+          Swal.fire({
+            icon: "success",
+            title: "Print Berhasil!",
+            text: "2 salinan nota servis berhasil dicetak",
+            timer: 2500,
+            showConfirmButton: false,
+          });
+        }, 1500);
+        return;
+      }
+    } catch (error) {
+      console.warn("⚠️ Print service failed, using browser fallback:", error);
+    }
+  }
+
+  // Fallback to browser print
+  console.log("🌐 Using browser print (fallback)");
+  Swal.close();
+  printNotaServisBrowser(servisData);
+}
+
+// Browser print function for nota servis (fallback)
+function printNotaServisBrowser(servisData) {
   const notaHTML = generateNotaHTML(servisData);
   const printWindow = window.open("", "_blank");
 
@@ -2100,22 +2321,43 @@ function printNotaServis(servisData) {
 
   printWindow.document.close();
 
-  // Auto print 2x (double print) dengan auto-close
+  // Show printing message
+  Swal.fire({
+    title: "Sedang Mencetak...",
+    html: "Mohon tunggu, mencetak 2 salinan nota servis",
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+
+  // Print 2x
   let printCount = 0;
-  const handleAfterPrint = () => {
+  const doPrint = () => {
     printCount++;
-    if (printCount === 2) {
-      printWindow.removeEventListener("afterprint", handleAfterPrint);
-      setTimeout(() => printWindow.close(), 100);
+    printWindow.print();
+
+    if (printCount < 2) {
+      setTimeout(doPrint, 500);
+    } else {
+      // After 2nd print, show success
+      setTimeout(() => {
+        printWindow.close();
+        Swal.close();
+        Swal.fire({
+          icon: "success",
+          title: "Print Berhasil!",
+          text: "2 salinan nota servis berhasil dicetak",
+          timer: 2500,
+          showConfirmButton: false,
+        });
+      }, 1000);
     }
   };
 
-  printWindow.addEventListener("afterprint", handleAfterPrint);
-
-  printWindow.print();
-  setTimeout(() => {
-    printWindow.print();
-  }, 100);
+  printWindow.addEventListener("load", () => {
+    setTimeout(doPrint, 300);
+  });
 }
 
 // Fungsi untuk generate HTML nota custom
@@ -2169,6 +2411,26 @@ function generateNotaCustomHTML(servisData) {
   // Hitung grand total (DP + Ongkos)
   const grandTotal = totalDP + totalOngkos;
 
+  // Determine dpLabel based on all items' statusPembayaran
+  let dpLabel = "DP"; // default
+  let allItemsLunas = true;
+
+  servisData.forEach((servis) => {
+    const details = servis.detailBarangCustom || [];
+    details.forEach((item) => {
+      const status = item.statusPembayaran || "nominal";
+      if (status !== "nominal") {
+        allItemsLunas = false;
+      }
+    });
+  });
+
+  if (allItemsLunas) {
+    dpLabel = "LUNAS";
+  } else {
+    dpLabel = "DP";
+  }
+
   return `
     <div class="customer-info">
       <div>${formattedDate}</div>
@@ -2190,7 +2452,7 @@ function generateNotaCustomHTML(servisData) {
     </div>
 
     <div class="total-dp-info">
-      ${formatCurrency(totalDP)} (DP)
+      ${formatCurrency(totalDP)} (${dpLabel})
     </div>
 
     <div class="note-info">
@@ -2203,8 +2465,100 @@ function generateNotaCustomHTML(servisData) {
   `;
 }
 
-// Fungsi utama untuk print nota custom
-function printNotaCustom(servisData) {
+// Fungsi utama untuk print nota custom - try service first, fallback to browser
+async function printNotaCustom(servisData) {
+  // Show loading alert
+  Swal.fire({
+    title: "Memproses Print...",
+    html: "Sedang mempersiapkan nota custom untuk dicetak",
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+
+  // Check if print service is available
+  const isServiceOnline = await window.printService.checkAvailability();
+  console.log("🖨️ Print service status:", isServiceOnline ? "✅ Online" : "❌ Offline");
+
+  if (isServiceOnline) {
+    try {
+      const firstCustomer = servisData[0];
+      const notaData = {
+        tanggal: new Date().toLocaleDateString("id-ID"),
+        customerName: firstCustomer.namaCustomer || "",
+        customerPhone: firstCustomer.noHp || "",
+        salesName: firstCustomer.namaSales || "Admin",
+        items: [],
+        totalDP: 0,
+        totalOngkos: 0,
+        grandTotal: 0,
+      };
+
+      // Flatten items from all custom data
+      servisData.forEach((servis) => {
+        const details = servis.detailBarangCustom || [];
+
+        details.forEach((item) => {
+          const statusPembayaran = item.statusPembayaran || "nominal";
+
+          notaData.items.push({
+            jumlah: parseInt(item.jumlah) || 1,
+            namaBarang: item.namaBarang.trim(),
+            berat: item.berat?.trim() || "",
+            panjang: item.panjang?.trim() || "",
+            kadar: item.kadar?.trim() || "",
+            warna: item.warna?.trim() || "",
+            totalDP: parseInt(item.totalDP) || 0,
+            ongkos: parseInt(item.ongkos) || 0,
+            statusPembayaran: statusPembayaran,
+            rincianServis: item.rincianServis?.trim() || "",
+          });
+          notaData.totalDP += parseInt(item.totalDP) || 0;
+          notaData.totalOngkos += parseInt(item.ongkos) || 0;
+        });
+      });
+
+      notaData.grandTotal = notaData.totalDP + notaData.totalOngkos;
+
+      // Call print service API
+      const result = await window.printService.print("/api/print/nota-custom", notaData);
+
+      if (result.success) {
+        console.log("✅ Nota custom queued for printing:", result.jobID);
+
+        // Update loading message
+        Swal.update({
+          title: "Sedang Mencetak...",
+          html: "Printer sedang memproses 2 salinan nota custom",
+        });
+
+        // Wait a bit then show success
+        setTimeout(() => {
+          Swal.close();
+          Swal.fire({
+            icon: "success",
+            title: "Print Berhasil!",
+            text: "2 salinan nota custom berhasil dicetak",
+            timer: 2500,
+            showConfirmButton: false,
+          });
+        }, 1500);
+        return;
+      }
+    } catch (error) {
+      console.warn("⚠️ Print service failed, using browser fallback:", error);
+    }
+  }
+
+  // Fallback to browser print
+  console.log("🌐 Using browser print (fallback)");
+  Swal.close();
+  printNotaCustomBrowser(servisData);
+}
+
+// Browser print function for nota custom (fallback)
+function printNotaCustomBrowser(servisData) {
   const notaHTML = generateNotaCustomHTML(servisData);
   const printWindow = window.open("", "_blank");
 
@@ -2252,24 +2606,24 @@ function printNotaCustom(servisData) {
             line-height: 2;
           }
           td:nth-child(1) {
-            width: 40px;
+            width: 55px;
           }
           td:nth-child(2) {
-            width: 130px;
+            width: 220px;
           }
           td:nth-child(3) {
-            width: 20px;
+            width: 45px;
             align-items: center;
           }
           td:nth-child(4) {
-            width: 20px;
+            width: 65px;
             align-items: center;
           }
           td:nth-child(5) {
-            width: 30px;
+            width: 65px;
           }
           td:nth-child(6) {
-            width: 50px;
+            width: 70px;
           }
           .bayar-awal-section {
             position: absolute;
@@ -2325,18 +2679,43 @@ function printNotaCustom(servisData) {
 
   printWindow.document.close();
 
+  // Show printing message
+  Swal.fire({
+    title: "Sedang Mencetak...",
+    html: "Mohon tunggu, mencetak 2 salinan nota custom",
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+
+  // Print 2x
   let printCount = 0;
-  const handleAfterPrint = () => {
+  const doPrint = () => {
     printCount++;
-    if (printCount === 2) {
-      printWindow.removeEventListener("afterprint", handleAfterPrint);
-      setTimeout(() => printWindow.close(), 100);
+    printWindow.print();
+
+    if (printCount < 2) {
+      setTimeout(doPrint, 500);
+    } else {
+      // After 2nd print, show success
+      setTimeout(() => {
+        printWindow.close();
+        Swal.close();
+        Swal.fire({
+          icon: "success",
+          title: "Print Berhasil!",
+          text: "2 salinan nota custom berhasil dicetak",
+          timer: 2500,
+          showConfirmButton: false,
+        });
+      }, 1000);
     }
   };
 
-  printWindow.addEventListener("afterprint", handleAfterPrint);
-  printWindow.print();
-  setTimeout(() => printWindow.print(), 100);
+  printWindow.addEventListener("load", () => {
+    setTimeout(doPrint, 300);
+  });
 }
 
 function exportServisToPDF() {

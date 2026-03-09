@@ -197,17 +197,28 @@ function cleanupOldReportCache() {
   saveReportCacheToStorage();
 }
 
-// Fungsi untuk memaksa refresh data
-function forceRefreshData() {
-  // Tampilkan konfirmasi
-  if (confirm("Apakah Anda yakin ingin menyegarkan data dari server?")) {
-    // Panggil generateReport dengan forceRefresh=true
-    generateReport(true);
+// Fungsi untuk check akses admin/supervisor
+function checkAdminAccess() {
+  try {
+    const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+    const isAdmin = currentUser.username === "supervisor" || currentUser.role === "supervisor";
 
-    // Tampilkan pesan
-    showAlert("info", "Data sedang disegarkan dari server...");
+    if (!isAdmin) {
+      // Sembunyikan tombol hapus data bulan
+      const deleteDataBtn = document.getElementById("deleteDataBtn");
+      if (deleteDataBtn) {
+        deleteDataBtn.style.display = "none";
+      }
+
+      // Sembunyikan kolom aksi di tabel
+      const aksiHeaders = document.querySelectorAll(".aksi");
+      aksiHeaders.forEach((header) => (header.style.display = "none"));
+    }
+  } catch (error) {
+    console.error("Error checking admin access:", error);
   }
 }
+
 // Initialize page
 document.addEventListener("DOMContentLoaded", () => {
   try {
@@ -217,11 +228,8 @@ document.addEventListener("DOMContentLoaded", () => {
     restorePageState();
     // Bersihkan cache lama
     cleanupOldReportCache();
-    // Tambahkan event listener untuk tombol refresh jika ada
-    const refreshButton = document.getElementById("refreshData");
-    if (refreshButton) {
-      refreshButton.addEventListener("click", forceRefreshData);
-    }
+    // Check admin access untuk tombol hapus
+    checkAdminAccess();
 
     // Set current date and time
     function updateDateTime() {
@@ -812,7 +820,7 @@ async function generateReport(forceRefresh = false) {
       // Tidak ada cache, tampilkan pesan error
       showAlert(
         "danger",
-        '<i class="fas fa-exclamation-circle me-2"></i> Terjadi kesalahan saat memuat data: ' + error.message
+        '<i class="fas fa-exclamation-circle me-2"></i> Terjadi kesalahan saat memuat data: ' + error.message,
       );
       hideReportElements();
       document.getElementById("noDataMessage").style.display = "block";
@@ -1238,13 +1246,13 @@ function updateSummaryCards() {
 
     // Count by status
     const approvedCount = currentLeaveData.filter(
-      (leave) => leave.status === "Approved" || leave.status === "Disetujui"
+      (leave) => leave.status === "Approved" || leave.status === "Disetujui",
     ).length;
     const rejectedCount = currentLeaveData.filter(
-      (leave) => leave.status === "Rejected" || leave.status === "Ditolak"
+      (leave) => leave.status === "Rejected" || leave.status === "Ditolak",
     ).length;
     const pendingCount = currentLeaveData.filter(
-      (leave) => leave.status === "Pending" || leave.status === "Menunggu Persetujuan"
+      (leave) => leave.status === "Pending" || leave.status === "Menunggu Persetujuan",
     ).length;
 
     const approvedLeaves = document.getElementById("approvedLeaves");
@@ -1417,16 +1425,16 @@ function populateLeaveTable() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
 
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
 
           // Format tanggal dalam format Indonesia
@@ -1469,15 +1477,15 @@ function populateLeaveTable() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
           const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -1843,7 +1851,38 @@ async function deleteMonthData() {
       confirmDeleteBtn.disabled = true;
     }
 
-    // Delete data
+    // Collect medical certificate paths for deletion
+    const dataToDelete = allCachedData.length > 0 ? allCachedData : currentLeaveData;
+    const medicalCertPaths = dataToDelete
+      .map((leave) => {
+        // Check if leave has medical certificate
+        if (
+          leave.leaveType === "sakit" &&
+          leave.replacementDetails &&
+          leave.replacementDetails.hasMedicalCertificate &&
+          leave.replacementDetails.medicalCertificateFile &&
+          leave.replacementDetails.medicalCertificateFile.path
+        ) {
+          return leave.replacementDetails.medicalCertificateFile.path;
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    // Delete photos from storage first
+    let deletedPhotosCount = 0;
+    if (medicalCertPaths.length > 0) {
+      console.log(`🗑️ Deleting ${medicalCertPaths.length} medical certificates from storage...`);
+
+      // Import delete function dynamically
+      const { deleteMultipleMedicalCertificates } = await import("../services/firebase-medical-cert-service.js");
+
+      const deleteResult = await deleteMultipleMedicalCertificates(medicalCertPaths);
+      deletedPhotosCount = deleteResult.success;
+      console.log(`✓ Medical certificates deleted: ${deleteResult.success}, failed: ${deleteResult.failed}`);
+    }
+
+    // Delete data from Firestore
     const deletedCount = await deleteLeaveRequestsByMonth(month, year);
 
     // Hide modal
@@ -1861,8 +1900,12 @@ async function deleteMonthData() {
       confirmDeleteBtn.disabled = false;
     }
 
-    // Show success message
-    showAlert("success", `Berhasil menghapus ${deletedCount} data izin untuk bulan ${monthNames[month - 1]} ${year}`);
+    // Show success message with photo count
+    const successMessage =
+      deletedPhotosCount > 0
+        ? `Berhasil menghapus ${deletedCount} data izin dan ${deletedPhotosCount} foto medical certificate untuk bulan ${monthNames[month - 1]} ${year}`
+        : `Berhasil menghapus ${deletedCount} data izin untuk bulan ${monthNames[month - 1]} ${year}`;
+    showAlert("success", successMessage);
 
     // Clear cache for this month/year
     const cacheKey = `${month}_${year}`;
@@ -1890,7 +1933,7 @@ async function deleteMonthData() {
 }
 
 // Export to Excel - update untuk mendukung format baru
-function exportToExcel() {
+async function exportToExcel() {
   try {
     // Gunakan allCachedData jika tersedia, jika tidak gunakan currentLeaveData
     const dataToExport = allCachedData.length > 0 ? allCachedData : currentLeaveData;
@@ -1904,12 +1947,79 @@ function exportToExcel() {
     const year = parseInt(document.getElementById("yearSelector").value);
     const monthName = monthNames[month - 1];
 
+    // Show loading state
+    const exportBtn = document.getElementById("exportExcelBtn");
+    const originalText = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Memproses...';
+    exportBtn.disabled = true;
+
     // Create a new workbook
     const wb = XLSX.utils.book_new();
 
     // Prepare data for export
     const exportData = [];
     let rowNumber = 1;
+
+    // Collect medical certificate URLs for download
+    const medicalCertFiles = [];
+    const usedMedicalCertNames = new Map();
+
+    const normalizeStaffNameForFile = (name) => {
+      return (
+        String(name || "Unknown")
+          .replace(/[^a-zA-Z0-9\s-]/g, "")
+          .trim()
+          .replace(/\s+/g, "_")
+          .substring(0, 50) || "Unknown"
+      );
+    };
+
+    const extractDateForFile = (dateValue) => {
+      try {
+        let parsedDate = null;
+        if (dateValue instanceof Date) {
+          parsedDate = dateValue;
+        } else if (dateValue && typeof dateValue === "object" && typeof dateValue.seconds === "number") {
+          parsedDate = new Date(dateValue.seconds * 1000);
+        } else if (typeof dateValue === "string" || typeof dateValue === "number") {
+          parsedDate = new Date(dateValue);
+        }
+
+        if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+          const now = new Date();
+          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        }
+
+        return `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, "0")}-${String(parsedDate.getDate()).padStart(2, "0")}`;
+      } catch (error) {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      }
+    };
+
+    const buildMedicalCertExportName = (leave, certFile, leaveDateValue) => {
+      const staffName = normalizeStaffNameForFile(leave.name || leave.employeeId || "Unknown");
+      const leaveDate = extractDateForFile(leaveDateValue);
+
+      let ext = "jpg";
+      if (certFile && certFile.name && certFile.name.includes(".")) {
+        ext = certFile.name.split(".").pop().toLowerCase();
+      } else if (certFile && certFile.type) {
+        if (certFile.type.includes("pdf")) ext = "pdf";
+        else if (certFile.type.includes("png")) ext = "png";
+        else if (certFile.type.includes("jpeg") || certFile.type.includes("jpg")) ext = "jpg";
+      }
+
+      const baseName = `${staffName}_${leaveDate}`;
+      const currentCount = usedMedicalCertNames.get(baseName) || 0;
+      usedMedicalCertNames.set(baseName, currentCount + 1);
+
+      if (currentCount === 0) {
+        return `${baseName}.${ext}`;
+      }
+
+      return `${baseName}_${currentCount + 1}.${ext}`;
+    };
 
     // Process each leave request
     dataToExport.forEach((leave) => {
@@ -2002,6 +2112,14 @@ function exportToExcel() {
           }
         }
 
+        // Collect medical certificate URL if available
+        if (hasMedicalCert && leave.replacementDetails && leave.replacementDetails.medicalCertificateFile) {
+          const certFile = leave.replacementDetails.medicalCertificateFile;
+          const certUrl = certFile.url;
+          const certName = buildMedicalCertExportName(leave, certFile, leave.leaveDate || leave.date);
+          medicalCertFiles.push({ url: certUrl, name: certName, employeeId: leave.employeeId });
+        }
+
         // Add to export data
         exportData.push({
           No: rowNumber,
@@ -2024,16 +2142,16 @@ function exportToExcel() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
 
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
 
           // Format tanggal dalam format Indonesia
@@ -2051,6 +2169,14 @@ function exportToExcel() {
           // Format replacement info
           let replacementType = hasMedicalCert ? "Ada Surat DC" : "Cuti";
           let replacementInfo = "Tidak perlu diganti";
+
+          // Collect medical certificate URL if available
+          if (hasMedicalCert && leave.replacementDetails && leave.replacementDetails.medicalCertificateFile) {
+            const certFile = leave.replacementDetails.medicalCertificateFile;
+            const certUrl = certFile.url;
+            const certName = buildMedicalCertExportName(leave, certFile, leave.leaveStartDate || leave.date);
+            medicalCertFiles.push({ url: certUrl, name: certName, employeeId: leave.employeeId });
+          }
 
           // Add to export data
           exportData.push({
@@ -2072,15 +2198,15 @@ function exportToExcel() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
           const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -2156,7 +2282,7 @@ function exportToExcel() {
     XLSX.utils.sheet_add_aoa(
       ws,
       [[`LAPORAN IZIN KARYAWAN`], [`MELATI GOLD SHOP`], [`BULAN ${monthName.toUpperCase()} ${year}`]],
-      { origin: "A1" }
+      { origin: "A1" },
     );
 
     // Set column widths
@@ -2198,15 +2324,76 @@ function exportToExcel() {
     XLSX.utils.book_append_sheet(wb, ws, "Laporan Izin");
 
     // Generate filename
-    const fileName = `Laporan_Izin_${monthName}_${year}.xlsx`;
+    const fileName = `Laporan_Izin_${monthName}_${year}`;
 
-    // Export to file
-    XLSX.writeFile(wb, fileName);
+    // Check if there are medical certificates to download
+    if (medicalCertFiles.length > 0) {
+      // Export dengan foto - create ZIP
+      exportBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i> Mengunduh ${medicalCertFiles.length} foto...`;
 
-    showAlert("success", `Berhasil mengekspor data ke ${fileName}`);
+      // Create ZIP file
+      const zip = new JSZip();
+
+      // Add Excel file to ZIP
+      const excelBlob = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      zip.file(`${fileName}.xlsx`, excelBlob);
+
+      // Create folder for medical certificates
+      const medicalCertFolder = zip.folder("medical_certificates");
+
+      // Download all medical certificate photos
+      let downloadedCount = 0;
+      const downloadPromises = medicalCertFiles.map(async (certFile, index) => {
+        try {
+          exportBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i> Mengunduh ${downloadedCount + 1}/${medicalCertFiles.length} foto...`;
+
+          const response = await fetch(certFile.url);
+          if (!response.ok) throw new Error(`Failed to download ${certFile.name}`);
+
+          const blob = await response.blob();
+          medicalCertFolder.file(certFile.name, blob);
+          downloadedCount++;
+
+          exportBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i> Mengunduh ${downloadedCount}/${medicalCertFiles.length} foto...`;
+        } catch (error) {
+          console.warn(`Failed to download medical cert ${certFile.name}:`, error);
+          // Continue with other files even if one fails
+        }
+      });
+
+      // Wait for all downloads to complete
+      await Promise.all(downloadPromises);
+
+      // Generate ZIP
+      exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Membuat file ZIP...';
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+
+      // Download ZIP file
+      saveAs(zipBlob, `${fileName}.zip`);
+
+      showAlert(
+        "success",
+        `Berhasil mengekspor data dengan ${downloadedCount} foto medical certificate ke ${fileName}.zip`,
+      );
+    } else {
+      // Export tanpa foto - Excel biasa
+      XLSX.writeFile(wb, `${fileName}.xlsx`);
+      showAlert("success", `Berhasil mengekspor data ke ${fileName}.xlsx`);
+    }
+
+    // Reset button
+    exportBtn.innerHTML = originalText;
+    exportBtn.disabled = false;
   } catch (error) {
     console.error("Error exporting to Excel:", error);
     showAlert("danger", "Terjadi kesalahan saat mengekspor data: " + error.message);
+
+    // Reset button
+    const exportBtn = document.getElementById("exportExcelBtn");
+    if (exportBtn) {
+      exportBtn.innerHTML = '<i class="fas fa-file-excel me-2"></i> Export Excel';
+      exportBtn.disabled = false;
+    }
   }
 }
 
@@ -2408,16 +2595,16 @@ function exportToPDF() {
           leave.status === "Disetujui"
             ? "statusApproved"
             : leave.status === "Ditolak"
-            ? "statusRejected"
-            : "statusPending";
+              ? "statusRejected"
+              : "statusPending";
 
         // Determine replacement status style
         const replacementStatusStyle =
           leave.replacementStatus === "Sudah Diganti"
             ? "replacementDone"
             : leave.replacementStatus === "Tidak Perlu Diganti"
-            ? "replacementNotNeeded"
-            : "replacementPending";
+              ? "replacementNotNeeded"
+              : "replacementPending";
 
         // Add row to table
         docDefinition.content[0].table.body.push([
@@ -2441,16 +2628,16 @@ function exportToPDF() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
 
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
 
           // Format tanggal dalam format Indonesia
@@ -2474,8 +2661,8 @@ function exportToPDF() {
             leave.status === "Disetujui"
               ? "statusApproved"
               : leave.status === "Ditolak"
-              ? "statusRejected"
-              : "statusPending";
+                ? "statusRejected"
+                : "statusPending";
 
           // Add row to table
           docDefinition.content[0].table.body.push([
@@ -2497,15 +2684,15 @@ function exportToPDF() {
             leave.leaveStartDate instanceof Date
               ? leave.leaveStartDate
               : leave.leaveStartDate.seconds
-              ? new Date(leave.leaveStartDate.seconds * 1000)
-              : leave.leaveStartDate
+                ? new Date(leave.leaveStartDate.seconds * 1000)
+                : leave.leaveStartDate,
           );
           const endDate = new Date(
             leave.leaveEndDate instanceof Date
               ? leave.leaveEndDate
               : leave.leaveEndDate.seconds
-              ? new Date(leave.leaveEndDate.seconds * 1000)
-              : leave.leaveEndDate
+                ? new Date(leave.leaveEndDate.seconds * 1000)
+                : leave.leaveEndDate,
           );
           const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -2547,15 +2734,15 @@ function exportToPDF() {
               leave.status === "Disetujui"
                 ? "statusApproved"
                 : leave.status === "Ditolak"
-                ? "statusRejected"
-                : "statusPending";
+                  ? "statusRejected"
+                  : "statusPending";
 
             const replacementStatusStyle =
               dayStatus === "Sudah Diganti"
                 ? "replacementDone"
                 : dayStatus === "Tidak Perlu Diganti"
-                ? "replacementNotNeeded"
-                : "replacementPending";
+                  ? "replacementNotNeeded"
+                  : "replacementPending";
 
             // Tampilkan informasi penggantian untuk hari ini
             let replacementInfo = baseReplacementInfo;
@@ -2746,7 +2933,12 @@ function attachSingleDeleteHandlers() {
   const oldPopulate = populateLeaveTable;
   populateLeaveTable = function () {
     oldPopulate.apply(this, arguments);
-    // setelah tabel ter-render, tambahkan tombol hapus ke setiap baris (kecuali header)
+
+    // Check if user is admin
+    const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+    const isAdmin = currentUser.username === "supervisor" || currentUser.role === "supervisor";
+
+    // setelah tabel ter-render, tambahkan tombol hapus ke setiap baris (kecuali header) hanya jika admin
     const tbody = document.getElementById("leaveReportList");
     if (tbody) {
       Array.from(tbody.rows).forEach((tr, i) => {
@@ -2756,19 +2948,23 @@ function attachSingleDeleteHandlers() {
           // Jika kolom aksi belum ada, tambahkan td
           if (tr.cells.length < 10) {
             const td = document.createElement("td");
-            td.innerHTML = idRef
-              ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
-              : "-";
+            td.innerHTML =
+              isAdmin && idRef
+                ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
+                : "-";
             tr.appendChild(td);
           } else {
             // overwrite kolom aksi
-            tr.cells[9].innerHTML = idRef
-              ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
-              : "-";
+            tr.cells[9].innerHTML =
+              isAdmin && idRef
+                ? `<button class="btn btn-sm btn-outline-danger" data-delete-id="${idRef}"><i class="fas fa-trash"></i></button>`
+                : "-";
           }
         }
       });
-      attachSingleDeleteHandlers();
+      if (isAdmin) {
+        attachSingleDeleteHandlers();
+      }
     }
   };
 })();
@@ -2862,8 +3058,5 @@ window.debugFunctions = {
         };
       }),
     };
-  },
-  forceRefresh: function () {
-    generateReport(true);
   },
 };

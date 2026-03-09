@@ -113,16 +113,39 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="dataPenjualan.html">
-              <i class="fas fa-shopping-cart"></i>
-              <span class="menu-text">Penjualan</span>
+            <a class="nav-link" href="return.html">
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span class="menu-text">Return Barang</span>
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="return.html">
-              <i class="fa-solid fa-right-from-bracket"></i>
-              <span class="menu-text">Return</span>
+            <a
+              class="nav-link collapsed"
+              href="#"
+              data-bs-toggle="collapse"
+              data-bs-target="#penjualanSubmenu"
+              aria-expanded="false"
+            >
+              <i class="fas fa-shopping-cart"></i>
+              <span class="menu-text">Penjualan</span>
+              <i class="fas fa-chevron-down ms-auto submenu-icon"></i>
             </a>
+            <div class="collapse" id="penjualanSubmenu">
+              <ul class="nav flex-column ms-3">
+                <li class="nav-item">
+                  <a class="nav-link" href="penjualanAksesoris.html">
+                    <i class="fas fa-cash-register"></i>
+                    <span class="menu-text">Transaksi Penjualan</span>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="dataPenjualan.html">
+                    <i class="fas fa-list"></i>
+                    <span class="menu-text">Data Penjualan</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="laporanPenjualan.html">
@@ -136,6 +159,12 @@
               <span class="menu-text">Laporan Stok</span>
             </a>
           </li>
+            <li class="nav-item">
+              <a class="nav-link" href="kelolaSales.html">
+                <i class="fas fa-users-cog"></i>
+                <span class="menu-text">Kelola Sales</span>
+              </a>
+            </li>
         </ul>
       </div>
     </li>
@@ -155,7 +184,7 @@
       <div class="collapse" id="antrianSubmenu" data-bs-parent="#sidebarAccordion">
         <ul class="nav flex-column ms-3">
           <li class="nav-item">
-            <a class="nav-link" href="admin.html">
+            <a class="nav-link" href="admin-antrian.html">
               <i class="fas fa-user-cog"></i>
               <span class="menu-text">Admin Antrian</span>
             </a>
@@ -337,7 +366,13 @@
           <li class="nav-item">
             <a class="nav-link" href="jam-absensi.html">
               <i class="fas fa-clock"></i>
-              <span class="menu-text">Jam Absensi</span>
+              <span class="menu-text">Absensi</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="kode-akses.html">
+              <i class="fas fa-key"></i>
+              <span class="menu-text">Kode Akses</span>
             </a>
           </li>
         </ul>
@@ -346,5 +381,5 @@
   </ul>
 </div>
 <div class="sidebar-footer">
-  <p>© 2025 Melati Gold Shop</p>
+  <p>© 2026 Melati Gold Shop</p>
 </div>

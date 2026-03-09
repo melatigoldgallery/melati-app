@@ -327,6 +327,13 @@ class OptimizedStockReport {
   // Initialize the module
   init() {
     this.loadCacheFromStorage();
+
+    // 🔧 Clean up old cache that may contain duplicate data from kodeAksesoris
+    if (this.cache.has("kodeAksesorisData")) {
+      this.cache.delete("kodeAksesorisData");
+      this.cacheMeta.delete("kodeAksesorisData");
+    }
+
     this.initDatePickers();
     this.attachEventListeners();
     this.setDefaultDates();
@@ -354,6 +361,7 @@ class OptimizedStockReport {
   setDefaultDates() {
     const today = new Date();
     document.getElementById("startDate").value = this.formatDate(today);
+    document.getElementById("endDate").value = this.formatDate(today);
   }
 
   // Initialize DataTable
@@ -420,29 +428,71 @@ class OptimizedStockReport {
     if (resetBtn) {
       resetBtn.addEventListener("click", () => this.resetFilters());
     }
+
+    // Event listener untuk jenis laporan
+    const jenisLaporanSelect = document.getElementById("jenisLaporan");
+    if (jenisLaporanSelect) {
+      jenisLaporanSelect.addEventListener("change", () => {
+        this.toggleTableView();
+        // Re-render jika data sudah dimuat
+        if (this.isDataLoaded && this.filteredStockData.length > 0) {
+          this.renderStockTable();
+        }
+      });
+    }
+
+    // Auto-fill end date when start date changes (if end date is empty)
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
+    if (startDateInput && endDateInput) {
+      startDateInput.addEventListener("change", () => {
+        const startValue = startDateInput.value;
+        const endValue = endDateInput.value;
+
+        // Auto-fill end date if empty or if end date < start date
+        if (!endValue || endValue < startValue) {
+          endDateInput.value = startValue;
+        }
+      });
+
+      // Validate end date is not before start date
+      endDateInput.addEventListener("change", () => {
+        const startValue = startDateInput.value;
+        const endValue = endDateInput.value;
+
+        if (endValue && startValue && endValue < startValue) {
+          this.showError("Tanggal akhir tidak boleh lebih kecil dari tanggal awal");
+          endDateInput.value = startValue;
+        }
+      });
+    }
   }
 
   // Reset filters
   resetFilters() {
     const today = new Date();
     document.getElementById("startDate").value = this.formatDate(today);
+    document.getElementById("endDate").value = this.formatDate(today);
     this.loadAndFilterStockData();
   }
 
-  // Tambahkan method baru untuk mengambil data return
+  // Tambahkan method baru untuk mengambil data return dari stokAksesorisTransaksi (Single Source of Truth)
   async fetchReturnData(selectedDate) {
     try {
-      // Format tanggal untuk range query (karena tanggal disimpan sebagai ISO string lengkap)
+      // Format tanggal untuk range query
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const returnRef = collection(firestore, "returnBarang");
+      // Query dari stokAksesorisTransaksi dengan jenis = "return"
+      // ✅ FIX: Query berdasarkan field 'tanggal' (user input) bukan 'timestamp' (server time)
+      const transactionRef = collection(firestore, "stokAksesorisTransaksi");
       const q = query(
-        returnRef,
+        transactionRef,
+        where("jenis", "==", "return"),
         where("tanggal", ">=", startOfDay.toISOString()),
-        where("tanggal", "<=", endOfDay.toISOString())
+        where("tanggal", "<=", endOfDay.toISOString()),
       );
 
       const snapshot = await getDocs(q);
@@ -450,22 +500,21 @@ class OptimizedStockReport {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
+        const kode = data.kode;
+        const jumlah = parseInt(data.jumlah) || 0;
 
-        if (data.detailReturn && Array.isArray(data.detailReturn)) {
-          data.detailReturn.forEach((item) => {
-            if (item.kode && item.jumlah) {
-              const currentAmount = returnMap.get(item.kode) || 0;
-              const newAmount = currentAmount + parseInt(item.jumlah);
-              returnMap.set(item.kode, newAmount);
-            }
-          });
+        if (kode && jumlah > 0) {
+          const currentAmount = returnMap.get(kode) || 0;
+          returnMap.set(kode, currentAmount + jumlah);
         }
       });
 
       this.returnData = returnMap;
+      console.log(`✅ Loaded return data: ${returnMap.size} items`);
 
       return returnMap;
     } catch (error) {
+      console.error("Error fetching return data:", error);
       this.returnData = new Map();
       return new Map();
     }
@@ -477,18 +526,42 @@ class OptimizedStockReport {
       this.showLoading(true);
 
       const startDateStr = document.getElementById("startDate").value;
+      const endDateStr = document.getElementById("endDate").value;
+
       if (!startDateStr) {
-        this.showError("Tanggal harus diisi");
+        this.showError("Tanggal awal harus diisi");
         return;
       }
 
-      const selectedDate = this.parseDate(startDateStr);
-      if (!selectedDate) {
-        this.showError("Format tanggal tidak valid");
+      const startDate = this.parseDate(startDateStr);
+      if (!startDate) {
+        this.showError("Format tanggal awal tidak valid");
         return;
       }
+
+      // Check if range mode
+      if (endDateStr && endDateStr !== startDateStr) {
+        const endDate = this.parseDate(endDateStr);
+
+        if (!endDate) {
+          this.showError("Format tanggal akhir tidak valid");
+          return;
+        }
+
+        if (startDate > endDate) {
+          this.showError("Tanggal awal tidak boleh lebih besar dari tanggal akhir");
+          return;
+        }
+
+        // Range mode
+        return this.loadAndFilterStockDataRange(startDate, endDate);
+      }
+
+      // Single date mode (existing logic)
+      const selectedDate = startDate;
 
       this.currentSelectedDate = selectedDate;
+      this.currentDateRange = null; // Clear range info for single date mode
 
       // Setup real-time listener for today's data
       this.setupRealtimeListener(selectedDate);
@@ -536,6 +609,190 @@ class OptimizedStockReport {
     }
   }
 
+  // Load and filter stock data for date range (OPSI 1: Aggregate Query Range)
+  async loadAndFilterStockDataRange(startDate, endDate) {
+    try {
+      this.showLoading(true);
+
+      // Store range info for table title
+      this.currentDateRange = {
+        start: startDate,
+        end: endDate,
+      };
+
+      // Load master data
+      await this.loadStockMasterData(false);
+
+      // Calculate stock for range
+      await this.calculateStockForDateRange(startDate, endDate);
+
+      // Render table with range title
+      this.renderStockTable();
+      this.isDataLoaded = true;
+
+      console.log(`✅ Loaded stock data for range: ${this.formatDate(startDate)} - ${this.formatDate(endDate)}`);
+    } catch (error) {
+      this.showError("Terjadi kesalahan: " + error.message);
+      console.error("Error loadAndFilterStockDataRange:", error);
+    } finally {
+      this.showLoading(false);
+    }
+  }
+
+  // Calculate stock for date range (OPSI 1: Single query + client-side aggregation)
+  async calculateStockForDateRange(startDate, endDate) {
+    try {
+      console.log(`📊 Calculating stock for range: ${this.formatDate(startDate)} - ${this.formatDate(endDate)}`);
+
+      // 1. Get Stok Awal from startDate (beginning of day)
+      const stokAwalMap = await this.getStokAwal(startDate);
+      console.log(`✅ Got stok awal for ${stokAwalMap.size} items`);
+
+      // 2. Get transactions in range [startDate 00:00 - endDate 23:59]
+      const startOfDay = new Date(startDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const transactions = await getDocs(
+        query(
+          collection(firestore, "stokAksesorisTransaksi"),
+          where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
+          where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+          orderBy("timestamp", "asc"),
+        ),
+      );
+
+      console.log(`✅ Fetched ${transactions.size} transactions in range`);
+
+      // 3. Aggregate transactions by kode
+      const aggregateMap = new Map();
+
+      transactions.forEach((doc) => {
+        const data = doc.data();
+        const kode = data.kode;
+        const jumlah = data.jumlah || 0;
+        const jenis = data.jenis;
+
+        if (!aggregateMap.has(kode)) {
+          aggregateMap.set(kode, {
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            return: 0,
+          });
+        }
+
+        const agg = aggregateMap.get(kode);
+
+        switch (jenis) {
+          case "tambah":
+          case "stockAddition":
+          case "initialStock":
+            agg.tambahStok += jumlah;
+            break;
+          case "laku":
+            agg.laku += jumlah;
+            break;
+          case "free":
+            agg.free += jumlah;
+            break;
+          case "gantiLock":
+            agg.gantiLock += jumlah;
+            break;
+          case "return":
+            agg.return += jumlah;
+            break;
+        }
+      });
+
+      console.log(`✅ Aggregated transactions for ${aggregateMap.size} unique kode`);
+
+      // 4. Combine with master data and calculate Stok Akhir
+      this.filteredStockData = this.stockData.map((item) => {
+        const kode = item.kode;
+        const stokAwal = stokAwalMap.get(kode) || 0;
+        const agg = aggregateMap.get(kode) || {
+          tambahStok: 0,
+          laku: 0,
+          free: 0,
+          gantiLock: 0,
+          return: 0,
+        };
+
+        const stokAkhir = Math.max(0, stokAwal + agg.tambahStok - agg.laku - agg.free - agg.gantiLock - agg.return);
+
+        // ✅ FIX: Preserve ALL fields from master data (including kadar, berat for silver)
+        return {
+          ...item, // Preserve all fields (kode, nama, kategori, kadar, berat, etc)
+          stokAwal: stokAwal,
+          tambahStok: agg.tambahStok,
+          laku: agg.laku,
+          free: agg.free,
+          gantiLock: agg.gantiLock,
+          return: agg.return,
+          stokAkhir: stokAkhir,
+        };
+      });
+
+      // Sort by kategori and kode
+      this.filteredStockData.sort((a, b) => {
+        if (a.kategori !== b.kategori) return a.kategori === "kotak" ? -1 : 1;
+        return a.kode.localeCompare(b.kode);
+      });
+
+      console.log(`✅ Final filtered data: ${this.filteredStockData.length} items`);
+    } catch (error) {
+      console.error("❌ Error calculateStockForDateRange:", error);
+      throw error;
+    }
+  }
+
+  // Get stok awal for a specific date (beginning of day)
+  async getStokAwal(date) {
+    try {
+      // 🔧 FIX: Untuk mendapatkan stok AWAL tanggal X, kita perlu stok AKHIR tanggal X-1
+      // Contoh: Stok awal 11 Feb = Stok akhir 10 Feb
+      const previousDate = new Date(date);
+      previousDate.setDate(previousDate.getDate() - 1);
+
+      // Try to get snapshot from PREVIOUS day
+      const snapshotMap = await this.getDailySnapshot(previousDate);
+
+      if (snapshotMap && snapshotMap.size > 0) {
+        // Snapshot exists for previous day, use its stokAkhir as our stokAwal
+        console.log(
+          `✅ Using snapshot from ${this.formatDate(previousDate)} for stok awal (${snapshotMap.size} items)`,
+        );
+        const stokMap = new Map();
+        snapshotMap.forEach((data, kode) => {
+          // snapshot's stokAwal field contains the stokAkhir from that day
+          stokMap.set(kode, data.stokAwal || 0);
+        });
+        return stokMap;
+      } else {
+        // No snapshot, calculate up to END of previous day
+        console.log(`⚠️ No snapshot found for ${this.formatDate(previousDate)}, calculating from transactions`);
+        const endOfPreviousDay = new Date(date);
+        endOfPreviousDay.setDate(endOfPreviousDay.getDate() - 1);
+        endOfPreviousDay.setHours(23, 59, 59, 999);
+
+        // Calculate stock up to end of previous day
+        const kodeList = this.stockData.map((item) => item.kode);
+        const stockMap = await StockService.calculateAllStocksBatch(endOfPreviousDay, kodeList);
+
+        console.log(
+          `✅ Calculated stok awal from transactions up to ${this.formatDate(previousDate)} (${stockMap.size} items)`,
+        );
+        return stockMap;
+      }
+    } catch (error) {
+      console.error("❌ Error getStokAwal:", error);
+      throw error;
+    }
+  }
+
   // Setup real-time listener only for today's data
   setupRealtimeListener(selectedDate) {
     const today = new Date();
@@ -568,7 +825,7 @@ class OptimizedStockReport {
     const transQuery = query(
       collection(firestore, "stokAksesorisTransaksi"),
       where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-      where("timestamp", "<=", Timestamp.fromDate(endOfDay))
+      where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
     );
 
     const unsubscribeTrans = onSnapshot(transQuery, (snapshot) => {
@@ -629,7 +886,7 @@ class OptimizedStockReport {
           return: returnAmount,
           stokAkhir: Math.max(
             0,
-            item.stokAwal + item.tambahStok - item.laku - item.free - item.gantiLock - returnAmount
+            item.stokAwal + item.tambahStok - item.laku - item.free - item.gantiLock - returnAmount,
           ),
         };
       });
@@ -664,9 +921,8 @@ class OptimizedStockReport {
         this.stockData.push({ id: doc.id, ...doc.data() });
       });
 
-      // Load all kode aksesoris
-
-      await this.loadAllKodeAksesoris();
+      // ✅ FIXED: Removed loadAllKodeAksesoris() to prevent duplicate data
+      // Data should only come from stokAksesoris collection (Single Source of Truth)
 
       // Cache the data
       this.setCache(cacheKey, [...this.stockData]);
@@ -686,60 +942,15 @@ class OptimizedStockReport {
     }
   }
 
-  // Load all kode aksesoris
+  // ⚠️ DEPRECATED: Method ini tidak digunakan lagi dan menyebabkan duplikasi data
+  // Semua data kode aksesoris sekarang diambil langsung dari stokAksesoris (Single Source of Truth)
+  // Method ini di-comment out untuk mencegah duplikasi data
+  /*
   async loadAllKodeAksesoris() {
-    const cacheKey = "kodeAksesorisData";
-
-    if (this.isCacheValid(cacheKey)) {
-      const cachedData = this.cache.get(cacheKey);
-      this.mergeKodeAksesoris(cachedData);
-      return;
-    }
-
-    try {
-      const kodeAksesorisData = [];
-
-      // Get kotak, aksesoris, and silver data
-      const [kotakSnapshot, aksesorisSnapshot, silverSnapshot] = await Promise.all([
-        getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak")),
-        getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris")),
-        getDocs(collection(firestore, "kodeAksesoris", "kategori", "silver")),
-      ]);
-
-      // Process kotak data
-      kotakSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kodeItem = this.createKodeItem(data, "kotak");
-        kodeAksesorisData.push(kodeItem);
-        this.mergeStockItem(kodeItem);
-      });
-
-      // Process aksesoris data
-      aksesorisSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kodeItem = this.createKodeItem(data, "aksesoris");
-        kodeAksesorisData.push(kodeItem);
-        this.mergeStockItem(kodeItem);
-      });
-
-      // Process silver data
-      silverSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kodeItem = this.createKodeItem(data, "silver");
-        kodeAksesorisData.push(kodeItem);
-        this.mergeStockItem(kodeItem);
-      });
-
-      // Cache the data
-      this.setCache(cacheKey, kodeAksesorisData);
-    } catch (error) {
-      // Fallback to cache
-      if (this.cache.has(cacheKey)) {
-        const cachedData = this.cache.get(cacheKey);
-        this.mergeKodeAksesoris(cachedData);
-      }
-    }
+    // DEPRECATED: Causes duplicate data when merged with stokAksesoris
+    // All accessory codes should come from stokAksesoris collection only
   }
+  */
 
   // Calculate stock for specific date
   // 🚀 OPTIMIZATION: Calculate stock incrementally from snapshot
@@ -761,11 +972,12 @@ class OptimizedStockReport {
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // ✅ Query berdasarkan 'timestamp' (single source of truth untuk semua jenis transaksi)
     const transaksiQuery = query(
       collection(firestore, "stokAksesorisTransaksi"),
       where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
       where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-      orderBy("timestamp", "asc")
+      orderBy("timestamp", "asc"),
     );
 
     const transaksiSnapshot = await getDocs(transaksiQuery);
@@ -824,12 +1036,11 @@ class OptimizedStockReport {
       };
 
       // Calculate stokAkhir using tambahStok (consistent with batch method)
-      const stokAkhir = stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock + trans.return;
+      // Return MENGURANGI stok (barang keluar/rusak/dikembalikan ke supplier)
+      const stokAkhir = stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - trans.return;
 
       result.push({
-        kode: item.kode,
-        nama: item.nama,
-        kategori: item.kategori,
+        ...item,
         stokAwal,
         stokAkhir,
         tambahStok: trans.tambahStok,
@@ -1072,7 +1283,7 @@ class OptimizedStockReport {
             const currentStock = stockMap.get(kode) || 0;
             const newStock = Math.max(
               0,
-              currentStock + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - (trans.return || 0)
+              currentStock + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - (trans.return || 0),
             );
             stockMap.set(kode, newStock);
 
@@ -1122,7 +1333,7 @@ class OptimizedStockReport {
       const transQuery = query(
         collection(firestore, "stokAksesorisTransaksi"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
       );
 
       const transSnapshot = await getDocs(transQuery);
@@ -1179,9 +1390,57 @@ class OptimizedStockReport {
     }
   }
 
+  // Toggle table view berdasarkan jenis laporan
+  toggleTableView() {
+    const jenisLaporan = document.getElementById("jenisLaporan").value;
+    const tableKotakAksesoris = document.getElementById("tableKotakAksesorisContainer");
+    const tableSilver = document.getElementById("tableSilverContainer");
+    const tableTitle = document.getElementById("tableTitle");
+
+    // Build title with date range (if applicable)
+    let baseTitle = "";
+    let dateRangeStr = "";
+
+    if (this.currentDateRange) {
+      // Range mode
+      const startStr = this.formatDate(this.currentDateRange.start);
+      const endStr = this.formatDate(this.currentDateRange.end);
+      dateRangeStr = ` (${startStr} - ${endStr})`;
+    } else if (this.currentSelectedDate) {
+      // Single date mode
+      dateRangeStr = ` (${this.formatDate(this.currentSelectedDate)})`;
+    }
+
+    if (jenisLaporan === "silver") {
+      tableKotakAksesoris.style.display = "none";
+      tableSilver.style.display = "block";
+      baseTitle = "Data Stok Silver";
+      tableTitle.textContent = baseTitle + dateRangeStr;
+    } else {
+      tableKotakAksesoris.style.display = "block";
+      tableSilver.style.display = "none";
+      baseTitle = "Data Stok Aksesoris";
+      tableTitle.textContent = baseTitle + dateRangeStr;
+    }
+  }
+
   // Render stock table
   renderStockTable() {
+    const jenisLaporan = document.getElementById("jenisLaporan").value;
+
+    if (jenisLaporan === "silver") {
+      this.renderSilverStockTable();
+    } else {
+      this.renderKotakAksesorisStockTable();
+    }
+  }
+
+  // Render Kotak & Aksesoris Stock Table
+  renderKotakAksesorisStockTable() {
     try {
+      // Update table title with date range
+      this.toggleTableView();
+
       // Destroy existing DataTable
       if ($.fn.DataTable.isDataTable("#stockTable")) {
         $("#stockTable").DataTable().destroy();
@@ -1203,30 +1462,18 @@ class OptimizedStockReport {
         return;
       }
 
-      // Group data by category
+      // Filter hanya kotak & aksesoris
       const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
       const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
-      const silverItems = this.filteredStockData.filter((item) => item.kategori === "silver");
       const otherItems = this.filteredStockData.filter(
-        (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris" && item.kategori !== "silver"
+        (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris" && item.kategori !== "silver",
       );
 
       // Create HTML for table
       let html = "";
       let rowIndex = 1;
 
-      [...kotakItems, ...aksesorisItems, ...silverItems, ...otherItems].forEach((item) => {
-        // Debug: Log items with all zero values
-        if (
-          item.stokAwal === 0 &&
-          item.tambahStok === 0 &&
-          item.laku === 0 &&
-          item.free === 0 &&
-          item.gantiLock === 0 &&
-          item.return === 0
-        ) {
-        }
-
+      [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
         html += `
           <tr>
             <td class="text-center">${rowIndex++}</td>
@@ -1246,26 +1493,286 @@ class OptimizedStockReport {
       tableBody.innerHTML = html;
 
       // Initialize DataTable
-      const selectedDateStr = document.getElementById("startDate").value;
-      this.initDataTableWithExport(selectedDateStr);
-
-      // Debug: Log summary of rendered data
-      const nonZeroItems = this.filteredStockData.filter(
-        (item) =>
-          item.stokAwal > 0 ||
-          item.tambahStok > 0 ||
-          item.laku > 0 ||
-          item.free > 0 ||
-          item.gantiLock > 0 ||
-          item.return > 0
-      );
+      this.initDataTableWithExport();
     } catch (error) {
       this.showError("Terjadi kesalahan saat menampilkan data");
     }
   }
 
+  // Render Silver Stock Table with Weight
+  renderSilverStockTable() {
+    try {
+      // Update table title with date range
+      this.toggleTableView();
+
+      // Destroy existing DataTable
+      if ($.fn.DataTable.isDataTable("#silverStockTable")) {
+        $("#silverStockTable").DataTable().destroy();
+      }
+
+      const tableBody = document.querySelector("#silverStockTable tbody");
+      if (!tableBody) {
+        return;
+      }
+
+      // Check if there's data to display
+      if (!this.filteredStockData || this.filteredStockData.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
+          </tr>
+        `;
+        this.initSilverDataTable();
+        return;
+      }
+
+      // Filter hanya silver
+      const silverItems = this.filteredStockData.filter((item) => item.kategori === "silver");
+
+      if (silverItems.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center">Tidak ada data silver</td>
+          </tr>
+        `;
+        this.initSilverDataTable();
+        return;
+      }
+
+      // Create HTML for table dengan format single-row (berat di dalam cell yang sama)
+      let html = "";
+      let rowIndex = 1;
+
+      // Variabel untuk menghitung total
+      let totalStokAwalPcs = 0,
+        totalStokAwalBerat = 0;
+      let totalTambahPcs = 0,
+        totalTambahBerat = 0;
+      let totalLakuPcs = 0,
+        totalLakuBerat = 0;
+      let totalLockPcs = 0,
+        totalLockBerat = 0;
+      let totalReturnPcs = 0,
+        totalReturnBerat = 0;
+      let totalStokAkhirPcs = 0,
+        totalStokAkhirBerat = 0;
+
+      console.log("Silver items data:", silverItems); // Debug log
+
+      silverItems.forEach((item) => {
+        const berat = item.berat || 0;
+
+        // Debug log untuk setiap item
+        console.log(`Item ${item.kode}: kadar=${item.kadar}, berat=${item.berat}, parsed berat=${berat}`);
+
+        // Hitung total berat untuk setiap kolom
+        const beratStokAwal = (item.stokAwal || 0) * berat;
+        const beratTambah = (item.tambahStok || 0) * berat;
+        const beratLaku = (item.laku || 0) * berat;
+        const beratLock = (item.gantiLock || 0) * berat;
+        const beratReturn = (item.return || 0) * berat;
+        const beratStokAkhir = (item.stokAkhir || 0) * berat;
+
+        // Akumulasi total
+        totalStokAwalPcs += item.stokAwal || 0;
+        totalStokAwalBerat += beratStokAwal;
+        totalTambahPcs += item.tambahStok || 0;
+        totalTambahBerat += beratTambah;
+        totalLakuPcs += item.laku || 0;
+        totalLakuBerat += beratLaku;
+        totalLockPcs += item.gantiLock || 0;
+        totalLockBerat += beratLock;
+        totalReturnPcs += item.return || 0;
+        totalReturnBerat += beratReturn;
+        totalStokAkhirPcs += item.stokAkhir || 0;
+        totalStokAkhirBerat += beratStokAkhir;
+
+        html += `
+          <tr>
+            <td class="text-center">${rowIndex++}</td>
+            <td class="text-center">${item.kode || "-"}</td>
+            <td class="text-start">${item.nama || "-"}</td>
+            <td class="text-center">${item.stokAwal || 0}<br><small class="text-muted">${beratStokAwal.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.tambahStok || 0}<br><small class="text-muted">${beratTambah.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.laku || 0}<br><small class="text-muted">${beratLaku.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.gantiLock || 0}<br><small class="text-muted">${beratLock.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.return || 0}<br><small class="text-muted">${beratReturn.toFixed(2)} gr</small></td>
+            <td class="text-center">${item.stokAkhir || 0}<br><small class="text-muted">${beratStokAkhir.toFixed(2)} gr</small></td>
+          </tr>
+        `;
+      });
+
+      tableBody.innerHTML = html;
+
+      // Update tfoot dengan total
+      document.getElementById("totalStokAwal").innerHTML =
+        `${totalStokAwalPcs}<br><small class="text-muted">${totalStokAwalBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalTambah").innerHTML =
+        `${totalTambahPcs}<br><small class="text-muted">${totalTambahBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalLaku").innerHTML =
+        `${totalLakuPcs}<br><small class="text-muted">${totalLakuBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalLock").innerHTML =
+        `${totalLockPcs}<br><small class="text-muted">${totalLockBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalReturn").innerHTML =
+        `${totalReturnPcs}<br><small class="text-muted">${totalReturnBerat.toFixed(2)} gr</small>`;
+      document.getElementById("totalStokAkhir").innerHTML =
+        `${totalStokAkhirPcs}<br><small class="text-muted">${totalStokAkhirBerat.toFixed(2)} gr</small>`;
+
+      // Initialize DataTable for silver
+      this.initSilverDataTable();
+    } catch (error) {
+      console.error("Error rendering silver stock table:", error);
+      this.showError("Terjadi kesalahan saat menampilkan data silver");
+    }
+  }
+
+  // Initialize DataTable for Silver
+  initSilverDataTable() {
+    const dateRangeStr = this.getExportDateRangeString();
+
+    $("#silverStockTable").DataTable({
+      responsive: true,
+      dom: "Bfrtip",
+      ordering: false,
+      pageLength: 25,
+      autoWidth: false,
+      buttons: [
+        {
+          extend: "excel",
+          text: '<i class="fas fa-file-excel me-2"></i>Excel',
+          className: "btn btn-success btn-sm me-1",
+          title: `Laporan Stok Silver - ${dateRangeStr}`,
+          exportOptions: {
+            format: {
+              body: function (data, row, column, node) {
+                // Strip HTML tags dan replace <br> dengan newline untuk Excel
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
+              footer: function (data, row, column, node) {
+                // Strip HTML tags dan replace <br> dengan newline untuk footer
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
+            },
+          },
+          footer: true,
+        },
+        {
+          extend: "pdf",
+          text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+          className: "btn btn-danger btn-sm me-1",
+          title: `Laporan Stok Silver\nMelati Gold Shop\n${dateRangeStr}`,
+          orientation: "portrait",
+          pageSize: "A4",
+          exportOptions: {
+            orthogonal: "export",
+            columns: ":visible",
+            format: {
+              body: function (data, row, column, node) {
+                // Strip HTML tags dan replace <br> dengan newline untuk PDF
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
+              footer: function (data, row, column, node) {
+                // Strip HTML untuk semua cell
+                return data
+                  .replace(/<br\s*\/?>/gi, "\n")
+                  .replace(/<[^>]+>/g, "")
+                  .trim();
+              },
+            },
+          },
+          footer: true,
+          customize: function (doc) {
+            // Set font sizes
+            doc.defaultStyle.fontSize = 8;
+            doc.styles.tableHeader.fontSize = 9;
+            doc.styles.tableHeader.fillColor = "#e0e0e0";
+            doc.styles.tableHeader.color = "black";
+            doc.styles.tableHeader.alignment = "center";
+
+            // Style title - multi line dengan ukuran berbeda
+            const titleText = doc.content[0].text;
+            doc.content[0] = {
+              stack: [
+                { text: "Laporan Stok Silver", fontSize: 14, bold: true },
+                { text: "Melati Gold Shop", fontSize: 12, bold: true },
+                { text: titleText.split("\n")[2], fontSize: 9, margin: [0, 2, 0, 0] }, // Tanggal dengan font lebih kecil
+              ],
+              alignment: "center",
+              margin: [0, 0, 0, 10],
+            };
+
+            // Style footer
+            doc.styles.tableFooter = {
+              fontSize: 8,
+              bold: true,
+              fillColor: "#e0e0e0",
+              alignment: "center",
+            };
+
+            // Set column widths
+            doc.content[1].table.widths = [15, 40, 90, 50, 50, 50, 50, 50, 60];
+
+            // Manipulasi footer row untuk menghapus duplikasi TOTAL
+            const tableBody = doc.content[1].table.body;
+            const lastRow = tableBody[tableBody.length - 1]; // Footer row
+
+            // Cek dan perbaiki footer row - hapus TOTAL di kolom 0 dan 1, biarkan hanya di kolom 2
+            if (lastRow && lastRow.length > 0) {
+              lastRow.forEach(function (cell, index) {
+                if (cell.text && cell.text.toString().includes("TOTAL")) {
+                  if (index === 0 || index === 1) {
+                    cell.text = ""; // Hapus TOTAL dari kolom 0 dan 1
+                  } else if (index === 2) {
+                    cell.text = "TOTAL:"; // Pastikan hanya ada di kolom 2
+                  }
+                }
+              });
+            }
+
+            // Center align all cells
+            doc.content[1].table.body.forEach(function (row, rowIndex) {
+              row.forEach(function (cell, cellIndex) {
+                if (cellIndex === 2) {
+                  // Nama column - align left (kecuali footer)
+                  cell.alignment = rowIndex === tableBody.length - 1 ? "right" : "left";
+                } else {
+                  // Other columns - center
+                  cell.alignment = "center";
+                }
+              });
+            });
+          },
+        },
+      ],
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+        infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
+        infoFiltered: "(disaring dari _MAX_ total data)",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Selanjutnya",
+          previous: "Sebelumnya",
+        },
+      },
+    });
+  }
+
   // Initialize DataTable with export - VERSI RINGKAS
-  initDataTableWithExport(selectedDate) {
+  initDataTableWithExport() {
+    const dateRangeStr = this.getExportDateRangeString();
+
     // Add simple inline styles
     const tableStyle = `
       <style id="stockTableStyle">
@@ -1300,18 +1807,31 @@ class OptimizedStockReport {
           text: '<i class="fas fa-file-excel me-2"></i>Excel',
           className: "btn btn-success btn-sm me-1",
           exportOptions: { columns: ":visible" },
-          title: `Laporan Stok Kotak & Aksesoris Melati Bawah (${selectedDate})`,
+          title: `Laporan Stok Kotak & Aksesoris Melati Bawah - ${dateRangeStr}`,
         },
         {
           extend: "pdf",
           text: '<i class="fas fa-file-pdf me-2"></i>PDF',
           className: "btn btn-danger btn-sm me-1",
           exportOptions: { columns: ":visible" },
-          title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n(${selectedDate})`,
+          title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n${dateRangeStr}`,
           customize: function (doc) {
             doc.defaultStyle.fontSize = 8;
             doc.styles.tableHeader.fontSize = 9;
-            doc.content[1].table.widths = ["5%", "9%", "28%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
+
+            // Style title - multi line dengan ukuran berbeda
+            const titleText = doc.content[0].text;
+            const titleLines = titleText.split("\n");
+            doc.content[0] = {
+              stack: [
+                { text: titleLines[0], fontSize: 14, bold: true },
+                { text: titleLines[1] || "", fontSize: 10, margin: [0, 2, 0, 0] },
+              ],
+              alignment: "center",
+              margin: [0, 0, 0, 10],
+            };
+
+            doc.content[1].table.widths = ["5%", "9%", "30%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
             // Center align all columns except name column (3rd column)
             doc.content[1].table.body.forEach((row) => {
               row.forEach((cell, index) => {
@@ -1337,39 +1857,21 @@ class OptimizedStockReport {
     });
   }
 
-  // Helper methods for kode aksesoris
+  // ⚠️ DEPRECATED: Helper methods untuk loadAllKodeAksesoris() yang sudah tidak digunakan
+  // Method-method ini menyebabkan duplikasi data
+  /*
   createKodeItem(data, kategori) {
-    return {
-      id: null,
-      kode: data.text,
-      nama: data.nama,
-      kategori: kategori,
-      stokAwal: 0,
-      tambahStok: 0,
-      laku: 0,
-      free: 0,
-      gantiLock: 0,
-      return: 0,
-      stokAkhir: 0,
-      lastUpdate: new Date(),
-    };
+    // DEPRECATED: Only used by loadAllKodeAksesoris() which is now disabled
   }
 
   mergeStockItem(kodeItem) {
-    const existingIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kodeItem.kode);
-    if (existingIndex === -1) {
-      this.stockData.push(kodeItem);
-    } else {
-      this.stockData[existingIndex].kategori = kodeItem.kategori;
-      this.stockData[existingIndex].nama = kodeItem.nama;
-    }
+    // DEPRECATED: Causes duplicate data by merging kodeAksesoris with stokAksesoris
   }
 
   mergeKodeAksesoris(kodeAksesorisData) {
-    kodeAksesorisData.forEach((item) => {
-      this.mergeStockItem(item);
-    });
+    // DEPRECATED: Causes duplicate data by merging kodeAksesoris with stokAksesoris
   }
+  */
 
   // Cache management methods
   setCache(key, data, customTTL = null) {
@@ -1622,6 +2124,54 @@ class OptimizedStockReport {
     );
   }
 
+  // Format date to Indonesian format (e.g., "10 Februari 2026")
+  formatDateIndonesia(date) {
+    if (!date) return "";
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      if (isNaN(d.getTime())) return "";
+
+      const months = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+
+      const day = d.getUTCDate();
+      const month = months[d.getUTCMonth()];
+      const year = d.getUTCFullYear();
+
+      return `${day} ${month} ${year}`;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  // Get formatted date range string for export titles
+  getExportDateRangeString() {
+    if (this.currentDateRange) {
+      // Range mode
+      const startStr = this.formatDateIndonesia(this.currentDateRange.start);
+      const endStr = this.formatDateIndonesia(this.currentDateRange.end);
+      return `${startStr} - ${endStr}`;
+    } else if (this.currentSelectedDate) {
+      // Single date mode
+      return this.formatDateIndonesia(this.currentSelectedDate);
+    } else {
+      // Fallback to today
+      return this.formatDateIndonesia(new Date());
+    }
+  }
+
   // 🚀 NEW METHOD: Batch calculation (99% faster than loop per kode!)
   async calculateStockBatch(selectedDate) {
     try {
@@ -1683,10 +2233,11 @@ class OptimizedStockReport {
   // Helper: Get ALL transactions for date in one query
   async getTransactionsForDateBatch(startDate, endDate) {
     try {
+      // ✅ Query berdasarkan 'timestamp' (single source of truth untuk semua jenis transaksi)
       const transQuery = query(
         collection(firestore, "stokAksesorisTransaksi"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
       );
 
       const snapshot = await getDocs(transQuery);

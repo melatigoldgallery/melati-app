@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -216,6 +216,35 @@
         font-size: 0.875em;
         color: #dc3545;
       }
+
+      /* Print Service Status Indicator */
+      .print-service-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-left: 1rem;
+        transition: all 0.3s ease;
+      }
+
+      .print-service-status.online {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        border: 1px solid #badbcc;
+      }
+
+      .print-service-status.offline {
+        background-color: #fff3cd;
+        color: #997404;
+        border: 1px solid #ffe69c;
+      }
+
+      .print-service-status i {
+        font-size: 1rem;
+      }
     </style>
     <title>Penjualan - Melati Gold Shop</title>
   </head>
@@ -274,6 +303,13 @@
             </nav>
           </div>
 
+          <!-- Print Service Status Indicator -->
+          <div id="printServiceStatus" class="alert alert-dismissible fade show" role="alert" style="display: none">
+            <i class="fas fa-print me-2"></i>
+            <span id="printServiceStatusText"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+
           <div class="content-wrapper">
             <!-- Form Penjualan -->
             <div class="card mb-4">
@@ -311,13 +347,23 @@
                     <label for="jenisManual" class="form-label">
                       Jenis Manual
                       <span class="text-danger">*</span>
+                      <i
+                        class="fas fa-info-circle text-primary ms-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="Pilih jenis manual sesuai kebutuhan mutasi kode barang"
+                        style="cursor: help; font-size: 0.9rem"
+                      ></i>
                     </label>
                     <select class="form-select" id="jenisManual" required>
                       <option value="">Pilih Jenis Manual</option>
                       <option value="perlu-mutasi">Perlu Mutasi</option>
                       <option value="tidak-perlu-mutasi">Tidak Perlu Mutasi</option>
                     </select>
-                    <div class="invalid-feedback">Jenis manual harus dipilih</div>
+                    <small class="form-text text-muted" id="jenisManualHelp" style="display: none">
+                      <i class="fas fa-lightbulb"></i>
+                      <span id="jenisManualHelpText"></span>
+                    </small>
                   </div>
                   <div class="col-md-2">
                     <label for="sales" class="form-label">
@@ -381,7 +427,7 @@
                     </tbody>
                     <tfoot>
                       <tr>
-                        <th colspan="5" class="text-end">Total:</th>
+                        <th colspan="6" class="text-end">Total:</th>
                         <th id="grand-total-aksesoris">0</th>
                         <th></th>
                       </tr>
@@ -409,7 +455,7 @@
                     </tbody>
                     <tfoot>
                       <tr>
-                        <th colspan="5" class="text-end">Total:</th>
+                        <th colspan="6" class="text-end">Total:</th>
                         <th id="grand-total-silver">0</th>
                         <th></th>
                       </tr>
@@ -435,7 +481,7 @@
                     </tbody>
                     <tfoot>
                       <tr>
-                        <th colspan="4" class="text-end">Total:</th>
+                        <th colspan="5" class="text-end">Total:</th>
                         <th id="grand-total-kotak">0</th>
                         <th></th>
                       </tr>
@@ -464,7 +510,7 @@
                     </tbody>
                     <tfoot>
                       <tr>
-                        <th colspan="6" class="text-end">Total:</th>
+                        <th colspan="7" class="text-end">Total:</th>
                         <th id="grand-total-manual">0</th>
                         <th colspan="2"></th>
                       </tr>
@@ -840,6 +886,7 @@
     </div>
     <script src="js/sidebar-loader.js"></script>
     <script src="js/pages/staffHelper.js"></script>
+    <script src="js/services/print-service.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/pages/penjualanAksesoris.js"></script>
   </body>

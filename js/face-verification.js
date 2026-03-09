@@ -1,6 +1,5 @@
 import { getFaceDescriptor } from "./services/employee-service.js";
 
-
 // Variabel global untuk menyimpan status
 let isFaceApiInitialized = false;
 let videoStream = null;
@@ -20,22 +19,20 @@ export async function getCachedFaceDescriptor(employeeId) {
       faceDescriptorCache.clear();
       lastCacheCleanup = now;
     }
-    
+
     // Cek apakah descriptor ada di cache
     if (faceDescriptorCache.has(employeeId)) {
-      console.log(`Using cached face descriptor for employee ID: ${employeeId}`);
       return faceDescriptorCache.get(employeeId);
     }
-    
+
     // Jika tidak ada di cache, ambil dari database
-    console.log(`Fetching face descriptor for employee ID: ${employeeId}`);
     const descriptor = await getFaceDescriptor(employeeId);
-    
+
     // Simpan ke cache jika ditemukan
     if (descriptor) {
       faceDescriptorCache.set(employeeId, descriptor);
     }
-    
+
     return descriptor;
   } catch (error) {
     console.error("Error getting cached face descriptor:", error);
@@ -45,21 +42,18 @@ export async function getCachedFaceDescriptor(employeeId) {
 
 export async function loadFaceApiModels() {
   if (isFaceApiInitialized) return true;
-  
+
   try {
-    console.log("Loading face-api models...");
-    
     // Set path ke model
-    const MODEL_URL = 'js/face-api/models';
-    
+    const MODEL_URL = "js/face-api/models";
+
     // Muat model secara paralel
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
     ]);
-    
-    console.log("Face-api models loaded successfully");
+
     isFaceApiInitialized = true;
     return true;
   } catch (error) {
@@ -73,24 +67,24 @@ export async function initCamera() {
   try {
     // Hentikan stream sebelumnya jika ada
     if (videoStream) {
-      videoStream.getTracks().forEach(track => track.stop());
+      videoStream.getTracks().forEach((track) => track.stop());
     }
-    
+
     // Minta akses kamera
     videoStream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 640 },
         height: { ideal: 480 },
-        facingMode: "user"
-      }
+        facingMode: "user",
+      },
     });
-    
+
     // Tampilkan video di elemen yang sesuai
-    const videoElement = document.getElementById('faceVerificationVideo');
+    const videoElement = document.getElementById("faceVerificationVideo");
     if (videoElement) {
       videoElement.srcObject = videoStream;
     }
-    
+
     return true;
   } catch (error) {
     console.error("Error initializing camera:", error);
@@ -101,11 +95,11 @@ export async function initCamera() {
 // Fungsi untuk menghentikan kamera
 export function stopCamera() {
   if (videoStream) {
-    videoStream.getTracks().forEach(track => track.stop());
+    videoStream.getTracks().forEach((track) => track.stop());
     videoStream = null;
-    
+
     // Reset video element
-    const videoElement = document.getElementById('faceVerificationVideo');
+    const videoElement = document.getElementById("faceVerificationVideo");
     if (videoElement) {
       videoElement.srcObject = null;
     }
@@ -115,63 +109,58 @@ export function stopCamera() {
 // Fungsi untuk memulai verifikasi wajah
 export function startFaceVerification() {
   // Tampilkan UI verifikasi wajah
-  const container = document.querySelector('.face-verification-container');
+  const container = document.querySelector(".face-verification-container");
   if (container) {
-    container.style.display = 'block';
+    container.style.display = "block";
   }
-  
+
   // Pastikan video element ada
-  const videoElement = document.getElementById('faceVerificationVideo');
+  const videoElement = document.getElementById("faceVerificationVideo");
   if (!videoElement) {
     console.error("Video element not found");
     return false;
   }
-  
+
   return true;
 }
 
 export async function detectAndVerifyFace(employeeId) {
   try {
-    console.log(`Verifying face for employee ID: ${employeeId}`);
-    
     // Pastikan model sudah dimuat
     if (!isFaceApiInitialized) {
       await loadFaceApiModels();
     }
-    
+
     // Pastikan kamera sudah diinisialisasi
-    const videoElement = document.getElementById('faceVerificationVideo');
+    const videoElement = document.getElementById("faceVerificationVideo");
     if (!videoElement || !videoElement.srcObject) {
       throw new Error("Kamera belum diinisialisasi");
     }
-    
+
     // Tampilkan status
-    const statusElement = document.getElementById('faceVerificationStatus');
+    const statusElement = document.getElementById("faceVerificationStatus");
     if (statusElement) {
       statusElement.textContent = "Mendeteksi wajah...";
       statusElement.className = "text-info";
     }
-    
+
     // Tunggu video siap - tambahkan pengecekan null
     if (videoElement && videoElement.readyState !== 4) {
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         videoElement.onloadeddata = resolve;
       });
     }
-    
+
     // OPTIMASI: Gunakan TinyFaceDetector dengan parameter yang dioptimalkan
-    const options = new faceapi.TinyFaceDetectorOptions({ 
-      inputSize: 320,  // Lebih kecil = lebih cepat
-      scoreThreshold: 0.5 // Lebih rendah = lebih cepat tapi kurang akurat
+    const options = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 320, // Lebih kecil = lebih cepat
+      scoreThreshold: 0.5, // Lebih rendah = lebih cepat tapi kurang akurat
     });
-    
+
     // OPTIMASI: Deteksi wajah dengan ukuran gambar yang lebih kecil
     const displaySize = { width: videoElement.width, height: videoElement.height };
-    const detections = await faceapi.detectAllFaces(
-      videoElement, 
-      options
-    ).withFaceLandmarks().withFaceDescriptors();
-    
+    const detections = await faceapi.detectAllFaces(videoElement, options).withFaceLandmarks().withFaceDescriptors();
+
     // Periksa hasil deteksi
     if (detections.length === 0) {
       if (statusElement) {
@@ -180,7 +169,7 @@ export async function detectAndVerifyFace(employeeId) {
       }
       return { verified: false, message: "Tidak ada wajah terdeteksi" };
     }
-    
+
     if (detections.length > 1) {
       if (statusElement) {
         statusElement.textContent = "Terdeteksi lebih dari satu wajah. Pastikan hanya ada satu wajah.";
@@ -188,41 +177,34 @@ export async function detectAndVerifyFace(employeeId) {
       }
       return { verified: false, message: "Terdeteksi lebih dari satu wajah" };
     }
-    
+
     // Ambil descriptor wajah yang terdeteksi
     const detectedDescriptor = detections[0].descriptor;
-    
+
     // OPTIMASI: Gunakan cache untuk descriptor wajah
-    console.log(`Fetching stored face descriptor for employee ID: ${employeeId}`);
     const storedDescriptor = await getCachedFaceDescriptor(employeeId);
-    
-    // Log untuk debugging
-    console.log("Stored descriptor:", storedDescriptor ? "Found" : "Not found");
-    
+
     // Jika tidak ada data wajah tersimpan, ini adalah pendaftaran pertama kali
     if (!storedDescriptor) {
       if (statusElement) {
         statusElement.textContent = "Data wajah belum terdaftar.";
         statusElement.className = "text-danger";
       }
-      
+
       return { verified: false, message: "Data wajah belum terdaftar" };
     }
-    
+
     // Pastikan storedDescriptor adalah Float32Array
-    const storedFloat32Array = storedDescriptor instanceof Float32Array 
-      ? storedDescriptor 
-      : new Float32Array(storedDescriptor);
-    
+    const storedFloat32Array =
+      storedDescriptor instanceof Float32Array ? storedDescriptor : new Float32Array(storedDescriptor);
+
     // OPTIMASI: Gunakan euclideanDistance yang lebih efisien
     const distance = faceapi.euclideanDistance(detectedDescriptor, storedFloat32Array);
     const similarity = 1 - distance;
-    
-    console.log(`Face verification result: similarity ${similarity.toFixed(2)} (threshold: ${faceMatchThreshold})`);
-    
+
     // Verifikasi berhasil jika similarity di atas threshold
     const isVerified = similarity >= faceMatchThreshold;
-    
+
     if (statusElement) {
       if (isVerified) {
         statusElement.textContent = `Verifikasi berhasil! Kecocokan: ${(similarity * 100).toFixed(0)}%`;
@@ -232,26 +214,24 @@ export async function detectAndVerifyFace(employeeId) {
         statusElement.className = "text-danger";
       }
     }
-    
-    return { 
-      verified: isVerified, 
+
+    return {
+      verified: isVerified,
       similarity: similarity,
-      message: isVerified ? "Verifikasi berhasil" : "Wajah tidak cocok"
+      message: isVerified ? "Verifikasi berhasil" : "Wajah tidak cocok",
     };
-    
   } catch (error) {
     console.error("Error in face detection and verification:", error);
-    
-    const statusElement = document.getElementById('faceVerificationStatus');
+
+    const statusElement = document.getElementById("faceVerificationStatus");
     if (statusElement) {
       statusElement.textContent = "Terjadi kesalahan saat verifikasi wajah.";
       statusElement.className = "text-danger";
     }
-    
+
     return { verified: false, message: "Terjadi kesalahan: " + error.message };
   }
 }
-
 
 // Fungsi untuk menghapus data wajah
 export async function deleteFaceDescriptor(employeeId) {
