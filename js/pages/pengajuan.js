@@ -614,12 +614,9 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
             }
 
             // Upload file ke Firebase Storage dengan progress tracking
-            const uploadResult = await uploadMedicalCertificate(fileToUpload, employeeId, (progress) => {
+            const uploadResult = await uploadMedicalCertificate(fileToUpload, employeeId, employee.name, (progress) => {
               const percent = progress.progress.toFixed(0);
-              console.log(`Upload progress: ${percent}%`);
             });
-
-            console.log("Upload result:", uploadResult); // Debugging
 
             // Simpan informasi file dari Firebase
             medicalCertificateFileInfo = {
@@ -724,8 +721,6 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
         });
         replacementDetails.formattedValue = `${value} ${timeUnit}`;
       }
-
-      console.log("Replacement details with medical certificate:", replacementDetails); // Debugging
     } else if (leaveType === "cuti") {
       const cutiType = document.querySelector('input[name="leaveTypeRadio"]:checked')?.value || "regular";
       let specialReason = null;
@@ -849,8 +844,6 @@ document.getElementById("leaveForm")?.addEventListener("submit", async function 
       submissionDate: new Date().toISOString(),
       status: "Menunggu Persetujuan",
     };
-
-    console.log("Final leave request data:", leaveRequest); // Debugging
 
     // Submit the leave request
     await submitLeaveRequest(leaveRequest);

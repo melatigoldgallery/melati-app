@@ -388,7 +388,7 @@ async function loadFromPenjualanAksesoris() {
     const penjualanQuery = query(
       collection(firestore, "penjualanAksesoris"),
       where("jenisPenjualan", "==", "manual"),
-      orderBy("timestamp", "desc")
+      orderBy("timestamp", "desc"),
     );
 
     const querySnapshot = await getDocs(penjualanQuery);
@@ -623,7 +623,7 @@ function setupRealtimeListener() {
       const penjualanQuery = query(
         collection(firestore, "penjualanAksesoris"),
         where("jenisPenjualan", "==", "manual"),
-        orderBy("timestamp", "desc")
+        orderBy("timestamp", "desc"),
       );
 
       unsubscribeListener = onSnapshot(
@@ -646,7 +646,7 @@ function setupRealtimeListener() {
         (error) => {
           console.error("Real-time listener error for penjualanAksesoris:", error);
           setTimeout(() => loadKodeData(true), 5000);
-        }
+        },
       );
     } else {
       const mutasiKodeQuery = query(collection(firestore, "mutasiKode"), orderBy("timestamp", "desc"));
@@ -670,7 +670,7 @@ function setupRealtimeListener() {
         (error) => {
           console.error("Real-time listener error for mutasiKode:", error);
           setTimeout(() => loadKodeData(true), 5000);
-        }
+        },
       );
     }
   } catch (error) {
@@ -1375,7 +1375,7 @@ function updateButtonStatus(type) {
 
     if (hasSelected) {
       $("#btnMutasiSelected").html(
-        `<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih (${selectedKodes.active.size})`
+        `<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih (${selectedKodes.active.size})`,
       );
     } else {
       $("#btnMutasiSelected").html(`<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih`);
@@ -1407,41 +1407,43 @@ function showKodeDetail(id, type) {
     return;
   }
 
-  $("#detailKode").val(item.kode);
-  $("#detailSales").val(item.sales || "-");
+  // Set nilai untuk elemen div menggunakan .text()
+  $("#detailKode").text(item.kode);
+  $("#detailSales").text(item.sales || "-");
+  $("#detailJenis").text(item.jenisNama);
+  $("#detailTanggal").text(item.tanggalInput);
+
+  // Set nilai untuk input fields menggunakan .val()
   $("#detailNama").val(item.nama);
   $("#detailKadar").val(item.kadar);
   $("#detailBerat").val(item.berat);
-  $("#detailTanggal").val(item.tanggalInput);
-  $("#detailJenis").val(item.jenisNama);
   $("#detailKeterangan").val(item.keterangan);
 
   if (type === "mutated") {
     $("#mutasiInfoContainer").show();
+
+    // Set nilai untuk elemen mutasi
     $("#detailTanggalMutasi").val(item.tanggalMutasi);
     $("#detailKeteranganMutasi").val(item.mutasiKeterangan);
 
+    // Handle riwayat mutasi
     const historyContainer = $("#mutasiHistoryContainer");
-    historyContainer.empty();
+    const historyTableBody = $("#mutasiHistoryTableBody");
 
     if (item.mutasiHistory && item.mutasiHistory.length > 0) {
       historyContainer.show();
-      const historyList = $("<ul class='list-group'></ul>");
+      historyTableBody.empty();
 
       item.mutasiHistory.forEach((history) => {
-        const historyItem = $(`
-          <li class="list-group-item">
-            <div class="d-flex justify-content-between">
-              <span>${history.tanggal}</span>
-              <span class="badge bg-secondary">${history.status}</span>
-            </div>
-            <div class="mt-1">${history.keterangan}</div>
-          </li>
-        `);
-        historyList.append(historyItem);
+        const row = `
+          <tr>
+            <td class="text-muted">${history.tanggal}</td>
+            <td><span class="badge bg-secondary">${history.status}</span></td>
+            <td>${history.keterangan}</td>
+          </tr>
+        `;
+        historyTableBody.append(row);
       });
-
-      historyContainer.append(historyList);
     } else {
       historyContainer.hide();
     }

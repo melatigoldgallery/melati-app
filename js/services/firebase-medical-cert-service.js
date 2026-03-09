@@ -1,24 +1,25 @@
 /**
  * Firebase Medical Certificate Upload Service
  * Handles uploading medical certificates to Firebase Storage
- * Replaces cloudinary-service.js functionality
  */
 
 import {
-  getStorage,
   ref,
   uploadBytesResumable,
   getDownloadURL,
-} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js";
+  deleteObject,
+} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-storage.js";
+import { storage, auth } from "../configFirebase.js";
 
 /**
  * Upload medical certificate to Firebase Storage
  * @param {File} file - The file to upload
  * @param {string} employeeId - Employee ID for file organization
+ * @param {string} employeeName - Employee name for filename
  * @param {Function} onProgress - Callback for progress updates (optional)
  * @returns {Promise<Object>} Upload result with url, path, name, type, size, uploadedAt
  */
-export async function uploadMedicalCertificate(file, employeeId, onProgress = null) {
+export async function uploadMedicalCertificate(file, employeeId, employeeName, onProgress = null) {
   try {
     // Validate file before upload
     const validation = validateMedicalCertFile(file);
@@ -26,7 +27,9 @@ export async function uploadMedicalCertificate(file, employeeId, onProgress = nu
       throw new Error(validation.message);
     }
 
-    const storage = getStorage();
+    if (!auth.currentUser?.uid) {
+      throw new Error("Sesi login Firebase tidak aktif. Silakan login ulang.");
+    }
 
     // Generate file path structure: medical-certificates/{year}/{month}/{filename}
     const now = new Date();
@@ -34,16 +37,31 @@ export async function uploadMedicalCertificate(file, employeeId, onProgress = nu
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const timestamp = Date.now();
     const uuid = generateUUID();
-    const extension = file.name.split(".").pop();
+    const extension = (file.name.split(".").pop() || "bin").toLowerCase();
 
-    const fileName = `${employeeId}_${timestamp}_${uuid}.${extension}`;
+    // Sanitize employee name for filename (remove special chars, spaces to underscore)
+    const safeName = String(employeeName || "Unknown")
+      .replace(/[^a-zA-Z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "_") // Replace spaces with underscore
+      .substring(0, 50); // Limit length
+
+    const fileName = `${safeName}_${timestamp}_${uuid}.${extension}`;
     const storagePath = `medical-certificates/${year}/${month}/${fileName}`;
 
     // Create storage reference
     const storageRef = ref(storage, storagePath);
 
+    // Attach metadata for secure rule checks
+    const uploadMetadata = {
+      contentType: file.type,
+      customMetadata: {
+        uploadedBy: auth.currentUser.uid,
+        employeeId: String(employeeId || ""),
+      },
+    };
+
     // Start resumable upload
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    const uploadTask = uploadBytesResumable(storageRef, file, uploadMetadata);
 
     // Return promise that handles upload events
     return new Promise((resolve, reject) => {
@@ -60,7 +78,6 @@ export async function uploadMedicalCertificate(file, employeeId, onProgress = nu
               state: snapshot.state,
             });
           }
-          console.log(`Upload progress: ${progress.toFixed(2)}%`);
         },
         // Error callback
         (error) => {
@@ -82,7 +99,6 @@ export async function uploadMedicalCertificate(file, employeeId, onProgress = nu
               uploadedAt: new Date().toISOString(),
             };
 
-            console.log("Medical certificate uploaded successfully:", uploadMetadata);
             resolve(uploadMetadata);
           } catch (error) {
             console.error("Error getting download URL:", error);
@@ -143,14 +159,40 @@ function generateUUID() {
  */
 export async function deleteMedicalCertificate(filePath) {
   try {
-    const storage = getStorage();
     const fileRef = ref(storage, filePath);
     await deleteObject(fileRef);
-    console.log("Medical certificate deleted successfully:", filePath);
   } catch (error) {
     console.error("Error deleting medical certificate:", error);
     throw error;
   }
+}
+
+/**
+ * Delete multiple medical certificates from Firebase Storage
+ * @param {string[]} storagePaths - Array of storage paths to delete
+ * @returns {Promise<Object>} Result with success count and failed items
+ */
+export async function deleteMultipleMedicalCertificates(storagePaths) {
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  for (const path of storagePaths) {
+    if (!path) continue;
+
+    try {
+      await deleteMedicalCertificate(path);
+      results.success++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ path, error: error.message });
+      console.warn(`Failed to delete ${path}:`, error.message);
+    }
+  }
+
+  return results;
 }
 
 /**

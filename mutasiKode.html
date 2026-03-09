@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -133,12 +133,7 @@
                   </div>
                   <div class="col-md-2">
                     <label for="searchKode" class="form-label">Cari Kode</label>
-                    <input
-                      type="text"
-                      class="form-control"
-                      id="searchKode"
-                      placeholder="Masukkan kode..."
-                    />
+                    <input type="text" class="form-control" id="searchKode" placeholder="Masukkan kode..." />
                   </div>
                   <div class="col-md-4 d-flex align-items-end d-none">
                     <button type="button" class="btn btn-primary" id="btnFilter">
@@ -320,7 +315,7 @@
       </main>
     </div>
 
-    <!-- Modal Detail Kode - UPDATE ID -->
+    <!-- Modal Detail Kode - MODERN UI -->
     <div
       class="modal fade"
       id="kodeDetailModal"
@@ -329,97 +324,142 @@
       aria-hidden="true"
     >
       <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="kodeDetailModalLabel">Detail Kode</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content border-0">
+          <div class="modal-header bg-primary text-white border-0 py-3">
+            <h5 class="modal-title" id="kodeDetailModalLabel">
+              <i class="fas fa-tag me-2"></i>
+              Detail Kode Barang
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body">
-            <div class="row mb-3">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Kode</label>
-                  <input type="text" class="form-control" id="detailKode" readonly />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Sales</label>
-                  <input type="text" class="form-control" id="detailSales" readonly />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Nama Barang</label>
-                  <input type="text" class="form-control" id="detailNama" readonly />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Kadar</label>
-                  <input type="text" class="form-control" id="detailKadar" readonly />
+          <div class="modal-body p-4">
+            <!-- Sektion 1: Informasi Utama -->
+            <div class="row g-2 mb-3 px-2">
+              <div class="col-md-4">
+                <div class="border-start border-4 border-primary ps-3 py-2">
+                  <small class="text-muted d-block">KODE</small>
+                  <div class="h5 fw-bold mb-0" id="detailKode">-</div>
                 </div>
               </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Berat</label>
-                  <input type="text" class="form-control" id="detailBerat" readonly />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Tanggal Input</label>
-                  <input type="text" class="form-control" id="detailTanggal" readonly />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Jenis Barang</label>
-                  <input type="text" class="form-control" id="detailJenis" readonly />
+              <div class="col-md-4">
+                <div class="border-start border-4 border-primary ps-3 py-2">
+                  <small class="text-muted d-block">SALES</small>
+                  <div class="h5 fw-bold mb-0" id="detailSales">-</div>
                 </div>
               </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Keterangan</label>
-              <textarea class="form-control" id="detailKeterangan" rows="3" readonly></textarea>
+              <div class="col-md-4">
+                <div class="border-start border-4 border-primary ps-3 py-2">
+                  <small class="text-muted d-block">JENIS</small>
+                  <div class="h5 fw-bold mb-0" id="detailJenis">-</div>
+                </div>
+              </div>
             </div>
 
-            <!-- Container untuk informasi mutasi -->
-            <div id="mutasiInfoContainer" style="display: none">
-              <hr />
-              <h6 class="mb-3">Informasi Mutasi</h6>
-              <div class="row mb-3">
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Tanggal Mutasi</label>
-                    <input type="text" class="form-control" id="detailTanggalMutasi" readonly />
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Status</label>
-                    <span class="badge bg-secondary">Sudah Dimutasi</span>
-                  </div>
-                </div>
-              </div>
+            <!-- Sektion 2: Detail Barang -->
+            <div class="mb-3 px-2 py-3 bg-light rounded">
+              <h6 class="text-secondary mb-3">
+                <i class="fas fa-box me-2"></i>
+                Informasi Barang
+              </h6>
               <div class="mb-3">
-                <label class="form-label">Keterangan Mutasi</label>
-                <textarea class="form-control" id="detailKeteranganMutasi" rows="2" readonly></textarea>
+                <label class="form-label small text-muted mb-3">Nama Barang</label>
+                <div class="px-2 py-0 bg-white rounded border">
+                  <input
+                    type="text"
+                    class="form-control form-control-plaintext form-control-sm fw-500 border-0"
+                    id="detailNama"
+                    readonly
+                  />
+                </div>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label small text-muted mb-3">Kadar</label>
+                  <div class="px-2 py-0 bg-white rounded border">
+                    <input
+                      type="text"
+                      class="form-control form-control-plaintext form-control-sm border-0"
+                      id="detailKadar"
+                      readonly
+                    />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small text-muted mb-3">Berat (gr)</label>
+                  <div class="px-2 py-0 bg-white rounded border">
+                    <input
+                      type="text"
+                      class="form-control form-control-plaintext form-control-sm border-0"
+                      id="detailBerat"
+                      readonly
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="mb-0">
+                <label class="form-label small text-muted mb-3">Keterangan</label>
+                <div class="px-2 py-0 bg-white rounded border">
+                  <textarea
+                    class="form-control form-control-plaintext form-control-sm border-0"
+                    id="detailKeterangan"
+                    rows="1"
+                    readonly
+                    style="resize: none"
+                  ></textarea>
+                </div>
               </div>
             </div>
 
-            <!-- Container untuk riwayat mutasi -->
-            <div id="mutasiHistoryContainer" style="display: none">
-              <hr />
-              <h6 class="mb-3">Riwayat Mutasi</h6>
-              <div class="table-responsive">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Tanggal</th>
-                      <th>Status</th>
-                      <th>Keterangan</th>
-                    </tr>
-                  </thead>
-                  <tbody id="mutasiHistoryTableBody">
-                    <!-- Riwayat mutasi akan ditampilkan di sini oleh JavaScript -->
-                  </tbody>
-                </table>
+            <!-- Sektion 3: Tanggal Input -->
+            <div class="mb-3 p-3 bg-light rounded">
+              <small class="text-muted d-block mb-2">TANGGAL INPUT</small>
+              <strong id="detailTanggal">-</strong>
+            </div>
+
+            <!-- Sektion 4: Informasi Mutasi (Conditional) -->
+            <div id="mutasiInfoContainer" style="display: none" class="mb-3 px-2 py-3 bg-light rounded">
+              <h6 class="text-secondary mb-3">
+                <i class="fas fa-exchange-alt me-2"></i>
+                Informasi Mutasi
+              </h6>
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label small text-muted mb-3">Tanggal Mutasi</label>
+                  <div class="px-2 py-0 bg-white rounded border">
+                    <input
+                      type="text"
+                      class="form-control form-control-plaintext form-control-sm border-0"
+                      id="detailTanggalMutasi"
+                      readonly
+                    />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small text-muted mb-3">Status</label>
+                  <div class="pt-1">
+                    <span class="badge bg-secondary small">Sudah Dimutasi</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-0">
+                <label class="form-label small text-muted mb-3">Keterangan Mutasi</label>
+                <div class="px-2 py-0 bg-white rounded border">
+                  <textarea
+                    class="form-control form-control-plaintext form-control-sm border-0"
+                    id="detailKeteranganMutasi"
+                    rows="1"
+                    readonly
+                    style="resize: none"
+                  ></textarea>
+                </div>
               </div>
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <div class="modal-footer bg-light border-top py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+              <i class="fas fa-times me-1"></i>
+              Tutup
+            </button>
           </div>
         </div>
       </div>
