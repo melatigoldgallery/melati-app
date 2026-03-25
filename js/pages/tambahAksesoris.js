@@ -1689,11 +1689,16 @@ export const aksesorisSaleHandler = {
     if (modalTitle) {
       modalTitle.textContent = docId ? "Edit Kode Barang" : "Tambah Kode Baru";
     }
+    const textKodeInput = document.getElementById("textKode");
     if (docId) {
       document.getElementById("docId").value = docId;
+      textKodeInput.readOnly = true;
+      textKodeInput.classList.add("bg-light");
       this.loadKodeBarangData(docId, kategori);
     } else {
       document.getElementById("docId").value = "";
+      textKodeInput.readOnly = false;
+      textKodeInput.classList.remove("bg-light");
     }
     this.modalFormKode.show();
   },

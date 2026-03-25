@@ -1271,11 +1271,26 @@ const penjualanHandler = {
     }
   },
 
+  // Renumber row-no cells in a table (excludes .input-row)
+  renumberRows(tableId) {
+    $(`#${tableId} tbody tr:not(.input-row)`).each(function (index) {
+      $(this)
+        .find(".row-no")
+        .text(index + 1);
+    });
+  },
+
   // Add aksesoris to table
   addAksesorisToTable(data) {
+    const currentRows = $("#tableAksesorisDetail tbody tr").length;
+    if (currentRows >= 10) {
+      utils.showAlert("Maksimal 10 baris barang per transaksi.", "Batas Tercapai", "warning");
+      return;
+    }
     const { kode, nama, harga } = data;
     const newRow = `
       <tr>
+        <td class="row-no"></td>
         <td>${kode}</td>
         <td>${nama}</td>
         <td>
@@ -1305,11 +1320,17 @@ const penjualanHandler = {
     const $newRow = $("#tableAksesorisDetail tbody tr:last-child");
     $newRow.find(".kadar-input").focus();
     this.attachRowEventHandlers($newRow);
+    this.renumberRows("tableAksesorisDetail");
     this.updateGrandTotal("aksesoris");
   },
 
   // Add kotak to table
   addKotakToTable(data) {
+    const currentRows = $("#tableKotakDetail tbody tr").length;
+    if (currentRows >= 10) {
+      utils.showAlert("Maksimal 10 baris barang per transaksi.", "Batas Tercapai", "warning");
+      return;
+    }
     const { kode, nama, harga } = data;
     const jumlah = 1;
     const hargaSatuan = parseInt(harga) || 0;
@@ -1317,6 +1338,7 @@ const penjualanHandler = {
 
     const newRow = `
       <tr>
+        <td class="row-no"></td>
         <td>${kode}</td>
         <td>${nama}</td>
         <td>
@@ -1340,11 +1362,17 @@ const penjualanHandler = {
     const $newRow = $("#tableKotakDetail tbody tr:last-child");
     $newRow.find(".harga-input").focus().select();
     this.attachRowEventHandlers($newRow);
+    this.renumberRows("tableKotakDetail");
     this.updateGrandTotal("kotak");
   },
 
   // Add silver to table
   addSilverToTable(data) {
+    const currentRows = $("#tableSilverDetail tbody tr").length;
+    if (currentRows >= 10) {
+      utils.showAlert("Maksimal 10 baris barang per transaksi.", "Batas Tercapai", "warning");
+      return;
+    }
     const { kode, nama, harga, kadar, berat } = data;
 
     // Auto-fill kadar & berat dari master data
@@ -1354,6 +1382,7 @@ const penjualanHandler = {
 
     const newRow = `
       <tr>
+        <td class="row-no"></td>
         <td>${kode}</td>
         <td>${nama}</td>
         <td>
@@ -1392,6 +1421,7 @@ const penjualanHandler = {
       $newRow.find(".kadar-input").focus();
     }
     this.attachRowEventHandlers($newRow);
+    this.renumberRows("tableSilverDetail");
     this.updateGrandTotal("silver");
   },
 
@@ -1419,6 +1449,7 @@ const penjualanHandler = {
               ? "kotak"
               : "manual";
       $row.remove();
+      this.renumberRows(tableId);
       this.updateGrandTotal(salesType);
     });
   },
