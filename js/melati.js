@@ -23,7 +23,6 @@ let queueDisplay;
 let nextQueueDisplay;
 let delayQueueDisplay;
 
-
 // Expose handleLogout to global scope for the onclick attribute
 window.handleLogout = handleLogout;
 
@@ -33,17 +32,39 @@ function updateDisplays() {
   const currentQueue = queueManager?.getCurrentQueue() || "A01";
   const nextQueue = queueManager?.getNextQueue() || "A02";
   const delayedQueue = queueManager?.getDelayedQueue() || [];
-  const skipList = queueManager?.getSkipList() || []; // Tambahkan ini
+  const skipList = queueManager?.getSkipList() || [];
+  const missedQueue = queueManager?.getMissedQueue() || [];
 
   if (queueDisplay) queueDisplay.textContent = currentQueue;
   if (nextQueueDisplay) nextQueueDisplay.textContent = nextQueue;
-  if (delayQueueDisplay) delayQueueDisplay.textContent = delayedQueue.join(", ") || "-";
+  if (delayQueueDisplay) {
+    if (delayedQueue.length === 0) {
+      delayQueueDisplay.textContent = "-";
+    } else {
+      const MAX_SHOW = 2;
+      const visible = delayedQueue.slice(0, MAX_SHOW).join(", ");
+      const remaining = delayedQueue.length - MAX_SHOW;
+      delayQueueDisplay.textContent = remaining > 0 ? `${visible}, ...` : visible;
+    }
+  }
   // Perbarui tampilan skipList
   const skipListDisplay = document.getElementById("skipListDisplay");
   if (skipListDisplay) {
     skipListDisplay.textContent = skipList.length > 0 ? skipList.join(", ") : "-";
   } else {
     console.warn("Element skipListDisplay not found");
+  }
+  // Perbarui tampilan missedQueue
+  const missedQueueDisplay = document.getElementById("missedQueueDisplay");
+  if (missedQueueDisplay) {
+    if (missedQueue.length === 0) {
+      missedQueueDisplay.textContent = "-";
+    } else {
+      const MAX_SHOW = 2;
+      const visible = missedQueue.slice(0, MAX_SHOW).join(", ");
+      const remaining = missedQueue.length - MAX_SHOW;
+      missedQueueDisplay.textContent = remaining > 0 ? `${visible}, ...` : visible;
+    }
   }
 }
 
@@ -187,6 +208,18 @@ function initializeButtons(queueAnalytics) {
   const callButton = document.getElementById("callButton");
   if (callButton) {
     callButton.addEventListener("click", async () => {
+      // Jika ada antrian terlewat, blokir dan tampilkan SweetAlert
+      const missedQueue = queueManager.getMissedQueue();
+      if (missedQueue.length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Antrian Terlewat",
+          text: "Panggil antrian terlewat terlebih dahulu sebelum memanggil antrian saat ini.",
+          confirmButtonText: "Mengerti",
+          confirmButtonColor: "#f44336",
+        });
+        return;
+      }
       if (isAudioBusy()) {
         console.log("Audio sedang diputar, mengabaikan klik");
         return;
@@ -227,61 +260,110 @@ function initializeButtons(queueAnalytics) {
     });
   }
 
-  // Tombol Handle Delay Queue Number
-  const delayHandleButton = document.getElementById("delayHandleButton");
-  if (delayHandleButton) {
-    delayHandleButton.addEventListener("click", () => {
+  // Tombol Handle Delay Queue Number — Pindahkan ke Antrian Terlewat
+  const moveToMissedButton = document.getElementById("moveToMissedButton");
+  if (moveToMissedButton) {
+    moveToMissedButton.addEventListener("click", () => {
       const delayedNumbers = queueManager.getDelayedQueue();
-      if (delayedNumbers.length > 0) {
-        // Get the select element
-        const selectElement = document.getElementById("delayedQueueSelect");
-
-        // Clear existing options
-        selectElement.innerHTML = "";
-
-        // Add options for each delayed number
-        delayedNumbers.forEach((number) => {
-          const option = document.createElement("option");
-          option.value = number;
-          option.textContent = number;
-          selectElement.appendChild(option);
+      if (delayedNumbers.length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "Tidak Ada Antrian Tertunda",
+          text: "Tidak ada nomor antrian tertunda yang bisa dipindahkan.",
+          confirmButtonText: "OK",
         });
-
-        const confirmDelayedModal = new bootstrap.Modal("#confirmDelayedModal");
-        confirmDelayedModal.show();
+        return;
       }
+      const selectElement = document.getElementById("moveToMissedSelect");
+      selectElement.innerHTML = "";
+      delayedNumbers.forEach((number) => {
+        const option = document.createElement("option");
+        option.value = number;
+        option.textContent = number;
+        selectElement.appendChild(option);
+      });
+      const modal = new bootstrap.Modal(document.getElementById("moveToMissedModal"));
+      modal.show();
     });
   }
 
-  const confirmDelayedYes = document.getElementById("confirmDelayedYes");
-  if (confirmDelayedYes) {
-    confirmDelayedYes.addEventListener("click", async () => {
-      const selectElement = document.getElementById("delayedQueueSelect");
+  const confirmMoveToMissed = document.getElementById("confirmMoveToMissed");
+  if (confirmMoveToMissed) {
+    confirmMoveToMissed.addEventListener("click", () => {
+      const selectElement = document.getElementById("moveToMissedSelect");
       const selectedQueue = selectElement.value;
-
       if (selectedQueue) {
-        await queueManager.decrementCustomer(); // Kurangi customer saat dilayani
         queueManager.removeFromDelayedQueue(selectedQueue);
+        queueManager.addToMissedQueue(selectedQueue);
         updateDisplays();
-
-        const modal = bootstrap.Modal.getInstance(document.getElementById("confirmDelayedModal"));
-        modal.hide();
+        bootstrap.Modal.getInstance(document.getElementById("moveToMissedModal")).hide();
       }
     });
   }
 
-  // Sequential call button
-  const sequentialCallButton = document.getElementById("sequentialCallButton");
-  if (sequentialCallButton) {
-    sequentialCallButton.addEventListener("click", async () => {
+  // Tombol Panggil Antrian Terlewat — langsung panggil nomor pertama (terlama)
+  const callMissedButton = document.getElementById("callMissedButton");
+  if (callMissedButton) {
+    callMissedButton.addEventListener("click", async () => {
+      const missedNumbers = queueManager.getMissedQueue();
+      if (missedNumbers.length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "Tidak Ada Antrian Terlewat",
+          text: "Tidak ada nomor antrian terlewat saat ini.",
+          confirmButtonText: "OK",
+        });
+        return;
+      }
       if (isAudioBusy()) {
         console.log("Audio sedang diputar, mengabaikan klik");
         return;
       }
+      const firstMissed = missedNumbers[0];
+      callMissedButton.classList.add("audio-active");
+      await playQueueAnnouncement(firstMissed);
+      callMissedButton.classList.remove("audio-active");
+    });
+  }
 
-      sequentialCallButton.classList.add("audio-active");
-      await callSequentially("id");
-      sequentialCallButton.classList.remove("audio-active");
+  // Tombol Sudah Dilayani - Antrian Terlewat
+  const missedHandleButton = document.getElementById("missedHandleButton");
+  if (missedHandleButton) {
+    missedHandleButton.addEventListener("click", () => {
+      const missedNumbers = queueManager.getMissedQueue();
+      if (missedNumbers.length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "Tidak Ada Antrian Terlewat",
+          text: "Tidak ada nomor antrian terlewat saat ini.",
+          confirmButtonText: "OK",
+        });
+        return;
+      }
+      const selectElement = document.getElementById("missedHandleSelect");
+      selectElement.innerHTML = "";
+      missedNumbers.forEach((number) => {
+        const option = document.createElement("option");
+        option.value = number;
+        option.textContent = number;
+        selectElement.appendChild(option);
+      });
+      const modal = new bootstrap.Modal(document.getElementById("missedHandleModal"));
+      modal.show();
+    });
+  }
+
+  const confirmMissedHandle = document.getElementById("confirmMissedHandle");
+  if (confirmMissedHandle) {
+    confirmMissedHandle.addEventListener("click", async () => {
+      const selectElement = document.getElementById("missedHandleSelect");
+      const selectedQueue = selectElement.value;
+      if (selectedQueue) {
+        await queueManager.decrementCustomer();
+        queueManager.removeFromMissedQueue(selectedQueue);
+        updateDisplays();
+        bootstrap.Modal.getInstance(document.getElementById("missedHandleModal")).hide();
+      }
     });
   }
 
@@ -315,57 +397,56 @@ function initializeButtons(queueAnalytics) {
     });
   }
 
-// Tambahkan event listener untuk tombol skip
-const skipQueueButton = document.getElementById("skipQueueButton");
-const confirmSkipQueue = document.getElementById("confirmSkipQueue");
+  // Tambahkan event listener untuk tombol skip
+  const skipQueueButton = document.getElementById("skipQueueButton");
+  const confirmSkipQueue = document.getElementById("confirmSkipQueue");
 
-if (skipQueueButton) {
-  skipQueueButton.addEventListener("click", () => {
-    // Persiapkan informasi untuk modal
-    const currentQueue = queueManager.getCurrentQueue();
-    
-    // Update teks di modal
-    document.getElementById("currentQueueText").textContent = currentQueue;
-    
-    // Set default value untuk select letter berdasarkan huruf saat ini
-    const letterSelect = document.getElementById("skipQueueLetter");
-    letterSelect.value = queueManager.letters[queueManager.currentLetter];
-    
-    // Tampilkan modal
-    const modal = new bootstrap.Modal(document.getElementById("skipQueueModal"));
-    modal.show();
-  });
-}
+  if (skipQueueButton) {
+    skipQueueButton.addEventListener("click", () => {
+      // Persiapkan informasi untuk modal
+      const currentQueue = queueManager.getCurrentQueue();
 
-if (confirmSkipQueue) {
-  confirmSkipQueue.addEventListener("click", () => {
-    try {
-      const letter = document.getElementById("skipQueueLetter").value;
-      const number = parseInt(document.getElementById("skipQueueNumberInput").value);
-      
-      if (isNaN(number) || number < 1 || number > 50) {
-        alert("Masukkan nomor antrian yang valid (1-50)");
-        return;
+      // Update teks di modal
+      document.getElementById("currentQueueText").textContent = currentQueue;
+
+      // Set default value untuk select letter berdasarkan huruf saat ini
+      const letterSelect = document.getElementById("skipQueueLetter");
+      letterSelect.value = queueManager.letters[queueManager.currentLetter];
+
+      // Tampilkan modal
+      const modal = new bootstrap.Modal(document.getElementById("skipQueueModal"));
+      modal.show();
+    });
+  }
+
+  if (confirmSkipQueue) {
+    confirmSkipQueue.addEventListener("click", () => {
+      try {
+        const letter = document.getElementById("skipQueueLetter").value;
+        const number = parseInt(document.getElementById("skipQueueNumberInput").value);
+
+        if (isNaN(number) || number < 1 || number > 50) {
+          alert("Masukkan nomor antrian yang valid (1-50)");
+          return;
+        }
+
+        // Tambahkan ke skipList
+        if (queueManager.addToSkipList(letter, number)) {
+          // Tutup modal
+          bootstrap.Modal.getInstance(document.getElementById("skipQueueModal")).hide();
+
+          // Bersihkan input
+          document.getElementById("skipQueueNumberInput").value = "";
+
+          console.log("Nomor antrian berhasil ditambahkan ke skip list");
+        } else {
+          alert("Nomor antrian ini sudah ada dalam daftar skip");
+        }
+      } catch (error) {
+        console.error("Error saat menambahkan nomor ke skip list:", error);
       }
-      
-      // Tambahkan ke skipList
-      if (queueManager.addToSkipList(letter, number)) {
-        // Tutup modal
-        bootstrap.Modal.getInstance(document.getElementById("skipQueueModal")).hide();
-        
-        // Bersihkan input
-        document.getElementById("skipQueueNumberInput").value = "";
-        
-        console.log("Nomor antrian berhasil ditambahkan ke skip list");
-      } else {
-        alert("Nomor antrian ini sudah ada dalam daftar skip");
-      }
-    } catch (error) {
-      console.error("Error saat menambahkan nomor ke skip list:", error);
-    }
-  });
-}
-
+    });
+  }
 
   // Add event listeners for custom queue
   const customQueueButton = document.getElementById("customQueueButton");
@@ -542,7 +623,6 @@ if (typeof QueueManager !== "undefined") {
   };
 }
 
-
 // Main initialization function
 async function initializePage() {
   try {
@@ -559,12 +639,11 @@ window.speechSynthesis.onvoiceschanged = () => {
 
 // Main DOM content loaded event
 document.addEventListener("DOMContentLoaded", function () {
-  
-     // Tambahkan event listener untuk tombol logout jika menggunakan event listener
-     const logoutBtn = document.getElementById('logoutBtn');
-     if (logoutBtn) {
-         logoutBtn.addEventListener('click', handleLogout);
-     }
+  // Tambahkan event listener untuk tombol logout jika menggunakan event listener
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", handleLogout);
+  }
   // Initialize authentication
   initializePage();
 
