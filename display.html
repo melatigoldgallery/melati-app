@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -182,13 +182,15 @@
         border-radius: 15px;
         overflow: hidden;
         box-shadow: var(--shadow-soft);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease;
         height: 450px;
-        width: 670px;
+        width: 800px;
         max-width: 98vw;
         border: none;
         position: relative;
-        box-shadow:0 20px 40px rgba(184, 152, 7, 0.63);
+        box-shadow: 0 20px 40px rgba(184, 152, 7, 0.63);
       }
 
       .queue-card::before {
@@ -220,7 +222,7 @@
       }
 
       .queue-card-header h1 {
-        font-family:'Times New Roman', Times, serif;
+        font-family: "Times New Roman", Times, serif;
         font-size: 3.25rem;
         font-weight: bold;
         margin: 0;
@@ -334,7 +336,9 @@
       }
 
       .footer p {
-        font-family: playfair display, serif;
+        font-family:
+          playfair display,
+          serif;
       }
 
       /* Animation for Queue Numbers */
@@ -383,9 +387,27 @@
         border: 1px solid var(--gold-primary);
         border-radius: 10px;
         padding: 1px;
-        background: linear-gradient(var(--white), var(--white)) padding-box,
+        background:
+          linear-gradient(var(--white), var(--white)) padding-box,
           linear-gradient(45deg, var(--gold-primary), var(--gold-secondary), var(--gold-primary)) border-box;
         border: 1px solid transparent;
+      }
+
+      /* Queue number font-size utility classes */
+      .queue-number.text-xl {
+        font-size: 17rem;
+      }
+      .queue-number.text-lg {
+        font-size: 12.5rem;
+      }
+      .queue-number.text-md {
+        font-size: 6rem;
+      }
+      .queue-number.text-sm {
+        font-size: 4.5rem;
+      }
+      .queue-number.text-xs {
+        font-size: 3rem;
       }
     </style>
   </head>
@@ -434,9 +456,7 @@
         <div class="col-auto" data-aos="fade-up" data-aos-delay="300">
           <div class="queue-card card-current gold-border">
             <div class="queue-card-header">
-              <h1>
-                SEDANG DILAYANI
-              </h1>
+              <h1>SEDANG DILAYANI</h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number active" id="queueNumber">-</div>
@@ -448,9 +468,7 @@
         <div class="col-auto" data-aos="fade-up" data-aos-delay="400">
           <div class="queue-card card-next gold-border">
             <div class="queue-card-header">
-              <h1>
-                AKAN DIPANGGIL
-              </h1>
+              <h1>AKAN DIPANGGIL</h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number" id="nextQueueNumber">-</div>
@@ -522,6 +540,23 @@
           element.classList.add(totalLength > 15 ? "text-sm" : "text-md");
         } else {
           element.classList.add("text-xs");
+        }
+      }
+
+      // Fungsi untuk menyesuaikan ukuran font card AKAN DIPANGGIL
+      function adjustNextQueueFontSize(text) {
+        const element = document.getElementById("nextQueueNumber");
+        if (!element) return;
+        element.classList.remove("text-xs", "text-sm", "text-md", "text-lg", "text-xl");
+        const parts = String(text)
+          .split(",")
+          .filter((p) => p.trim() !== "...");
+        const count = parts.length;
+        if (count <= 1) {
+          element.classList.add("text-xl");
+        } else {
+          // 2 nomor + opsional "..."
+          element.classList.add("text-lg");
         }
       }
 
