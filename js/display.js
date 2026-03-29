@@ -31,15 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const nextLetter = nextNumber > 50 ? data.currentLetter % 4 : data.currentLetter;
       const nextSequentialQueue = `${["A", "B", "C", "D"][nextLetter]}${String(nextNumber > 50 ? 1 : nextNumber).padStart(2, "0")}`;
 
-      // Build "AKAN DIPANGGIL" display: missed first, then current, max 2 shown
-      const missedQueue = data.missedQueue || [];
-      let nextQueueDisplay;
-      if (missedQueue.length > 0) {
-        const items = [missedQueue[0], nextSequentialQueue];
-        nextQueueDisplay = missedQueue.length > 1 ? `${items.join(", ")}, ...` : items.join(", ");
-      } else {
-        nextQueueDisplay = nextSequentialQueue;
-      }
+      // Show only the next queue number (nextQueue from Firebase, fallback to computed)
+      const nextQueueDisplay = data.nextQueue || nextSequentialQueue;
 
       const nextQueueElement = document.getElementById("nextQueueNumber");
       if (nextQueueElement) {
@@ -48,10 +41,6 @@ document.addEventListener("DOMContentLoaded", () => {
           nextQueueElement.textContent = nextQueueDisplay;
           nextQueueElement.classList.add("active");
           setTimeout(() => nextQueueElement.classList.remove("active"), 2000);
-        }
-        // Adjust font size based on content length
-        if (typeof adjustNextQueueFontSize === "function") {
-          adjustNextQueueFontSize(nextQueueDisplay);
         }
       }
 
