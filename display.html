@@ -241,13 +241,14 @@
 
       .queue-card-header h1 {
         font-family: "Times New Roman", Times, serif;
-        font-size: 3.25rem;
+        font-size: clamp(1.6rem, 2.6vw, 3.25rem);
         font-weight: bold;
         margin: 0;
         color: var(--dark-brown);
         display: flex;
         align-items: center;
         justify-content: center;
+        white-space: nowrap;
       }
 
       .queue-card-header h1 i {
@@ -505,7 +506,7 @@
         <div class="col-12 col-md-5" id="next-card-wrapper" data-aos="fade-up" data-aos-delay="400">
           <div class="queue-card card-next gold-border">
             <div class="queue-card-header">
-              <h1>AKAN DIPANGGIL</h1>
+              <h1 id="next-card-header">AKAN DIPANGGIL</h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number" id="nextQueueNumber">-</div>
@@ -612,11 +613,13 @@
                   const currentWrapper = document.getElementById("current-card-wrapper");
                   const nextWrapper = document.getElementById("next-card-wrapper");
                   const cardsRow = document.getElementById("cards-row");
+                  const nextCardHeader = document.getElementById("next-card-header");
                   if (delayedText) {
                     updateQueueElement("delayQueueNumber", delayedText);
                     adjustDelayedQueueFontSize(delayedText);
                     if (delayedWrapper) delayedWrapper.style.display = "";
                     if (cardsRow) cardsRow.classList.remove("layout-two-col");
+                    if (nextCardHeader) nextCardHeader.textContent = "ANTRIAN BERIKUTNYA";
                     // Saat 3 card: masing-masing col-md-4
                     if (currentWrapper) {
                       currentWrapper.classList.remove("col-md-5");
@@ -629,6 +632,7 @@
                   } else {
                     if (delayedWrapper) delayedWrapper.style.display = "none";
                     if (cardsRow) cardsRow.classList.add("layout-two-col");
+                    if (nextCardHeader) nextCardHeader.textContent = "AKAN DIPANGGIL";
                     // Saat 2 card: masing-masing col-md-5
                     if (currentWrapper) {
                       currentWrapper.classList.remove("col-md-4");
