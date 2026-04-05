@@ -175,6 +175,16 @@ function initializeButtons(queueAnalytics) {
   // Add click handler for delay button
   if (delayQueueButton) {
     delayQueueButton.addEventListener("click", () => {
+      if (queueManager.getMissedQueue().length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Antrian Terlewat",
+          text: "Panggil antrian terlewat terlebih dahulu sebelum memproses antrian saat ini.",
+          confirmButtonText: "Mengerti",
+          confirmButtonColor: "#f44336",
+        });
+        return;
+      }
       const modal = new bootstrap.Modal(document.getElementById("confirmDelayModal"));
       modal.show();
     });
@@ -235,6 +245,16 @@ function initializeButtons(queueAnalytics) {
   const handleButton = document.getElementById("handleButton");
   if (handleButton) {
     handleButton.addEventListener("click", () => {
+      if (queueManager.getMissedQueue().length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Antrian Terlewat",
+          text: "Panggil antrian terlewat terlebih dahulu sebelum memproses antrian saat ini.",
+          confirmButtonText: "Mengerti",
+          confirmButtonColor: "#f44336",
+        });
+        return;
+      }
       const modal = new bootstrap.Modal(document.getElementById("confirmModal"));
       modal.show();
     });
@@ -403,6 +423,16 @@ function initializeButtons(queueAnalytics) {
 
   if (skipQueueButton) {
     skipQueueButton.addEventListener("click", () => {
+      if (queueManager.getMissedQueue().length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Antrian Terlewat",
+          text: "Panggil antrian terlewat terlebih dahulu sebelum memproses antrian saat ini.",
+          confirmButtonText: "Mengerti",
+          confirmButtonColor: "#f44336",
+        });
+        return;
+      }
       // Persiapkan informasi untuk modal
       const currentQueue = queueManager.getCurrentQueue();
 
@@ -452,6 +482,16 @@ function initializeButtons(queueAnalytics) {
   const customQueueButton = document.getElementById("customQueueButton");
   if (customQueueButton) {
     customQueueButton.addEventListener("click", () => {
+      if (queueManager.getMissedQueue().length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Antrian Terlewat",
+          text: "Panggil antrian terlewat terlebih dahulu sebelum memproses antrian saat ini.",
+          confirmButtonText: "Mengerti",
+          confirmButtonColor: "#f44336",
+        });
+        return;
+      }
       // Langsung buka modal custom queue tanpa password
       const customQueueModal = new bootstrap.Modal(document.getElementById("customQueueModal"));
       customQueueModal.show();
@@ -479,6 +519,16 @@ function initializeButtons(queueAnalytics) {
   const confirmResetBtn = document.getElementById("confirmResetBtn");
   if (resetButton) {
     resetButton.addEventListener("click", () => {
+      if (queueManager.getMissedQueue().length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Antrian Terlewat",
+          text: "Panggil antrian terlewat terlebih dahulu sebelum memproses antrian saat ini.",
+          confirmButtonText: "Mengerti",
+          confirmButtonColor: "#f44336",
+        });
+        return;
+      }
       const modal = new bootstrap.Modal(document.getElementById("resetConfirmModal"));
       modal.show();
     });
