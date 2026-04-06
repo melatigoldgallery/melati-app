@@ -2149,8 +2149,8 @@ const penjualanHandler = {
 
     if (salesType === "aksesoris" || salesType === "silver") {
       $(tableSelector + " tbody tr:not(.input-row)").each(function (index) {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
+        const kode = $(this).find("td:nth-child(2)").text();
+        const nama = $(this).find("td:nth-child(3)").text();
         const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
         const kadar = $(this).find(".kadar-input").val();
         const berat = parseFloat($(this).find(".berat-input").val());
@@ -2197,8 +2197,8 @@ const penjualanHandler = {
       }
     } else if (salesType === "kotak") {
       $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
+        const kode = $(this).find("td:nth-child(2)").text();
+        const nama = $(this).find("td:nth-child(3)").text();
         const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
         const hargaSatuan = parseFloat($(this).find(".harga-input").val().replace(/\./g, "")) || 0;
         const totalHarga = parseFloat($(this).find(".total-harga").text().replace(/\./g, "")) || 0;

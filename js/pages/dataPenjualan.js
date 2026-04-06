@@ -1379,7 +1379,7 @@ class OptimizedDataPenjualanApp {
     let formHtml = `
       <div class="alert alert-info mb-3">
         <i class="fas fa-info-circle me-2"></i>
-        <strong>Informasi:</strong> Kode barang tidak dapat diubah. Perubahan jumlah hanya mempengaruhi data laporan penjualan dan tidak mengubah stok inventory.
+        <strong>Informasi:</strong> Kode barang dapat diubah untuk memperbaiki data yang salah. Perubahan jumlah hanya mempengaruhi data laporan penjualan dan tidak mengubah stok inventory.
       </div>
       <div class="row mb-3">
         <div class="col-md-6">
@@ -1459,10 +1459,10 @@ class OptimizedDataPenjualanApp {
               <h6>Item ${index + 1}</h6>
               <div class="row">
                 <div class="col-md-4">
-                  <label for="editKode_${index}" class="form-label">Kode: <span class="badge bg-secondary">Tidak dapat diubah</span></label>
+                  <label for="editKode_${index}" class="form-label">Kode: <span class="badge bg-warning">Dapat diubah</span></label>
                   <input type="text" class="form-control" id="editKode_${index}" value="${
                     item.kodeText || item.kode || ""
-                  }" readonly>
+                  }">
                 </div>
                 <div class="col-md-4">
                   <label for="editJumlah_${index}" class="form-label">Jumlah (Pcs): <span class="badge bg-info">Editable</span></label>
@@ -1574,9 +1574,11 @@ class OptimizedDataPenjualanApp {
         updateData.items = this.currentTransaction.items.map((item, index) => {
           const updatedItem = { ...item };
 
-          // Kode dan kodeLock TIDAK dapat diubah (pertahankan nilai original)
-          updatedItem.kodeText = item.kodeText || "";
-          updatedItem.kode = item.kode || item.kodeText || "";
+          // Kode dapat diubah (untuk koreksi data salah), kodeLock tidak dapat diubah
+          const kodeInput = document.getElementById(`editKode_${index}`);
+          const kodeValue = kodeInput?.value?.trim() || item.kodeText || item.kode || "";
+          updatedItem.kodeText = kodeValue;
+          updatedItem.kode = kodeValue;
           updatedItem.kodeLock = item.kodeLock || "";
 
           // Jumlah DAPAT diubah (baca dari input field)
