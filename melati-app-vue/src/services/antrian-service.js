@@ -1,0 +1,223 @@
+import { rtdb } from "@/config/firebase";
+import {
+  ref as dbRef,
+  onValue,
+  set,
+  get,
+  push,
+  remove,
+} from "firebase/database";
+
+const LETTERS = ["A", "B", "C", "D"];
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+export function padNumber(n) {
+  return String(n).padStart(2, "0");
+}
+
+export function formatQueue(letterIndex, number) {
+  return LETTERS[letterIndex] + padNumber(number);
+}
+
+export const LETTERS_MAP = {
+  A: "Layanan Umum",
+  B: "Khusus / Prioritas",
+  C: "Servis / Reparasi",
+  D: "Pembelian Emas",
+};
+
+const QUEUE_REF = "queue";
+const CUSTOMER_REF = "customerCount";
+
+function queueRef() {
+  return dbRef(rtdb, QUEUE_REF);
+}
+
+// ── State subscription ─────────────────────────────────────────────────────
+export function subscribeQueue(callback) {
+  return onValue(queueRef(), (snap) => {
+    const val = snap.val() || {};
+    callback({
+      currentLetter: val.currentLetter ?? 0,
+      currentNumber: val.currentNumber ?? 1,
+      delayedQueue: val.delayedQueue || [],
+      skipList: val.skipList || [],
+      missedQueue: val.missedQueue || [],
+    });
+  });
+}
+
+async function saveState(state) {
+  await set(queueRef(), {
+    currentLetter: state.currentLetter,
+    currentNumber: state.currentNumber,
+    delayedQueue: state.delayedQueue || [],
+    skipList: state.skipList || [],
+    missedQueue: state.missedQueue || [],
+  });
+}
+
+async function getState() {
+  const snap = await get(queueRef());
+  const val = snap.val() || {};
+  return {
+    currentLetter: val.currentLetter ?? 0,
+    currentNumber: val.currentNumber ?? 1,
+    delayedQueue: val.delayedQueue || [],
+    skipList: val.skipList || [],
+    missedQueue: val.missedQueue || [],
+  };
+}
+
+// ── Operations ─────────────────────────────────────────────────────────────
+export async function nextQueue(state) {
+  let { currentLetter, currentNumber, delayedQueue, skipList, missedQueue } = state;
+  let limit = 0;
+  do {
+    currentNumber++;
+    if (currentNumber > 50) {
+      currentNumber = 1;
+      currentLetter = (currentLetter + 1) % LETTERS.length;
+    }
+    const qNum = formatQueue(currentLetter, currentNumber);
+    const skipIdx = skipList.indexOf(qNum);
+    if (skipIdx !== -1) {
+      skipList = skipList.filter((_, i) => i !== skipIdx);
+      limit++;
+      continue;
+    }
+    break;
+  } while (limit < 200);
+
+  const newState = { currentLetter, currentNumber, delayedQueue, skipList, missedQueue };
+  await saveState(newState);
+  return newState;
+}
+
+export async function previousQueue(state) {
+  let { currentLetter, currentNumber, delayedQueue, skipList, missedQueue } = state;
+  currentNumber--;
+  if (currentNumber < 1) {
+    currentLetter = (currentLetter - 1 + LETTERS.length) % LETTERS.length;
+    currentNumber = 50;
+  }
+  const newState = { currentLetter, currentNumber, delayedQueue, skipList, missedQueue };
+  await saveState(newState);
+  return newState;
+}
+
+export async function setCustomQueue(state, letterIndex, number) {
+  const newState = {
+    ...state,
+    currentLetter: letterIndex,
+    currentNumber: Math.max(1, Math.min(50, number)),
+  };
+  await saveState(newState);
+  return newState;
+}
+
+export async function addToSkipList(state, queueNumber) {
+  if (state.skipList.includes(queueNumber)) return state;
+  const newState = { ...state, skipList: [...state.skipList, queueNumber] };
+  await saveState(newState);
+  return newState;
+}
+
+export async function addToDelayedQueue(state, queueNumber) {
+  if (state.delayedQueue.includes(queueNumber)) return state;
+  const newState = { ...state, delayedQueue: [...state.delayedQueue, queueNumber] };
+  await saveState(newState);
+  return newState;
+}
+
+export async function removeFromDelayedQueue(state, queueNumber) {
+  const newState = { ...state, delayedQueue: state.delayedQueue.filter((q) => q !== queueNumber) };
+  await saveState(newState);
+  return newState;
+}
+
+export async function moveToMissed(state, queueNumber) {
+  const newState = {
+    ...state,
+    delayedQueue: state.delayedQueue.filter((q) => q !== queueNumber),
+    missedQueue: state.missedQueue.includes(queueNumber)
+      ? state.missedQueue
+      : [...state.missedQueue, queueNumber],
+  };
+  await saveState(newState);
+  return newState;
+}
+
+export async function removeFromMissed(state, queueNumber) {
+  const newState = { ...state, missedQueue: state.missedQueue.filter((q) => q !== queueNumber) };
+  await saveState(newState);
+  return newState;
+}
+
+export async function resetQueue() {
+  await set(queueRef(), {
+    currentLetter: 0,
+    currentNumber: 1,
+    delayedQueue: [],
+    skipList: [],
+    missedQueue: [],
+  });
+}
+
+// ── Customer Count ─────────────────────────────────────────────────────────
+export async function incrementCustomer() {
+  const snap = await get(dbRef(rtdb, CUSTOMER_REF));
+  const current = snap.val() || 0;
+  await set(dbRef(rtdb, CUSTOMER_REF), current + 1);
+}
+
+export async function decrementCustomer() {
+  const snap = await get(dbRef(rtdb, CUSTOMER_REF));
+  const current = snap.val() || 0;
+  await set(dbRef(rtdb, CUSTOMER_REF), Math.max(0, current - 1));
+}
+
+export function subscribeCustomerCount(callback) {
+  return onValue(dbRef(rtdb, CUSTOMER_REF), (snap) => callback(snap.val() || 0));
+}
+
+// ── Analytics ─────────────────────────────────────────────────────────────
+export async function writeAnalyticsEntry({ queueNumber, status = "served", waitTime = null }) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const analyticsRef = dbRef(rtdb, `analytics/${y}/${m}/${d}`);
+  await push(analyticsRef, {
+    queueNumber,
+    status,
+    timestamp: now.toISOString(),
+    hour: now.getHours(),
+    day: now.getDay(),
+    date: d,
+    month: m,
+    year: y,
+    waitTime,
+  });
+}
+
+export async function fetchAnalyticsByMonth(year, month) {
+  const snap = await get(dbRef(rtdb, `analytics/${year}/${month}`));
+  if (!snap.val()) return [];
+  const entries = [];
+  snap.forEach((daySnap) => {
+    daySnap.forEach((entrySnap) => {
+      entries.push({ id: entrySnap.key, ...entrySnap.val() });
+    });
+  });
+  return entries;
+}
+
+export async function resetAnalytics(year, month) {
+  await remove(dbRef(rtdb, `analytics/${year}/${month}`));
+}
+
+// ── Connection status ──────────────────────────────────────────────────────
+export function subscribeConnection(callback) {
+  return onValue(dbRef(rtdb, ".info/connected"), (snap) => callback(snap.val() === true));
+}

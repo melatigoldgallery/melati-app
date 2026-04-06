@@ -1,0 +1,32 @@
+{
+  "name": "melati-app-vue",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
+    "firebase": "^11.6.0",
+    "pinia": "^2.3.1",
+    "sweetalert2": "^11.15.10",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
+    "xlsx": "^0.18.5"
+  },
+  "optionalDependencies": {
+    "aos": "^2.3.4",
+    "chart.js": "^4.4.9",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "vite": "^6.2.0"
+  }
+}
