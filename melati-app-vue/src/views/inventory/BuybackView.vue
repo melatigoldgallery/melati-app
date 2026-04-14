@@ -1,11 +1,22 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-arrow-left-right me-2 text-warning"></i>Kalkulator Buyback
-      </h4>
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-arrow-left-right me-2 text-dark"></i>
+        Kalkulator Buyback
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Buyback</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex justify-content-end mb-3">
       <button class="btn btn-outline-secondary btn-sm" @click="openSettings">
-        <i class="bi bi-gear me-1"></i>Pengaturan Persentase
+        <i class="bi bi-gear me-1"></i>
+        Pengaturan Persentase
       </button>
     </div>
 
@@ -29,21 +40,37 @@
             <tr v-for="(row, i) in rows" :key="i">
               <td class="small">{{ i + 1 }}</td>
               <td>
-                <select v-model="row.kadar" class="form-select form-select-sm" style="width:80px">
+                <select v-model="row.kadar" class="form-select form-select-sm" style="width: 80px">
                   <option v-for="k in KADAR_OPTIONS" :key="k" :value="k">{{ k }}</option>
                 </select>
               </td>
-              <td><input v-model="row.namaBarang" type="text" class="form-control form-control-sm" style="width:150px" /></td>
               <td>
-                <select v-model="row.kondisiBarang" class="form-select form-select-sm" style="width:90px">
+                <input v-model="row.namaBarang" type="text" class="form-control form-control-sm" style="width: 150px" />
+              </td>
+              <td>
+                <select v-model="row.kondisiBarang" class="form-select form-select-sm" style="width: 90px">
                   <option value="1">K1</option>
                   <option value="2">K2</option>
                   <option value="3">K3</option>
                   <option value="4">K4</option>
                 </select>
               </td>
-              <td><input v-model.number="row.hargaBeli" type="number" class="form-control form-control-sm" style="width:130px" /></td>
-              <td><input v-model.number="row.hargaHariIni" type="number" class="form-control form-control-sm" style="width:130px" /></td>
+              <td>
+                <input
+                  v-model.number="row.hargaBeli"
+                  type="number"
+                  class="form-control form-control-sm"
+                  style="width: 130px"
+                />
+              </td>
+              <td>
+                <input
+                  v-model.number="row.hargaHariIni"
+                  type="number"
+                  class="form-control form-control-sm"
+                  style="width: 130px"
+                />
+              </td>
               <td>
                 <button class="btn btn-outline-danger btn-sm" @click="removeRow(i)" :disabled="rows.length === 1">
                   <i class="bi bi-trash"></i>
@@ -55,11 +82,13 @@
       </div>
       <div class="card-footer bg-white d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" @click="addRow">
-          <i class="bi bi-plus-circle me-1"></i>Tambah Baris
+          <i class="bi bi-plus-circle me-1"></i>
+          Tambah Baris
         </button>
         <button class="btn btn-warning btn-sm" @click="calculate" :disabled="loading">
           <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
-          <i v-else class="bi bi-calculator me-1"></i>Hitung Buyback
+          <i v-else class="bi bi-calculator me-1"></i>
+          Hitung Buyback
         </button>
       </div>
     </div>
@@ -73,7 +102,7 @@
             <div class="p-2 border rounded text-center">
               <div class="fw-bold text-warning">{{ cond.key }}</div>
               <div class="small text-muted">{{ cond.desc }}</div>
-              <div class="small fw-semibold">{{ persentaseMap[cond.key] ? persentaseMap[cond.key] + '%' : '-' }}</div>
+              <div class="small fw-semibold">{{ persentaseMap[cond.key] ? persentaseMap[cond.key] + "%" : "-" }}</div>
             </div>
           </div>
         </div>
@@ -89,7 +118,7 @@
             <button class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <div class="text-muted small mb-3">{{ new Date().toLocaleString('id-ID') }}</div>
+            <div class="text-muted small mb-3">{{ new Date().toLocaleString("id-ID") }}</div>
             <div class="table-responsive">
               <table class="table table-sm">
                 <thead class="table-light">
@@ -102,10 +131,13 @@
                 </thead>
                 <tbody>
                   <tr v-for="(r, i) in results" :key="i">
-                    <td class="small">{{ r.namaBarang || '-' }}</td>
+                    <td class="small">{{ r.namaBarang || "-" }}</td>
                     <td class="small">{{ r.kadar }}</td>
                     <td class="small">{{ r.kondisi }}</td>
-                    <td class="text-end small fw-bold text-success">{{ formatRp(r.buybackPrice) }}<small class="text-muted">/gr</small></td>
+                    <td class="text-end small fw-bold text-success">
+                      {{ formatRp(r.buybackPrice) }}
+                      <small class="text-muted">/gr</small>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -122,25 +154,40 @@
     <div class="modal fade" id="settingsModal" tabindex="-1">
       <div class="modal-dialog modal-sm">
         <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title small fw-bold">Pengaturan Persentase</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-header">
+            <h5 class="modal-title small fw-bold">Pengaturan Persentase</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
           <div class="modal-body">
             <div v-if="!settingsUnlocked">
               <label class="form-label small">Password</label>
-              <input v-model="settingsPassword" type="password" class="form-control form-control-sm" @keydown.enter="unlockSettings" />
+              <input
+                v-model="settingsPassword"
+                type="password"
+                class="form-control form-control-sm"
+                @keydown.enter="unlockSettings"
+              />
               <div v-if="settingsError" class="text-danger small mt-1">{{ settingsError }}</div>
               <button class="btn btn-warning btn-sm mt-2 w-100" @click="unlockSettings">Masuk</button>
             </div>
             <div v-else>
               <div v-for="cond in CONDITIONS" :key="cond.key" class="mb-2">
                 <label class="form-label small">{{ cond.key }} — {{ cond.desc }} (%)</label>
-                <input v-model.number="editPersentase[cond.key]" type="number" min="0" max="100" class="form-control form-control-sm" />
+                <input
+                  v-model.number="editPersentase[cond.key]"
+                  type="number"
+                  min="0"
+                  max="100"
+                  class="form-control form-control-sm"
+                />
               </div>
             </div>
           </div>
           <div v-if="settingsUnlocked" class="modal-footer">
             <button class="btn btn-sm btn-light" data-bs-dismiss="modal">Batal</button>
             <button class="btn btn-warning btn-sm" @click="saveSettingsBuyback" :disabled="savingBuyback">
-              <span v-if="savingBuyback" class="spinner-border spinner-border-sm me-1"></span>Simpan
+              <span v-if="savingBuyback" class="spinner-border spinner-border-sm me-1"></span>
+              Simpan
             </button>
           </div>
         </div>
@@ -181,8 +228,12 @@ function defaultRow() {
 
 const rows = ref([defaultRow()]);
 
-function addRow() { rows.value.push(defaultRow()); }
-function removeRow(i) { if (rows.value.length > 1) rows.value.splice(i, 1); }
+function addRow() {
+  rows.value.push(defaultRow());
+}
+function removeRow(i) {
+  if (rows.value.length > 1) rows.value.splice(i, 1);
+}
 
 function formatRp(v) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(v);
@@ -206,7 +257,9 @@ async function calculate() {
       buybackPrice: calcBuybackPrice(row),
     }));
     Modal.getOrCreateInstance(document.getElementById("resultModal")).show();
-  } finally { loading.value = false; }
+  } finally {
+    loading.value = false;
+  }
 }
 
 function openSettings() {
@@ -237,15 +290,19 @@ async function saveSettingsBuyback() {
     });
     Object.assign(persentaseMap.value, editPersentase.value);
     Modal.getInstance(document.getElementById("settingsModal"))?.hide();
-  } catch (e) { showError("Gagal menyimpan", e.message); }
-  finally { savingBuyback.value = false; }
+  } catch (e) {
+    showError("Gagal menyimpan", e.message);
+  } finally {
+    savingBuyback.value = false;
+  }
 }
 
 onMounted(async () => {
   try {
     const snap = await getDoc(doc(db, "setting_buyback", "default"));
     if (snap.exists()) Object.assign(persentaseMap.value, snap.data());
-  } catch { /* use defaults */ }
+  } catch {
+    /* use defaults */
+  }
 });
 </script>
-

@@ -44,10 +44,12 @@ const BuybackView = () => import("@/views/inventory/BuybackView.vue");
 const SettingPromosiView = () => import("@/views/promosi/SettingPromosiView.vue");
 const DisplayPromosiView = () => import("@/views/promosi/DisplayPromosiView.vue");
 
-// Admin
-const KelolUserView = () => import("@/views/admin/KelolUserView.vue");
-const KodeAksesView = () => import("@/views/admin/KodeAksesView.vue");
-const JamAbsensiView = () => import("@/views/admin/JamAbsensiView.vue");
+// Pengaturan
+const KelolUserView = () => import("@/views/pengaturan/KelolUserView.vue");
+const KodeAksesView = () => import("@/views/pengaturan/KodeAksesView.vue");
+const JamAbsensiView = () => import("@/views/pengaturan/JamAbsensiView.vue");
+const AntrianClosingSettingView = () => import("@/views/pengaturan/AntrianSettingView.vue");
+const MaintenanceView = () => import("@/views/pengaturan/MaintenanceView.vue");
 
 // ─── Route definitions ────────────────────────────────────────────────────────
 const routes = [
@@ -61,120 +63,153 @@ const routes = [
   { path: "/promosi/display", component: DisplayPromosiView, meta: { layout: "blank", public: true } },
 
   // Dashboard
-  {
-    path: "/dashboard",
-    component: DashboardView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf", "admin_custom"] },
-  },
+  { path: "/dashboard", component: DashboardView, meta: { requiresAuth: true, pageKey: "dashboard" } },
 
-  // Absensi — kehadiran bisa tanpa login (kiosk)
-  { path: "/absensi/kehadiran", component: KehadiranView, meta: { requiresAuth: false, public: true } },
+  // Absensi
+  { path: "/absensi/kehadiran", component: KehadiranView, meta: { requiresAuth: true, pageKey: "absensi.kehadiran" } },
   {
     path: "/absensi/pengajuan-izin",
     component: PengajuanIzinView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf"] },
+    meta: { requiresAuth: true, pageKey: "absensi.pengajuan-izin" },
   },
   {
     path: "/absensi/laporan-kehadiran",
     component: LaporanKehadiranView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "absensi.laporan-kehadiran" },
   },
   {
     path: "/absensi/laporan-izin",
     component: LaporanIzinView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "absensi.laporan-izin" },
   },
   {
     path: "/absensi/supervisor",
     component: SupervisorView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "absensi.supervisor" },
   },
-  { path: "/absensi/tambah-pengguna", component: TambahPenggunaView, meta: { requiresAuth: true, roles: ["admin"] } },
+  {
+    path: "/absensi/tambah-pengguna",
+    component: TambahPenggunaView,
+    meta: { requiresAuth: true, pageKey: "absensi.tambah-pengguna" },
+  },
 
   // Antrian
-  {
-    path: "/antrian/admin",
-    component: AdminAntrianView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf"] },
-  },
+  { path: "/antrian/admin", component: AdminAntrianView, meta: { requiresAuth: true, pageKey: "antrian.admin" } },
   {
     path: "/antrian/laporan",
     component: LaporanAntrianView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "antrian.laporan" },
   },
 
   // Servis
-  {
-    path: "/servis/input",
-    component: InputServisView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf", "admin_custom"] },
-  },
-  {
-    path: "/servis/data",
-    component: DataServisView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf", "admin_custom"] },
-  },
+  { path: "/servis/input", component: InputServisView, meta: { requiresAuth: true, pageKey: "servis.input" } },
+  { path: "/servis/data", component: DataServisView, meta: { requiresAuth: true, pageKey: "servis.data" } },
   {
     path: "/servis/laporan",
     component: LaporanServisView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "servis.laporan" },
   },
 
   // Aksesoris
   {
     path: "/aksesoris/penjualan",
     component: PenjualanView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf", "admin_custom"] },
+    meta: { requiresAuth: true, pageKey: "aksesoris.penjualan" },
   },
   {
     path: "/aksesoris/data-penjualan",
     component: DataPenjualanView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor", "staf", "admin_custom"] },
+    meta: { requiresAuth: true, pageKey: "aksesoris.data-penjualan" },
   },
   {
     path: "/aksesoris/laporan-penjualan",
     component: LaporanPenjualanView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "aksesoris.laporan-penjualan" },
   },
-  { path: "/aksesoris/tambah-barang", component: TambahBarangView, meta: { requiresAuth: true, roles: ["admin"] } },
+  {
+    path: "/aksesoris/tambah-barang",
+    component: TambahBarangView,
+    meta: { requiresAuth: true, pageKey: "aksesoris.tambah-barang" },
+  },
   {
     path: "/aksesoris/return",
     component: ReturnBarangView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "aksesoris.return" },
   },
   {
     path: "/aksesoris/laporan-stok",
     component: LaporanStokView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "aksesoris.laporan-stok" },
   },
-  { path: "/aksesoris/kelola-sales", component: KelolaSalesView, meta: { requiresAuth: true, roles: ["admin"] } },
+  {
+    path: "/aksesoris/kelola-sales",
+    component: KelolaSalesView,
+    meta: { requiresAuth: true, pageKey: "aksesoris.kelola-sales" },
+  },
 
   // Inventory
   {
     path: "/inventory/manajemen",
     component: ManajemenStokView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "inventory.manajemen" },
   },
   {
     path: "/inventory/laporan-harian",
     component: LaporanStokHarianView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "inventory.laporan-harian" },
   },
-  { path: "/inventory/mutasi-kode", component: MutasiKodeView, meta: { requiresAuth: true, roles: ["admin"] } },
+  {
+    path: "/inventory/mutasi-kode",
+    component: MutasiKodeView,
+    meta: { requiresAuth: true, pageKey: "inventory.mutasi-kode" },
+  },
   {
     path: "/inventory/restok",
     component: RestokBarangView,
-    meta: { requiresAuth: true, roles: ["admin", "supervisor"] },
+    meta: { requiresAuth: true, pageKey: "inventory.restok" },
   },
-  { path: "/inventory/buyback", component: BuybackView, meta: { requiresAuth: true, roles: ["admin", "supervisor"] } },
+  {
+    path: "/inventory/buyback",
+    component: BuybackView,
+    meta: { requiresAuth: true, pageKey: "inventory.buyback" },
+  },
 
   // Promosi
-  { path: "/promosi/setting", component: SettingPromosiView, meta: { requiresAuth: true, roles: ["admin"] } },
+  {
+    path: "/promosi/setting",
+    component: SettingPromosiView,
+    meta: { requiresAuth: true, pageKey: "promosi.setting" },
+  },
 
-  // Admin
-  { path: "/admin/users", component: KelolUserView, meta: { requiresAuth: true, roles: ["admin"] } },
-  { path: "/admin/access-codes", component: KodeAksesView, meta: { requiresAuth: true, roles: ["admin"] } },
-  { path: "/admin/jam-absensi", component: JamAbsensiView, meta: { requiresAuth: true, roles: ["admin"] } },
+  // Pengaturan
+  { path: "/pengaturan/users", component: KelolUserView, meta: { requiresAuth: true, pageKey: "admin.users" } },
+  {
+    path: "/pengaturan/access-codes",
+    component: KodeAksesView,
+    meta: { requiresAuth: true, pageKey: "admin.access-codes" },
+  },
+  {
+    path: "/pengaturan/jam-absensi",
+    component: JamAbsensiView,
+    meta: { requiresAuth: true, pageKey: "admin.jam-absensi" },
+  },
+  {
+    path: "/pengaturan/antrian-penutupan",
+    component: AntrianClosingSettingView,
+    meta: { requiresAuth: true, pageKey: "admin.antrian-closing" },
+  },
+  {
+    path: "/pengaturan/maintenance",
+    component: MaintenanceView,
+    meta: { requiresAuth: true, pageKey: "admin.maintenance" },
+  },
+
+  // Backward-compatible redirects
+  { path: "/admin/users", redirect: "/pengaturan/users" },
+  { path: "/admin/access-codes", redirect: "/pengaturan/access-codes" },
+  { path: "/admin/jam-absensi", redirect: "/pengaturan/jam-absensi" },
+  { path: "/admin/antrian-penutupan", redirect: "/pengaturan/antrian-penutupan" },
+  { path: "/maintenance", redirect: "/pengaturan/maintenance" },
 
   // 404 catch-all
   { path: "/:pathMatch(.*)*", redirect: "/dashboard" },
@@ -200,6 +235,11 @@ router.beforeEach(async (to) => {
   // Needs auth but not logged in
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { path: "/login", query: { redirect: to.fullPath } };
+  }
+
+  // Page-based access check (KISS: supervisor is root)
+  if (to.meta.pageKey && !auth.canAccessPage(to.meta.pageKey)) {
+    return { path: "/unauthorized" };
   }
 
   // Role check

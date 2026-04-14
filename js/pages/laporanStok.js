@@ -2352,22 +2352,12 @@ export { optimizedStockReport as default };
 
 // Export snapshot function for global access (called from main.js)
 export async function ensureDailySnapshotExists() {
-  // Check if already checked in this session
-  if (sessionStorage.getItem("snapshotCheckedToday")) {
-    return { success: true, created: false, message: "Already checked in this session" };
-  }
-
-  try {
-    const result = await optimizedStockReport.checkAndCreateSnapshotWithLock();
-
-    // Mark as checked for this session
-    sessionStorage.setItem("snapshotCheckedToday", new Date().toISOString());
-
-    return result;
-  } catch (error) {
-    console.error("Error ensuring daily snapshot:", error);
-    return { success: false, created: false, message: error.message };
-  }
+  // Snapshot generation is server-side only (Cloud Function).
+  return {
+    success: true,
+    created: false,
+    message: "Snapshot is managed by Cloud Function",
+  };
 }
 
 // Backward compatibility

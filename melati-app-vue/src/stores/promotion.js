@@ -1,15 +1,31 @@
 import { defineStore } from "pinia";
 import { ref as dbRef, onValue, update, off } from "firebase/database";
-import { rtdb, storage } from "@/config/firebase";
+import { rtdb, storage, auth } from "@/config/firebase";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+
+function sanitizeFileName(fileName) {
+  return String(fileName || "promotion_file")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildPromotionStoragePath(fileName, folder = "file") {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const safeName = sanitizeFileName(fileName);
+  const finalName = `${Date.now()}_${safeName}`;
+  return `promotions/${year}/${month}/${folder}/${finalName}`;
+}
 
 export const usePromotionStore = defineStore("promotion", {
   state: () => ({
     settings: {
-      slideInterval: 5000,
+      slideInterval: 30,
       transitionEffect: "fade",
       enableAnimation: true,
-      showControls: false,
+      showControls: true,
       autoPlay: true,
     },
     slides: [], // Array {id, type, url, title, caption, order, isActive}
@@ -23,7 +39,7 @@ export const usePromotionStore = defineStore("promotion", {
   actions: {
     startListening() {
       const settingsRef = dbRef(rtdb, "settings/promotion");
-      const contentRef = dbRef(rtdb, "content/promotion/slides");
+      const contentRef = dbRef(rtdb, "content/promotion");
       const connRef = dbRef(rtdb, ".info/connected");
 
       onValue(connRef, (snap) => {
@@ -37,17 +53,21 @@ export const usePromotionStore = defineStore("promotion", {
       });
 
       onValue(contentRef, (snap) => {
-        if (snap.exists()) {
-          this.slides = Object.values(snap.val());
-        } else {
+        const content = snap.val() || {};
+        const sourceItems = content.customItems || content.slides || {};
+
+        if (!sourceItems || typeof sourceItems !== "object") {
           this.slides = [];
+          return;
         }
+
+        this.slides = Object.entries(sourceItems).map(([id, slide]) => ({ id, ...(slide || {}) }));
       });
     },
 
     stopListening() {
       off(dbRef(rtdb, "settings/promotion"));
-      off(dbRef(rtdb, "content/promotion/slides"));
+      off(dbRef(rtdb, "content/promotion"));
       off(dbRef(rtdb, ".info/connected"));
     },
 
@@ -65,11 +85,19 @@ export const usePromotionStore = defineStore("promotion", {
     },
 
     async uploadSlide(file, metadata, onProgress) {
-      const ext = file.name.split(".").pop().toLowerCase();
       const slideId = crypto.randomUUID();
-      const path = `promotions/${slideId}.${ext}`;
+      const folder = file.type.startsWith("video") ? "video" : "image";
+      const path = buildPromotionStoragePath(file.name, folder);
       const fileRef = storageRef(storage, path);
-      const task = uploadBytesResumable(fileRef, file);
+      const uid = auth.currentUser?.uid || "anonymous";
+
+      const task = uploadBytesResumable(fileRef, file, {
+        contentType: file.type || (folder === "video" ? "video/mp4" : "image/jpeg"),
+        customMetadata: {
+          uploadedBy: uid,
+          contentType: folder,
+        },
+      });
 
       return new Promise((resolve, reject) => {
         task.on(
@@ -93,7 +121,7 @@ export const usePromotionStore = defineStore("promotion", {
               isActive: true,
               uploadedAt: Date.now(),
             };
-            await update(dbRef(rtdb, `content/promotion/slides/${slideId}`), slide);
+            await update(dbRef(rtdb, `content/promotion/customItems/${slideId}`), slide);
             resolve(slide);
           },
         );
@@ -113,13 +141,13 @@ export const usePromotionStore = defineStore("promotion", {
       }
 
       // Hapus dari Realtime DB
-      await update(dbRef(rtdb, `content/promotion/slides/${slideId}`), null);
+      await update(dbRef(rtdb, `content/promotion/customItems/${slideId}`), null);
     },
 
     async reorderSlides(orderedIds) {
       const updates = {};
       orderedIds.forEach((id, idx) => {
-        updates[`content/promotion/slides/${id}/order`] = idx;
+        updates[`content/promotion/customItems/${id}/order`] = idx;
       });
       await update(dbRef(rtdb), updates);
     },

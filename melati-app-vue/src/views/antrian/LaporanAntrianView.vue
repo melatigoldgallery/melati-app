@@ -82,21 +82,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Letter distribution -->
-      <div class="col-12">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white fw-semibold small py-2">Distribusi Per Layanan (Bulan Ini)</div>
-          <div class="card-body">
-            <div class="row g-2">
-              <div v-for="(cnt, letter) in letterDist" :key="letter" class="col-6 col-md-3 text-center">
-                <div class="fs-4 fw-bold text-warning">{{ cnt }}</div>
-                <div class="small text-muted">{{ letter }} — {{ LETTERS_MAP[letter] }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

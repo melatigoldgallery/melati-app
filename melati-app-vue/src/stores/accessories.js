@@ -4,16 +4,21 @@ import { db } from "@/config/firebase";
 import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from "firebase/firestore";
 import {
   fetchCatalog,
-  fetchStockItem,
+  fetchCurrentStockMap,
+  fetchSalesCatalogWithComputedStock,
   fetchTransactions,
   processSale,
   deleteSale,
+  updateSale,
+  updateSaleFull,
   verifySupervisorPassword,
+  verifyEditPassword,
 } from "@/services/stock-service";
 
 export const useAccessoriesStore = defineStore("accessories", () => {
   // ─── State ───────────────────────────────────────────────────────────────
   const catalog = ref([]); // stokAksesoris master (cache-first)
+  const salesCatalog = ref([]); // stokAksesoris for sales transaction (computed stock)
   const catalogLoadedAt = ref(null); // timestamp last full load
   const transactions = ref([]); // current view transactions
   const lastTransactionDoc = ref(null);
@@ -23,6 +28,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
 
   // ─── Getters ─────────────────────────────────────────────────────────────
   const activeItems = computed(() => catalog.value.filter((c) => c.isActive !== false));
+  const activeSalesItems = computed(() => salesCatalog.value.filter((c) => c.isActive !== false));
 
   const getStockByKode = computed(() => (kode) => {
     const item = catalog.value.find((c) => c.kode === kode);
@@ -31,29 +37,62 @@ export const useAccessoriesStore = defineStore("accessories", () => {
 
   // ─── Catalog actions ──────────────────────────────────────────────────────
 
-  /** Load catalog from Firestore (cache-first: skip if already loaded) */
+  /** Load catalog from Firestore with real-time stock calculation (cache-first: skip if already loaded) */
   async function loadCatalog(force = false) {
     if (!force && catalog.value.length > 0) return;
     isLoading.value = true;
     try {
-      catalog.value = await fetchCatalog();
+      const [items, stockMap] = await Promise.all([fetchCatalog(), fetchCurrentStockMap()]);
+      catalog.value = items.map((item) => ({
+        ...item,
+        stok: stockMap.get(item.kode) ?? item.stok ?? 0,
+      }));
       catalogLoadedAt.value = Date.now();
     } finally {
       isLoading.value = false;
     }
   }
 
+  /** Load catalog for sales transaction with computed stock (legacy-compatible). */
+  async function loadSalesCatalog(force = false) {
+    if (!force && salesCatalog.value.length > 0) return;
+    isLoading.value = true;
+    try {
+      salesCatalog.value = await fetchSalesCatalogWithComputedStock();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   /**
-   * Refresh one stock item after a sale/return (targeted single getDoc).
-   * Cross-tab: called from handleStockSync event listener.
+   * Refresh stock values from computed stock map for selected kodes.
+   * Uses one batched read path instead of per-kode document reads.
+   * @param {string[]} kodes
+   */
+  async function refreshComputedStocks(kodes = []) {
+    if (!catalog.value.length && !salesCatalog.value.length) return;
+    const stockMap = await fetchCurrentStockMap();
+    const filter = kodes.length ? new Set(kodes) : null;
+
+    const applyMap = (items) =>
+      items.map((item) => {
+        if (filter && !filter.has(item.kode)) return item;
+        return {
+          ...item,
+          stok: stockMap.get(item.kode) ?? item.stok ?? 0,
+        };
+      });
+
+    if (catalog.value.length) catalog.value = applyMap(catalog.value);
+    if (salesCatalog.value.length) salesCatalog.value = applyMap(salesCatalog.value);
+  }
+
+  /**
+   * Backward-compatible single-kode refresher used by cross-tab listeners.
    * @param {string} kode
    */
   async function refreshSingleStock(kode) {
-    const fresh = await fetchStockItem(kode);
-    if (!fresh) return;
-    const idx = catalog.value.findIndex((c) => c.kode === kode);
-    if (idx !== -1) catalog.value[idx] = fresh;
-    else catalog.value.push(fresh);
+    await refreshComputedStocks([kode]);
   }
 
   // ─── Transaction actions ─────────────────────────────────────────────────
@@ -62,15 +101,23 @@ export const useAccessoriesStore = defineStore("accessories", () => {
    * Subscribe to today's transactions via onSnapshot.
    * Use this in DataPenjualanView for live updates.
    */
-  function startTodayListener() {
+  function startTodayListener(dateStr) {
     stopTodayListener();
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
+    // Build timestamp range for the given date (defaults to today)
+    const base = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
+    const startOfDay = new Date(base);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(base);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Query by timestamp range — same as old dataPenjualan.js setupDateListener.
+    // Single-field orderBy on the same field used in where() → no composite index needed.
     const q = query(
       collection(db, "penjualanAksesoris"),
-      where("tanggal", "==", dateStr),
-      orderBy("createdAt", "desc"),
+      where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
+      where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+      orderBy("timestamp", "desc"),
       limit(200),
     );
 
@@ -129,12 +176,11 @@ export const useAccessoriesStore = defineStore("accessories", () => {
   async function saveTransaction(cartItems, transactionData) {
     const saleId = await processSale(cartItems, transactionData);
 
-    // Targeted stock refresh — only affected kodes
     const affectedKodes = [
       ...cartItems.filter((i) => i.tipe !== "manual" && i.kode).map((i) => i.kode),
       ...cartItems.filter((i) => i.tipe === "manual" && i.kodeLock).map((i) => i.kodeLock),
     ];
-    await Promise.all(affectedKodes.map((k) => refreshSingleStock(k)));
+    await refreshComputedStocks([...new Set(affectedKodes)]);
 
     // Notify cross-tab
     notifyStockChanged(affectedKodes);
@@ -151,10 +197,13 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     await deleteSale(saleId, saleData);
 
     const affectedKodes = [
-      ...(saleData.items ?? []).filter((i) => i.tipe !== "manual" && i.kode).map((i) => i.kode),
+      ...(saleData.items ?? [])
+        .filter((i) => i.tipe !== "manual")
+        .map((i) => i.kode || i.kodeText)
+        .filter(Boolean),
       ...(saleData.items ?? []).filter((i) => i.tipe === "manual" && i.kodeLock).map((i) => i.kodeLock),
     ];
-    await Promise.all(affectedKodes.map((k) => refreshSingleStock(k)));
+    await refreshComputedStocks([...new Set(affectedKodes)]);
     notifyStockChanged(affectedKodes);
   }
 
@@ -165,6 +214,38 @@ export const useAccessoriesStore = defineStore("accessories", () => {
    */
   async function verifySupervisor(password) {
     return verifySupervisorPassword(password);
+  }
+
+  /**
+   * Update sale metadata fields (non-destructive, no stock side effects).
+   * @param {string} saleId
+   * @param {Object} updates
+   */
+  async function updateTransaction(saleId, updates) {
+    await updateSale(saleId, updates);
+    // Patch in-memory
+    const idx = transactions.value.findIndex((t) => t.id === saleId);
+    if (idx !== -1) transactions.value[idx] = { ...transactions.value[idx], ...updates };
+  }
+
+  /**
+   * Full update for a sale (items, salesName, totalHarga, etc.). No stock side effects.
+   * @param {string} saleId
+   * @param {Object} updates
+   */
+  async function updateTransactionFull(saleId, updates) {
+    await updateSaleFull(saleId, updates);
+    const idx = transactions.value.findIndex((t) => t.id === saleId);
+    if (idx !== -1) transactions.value[idx] = { ...transactions.value[idx], ...updates };
+  }
+
+  /**
+   * Verify edit access password (settings/passwords.editDataPenjualan).
+   * @param {string} password
+   * @returns {boolean}
+   */
+  async function verifyEditAccess(password) {
+    return verifyEditPassword(password);
   }
 
   // ─── Cross-tab sync ──────────────────────────────────────────────────────
@@ -180,6 +261,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
   return {
     // State
     catalog,
+    salesCatalog,
     catalogLoadedAt,
     transactions,
     lastTransactionDoc,
@@ -187,16 +269,22 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     isLoading,
     // Getters
     activeItems,
+    activeSalesItems,
     getStockByKode,
     // Actions
     loadCatalog,
+    loadSalesCatalog,
+    refreshComputedStocks,
     refreshSingleStock,
     startTodayListener,
     stopTodayListener,
     loadTransactions,
     saveTransaction,
     removeTransaction,
+    updateTransaction,
+    updateTransactionFull,
     verifySupervisor,
+    verifyEditAccess,
     notifyStockChanged,
   };
 });

@@ -18,7 +18,9 @@ import {
   onSnapshot,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/config/firebase";
+import { verifyStoredSecret } from "@/utils/security";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -105,7 +107,6 @@ function _buildMonthQuery(year, month) {
     where("tanggal", ">=", startDate),
     where("tanggal", "<=", endDate),
     orderBy("tanggal", "desc"),
-    orderBy("createdAt", "desc"),
   );
 }
 
@@ -120,7 +121,7 @@ export async function fetchServisByRange(startDate, endDate) {
   const q = query(
     collection(db, "servis"),
     where("tanggal", ">=", startDate),
-    where("tanggal", "<=", endDate),
+    where("tanggal", "<=", endDate + "T23:59:59.999Z"),
     orderBy("tanggal", "asc"),
     limit(500),
   );
@@ -132,6 +133,18 @@ export async function fetchServisByRange(startDate, endDate) {
 
 export function subscribeServisByMonth(year, month, callback) {
   return onSnapshot(_buildMonthQuery(year, month), (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export function subscribeServisByRange(startDate, endDate, callback) {
+  const q = query(
+    collection(db, "servis"),
+    where("tanggal", ">=", startDate),
+    where("tanggal", "<=", endDate + "T23:59:59.999Z"),
+    orderBy("tanggal", "desc"),
+  );
+  return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });
 }
@@ -178,8 +191,12 @@ export async function deleteServis(id) {
 export async function verifySupervisorPassword(inputPassword) {
   const snap = await getDoc(doc(db, "settings", "passwords"));
   if (!snap.exists()) throw new Error("Pengaturan password tidak ditemukan");
-  const { supervisorPassword } = snap.data();
-  if (inputPassword !== supervisorPassword) throw new Error("Password salah");
+  const data = snap.data();
+  // Field "deleteServis" is the primary password for servis edit/delete operations
+  const stored = data.deleteServis ?? data.supervisorPassword;
+  if (!stored) throw new Error("Password belum dikonfigurasi");
+  const isValid = await verifyStoredSecret(inputPassword, stored, { allowLegacyBase64: true });
+  if (!isValid) throw new Error("Password salah");
   return true;
 }
 
@@ -189,78 +206,99 @@ const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3
 
 /**
  * Try to print via local print service (localhost:3001).
- * Falls back to window.open browser print on failure.
+ * Throws if print service unreachable — caller should catch and show SweetAlert.
  */
 export async function printServisSlip(servisData) {
   const isCustom = servisData.jenisInput === "custom";
   const endpoint = isCustom ? "/api/print/nota-custom" : "/api/print/nota-servis";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
   try {
     const res = await fetch(`${PRINT_BASE}${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(servisData),
+      signal: controller.signal,
     });
-    if (!res.ok) throw new Error("Print service returned error");
-  } catch {
-    // Fallback: browser print
-    _browserPrintFallback(servisData);
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error(`Print service error: ${res.status}`);
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e; // caller handles with SweetAlert
   }
 }
 
-function _browserPrintFallback(data) {
-  const isCustom = data.jenisInput === "custom";
-  const items = isCustom ? (data.detailBarangCustom || []) : (data.detailBarang || []);
-  const rows = items
-    .map(
-      (item) =>
-        `<tr>
-          <td>${item.jumlah || 1}</td>
-          <td>${item.namaBarang}</td>
-          <td>${item.berat || ""} ${isCustom ? (item.panjang || "") : (item.karat || "")}</td>
-          <td>${isCustom ? "" : (item.jenisServis || "")}</td>
-          <td>${item.rincianServis || ""}</td>
-          <td style="text-align:right">Rp ${Number(item.ongkos || 0).toLocaleString("id-ID")}</td>
-        </tr>`,
-    )
-    .join("");
+/**
+ * Upload bukti pengambilan photo to Firebase Storage.
+ * @param {File} file - Image file to upload
+ * @param {string} servisId - Firestore document ID
+ * @returns {{ url: string, path: string, liteUrl?: string, litePath?: string }}
+ */
+async function createLiteImageBlob(file, options = {}) {
+  const maxSide = options.maxSide ?? 1280;
+  const quality = options.quality ?? 0.78;
 
-  const html = `<!DOCTYPE html><html><head>
-    <meta charset="utf-8"/>
-    <title>Nota Servis</title>
-    <style>
-      body{font-family:Arial,sans-serif;font-size:11px;margin:20px}
-      h3{margin:0 0 8px}
-      table{width:100%;border-collapse:collapse}
-      th,td{border:1px solid #ccc;padding:4px 6px}
-      th{background:#f0f0f0}
-      .right{text-align:right}
-      .total{font-weight:bold}
-    </style>
-  </head><body>
-    <h3>Melati Gold Shop — Nota ${isCustom ? "Custom" : "Servis"}</h3>
-    <p>
-      Tanggal: ${data.tanggal}<br/>
-      Pelanggan: ${data.namaCustomer} (${data.noHp})<br/>
-      Staff: ${data.namaSales}
-    </p>
-    <table>
-      <thead><tr><th>Jml</th><th>Barang</th><th>${isCustom ? "Berat/Pjg" : "Berat/Karat"}</th>
-        <th>${isCustom ? "" : "Jenis Servis"}</th><th>Rincian</th><th>Ongkos</th></tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot>
-        <tr class="total"><td colspan="5" style="text-align:right">Total</td>
-          <td style="text-align:right">Rp ${Number(data.totalOngkos || 0).toLocaleString("id-ID")}</td>
-        </tr>
-      </tfoot>
-    </table>
-  </body></html>`;
+  if (!file?.type?.startsWith("image/")) return null;
 
-  const w = window.open("", "_blank");
-  if (w) {
-    w.document.write(html);
-    w.document.close();
-    w.onload = () => w.print();
+  const img = await new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Gagal membaca gambar untuk kompresi"));
+    };
+    image.src = objectUrl;
+  });
+
+  const srcW = img.naturalWidth || img.width || 1;
+  const srcH = img.naturalHeight || img.height || 1;
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
+  const targetW = Math.max(1, Math.round(srcW * scale));
+  const targetH = Math.max(1, Math.round(srcH * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob || null), "image/jpeg", quality);
+  });
+}
+
+export async function uploadBuktiPengambilan(file, servisId) {
+  const timestamp = Date.now();
+  const ext = file.type === "image/png" ? "png" : "jpg";
+  const fileName = `servis_${servisId}_${timestamp}.${ext}`;
+  const year = new Date().getFullYear();
+  const month = String(new Date().getMonth() + 1).padStart(2, "0");
+  const storagePath = `bukti-pengambilan/${year}/${month}/${fileName}`;
+  const sRef = storageRef(storage, storagePath);
+  await uploadBytes(sRef, file, { contentType: file.type || "image/jpeg" });
+  const url = await getDownloadURL(sRef);
+
+  let liteUrl;
+  let litePath;
+  try {
+    const liteBlob = await createLiteImageBlob(file);
+    if (liteBlob) {
+      const liteFileName = `servis_${servisId}_${timestamp}_lite.jpg`;
+      litePath = `bukti-pengambilan-lite/${year}/${month}/${liteFileName}`;
+      const liteRef = storageRef(storage, litePath);
+      await uploadBytes(liteRef, liteBlob, { contentType: "image/jpeg" });
+      liteUrl = await getDownloadURL(liteRef);
+    }
+  } catch (e) {
+    console.warn("Upload foto lite gagal, lanjut pakai foto asli", e);
   }
+
+  return { url, path: storagePath, liteUrl, litePath };
 }
 
 // ── WhatsApp Helper ───────────────────────────────────────────────────────
@@ -272,7 +310,7 @@ export function buildWhatsAppUrl(servis) {
   const message =
     `Halo Kak ${servis.namaCustomer}, Barang servis Kakak sudah selesai:\n` +
     `(${namaBarang}) Sudah bisa diambil.\n` +
-    ` Silakan datang ke Melati Gold Shop untuk mengambil barangnya ya kak. Terima kasih 🙏`;
+    ` Silahkan datang ke Melati Gold Shop untuk mengambil barangnya ya kak. Terima kasih`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 

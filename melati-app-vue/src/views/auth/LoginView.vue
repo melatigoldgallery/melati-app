@@ -17,14 +17,14 @@
       <div class="card-body px-4 py-4">
         <form @submit.prevent="handleLogin">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Email</label>
+            <label class="form-label fw-semibold">Email / Username</label>
             <div class="input-group">
-              <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+              <span class="input-group-text"><i class="bi bi-person"></i></span>
               <input
-                v-model="form.email"
-                type="email"
+                v-model="form.identifier"
+                type="text"
                 class="form-control"
-                placeholder="email@melati.com"
+                placeholder="masukkan email atau username"
                 required
                 autocomplete="username"
               />
@@ -78,7 +78,7 @@ const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
-const form = ref({ email: "", password: "" });
+const form = ref({ identifier: "", password: "" });
 const showPassword = ref(false);
 const loading = ref(false);
 const errorMsg = ref("");
@@ -87,7 +87,7 @@ async function handleLogin() {
   errorMsg.value = "";
   loading.value = true;
   try {
-    await auth.login(form.value.email, form.value.password);
+    await auth.login(form.value.identifier, form.value.password);
     const redirect = route.query.redirect || "/dashboard";
     router.push(redirect);
   } catch (err) {
@@ -99,11 +99,17 @@ async function handleLogin() {
 
 function mapFirebaseError(code) {
   const map = {
-    "auth/invalid-credential": "Email atau password salah.",
+    "auth/invalid-credential": "Email/username atau password salah.",
     "auth/user-not-found": "Akun tidak ditemukan.",
     "auth/wrong-password": "Password salah.",
     "auth/too-many-requests": "Terlalu banyak percobaan. Coba lagi nanti.",
     "auth/network-request-failed": "Tidak ada koneksi internet.",
+    "auth/user-disabled": "Akun tidak aktif. Hubungi admin.",
+    "auth/server-login-config": "Layanan login username belum siap. Hubungi admin sistem.",
+    "permission-denied": "Akses login ditolak oleh aturan database. Hubungi admin.",
+    "auth/operation-not-allowed": "Metode login belum diaktifkan di Firebase Auth.",
+    "auth/username-not-found": "Username tidak ditemukan. Gunakan email atau hubungi admin.",
+    "auth/username-no-email": "Username belum ditautkan dengan email login. Hubungi admin.",
   };
   return map[code] || "Terjadi kesalahan. Coba lagi.";
 }

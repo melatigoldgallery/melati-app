@@ -1,31 +1,63 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-tools me-2 text-warning"></i>Input Servis
-      </h4>
+    <!-- Page Header -->
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-tools me-2 text-dark"></i>
+        Input Servis
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/servis/input">Servis</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Input Servis</li>
+        </ol>
+      </nav>
     </div>
 
     <form @submit.prevent="submitForm">
       <!-- Basic Info -->
       <div class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold py-2">
-          <i class="bi bi-person me-1 text-warning"></i> Data Pelanggan
+          <span>
+            <i class="bi bi-person me-1 text-dark"></i>
+            Data Pelanggan
+          </span>
         </div>
         <div class="card-body">
           <div class="row g-2">
             <div class="col-md-2">
-              <label class="form-label small fw-semibold">Tanggal <span class="text-danger">*</span></label>
+              <label class="form-label small fw-semibold">
+                Tanggal
+                <span class="text-danger">*</span>
+              </label>
               <input v-model="form.tanggal" type="date" class="form-control form-control-sm" required />
             </div>
             <div class="col-md-3">
-              <label class="form-label small fw-semibold">Nama Sales <span class="text-danger">*</span></label>
-              <input v-model="form.namaSales" type="text" class="form-control form-control-sm" placeholder="Nama sales" required />
+              <label class="form-label small fw-semibold">
+                Nama Sales
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                v-model="form.namaSales"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Nama sales"
+                required
+              />
             </div>
             <div class="col-md-3">
-              <label class="form-label small fw-semibold">Nama Customer <span class="text-danger">*</span></label>
-              <input v-model="form.namaCustomer" type="text" class="form-control form-control-sm" placeholder="Nama pelanggan" required />
+              <label class="form-label small fw-semibold">
+                Nama Customer
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                v-model="form.namaCustomer"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Nama pelanggan"
+                required
+              />
             </div>
             <div class="col-md-2">
               <label class="form-label small fw-semibold">No HP</label>
@@ -63,9 +95,13 @@
       <!-- Items Table — Servis mode -->
       <div v-if="form.jenisInput === 'servis'" class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold py-2 d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-list-ul me-1 text-warning"></i>Detail Barang Servis</span>
+          <span>
+            <i class="bi bi-list-ul me-1 text-dark"></i>
+            Detail Barang Servis
+          </span>
           <button type="button" class="btn btn-sm btn-outline-primary" @click="addServisRow">
-            <i class="bi bi-plus me-1"></i>Tambah Baris
+            <i class="bi bi-plus me-1"></i>
+            Tambah Baris
           </button>
         </div>
         <div class="card-body p-0">
@@ -73,30 +109,59 @@
             <table class="table table-sm table-bordered mb-0">
               <thead class="table-light">
                 <tr>
-                  <th style="width:50px">Jml</th>
+                  <th style="width: 50px">Jml</th>
                   <th>Nama Barang</th>
-                  <th style="width:90px">Berat</th>
-                  <th style="width:80px">Karat</th>
-                  <th style="width:160px">Jenis Servis <span class="text-danger">*</span></th>
+                  <th style="width: 90px">Berat</th>
+                  <th style="width: 80px">Karat</th>
+                  <th style="width: 160px">
+                    Jenis Servis
+                    <span class="text-danger">*</span>
+                  </th>
                   <th>Rincian</th>
-                  <th style="width:110px">Ongkos (Rp)</th>
-                  <th style="width:130px">Status Bayar</th>
-                  <th style="width:36px"></th>
+                  <th style="width: 110px">Ongkos (Rp)</th>
+                  <th style="width: 130px">Status Bayar</th>
+                  <th style="width: 36px"></th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(row, idx) in form.servisRows" :key="idx">
-                  <td><input v-model.number="row.jumlah" type="number" min="1" class="form-control form-control-sm text-center" /></td>
-                  <td><input v-model="row.namaBarang" type="text" class="form-control form-control-sm" placeholder="Nama barang" required /></td>
-                  <td><input v-model="row.berat" type="text" class="form-control form-control-sm" placeholder="gr/cm" /></td>
-                  <td><input v-model="row.karat" type="text" class="form-control form-control-sm" placeholder="22K" /></td>
+                  <td>
+                    <input
+                      v-model.number="row.jumlah"
+                      type="number"
+                      min="1"
+                      class="form-control form-control-sm text-center"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      v-model="row.namaBarang"
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="Nama barang"
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input v-model="row.berat" type="text" class="form-control form-control-sm" placeholder="gr/cm" />
+                  </td>
+                  <td>
+                    <input v-model="row.karat" type="text" class="form-control form-control-sm" placeholder="22K" />
+                  </td>
                   <td>
                     <select v-model="row.jenisServis" class="form-select form-select-sm" required>
                       <option value="">Pilih...</option>
                       <option v-for="j in JENIS_SERVIS_OPTIONS" :key="j" :value="j">{{ j }}</option>
                     </select>
                   </td>
-                  <td><input v-model="row.rincianServis" type="text" class="form-control form-control-sm" placeholder="Keterangan" /></td>
+                  <td>
+                    <input
+                      v-model="row.rincianServis"
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="Keterangan"
+                    />
+                  </td>
                   <td>
                     <input
                       v-model.number="row.ongkos"
@@ -108,7 +173,9 @@
                   </td>
                   <td>
                     <select v-model="row.statusPembayaran" class="form-select form-select-sm">
-                      <option v-for="s in STATUS_PEMBAYARAN_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
+                      <option v-for="s in STATUS_PEMBAYARAN_OPTIONS" :key="s.value" :value="s.value">
+                        {{ s.label }}
+                      </option>
                     </select>
                   </td>
                   <td class="text-center">
@@ -117,7 +184,9 @@
                       class="btn btn-sm btn-outline-danger"
                       @click="removeServisRow(idx)"
                       :disabled="form.servisRows.length === 1"
-                    ><i class="bi bi-x"></i></button>
+                    >
+                      <i class="bi bi-x"></i>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -136,9 +205,13 @@
       <!-- Items Table — Custom mode -->
       <div v-else class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold py-2 d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-stars me-1 text-warning"></i>Detail Barang Custom</span>
+          <span>
+            <i class="bi bi-stars me-1 text-warning"></i>
+            Detail Barang Custom
+          </span>
           <button type="button" class="btn btn-sm btn-outline-primary" @click="addCustomRow">
-            <i class="bi bi-plus me-1"></i>Tambah Baris
+            <i class="bi bi-plus me-1"></i>
+            Tambah Baris
           </button>
         </div>
         <div class="card-body p-0">
@@ -146,42 +219,80 @@
             <table class="table table-sm table-bordered mb-0">
               <thead class="table-light">
                 <tr>
-                  <th style="width:50px">Jml</th>
+                  <th style="width: 50px">Jml</th>
                   <th>Nama Barang</th>
-                  <th style="width:80px">Berat</th>
-                  <th style="width:80px">Panjang</th>
-                  <th style="width:70px">Kadar</th>
-                  <th style="width:80px">Warna</th>
-                  <th style="width:110px">DP (Rp)</th>
-                  <th style="width:110px">Ongkos (Rp)</th>
-                  <th style="width:120px">Status Bayar</th>
+                  <th style="width: 80px">Berat</th>
+                  <th style="width: 80px">Panjang</th>
+                  <th style="width: 70px">Kadar</th>
+                  <th style="width: 80px">Warna</th>
+                  <th style="width: 110px">DP (Rp)</th>
+                  <th style="width: 110px">Ongkos (Rp)</th>
+                  <th style="width: 120px">Status Bayar</th>
                   <th>Rincian</th>
-                  <th style="width:36px"></th>
+                  <th style="width: 36px"></th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(row, idx) in form.customRows" :key="idx">
-                  <td><input v-model.number="row.jumlah" type="number" min="1" class="form-control form-control-sm text-center" /></td>
-                  <td><input v-model="row.namaBarang" type="text" class="form-control form-control-sm" placeholder="Nama barang" required /></td>
-                  <td><input v-model="row.berat" type="text" class="form-control form-control-sm" placeholder="gr" /></td>
-                  <td><input v-model="row.panjang" type="text" class="form-control form-control-sm" placeholder="cm" /></td>
-                  <td><input v-model="row.kadar" type="text" class="form-control form-control-sm" placeholder="22K" /></td>
-                  <td><input v-model="row.warna" type="text" class="form-control form-control-sm" placeholder="Kuning" /></td>
-                  <td><input v-model.number="row.totalDP" type="number" min="0" class="form-control form-control-sm" /></td>
-                  <td><input v-model.number="row.ongkos" type="number" min="0" class="form-control form-control-sm" /></td>
+                  <td>
+                    <input
+                      v-model.number="row.jumlah"
+                      type="number"
+                      min="1"
+                      class="form-control form-control-sm text-center"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      v-model="row.namaBarang"
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="Nama barang"
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input v-model="row.berat" type="text" class="form-control form-control-sm" placeholder="gr" />
+                  </td>
+                  <td>
+                    <input v-model="row.panjang" type="text" class="form-control form-control-sm" placeholder="cm" />
+                  </td>
+                  <td>
+                    <input v-model="row.kadar" type="text" class="form-control form-control-sm" placeholder="22K" />
+                  </td>
+                  <td>
+                    <input v-model="row.warna" type="text" class="form-control form-control-sm" placeholder="Kuning" />
+                  </td>
+                  <td>
+                    <input v-model.number="row.totalDP" type="number" min="0" class="form-control form-control-sm" />
+                  </td>
+                  <td>
+                    <input v-model.number="row.ongkos" type="number" min="0" class="form-control form-control-sm" />
+                  </td>
                   <td>
                     <select v-model="row.statusPembayaran" class="form-select form-select-sm">
-                      <option v-for="s in STATUS_PEMBAYARAN_CUSTOM" :key="s.value" :value="s.value">{{ s.label }}</option>
+                      <option v-for="s in STATUS_PEMBAYARAN_CUSTOM" :key="s.value" :value="s.value">
+                        {{ s.label }}
+                      </option>
                     </select>
                   </td>
-                  <td><input v-model="row.rincianServis" type="text" class="form-control form-control-sm" placeholder="Keterangan" /></td>
+                  <td>
+                    <input
+                      v-model="row.rincianServis"
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="Keterangan"
+                    />
+                  </td>
                   <td class="text-center">
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-danger"
                       @click="removeCustomRow(idx)"
                       :disabled="form.customRows.length === 1"
-                    ><i class="bi bi-x"></i></button>
+                    >
+                      <i class="bi bi-x"></i>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -205,7 +316,8 @@
       <!-- Submit -->
       <div class="d-flex justify-content-end gap-2">
         <button type="button" class="btn btn-secondary btn-sm" @click="resetForm">
-          <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+          <i class="bi bi-arrow-counterclockwise me-1"></i>
+          Reset
         </button>
         <button type="submit" class="btn btn-warning btn-sm" :disabled="saving">
           <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
@@ -214,6 +326,13 @@
         </button>
       </div>
     </form>
+
+    <PrintFailedModal
+      v-model="showPrintFailedModal"
+      failed-title="Gagal Cetak Nota Servis"
+      :message="printFailedMessage"
+      @retry="retryPrintSlip"
+    />
   </div>
 </template>
 
@@ -228,8 +347,9 @@ import {
   saveServis,
   printServisSlip,
 } from "@/services/servis-service";
+import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 
-const { toast, error: showError } = useAlert();
+const { swal, error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 
 // ── Default row factories ──────────────────────────────────────────────────
@@ -259,6 +379,9 @@ const newCustomRow = () => ({
 
 // ── State ─────────────────────────────────────────────────────────────────
 const saving = ref(false);
+const showPrintFailedModal = ref(false);
+const printFailedMessage = ref("Pastikan printing service sudah dijalankan di komputer ini.");
+const lastFailedPrintPayload = ref(null);
 const form = ref({
   tanggal: todayStringWITA(),
   namaSales: "",
@@ -281,10 +404,18 @@ const totalDP = computed(() => {
 });
 
 // ── Row management ────────────────────────────────────────────────────────
-function addServisRow() { form.value.servisRows.push(newServisRow()); }
-function removeServisRow(idx) { form.value.servisRows.splice(idx, 1); }
-function addCustomRow() { form.value.customRows.push(newCustomRow()); }
-function removeCustomRow(idx) { form.value.customRows.splice(idx, 1); }
+function addServisRow() {
+  form.value.servisRows.push(newServisRow());
+}
+function removeServisRow(idx) {
+  form.value.servisRows.splice(idx, 1);
+}
+function addCustomRow() {
+  form.value.customRows.push(newCustomRow());
+}
+function removeCustomRow(idx) {
+  form.value.customRows.splice(idx, 1);
+}
 
 // ── Submit ────────────────────────────────────────────────────────────────
 async function submitForm() {
@@ -295,8 +426,8 @@ async function submitForm() {
 
     // Validate rows
     for (const row of rows) {
-      if (!row.namaBarang.trim()) return toast("Nama barang wajib diisi", "warning");
-      if (isServis && !row.jenisServis) return toast("Jenis servis wajib dipilih", "warning");
+      if (!row.namaBarang.trim()) return swal("Nama barang wajib diisi", "warning");
+      if (isServis && !row.jenisServis) return swal("Jenis servis wajib dipilih", "warning");
     }
 
     const firstItem = rows[0];
@@ -323,11 +454,18 @@ async function submitForm() {
 
     const newId = await saveServis(data);
 
-    // Attempt print (fire-and-forget — don't block UI)
-    printServisSlip({ id: newId, ...data }).catch(() => {});
-
-    toast(`Servis berhasil disimpan`);
+    swal("Servis berhasil disimpan");
     resetForm();
+
+    // Print via printing-service only — no browser fallback
+    try {
+      await printServisSlip({ id: newId, ...data });
+      lastFailedPrintPayload.value = null;
+    } catch (e) {
+      lastFailedPrintPayload.value = { id: newId, ...data };
+      printFailedMessage.value = e?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
+      showPrintFailedModal.value = true;
+    }
   } catch (e) {
     showError("Gagal menyimpan servis", e.message);
   } finally {
@@ -345,5 +483,20 @@ function resetForm() {
     servisRows: [newServisRow()],
     customRows: [newCustomRow()],
   };
+}
+
+async function retryPrintSlip() {
+  const payload = lastFailedPrintPayload.value;
+  if (!payload) return;
+
+  showPrintFailedModal.value = false;
+  try {
+    await printServisSlip(payload);
+    lastFailedPrintPayload.value = null;
+    swal("Nota servis dikirim ke printer", "success");
+  } catch (e) {
+    printFailedMessage.value = e?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
+    showPrintFailedModal.value = true;
+  }
 }
 </script>

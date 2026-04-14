@@ -1,50 +1,84 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-table me-2 text-warning"></i>Data Servis
-      </h4>
+    <!-- Page Header -->
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-table me-2 text-dark"></i>
+        Data Servis
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/servis/input">Servis</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Data Servis</li>
+        </ol>
+      </nav>
     </div>
 
     <!-- Filters -->
     <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header">
+        <h2>
+          <i class="fas fa-filter me-2"></i>
+          Filter Laporan
+        </h2>
+      </div>
       <div class="card-body py-2">
         <div class="row g-2 align-items-end">
-          <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Bulan</label>
-            <input v-model="filterBulan" type="month" class="form-control form-control-sm" @change="onMonthChange" />
+          <div class="col-6 col-md-2">
+            <label class="form-label small fw-semibold mb-1">Tanggal</label>
+            <input v-model="filterDate" type="date" class="form-control form-control-sm" />
           </div>
-          <div class="col-md-2">
+          <div class="col-6 col-md-2">
+            <label class="form-label small fw-semibold mb-1">Jenis</label>
+            <select v-model="filterJenis" class="form-select form-select-sm">
+              <option value="servis">Servis</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
             <label class="form-label small fw-semibold mb-1">Status Servis</label>
-            <select v-model="filterStatus" class="form-select form-select-sm" @change="applyFilters">
+            <select v-model="filterStatus" class="form-select form-select-sm">
               <option value="">Semua</option>
               <option value="Belum Selesai">Belum Selesai</option>
               <option value="Sudah Selesai">Sudah Selesai</option>
             </select>
           </div>
-          <div class="col-md-2">
+          <div class="col-6 col-md-2">
             <label class="form-label small fw-semibold mb-1">Status Pengambilan</label>
-            <select v-model="filterPengambilan" class="form-select form-select-sm" @change="applyFilters">
+            <select v-model="filterPengambilan" class="form-select form-select-sm">
               <option value="">Semua</option>
               <option value="Belum Diambil">Belum Diambil</option>
               <option value="Sudah Diambil">Sudah Diambil</option>
             </select>
           </div>
-          <div class="col-md-3">
+          <div class="col-12 col-md-2">
             <label class="form-label small fw-semibold mb-1">Cari</label>
             <input
               v-model="searchText"
               type="search"
               class="form-control form-control-sm"
-              placeholder="Cari nama customer..."
+              placeholder="Customer / barang..."
             />
           </div>
-          <div class="col-md-auto ms-auto d-flex align-items-end">
-            <span class="small text-muted">{{ filteredList.length }} data</span>
+          <div class="col-12 col-md-auto d-flex align-items-end gap-2 flex-wrap">
+            <button class="btn btn-primary btn-sm fw-semibold flex-fill flex-md-grow-0" @click="loadData">
+              <i class="bi bi-search me-1"></i>
+              Tampilkan
+            </button>
           </div>
         </div>
       </div>
+    </div>
+    <div class="d-none d-md-flex justify-content-start py-2 gap-2 border-bottom mb-3">
+      <button class="btn btn-danger btn-sm" @click="exportPDF" title="Export PDF sesuai filter">
+        <i class="bi bi-file-earmark-pdf me-1"></i>
+        Export PDF
+      </button>
+      <button class="btn btn-success btn-sm" @click="printAllLabels" title="Print semua label">
+        <i class="bi bi-tags me-1"></i>
+        Print Label
+      </button>
     </div>
 
     <!-- Loading -->
@@ -53,103 +87,259 @@
       <p class="mt-2 text-muted small">Memuat data servis...</p>
     </div>
 
-    <!-- Table -->
-    <div v-else class="card border-0 shadow-sm">
-      <div class="table-responsive">
-        <table class="table table-hover table-sm mb-0">
-          <thead class="table-light">
-            <tr>
-              <th style="width:42px">#</th>
-              <th>Tanggal</th>
-              <th>Customer</th>
-              <th>No HP</th>
-              <th>Barang / Jenis</th>
-              <th class="text-center">Status Servis</th>
-              <th class="text-center">Pengambilan</th>
-              <th class="text-end">Ongkos</th>
-              <th class="text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="filteredList.length === 0">
-              <td colspan="9" class="text-center text-muted py-5">
-                <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
-                Tidak ada data servis.
-              </td>
-            </tr>
-            <tr v-for="(item, idx) in filteredList" :key="item.id">
-              <td class="text-muted small align-middle">{{ idx + 1 }}</td>
-              <td class="align-middle small">{{ item.tanggal }}</td>
-              <td class="align-middle fw-semibold">{{ item.namaCustomer }}</td>
-              <td class="align-middle small">{{ item.noHp }}</td>
-              <td class="align-middle small">
-                <div>{{ item.namaBarang }}</div>
-                <span class="badge bg-light text-dark border">
-                  {{ item.jenisInput === "custom" ? "CUSTOM" : (item.jenisServis || item.detailBarang?.[0]?.jenisServis || "-") }}
-                </span>
-              </td>
-              <td class="text-center align-middle">
-                <span class="badge" :class="statusServisBadge(item.statusServis)">
+    <div v-else-if="!hasLoaded" class="card border-0 shadow-sm">
+      <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-search display-4 d-block mb-2 opacity-25"></i>
+        Klik tombol Tampilkan untuk memuat data servis.
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div v-else>
+      <!-- Mobile card view -->
+      <div class="d-md-none">
+        <div v-if="filteredList.length === 0" class="text-center text-muted py-5">
+          <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
+          <p class="small">Tidak ada data servis.</p>
+        </div>
+        <div v-for="(item, idx) in paginatedList" :key="item.id" class="card border-0 shadow-sm mb-2 rounded-3">
+          <div class="card-body py-2 px-3">
+            <!-- Row 1: customer + tanggal -->
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-bold text-dark">{{ item.namaCustomer }}</span>
+              <span class="text-muted" style="font-size: 0.75rem">{{ formatTanggal(item.tanggal) }}</span>
+            </div>
+            <!-- Row 2: nama barang + jenis -->
+            <div class="d-flex align-items-center gap-1 mb-1" style="font-size: 0.82rem">
+              <span class="text-truncate flex-grow-1">{{ getItemNama(item) }}</span>
+              <span class="badge text-muted flex-shrink-0" style="font-size: 0.7rem">
+                {{ item.jenisInput === "custom" ? "CUSTOM" : getItemJenisServis(item) }}
+              </span>
+            </div>
+            <!-- Row 3: sales + rincian -->
+            <div class="text-muted mb-1" style="font-size: 0.75rem">
+              <span v-if="item.namaSales && getItemRincian(item) !== '-'">SALES :</span>
+              <span v-if="item.namaSales">{{ item.namaSales }}</span>
+            </div>
+            <!-- Row 4: badges + ongkos -->
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+              <div class="d-flex gap-1 flex-wrap">
+                <span class="badge" :class="statusServisBadge(item.statusServis)" style="font-size: 0.7rem">
                   {{ item.statusServis }}
                 </span>
-              </td>
-              <td class="text-center align-middle">
-                <span class="badge" :class="statusPengambilanBadge(item.statusPengambilan)">
+                <span class="badge" :class="statusPengambilanBadge(item.statusPengambilan)" style="font-size: 0.7rem">
                   {{ item.statusPengambilan }}
                 </span>
-              </td>
-              <td class="text-end align-middle small fw-semibold">
-                Rp {{ Number(item.totalOngkos || item.ongkos || 0).toLocaleString("id-ID") }}
-              </td>
-              <td class="text-center align-middle">
-                <div class="btn-group btn-group-sm">
-                  <button
-                    class="btn btn-outline-warning"
-                    @click="openStatusModal(item)"
-                    title="Update Status"
-                  ><i class="bi bi-arrow-repeat"></i></button>
-                  <button
-                    v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
-                    class="btn btn-outline-success"
-                    @click="sendWA(item)"
-                    title="Kirim WhatsApp"
-                  ><i class="bi bi-whatsapp"></i></button>
-                  <button
-                    class="btn btn-outline-primary"
-                    @click="rePrint(item)"
-                    title="Cetak ulang"
-                  ><i class="bi bi-printer"></i></button>
-                  <button
-                    class="btn btn-outline-secondary"
-                    @click="openEditModal(item)"
-                    title="Edit (perlu password)"
-                  ><i class="bi bi-pencil"></i></button>
-                  <button
-                    class="btn btn-outline-danger"
-                    @click="confirmDelete(item)"
-                    title="Hapus (perlu password)"
-                  ><i class="bi bi-trash"></i></button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <span
+                  class="badge"
+                  :class="statusPembayaranBadge(getItemStatusPembayaran(item))"
+                  style="font-size: 0.7rem"
+                >
+                  {{ statusPembayaranLabel(getItemStatusPembayaran(item)) }}
+                </span>
+              </div>
+              <span class="fw-bold text-dark" style="font-size: 0.85rem">
+                Rp {{ Number(getItemOngkos(item)).toLocaleString("id-ID") }}
+              </span>
+            </div>
+            <!-- Row 5: actions (update status + WA only) -->
+            <div class="d-flex gap-2">
+              <button class="btn btn-warning btn-sm flex-fill" @click="openStatusModal(item)">
+                <i class="bi bi-arrow-repeat me-1"></i>
+                Update Status
+              </button>
+              <button
+                v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
+                class="btn btn-success btn-sm flex-fill"
+                @click="sendWA(item)"
+              >
+                <i class="bi bi-whatsapp me-1"></i>
+                WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop table view -->
+      <div class="d-none d-md-block card border-0 shadow-sm">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0" style="font-size: 0.8rem">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 38px">No</th>
+                <th style="min-width: 90px">Tanggal</th>
+                <th style="min-width: 90px">Sales</th>
+                <th style="min-width: 110px">Customer</th>
+                <th style="min-width: 100px">No HP</th>
+                <th style="min-width: 110px">Nama Barang</th>
+                <th style="min-width: 70px">Berat</th>
+                <th style="min-width: 70px">Kadar</th>
+                <th style="min-width: 90px">Barang/Jenis</th>
+                <th style="min-width: 200px">Rincian</th>
+                <th style="min-width: 90px">Pembayaran</th>
+                <th class="text-end" style="min-width: 80px">Ongkos</th>
+                <th class="text-center" style="min-width: 100px">Status Servis</th>
+                <th style="min-width: 110px">Handle/Waktu</th>
+                <th class="text-center" style="width: 60px">Bukti</th>
+                <th class="text-center" style="min-width: 140px">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="filteredList.length === 0">
+                <td colspan="16" class="text-center text-muted py-5">
+                  <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
+                  Tidak ada data servis.
+                </td>
+              </tr>
+              <tr v-for="(item, idx) in paginatedList" :key="item.id">
+                <td class="text-muted align-middle">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
+                <td class="align-middle">{{ formatTanggal(item.tanggal) }}</td>
+                <td class="align-middle">{{ item.namaSales || "-" }}</td>
+                <td class="align-middle fw-semibold">{{ item.namaCustomer }}</td>
+                <td class="align-middle">{{ item.noHp || "-" }}</td>
+                <td
+                  class="align-middle"
+                  style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                  :title="getItemNama(item)"
+                >
+                  {{ getItemNama(item) }}
+                </td>
+                <td class="align-middle">{{ getItemBerat(item) }}</td>
+                <td class="align-middle">{{ getItemKarat(item) }}</td>
+                <td class="align-middle">
+                  <span class="badge bg-light text-dark border">
+                    {{ item.jenisInput === "custom" ? "CUSTOM" : getItemJenisServis(item) }}
+                  </span>
+                </td>
+                <td
+                  class="align-middle"
+                  style="
+                    min-width: 200px;
+                    max-width: 220px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                  :title="getItemRincian(item)"
+                >
+                  {{ getItemRincian(item) }}
+                </td>
+                <td class="align-middle">
+                  <span class="badge" :class="statusPembayaranBadge(getItemStatusPembayaran(item))">
+                    {{ statusPembayaranLabel(getItemStatusPembayaran(item)) }}
+                  </span>
+                </td>
+                <td class="text-end align-middle fw-semibold">
+                  Rp {{ Number(getItemOngkos(item)).toLocaleString("id-ID") }}
+                </td>
+                <td class="text-center align-middle">
+                  <span class="badge" :class="statusServisBadge(item.statusServis)">
+                    {{ item.statusServis }}
+                  </span>
+                  <br />
+                  <span class="badge mt-1" :class="statusPengambilanBadge(item.statusPengambilan)">
+                    {{ item.statusPengambilan }}
+                  </span>
+                </td>
+                <td class="align-middle small">
+                  <div v-if="item.stafHandle">{{ item.stafHandle }}</div>
+                  <div v-if="item.waktuPengambilan" class="text-muted">
+                    {{ formatWaktu(item.waktuPengambilan) }}
+                  </div>
+                  <span v-if="!item.stafHandle && !item.waktuPengambilan" class="text-muted">-</span>
+                </td>
+                <td class="text-center align-middle">
+                  <a
+                    v-if="item.buktiPengambilanUrl"
+                    :href="item.buktiPengambilanUrl"
+                    target="_blank"
+                    class="btn btn-outline-info btn-sm py-0 px-1"
+                    title="Lihat bukti"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <span v-else class="text-muted">-</span>
+                </td>
+                <td class="text-center align-middle">
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-warning" @click="openStatusModal(item)" title="Update Status">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    <button
+                      v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
+                      class="btn btn-success"
+                      @click="sendWA(item)"
+                      title="Kirim WhatsApp"
+                    >
+                      <i class="bi bi-whatsapp"></i>
+                    </button>
+                    <button class="btn btn-primary" @click="rePrint(item)" title="Cetak ulang">
+                      <i class="bi bi-printer"></i>
+                    </button>
+                    <button class="btn btn-secondary" @click="printSingleLabel(item)" title="Print label">
+                      <i class="bi bi-tag"></i>
+                    </button>
+                    <button class="btn btn-info text-white" @click="openEditModal(item)" title="Edit (perlu password)">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-danger" @click="confirmDelete(item)" title="Hapus (perlu password)">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div
+        v-if="totalPages > 1"
+        class="d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2 mt-2 card border-0 shadow-sm"
+      >
+        <span class="small text-muted">
+          Halaman {{ currentPage }} dari {{ totalPages }} ({{ filteredList.length }} data)
+        </span>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" :class="{ disabled: currentPage === 1 }">
+              <button class="page-link" @click="currentPage = 1">&laquo;</button>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === 1 }">
+              <button class="page-link" @click="currentPage--">&lsaquo;</button>
+            </li>
+            <li v-for="p in visiblePages" :key="p" class="page-item" :class="{ active: p === currentPage }">
+              <button class="page-link" @click="currentPage = p">{{ p }}</button>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+              <button class="page-link" @click="currentPage++">&rsaquo;</button>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+              <button class="page-link" @click="currentPage = totalPages">&raquo;</button>
+            </li>
+          </ul>
+        </nav>
       </div>
     </div>
 
     <!-- ── Status Modal ── -->
     <div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-sm">
+      <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header py-2">
             <h6 class="modal-title fw-semibold">
-              <i class="bi bi-arrow-repeat me-1 text-warning"></i>Update Status
+              <i class="bi bi-arrow-repeat me-1 text-warning"></i>
+              Update Status
             </h6>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
             <p class="small text-muted mb-3">
-              Customer: <strong>{{ statusForm.namaCustomer }}</strong><br/>
+              Customer:
+              <strong>{{ statusForm.namaCustomer }}</strong>
+              <br />
               Barang: {{ statusForm.namaBarang }}
             </p>
             <div class="mb-2">
@@ -168,81 +358,369 @@
             </div>
             <div v-if="statusForm.statusPengambilan === 'Sudah Diambil'" class="mb-2">
               <label class="form-label small fw-semibold">Nama Staf Handle</label>
-              <input v-model="statusForm.stafHandle" type="text" class="form-control form-control-sm" placeholder="Nama staf" />
+              <input
+                v-model="statusForm.stafHandle"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Nama staf"
+              />
+            </div>
+            <!-- Bukti foto pengambilan -->
+            <div v-if="statusForm.statusPengambilan === 'Sudah Diambil'" class="mb-2">
+              <label class="form-label small fw-semibold">
+                Bukti Pengambilan
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                ref="photoInputRef"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                class="form-control form-control-sm"
+                @change="onPhotoChange"
+              />
+              <div v-if="!hasPhotoEvidence" class="small text-danger mt-1">
+                Upload foto bukti sebelum menyimpan status "Sudah Diambil".
+              </div>
+              <div v-if="photoPreviewUrl" class="mt-2">
+                <img
+                  :src="photoPreviewUrl"
+                  alt="Preview"
+                  class="img-fluid rounded border"
+                  style="max-height: 200px; object-fit: contain"
+                />
+                <button type="button" class="btn btn-outline-danger btn-sm mt-1 d-block" @click="clearPhoto">
+                  <i class="bi bi-x-circle me-1"></i>
+                  Hapus foto
+                </button>
+              </div>
+              <div v-if="statusForm.existingBuktiUrl && !photoPreviewUrl" class="mt-2">
+                <span class="small text-muted">Bukti sebelumnya:</span>
+                <a :href="statusForm.existingBuktiUrl" target="_blank" class="small">Lihat</a>
+              </div>
             </div>
           </div>
           <div class="modal-footer py-2">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-            <button class="btn btn-warning btn-sm" @click="saveStatus" :disabled="statusSaving">
+            <button class="btn btn-warning btn-sm" @click="saveStatus" :disabled="isStatusSaveDisabled">
               <span v-if="statusSaving" class="spinner-border spinner-border-sm me-1"></span>
-              <i v-else class="bi bi-save me-1"></i>Simpan
+              <i v-else class="bi bi-save me-1"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Edit Modal ── -->
-    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog">
+    <!-- ── Edit Verify Modal (md) ── -->
+    <div class="modal fade" id="editVerifyModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-md">
         <div class="modal-content">
           <div class="modal-header py-2">
             <h6 class="modal-title fw-semibold">
-              <i class="bi bi-pencil me-1 text-primary"></i>Edit Data Servis
+              <i class="bi bi-shield-lock me-1 text-primary"></i>
+              Verifikasi Edit Data Servis
             </h6>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <!-- Password step -->
-            <div v-if="!editUnlocked">
-              <p class="small text-muted mb-2">Masukkan password supervisor untuk melanjutkan.</p>
-              <input
-                v-model="editPassword"
-                type="password"
-                class="form-control form-control-sm"
-                placeholder="Password supervisor"
-                @keydown.enter="unlockEdit"
-              />
+            <p class="small text-muted mb-2">Masukkan password untuk melanjutkan.</p>
+            <input
+              v-model="editPassword"
+              type="password"
+              class="form-control form-control-sm"
+              placeholder="Password supervisor"
+              @keydown.enter="unlockEdit"
+            />
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button class="btn btn-primary btn-sm" @click="unlockEdit" :disabled="editUnlocking">
+              <span v-if="editUnlocking" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-unlock me-1"></i>
+              Verifikasi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Edit Modal (xl) ── -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-pencil me-1 text-primary"></i>
+              Edit Data Servis
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Header fields -->
+            <div class="row g-2 mb-3">
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">Tanggal</label>
+                <input v-model="editForm.tanggal" type="date" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">Nama Sales</label>
+                <input v-model="editForm.namaSales" type="text" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">Nama Customer</label>
+                <input v-model="editForm.namaCustomer" type="text" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">No HP</label>
+                <input v-model="editForm.noHp" type="text" class="form-control form-control-sm" />
+              </div>
             </div>
-            <!-- Edit form after unlock -->
+
+            <!-- Servis rows -->
+            <div v-if="editForm.jenisInput === 'servis'">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold">
+                  <i class="bi bi-list-ul me-1 text-warning"></i>
+                  Detail Barang Servis
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  @click="editForm.servisRows.push(newServisRow())"
+                >
+                  <i class="bi bi-plus me-1"></i>
+                  Tambah Baris
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" style="font-size: 0.8rem">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 50px">Jml</th>
+                      <th>Nama Barang</th>
+                      <th style="width: 90px">Berat</th>
+                      <th style="width: 80px">Karat</th>
+                      <th style="width: 160px">
+                        Jenis Servis
+                        <span class="text-danger">*</span>
+                      </th>
+                      <th>Rincian</th>
+                      <th style="width: 110px">Ongkos (Rp)</th>
+                      <th style="width: 130px">Status Bayar</th>
+                      <th style="width: 36px"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, idx) in editForm.servisRows" :key="idx">
+                      <td>
+                        <input
+                          v-model.number="row.jumlah"
+                          type="number"
+                          min="1"
+                          class="form-control form-control-sm text-center"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.namaBarang"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Nama barang"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.berat"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="gr/cm"
+                        />
+                      </td>
+                      <td>
+                        <input v-model="row.karat" type="text" class="form-control form-control-sm" placeholder="22K" />
+                      </td>
+                      <td>
+                        <select v-model="row.jenisServis" class="form-select form-select-sm">
+                          <option value="">Pilih...</option>
+                          <option v-for="j in JENIS_SERVIS_OPTIONS" :key="j" :value="j">{{ j }}</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.rincianServis"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Keterangan"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model.number="row.ongkos"
+                          type="number"
+                          min="0"
+                          class="form-control form-control-sm"
+                          @input="row.statusPembayaran = row.ongkos > 0 ? 'nominal' : 'free'"
+                        />
+                      </td>
+                      <td>
+                        <select v-model="row.statusPembayaran" class="form-select form-select-sm">
+                          <option v-for="s in STATUS_PEMBAYARAN_OPTIONS" :key="s.value" :value="s.value">
+                            {{ s.label }}
+                          </option>
+                        </select>
+                      </td>
+                      <td class="text-center">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-danger"
+                          @click="editForm.servisRows.splice(idx, 1)"
+                          :disabled="editForm.servisRows.length === 1"
+                        >
+                          <i class="bi bi-x"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot class="table-light">
+                    <tr>
+                      <td colspan="6" class="text-end fw-semibold">Total Ongkos:</td>
+                      <td class="fw-bold text-success">Rp {{ editTotalOngkos.toLocaleString("id-ID") }}</td>
+                      <td colspan="2"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <!-- Custom rows -->
             <div v-else>
-              <div class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Tanggal</label>
-                  <input v-model="editForm.tanggal" type="date" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Nama Sales</label>
-                  <input v-model="editForm.namaSales" type="text" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Nama Customer</label>
-                  <input v-model="editForm.namaCustomer" type="text" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">No HP</label>
-                  <input v-model="editForm.noHp" type="text" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Nama Barang</label>
-                  <input v-model="editForm.namaBarang" type="text" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small fw-semibold">Total Ongkos</label>
-                  <input v-model.number="editForm.totalOngkos" type="number" class="form-control form-control-sm" />
-                </div>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold">
+                  <i class="bi bi-stars me-1 text-warning"></i>
+                  Detail Barang Custom
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  @click="editForm.customRows.push(newCustomRow())"
+                >
+                  <i class="bi bi-plus me-1"></i>
+                  Tambah Baris
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" style="font-size: 0.8rem">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 50px">Jml</th>
+                      <th>Nama Barang</th>
+                      <th style="width: 80px">Berat</th>
+                      <th style="width: 80px">Panjang</th>
+                      <th style="width: 70px">Kadar</th>
+                      <th style="width: 80px">Warna</th>
+                      <th style="width: 110px">DP (Rp)</th>
+                      <th style="width: 110px">Ongkos (Rp)</th>
+                      <th style="width: 120px">Status Bayar</th>
+                      <th>Rincian</th>
+                      <th style="width: 36px"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, idx) in editForm.customRows" :key="idx">
+                      <td>
+                        <input
+                          v-model.number="row.jumlah"
+                          type="number"
+                          min="1"
+                          class="form-control form-control-sm text-center"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.namaBarang"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Nama barang"
+                        />
+                      </td>
+                      <td>
+                        <input v-model="row.berat" type="text" class="form-control form-control-sm" placeholder="gr" />
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.panjang"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="cm"
+                        />
+                      </td>
+                      <td>
+                        <input v-model="row.kadar" type="text" class="form-control form-control-sm" placeholder="22K" />
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.warna"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Kuning"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model.number="row.totalDP"
+                          type="number"
+                          min="0"
+                          class="form-control form-control-sm"
+                        />
+                      </td>
+                      <td>
+                        <input v-model.number="row.ongkos" type="number" min="0" class="form-control form-control-sm" />
+                      </td>
+                      <td>
+                        <select v-model="row.statusPembayaran" class="form-select form-select-sm">
+                          <option v-for="s in STATUS_PEMBAYARAN_CUSTOM" :key="s.value" :value="s.value">
+                            {{ s.label }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          v-model="row.rincianServis"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Keterangan"
+                        />
+                      </td>
+                      <td class="text-center">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-danger"
+                          @click="editForm.customRows.splice(idx, 1)"
+                          :disabled="editForm.customRows.length === 1"
+                        >
+                          <i class="bi bi-x"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot class="table-light">
+                    <tr>
+                      <td colspan="7" class="text-end fw-semibold">Total Ongkos:</td>
+                      <td class="fw-bold text-success">Rp {{ editTotalOngkos.toLocaleString("id-ID") }}</td>
+                      <td colspan="2"></td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </div>
           <div class="modal-footer py-2">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-            <button v-if="!editUnlocked" class="btn btn-primary btn-sm" @click="unlockEdit" :disabled="editUnlocking">
-              <span v-if="editUnlocking" class="spinner-border spinner-border-sm me-1"></span>
-              <i v-else class="bi bi-unlock me-1"></i>Verifikasi
-            </button>
-            <button v-else class="btn btn-primary btn-sm" @click="saveEdit" :disabled="editSaving">
+            <button class="btn btn-primary btn-sm" @click="saveEdit" :disabled="editSaving">
               <span v-if="editSaving" class="spinner-border spinner-border-sm me-1"></span>
-              <i v-else class="bi bi-save me-1"></i>Simpan
+              <i v-else class="bi bi-save me-1"></i>
+              Simpan
             </button>
           </div>
         </div>
@@ -255,13 +733,16 @@
         <div class="modal-content">
           <div class="modal-header py-2">
             <h6 class="modal-title fw-semibold text-danger">
-              <i class="bi bi-trash me-1"></i>Hapus Data Servis
+              <i class="bi bi-trash me-1"></i>
+              Hapus Data Servis
             </h6>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
             <p class="small text-muted mb-2">
-              Hapus data servis <strong>{{ deleteTarget?.namaCustomer }}</strong>? Tindakan ini tidak dapat dibatalkan.
+              Hapus data servis
+              <strong>{{ deleteTarget?.namaCustomer }}</strong>
+              ? Tindakan ini tidak dapat dibatalkan.
             </p>
             <input
               v-model="deletePassword"
@@ -274,12 +755,44 @@
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
             <button class="btn btn-danger btn-sm" @click="doDelete" :disabled="deleteSaving">
               <span v-if="deleteSaving" class="spinner-border spinner-border-sm me-1"></span>
-              <i v-else class="bi bi-trash me-1"></i>Hapus
+              <i v-else class="bi bi-trash me-1"></i>
+              Hapus
             </button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- ── Bukti Viewer Modal ── -->
+    <div class="modal fade" id="buktiModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-image me-1"></i>
+              Bukti Pengambilan
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-center">
+            <img
+              v-if="buktiViewUrl"
+              :src="buktiViewUrl"
+              alt="Bukti Pengambilan"
+              class="img-fluid rounded"
+              style="max-height: 70vh"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <PrintFailedModal
+      v-model="showPrintFailedModal"
+      failed-title="Gagal Cetak Nota Servis"
+      :message="printFailedMessage"
+      @retry="retryPrintServis"
+    />
   </div>
 </template>
 
@@ -288,54 +801,208 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { Modal } from "bootstrap";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
+import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import {
-  fetchServisByMonth,
-  subscribeServisByMonth,
+  fetchServisByRange,
+  subscribeServisByRange,
   updateServisStatus,
   updateServisData,
   deleteServis,
   verifySupervisorPassword,
   printServisSlip,
+  uploadBuktiPengambilan,
   buildWhatsAppUrl,
   getCachedServis,
   setCachedServis,
   invalidateCachedServis,
   statusServisBadge,
   statusPengambilanBadge,
+  statusPembayaranBadge,
+  statusPembayaranLabel,
+  JENIS_SERVIS_OPTIONS,
+  STATUS_PEMBAYARAN_OPTIONS,
+  STATUS_PEMBAYARAN_CUSTOM,
 } from "@/services/servis-service";
 
-const { toast, error: showError } = useAlert();
+const { swal, error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 
 // ── State ─────────────────────────────────────────────────────────────────
 const loading = ref(false);
 const allItems = ref([]);
-const filterBulan = ref(todayStringWITA().substring(0, 7));
-const filterStatus = ref("");
-const filterPengambilan = ref("");
+const filterDate = ref(todayStringWITA());
+const filterJenis = ref("servis");
+const filterStatus = ref("Belum Selesai");
+const filterPengambilan = ref("Belum Diambil");
 const searchText = ref("");
+const hasLoaded = ref(false);
+
+// Pagination
+const currentPage = ref(1);
+const pageSize = 25;
 
 let unsubscribe = null;
 
 // Status modal
 const statusSaving = ref(false);
-const statusForm = ref({ id: "", namaCustomer: "", namaBarang: "", statusServis: "", statusPengambilan: "", stafHandle: "" });
+const photoInputRef = ref(null);
+const photoFile = ref(null);
+const photoPreviewUrl = ref("");
+const statusForm = ref({
+  id: "",
+  namaCustomer: "",
+  namaBarang: "",
+  statusServis: "",
+  statusPengambilan: "",
+  stafHandle: "",
+  existingBuktiUrl: "",
+});
+
+const hasPhotoEvidence = computed(() => Boolean(photoFile.value || statusForm.value.existingBuktiUrl));
+
+const isStatusSaveDisabled = computed(
+  () => statusSaving.value || (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value),
+);
 
 // Edit modal
-const editUnlocked = ref(false);
 const editUnlocking = ref(false);
 const editSaving = ref(false);
 const editPassword = ref("");
-const editForm = ref({ id: "", tanggal: "", namaSales: "", namaCustomer: "", noHp: "", namaBarang: "", totalOngkos: 0 });
+const editForm = ref({
+  id: "",
+  tanggal: "",
+  namaSales: "",
+  namaCustomer: "",
+  noHp: "",
+  jenisInput: "servis",
+  servisRows: [],
+  customRows: [],
+});
+
+const editTotalOngkos = computed(() => {
+  const rows = editForm.value.jenisInput === "custom" ? editForm.value.customRows : editForm.value.servisRows;
+  return rows.reduce((sum, r) => sum + Number(r.ongkos || 0), 0);
+});
+
+const newServisRow = () => ({
+  jumlah: 1,
+  namaBarang: "",
+  berat: "",
+  karat: "",
+  jenisServis: "",
+  rincianServis: "",
+  ongkos: 0,
+  statusPembayaran: "nominal",
+});
+
+const newCustomRow = () => ({
+  jumlah: 1,
+  namaBarang: "",
+  berat: "",
+  panjang: "",
+  kadar: "",
+  warna: "",
+  totalDP: 0,
+  ongkos: 0,
+  statusPembayaran: "nominal",
+  rincianServis: "",
+});
 
 // Delete modal
 const deleteTarget = ref(null);
 const deletePassword = ref("");
 const deleteSaving = ref(false);
 
+// Bukti viewer
+const buktiViewUrl = ref("");
+const showPrintFailedModal = ref(false);
+const printFailedMessage = ref("Pastikan printing service sudah dijalankan di komputer ini.");
+const failedPrintItem = ref(null);
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function getItems(item) {
+  return item.jenisInput === "custom" ? item.detailBarangCustom || [] : item.detailBarang || [];
+}
+
+function joinField(item, field) {
+  const items = getItems(item);
+  if (!items.length) return item[field] || "-";
+  const vals = items.map((i) => i[field] || "").filter(Boolean);
+  return vals.length ? vals.join(" / ") : "-";
+}
+
+function getItemNama(item) {
+  return joinField(item, "namaBarang");
+}
+
+function getItemBerat(item) {
+  return joinField(item, "berat");
+}
+
+function getItemKarat(item) {
+  const items = getItems(item);
+  if (!items.length) return "-";
+  const vals = items.map((i) => i.karat || i.kadar || "").filter(Boolean);
+  return vals.length ? vals.join(" / ") : "-";
+}
+
+function getItemJenisServis(item) {
+  return joinField(item, "jenisServis");
+}
+
+function getItemRincian(item) {
+  return joinField(item, "rincianServis");
+}
+
+function getItemStatusPembayaran(item) {
+  const items = getItems(item);
+  if (!items.length) return item.statusPembayaran || "";
+  return items[0]?.statusPembayaran || "";
+}
+
+function getItemOngkos(item) {
+  if (item.totalOngkos != null) return item.totalOngkos;
+  const items = getItems(item);
+  if (!items.length) return item.ongkos || 0;
+  return items.reduce((sum, i) => sum + Number(i.ongkos || 0), 0);
+}
+
+function formatTanggal(val) {
+  if (!val) return "-";
+  // ISO datetime or plain date string — take first 10 chars
+  return String(val).substring(0, 10);
+}
+
+function formatWaktu(val) {
+  if (!val) return "";
+  try {
+    // Firestore Timestamp object
+    let ms;
+    if (val && typeof val === "object" && val.seconds != null) {
+      ms = val.seconds * 1000;
+    } else {
+      ms = new Date(val).getTime();
+    }
+    if (isNaN(ms)) return String(val);
+    const d = new Date(ms);
+    return (
+      d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) +
+      " " +
+      d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+    );
+  } catch {
+    return String(val);
+  }
+}
+
+function isToday() {
+  return filterDate.value === todayStringWITA();
+}
+
 // ── Computed ──────────────────────────────────────────────────────────────
 const filteredList = computed(() => {
   let list = allItems.value;
+  list = list.filter((i) => (i.jenisInput || "servis") === filterJenis.value);
   if (filterStatus.value) list = list.filter((i) => i.statusServis === filterStatus.value);
   if (filterPengambilan.value) list = list.filter((i) => i.statusPengambilan === filterPengambilan.value);
   if (searchText.value.trim()) {
@@ -343,19 +1010,35 @@ const filteredList = computed(() => {
     list = list.filter(
       (i) =>
         (i.namaCustomer || "").toLowerCase().includes(q) ||
-        (i.namaBarang || "").toLowerCase().includes(q),
+        (i.namaBarang || "").toLowerCase().includes(q) ||
+        (i.namaSales || "").toLowerCase().includes(q),
     );
   }
   return list;
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-function isCurrentMonth(bulanStr) {
-  const now = todayStringWITA();
-  return bulanStr === now.substring(0, 7);
-}
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredList.value.length / pageSize)));
 
-function applyFilters() { /* filters are computed */ }
+const paginatedList = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredList.value.slice(start, start + pageSize);
+});
+
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const cur = currentPage.value;
+  const delta = 2;
+  const pages = [];
+  for (let i = Math.max(1, cur - delta); i <= Math.min(total, cur + delta); i++) {
+    pages.push(i);
+  }
+  return pages;
+});
+
+// Reset to page 1 whenever filters change
+function resetPage() {
+  currentPage.value = 1;
+}
 
 // ── Data Loading ──────────────────────────────────────────────────────────
 function cleanupListener() {
@@ -365,59 +1048,80 @@ function cleanupListener() {
   }
 }
 
-async function loadData(bulanStr) {
+async function loadData() {
+  if (!filterDate.value) return swal("Pilih tanggal", "warning");
+
   cleanupListener();
   loading.value = true;
-
-  const [yearStr, monthStr] = bulanStr.split("-");
-  const year = parseInt(yearStr);
-  const month = parseInt(monthStr);
-  const isCurrent = isCurrentMonth(bulanStr);
+  hasLoaded.value = false;
+  resetPage();
 
   try {
-    if (isCurrent) {
-      // Real-time for current month
-      unsubscribe = subscribeServisByMonth(year, month, (data) => {
+    if (isToday()) {
+      // Real-time for today
+      unsubscribe = subscribeServisByRange(filterDate.value, filterDate.value, (data) => {
         allItems.value = data;
-        setCachedServis(year, month, data);
         loading.value = false;
+        hasLoaded.value = true;
       });
     } else {
-      // Cache-first for past months
-      const cached = getCachedServis(year, month);
-      if (cached) {
-        allItems.value = cached;
-      } else {
-        const data = await fetchServisByMonth(year, month);
-        setCachedServis(year, month, data);
-        allItems.value = data;
-      }
+      const data = await fetchServisByRange(filterDate.value, filterDate.value);
+      allItems.value = data;
       loading.value = false;
+      hasLoaded.value = true;
     }
   } catch (e) {
     showError("Gagal memuat data", e.message);
     loading.value = false;
+    hasLoaded.value = false;
   }
-}
-
-function onMonthChange() {
-  loadData(filterBulan.value);
 }
 
 // ── Status Modal ──────────────────────────────────────────────────────────
 function openStatusModal(item) {
+  photoFile.value = null;
+  photoPreviewUrl.value = "";
+  if (photoInputRef.value) photoInputRef.value.value = "";
   statusForm.value = {
     id: item.id,
     namaCustomer: item.namaCustomer,
-    namaBarang: item.namaBarang,
+    namaBarang: getItemNama(item),
     statusServis: item.statusServis,
     statusPengambilan: item.statusPengambilan,
     stafHandle: item.stafHandle || "",
+    existingBuktiUrl: item.buktiPengambilanUrl || "",
   };
   new Modal(document.getElementById("statusModal")).show();
 }
 
+function onPhotoChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    swal("File harus berupa gambar", "warning");
+    e.target.value = "";
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    swal("Ukuran file maksimal 10MB", "warning");
+    e.target.value = "";
+    return;
+  }
+  photoFile.value = file;
+  photoPreviewUrl.value = URL.createObjectURL(file);
+}
+
+function clearPhoto() {
+  photoFile.value = null;
+  photoPreviewUrl.value = "";
+  if (photoInputRef.value) photoInputRef.value.value = "";
+}
+
 async function saveStatus() {
+  if (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value) {
+    return swal("Upload foto bukti pengambilan terlebih dahulu", "warning");
+  }
+
   statusSaving.value = true;
   try {
     const updates = {
@@ -425,22 +1129,25 @@ async function saveStatus() {
       statusPengambilan: statusForm.value.statusPengambilan,
     };
     if (statusForm.value.statusPengambilan === "Sudah Diambil") {
-      updates.stafHandle = statusForm.value.stafHandle;
+      updates.stafHandle = statusForm.value.stafHandle || null;
       updates.waktuPengambilan = new Date().toISOString();
+      // Upload foto if provided
+      if (photoFile.value) {
+        const { url, path, liteUrl, litePath } = await uploadBuktiPengambilan(photoFile.value, statusForm.value.id);
+        updates.buktiPengambilanUrl = url;
+        updates.buktiPengambilanPath = path;
+        if (liteUrl) updates.buktiPengambilanLiteUrl = liteUrl;
+        if (litePath) updates.buktiPengambilanLitePath = litePath;
+      }
     } else {
       updates.stafHandle = null;
       updates.waktuPengambilan = null;
     }
     await updateServisStatus(statusForm.value.id, updates);
-
-    // Invalidate cache
-    const [y, m] = filterBulan.value.split("-").map(Number);
-    invalidateCachedServis(y, m);
-
+    invalidateCachedServis(filterDate.value, filterDate.value);
     Modal.getInstance(document.getElementById("statusModal"))?.hide();
-    toast("Status berhasil diperbarui");
-    // If not current month, reload manually
-    if (!isCurrentMonth(filterBulan.value)) loadData(filterBulan.value);
+    swal("Status berhasil diperbarui");
+    if (!isToday()) loadData();
   } catch (e) {
     showError("Gagal memperbarui status", e.message);
   } finally {
@@ -450,26 +1157,32 @@ async function saveStatus() {
 
 // ── Edit Modal ────────────────────────────────────────────────────────────
 function openEditModal(item) {
-  editUnlocked.value = false;
   editPassword.value = "";
+  const isCustom = item.jenisInput === "custom";
+  const servisRows = (item.detailBarang || []).length ? item.detailBarang.map((r) => ({ ...r })) : [newServisRow()];
+  const customRows = (item.detailBarangCustom || []).length
+    ? item.detailBarangCustom.map((r) => ({ ...r }))
+    : [newCustomRow()];
   editForm.value = {
     id: item.id,
-    tanggal: item.tanggal,
-    namaSales: item.namaSales,
-    namaCustomer: item.namaCustomer,
-    noHp: item.noHp,
-    namaBarang: item.namaBarang,
-    totalOngkos: item.totalOngkos || item.ongkos || 0,
+    tanggal: formatTanggal(item.tanggal),
+    namaSales: item.namaSales || "",
+    namaCustomer: item.namaCustomer || "",
+    noHp: item.noHp || "",
+    jenisInput: isCustom ? "custom" : "servis",
+    servisRows,
+    customRows,
   };
-  new Modal(document.getElementById("editModal")).show();
+  Modal.getOrCreateInstance(document.getElementById("editVerifyModal")).show();
 }
 
 async function unlockEdit() {
-  if (!editPassword.value) return toast("Password wajib diisi", "warning");
+  if (!editPassword.value) return swal("Password wajib diisi", "warning");
   editUnlocking.value = true;
   try {
     await verifySupervisorPassword(editPassword.value);
-    editUnlocked.value = true;
+    Modal.getInstance(document.getElementById("editVerifyModal"))?.hide();
+    Modal.getOrCreateInstance(document.getElementById("editModal")).show();
   } catch (e) {
     showError("Verifikasi gagal", e.message);
   } finally {
@@ -478,22 +1191,33 @@ async function unlockEdit() {
 }
 
 async function saveEdit() {
+  const isCustom = editForm.value.jenisInput === "custom";
+  const rows = isCustom ? editForm.value.customRows : editForm.value.servisRows;
+  if (!rows.length || !rows[0].namaBarang?.trim()) {
+    return swal("Nama barang wajib diisi", "warning");
+  }
   editSaving.value = true;
   try {
-    await updateServisData(editForm.value.id, {
+    const totalOngkos = editTotalOngkos.value;
+    const payload = {
       tanggal: editForm.value.tanggal,
       namaSales: editForm.value.namaSales,
       namaCustomer: editForm.value.namaCustomer,
       noHp: editForm.value.noHp,
-      namaBarang: editForm.value.namaBarang,
-      totalOngkos: editForm.value.totalOngkos,
-      ongkos: editForm.value.totalOngkos,
-    });
-    const [y, m] = filterBulan.value.split("-").map(Number);
-    invalidateCachedServis(y, m);
+      namaBarang: rows[0].namaBarang,
+      totalOngkos,
+      ongkos: totalOngkos,
+    };
+    if (isCustom) {
+      payload.detailBarangCustom = rows;
+    } else {
+      payload.detailBarang = rows;
+    }
+    await updateServisData(editForm.value.id, payload);
+    invalidateCachedServis(filterDate.value, filterDate.value);
     Modal.getInstance(document.getElementById("editModal"))?.hide();
-    toast("Data berhasil diperbarui");
-    if (!isCurrentMonth(filterBulan.value)) loadData(filterBulan.value);
+    swal("Data berhasil diperbarui");
+    if (!isToday()) loadData();
   } catch (e) {
     showError("Gagal memperbarui data", e.message);
   } finally {
@@ -509,16 +1233,15 @@ function confirmDelete(item) {
 }
 
 async function doDelete() {
-  if (!deletePassword.value) return toast("Password wajib diisi", "warning");
+  if (!deletePassword.value) return swal("Password wajib diisi", "warning");
   deleteSaving.value = true;
   try {
     await verifySupervisorPassword(deletePassword.value);
     await deleteServis(deleteTarget.value.id);
-    const [y, m] = filterBulan.value.split("-").map(Number);
-    invalidateCachedServis(y, m);
+    invalidateCachedServis(filterDate.value, filterDate.value);
     Modal.getInstance(document.getElementById("deleteModal"))?.hide();
-    toast("Data servis berhasil dihapus");
-    if (!isCurrentMonth(filterBulan.value)) loadData(filterBulan.value);
+    swal("Data servis berhasil dihapus");
+    if (!isToday()) loadData();
   } catch (e) {
     showError("Gagal menghapus", e.message);
   } finally {
@@ -530,28 +1253,280 @@ async function doDelete() {
 function sendWA(item) {
   const url = buildWhatsAppUrl(item);
   if (url) window.open(url, "_blank");
-  else toast("Nomor HP tidak tersedia", "warning");
+  else swal("Nomor HP tidak tersedia", "warning");
 }
 
-function rePrint(item) {
-  printServisSlip(item).catch(() => {});
+async function rePrint(item) {
+  try {
+    await printServisSlip(item);
+    failedPrintItem.value = null;
+  } catch (e) {
+    failedPrintItem.value = item;
+    printFailedMessage.value = e?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
+    showPrintFailedModal.value = true;
+  }
+}
+
+async function retryPrintServis() {
+  const item = failedPrintItem.value;
+  if (!item) return;
+
+  showPrintFailedModal.value = false;
+  await rePrint(item);
+}
+
+// ── Label Print ────────────────────────────────────────────────────────────
+function generateLabelBox(item) {
+  const isCustom = item.jenisInput === "custom";
+  const namaCustomer = item.namaCustomer || "N/A";
+
+  if (isCustom) {
+    const details = item.detailBarangCustom || [];
+    const combinedItems = details.length
+      ? details
+          .map((d) => {
+            let text = `${d.namaBarang || "-"}<br>B:${d.berat || "-"} P:${d.panjang || "-"} K:${d.kadar || "-"} W:${d.warna || "-"}`;
+            if (d.rincianServis?.trim()) text += `<br>${d.rincianServis}`;
+            return text;
+          })
+          .join("<br>")
+      : "Data tidak tersedia";
+    return `<div class="print-service-box"><div class="print-customer-name">${namaCustomer}</div><div class="print-nama-brg">${combinedItems}</div><div class="print-status">CUSTOM</div></div>`;
+  } else {
+    const details = (item.detailBarang || []).length
+      ? item.detailBarang
+      : [
+          {
+            namaBarang: item.namaBarang || "-",
+            jenisServis: item.jenisServis || "-",
+            rincianServis: item.rincianServis || "",
+            statusPembayaran: item.statusPembayaran || "nominal",
+          },
+        ];
+    const uniqueStatuses = [...new Set(details.map((d) => d.statusPembayaran || "nominal"))];
+    const statusText =
+      uniqueStatuses.length === 1
+        ? statusPembayaranLabel(uniqueStatuses[0])
+        : uniqueStatuses.map(statusPembayaranLabel).join(" / ");
+    const combinedItems = details
+      .map((d) => {
+        const rincian = d.rincianServis?.trim();
+        return rincian
+          ? `${d.namaBarang || "-"} - ${d.jenisServis || "-"} - ${rincian}`
+          : `${d.namaBarang || "-"} - ${d.jenisServis || "-"}`;
+      })
+      .join("<br>");
+    return `<div class="print-service-box"><div class="print-customer-name">${namaCustomer}</div><div class="print-nama-brg">${combinedItems}</div><div class="print-status">${statusText}</div></div>`;
+  }
+}
+
+function printLabel(items) {
+  if (!items.length) return swal("Tidak ada data untuk dicetak", "warning");
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return swal("Popup diblokir. Izinkan popup untuk mencetak.", "warning");
+  const boxes = items.map(generateLabelBox).join("");
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>Label Servis</title><style>
+    @page{size:A4;margin:1cm}
+    body{font-family:Arial,sans-serif;margin:0;padding:0}
+    .boxes-container{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:3mm}
+    .print-service-box{width:3.5cm;height:3.5cm;border:1px solid #000;padding:1.5mm;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;break-inside:avoid;overflow:hidden}
+    .print-customer-name{font-size:8px;font-weight:bold;word-wrap:break-word;line-height:1.1;margin:0;padding:0}
+    .print-nama-brg{font-size:8px;font-weight:bold;word-wrap:break-word;word-break:break-word;line-height:1.1;overflow:hidden;margin:0;padding:0}
+    .print-status{font-size:7px;font-weight:bold;color:#202020;margin:0;padding:0}
+  </style></head><body><div class="boxes-container">${boxes}</div></body></html>`);
+  printWindow.document.close();
+  printWindow.addEventListener("afterprint", () => setTimeout(() => printWindow.close(), 100));
+  printWindow.print();
+}
+
+function printAllLabels() {
+  if (!filteredList.value.length) return swal("Tidak ada data untuk dicetak", "warning");
+  printLabel(filteredList.value);
+}
+
+function printSingleLabel(item) {
+  printLabel([item]);
+}
+
+// ── Export PDF ────────────────────────────────────────────────────────────
+function exportPDF() {
+  if (filterJenis.value === "custom") return exportCustomPDF();
+  return exportServisPDF();
+}
+
+async function exportServisPDF() {
+  const data = filteredList.value.filter((i) => (i.jenisInput || "servis") === "servis");
+  if (!data.length) return swal("Tidak ada data servis untuk diekspor", "warning");
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14);
+  doc.text("LAPORAN SERVIS MELATI GOLD SHOP", 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Tanggal: ${filterDate.value}`, 14, 22);
+
+  const head = [
+    [
+      "No",
+      "Sales",
+      "Customer",
+      "No HP",
+      "Nama Barang",
+      "Berat",
+      "Karat",
+      "Jenis Servis",
+      "Rincian",
+      "Ongkos",
+      "Status",
+    ],
+  ];
+  const body = [];
+  data.forEach((item, idx) => {
+    const details = (item.detailBarang || []).length ? item.detailBarang : [{}];
+    details.forEach((d, di) => {
+      const sp = d.statusPembayaran || "nominal";
+      body.push([
+        di === 0 ? String(idx + 1) : "",
+        di === 0 ? item.namaSales || "" : "",
+        di === 0 ? item.namaCustomer || "" : "",
+        di === 0 ? item.noHp || "" : "",
+        d.namaBarang || "-",
+        d.berat || "-",
+        d.karat || "-",
+        d.jenisServis || "-",
+        d.rincianServis || "-",
+        `Rp ${(d.ongkos || 0).toLocaleString("id-ID")}`,
+        statusPembayaranLabel(sp),
+      ]);
+    });
+  });
+  const totalOngkos = data.reduce((sum, item) => {
+    const details = (item.detailBarang || []).length ? item.detailBarang : [{}];
+    return (
+      sum +
+      details.reduce((s, d) => {
+        const sp = d.statusPembayaran || "nominal";
+        return sp === "nominal" || sp === "custom" ? s + (d.ongkos || 0) : s;
+      }, 0)
+    );
+  }, 0);
+  body.push(["", "", "", "", "", "", "", "", "TOTAL:", `Rp ${totalOngkos.toLocaleString("id-ID")}`, ""]);
+
+  autoTable(doc, {
+    startY: 28,
+    head,
+    body,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [52, 152, 219] },
+    columnStyles: {
+      4: { cellWidth: 42 },
+      8: { cellWidth: 42 },
+      9: { cellWidth: 28, halign: "right" },
+    },
+  });
+  doc.save(`Laporan_Servis_${filterDate.value}.pdf`);
+}
+
+async function exportCustomPDF() {
+  const data = filteredList.value.filter((i) => i.jenisInput === "custom");
+  if (!data.length) return swal("Tidak ada data custom untuk diekspor", "warning");
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14);
+  doc.text("LAPORAN CUSTOM MELATI GOLD SHOP", 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Tanggal: ${filterDate.value}`, 14, 22);
+
+  const head = [
+    [
+      "No",
+      "Sales",
+      "Customer",
+      "No HP",
+      "Nama Barang",
+      "Berat",
+      "Panjang",
+      "Kadar",
+      "Warna",
+      "Rincian",
+      "Total DP",
+      "Ongkos",
+    ],
+  ];
+  const body = [];
+  let totalDP = 0;
+  let totalOngkos = 0;
+  data.forEach((item, idx) => {
+    const details = (item.detailBarangCustom || []).length ? item.detailBarangCustom : [{}];
+    details.forEach((d, di) => {
+      totalDP += d.totalDP || 0;
+      totalOngkos += d.ongkos || 0;
+      body.push([
+        di === 0 ? String(idx + 1) : "",
+        di === 0 ? item.namaSales || "" : "",
+        di === 0 ? item.namaCustomer || "" : "",
+        di === 0 ? item.noHp || "" : "",
+        d.namaBarang || "-",
+        d.berat || "-",
+        d.panjang || "-",
+        d.kadar || "-",
+        d.warna || "-",
+        d.rincianServis || "-",
+        `Rp ${(d.totalDP || 0).toLocaleString("id-ID")}`,
+        `Rp ${(d.ongkos || 0).toLocaleString("id-ID")}`,
+      ]);
+    });
+  });
+  const totalNominal = totalDP + totalOngkos;
+  body.push([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "TOTAL:",
+    `Rp ${totalDP.toLocaleString("id-ID")}`,
+    `Rp ${totalOngkos.toLocaleString("id-ID")}`,
+  ]);
+  body.push(["", "", "", "", "", "", "", "", "", "", "TOTAL NOMINAL:", `Rp ${totalNominal.toLocaleString("id-ID")}`]);
+
+  autoTable(doc, {
+    startY: 28,
+    head,
+    body,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [52, 152, 219] },
+    columnStyles: {
+      4: { cellWidth: 42 },
+      9: { cellWidth: 42 },
+      10: { halign: "right" },
+      11: { cellWidth: 28, halign: "right" },
+    },
+  });
+  doc.save(`Laporan_Custom_${filterDate.value}.pdf`);
 }
 
 // ── Cross-tab sync ────────────────────────────────────────────────────────
 function handleStorageSync(e) {
   if (e.key === "servisDataChanged") {
-    const { month, year } = JSON.parse(e.newValue || "{}");
-    if (!month || !year) return;
-    const [y, m] = filterBulan.value.split("-").map(Number);
-    invalidateCachedServis(year, month);
-    if (year === y && month === m && !isCurrentMonth(filterBulan.value)) {
-      loadData(filterBulan.value);
-    }
+    invalidateCachedServis(filterDate.value, filterDate.value);
+    if (hasLoaded.value && !isToday()) loadData();
   }
 }
 
+watch(filterDate, () => {
+  hasLoaded.value = false;
+  allItems.value = [];
+  cleanupListener();
+  resetPage();
+});
+
 onMounted(() => {
-  loadData(filterBulan.value);
   window.addEventListener("storage", handleStorageSync);
 });
 
@@ -560,3 +1535,17 @@ onUnmounted(() => {
   window.removeEventListener("storage", handleStorageSync);
 });
 </script>
+
+<style scoped>
+/* Ensure table columns don't wrap unexpectedly and scroll horizontally */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table th,
+.table td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+</style>

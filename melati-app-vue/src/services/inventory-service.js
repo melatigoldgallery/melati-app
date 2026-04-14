@@ -2,7 +2,19 @@
  * Inventory Service — Brankas Stock Management
  * Collections: stocks/{subDoc}, daily_stock_logs/{date}, daily_stock_reports/{date}
  */
-import { doc, getDoc, setDoc, arrayUnion, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  where,
+  arrayUnion,
+  Timestamp,
+} from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
 
@@ -54,6 +66,21 @@ export const COLOR_LABELS = {
 export const TYPED_CATS = ["KALUNG", "LIONTIN"];
 /** Categories that use jewelry type sub-types (HALA, KENDARI) */
 export const HALA_CATS = ["HALA & SDW", "KENDARI & EMAS BALI"];
+export const KETERANGAN_OPTS = [
+  "restok",
+  "laku",
+  "dipajang",
+  "sudah posting",
+  "tutup toko",
+  "mutasi staff",
+  "barang rusak",
+  "batu lepas",
+  "kode bermasalah",
+  "mutasi",
+  "diperbaiki",
+  "salah update",
+  "custom",
+];
 
 const ALL_SUB_DOCS = [
   "brankas",
@@ -68,6 +95,32 @@ const ALL_SUB_DOCS = [
   "stok-komputer",
 ];
 
+export const STOCK_DOCS = [...ALL_SUB_DOCS];
+const STAFF_CACHE_KEY = "inventoryStaffOptionsCache";
+const STAFF_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+function toInt(value) {
+  return parseInt(value, 10) || 0;
+}
+
+function sanitizeDetails(types, details = {}) {
+  const out = {};
+  types.forEach((t) => {
+    out[t] = Math.max(0, toInt(details[t]));
+  });
+  return out;
+}
+
+function totalFromDetails(details = {}) {
+  return Object.values(details).reduce((sum, v) => sum + toInt(v), 0);
+}
+
+function getDetailTypes(mainCat) {
+  if (TYPED_CATS.includes(mainCat)) return COLOR_TYPES;
+  if (HALA_CATS.includes(mainCat)) return HALA_TYPES;
+  return null;
+}
+
 // ── Firestore Operations ───────────────────────────────────────────────────
 
 /**
@@ -81,6 +134,102 @@ export async function fetchAllStockData() {
   ALL_SUB_DOCS.forEach((id, i) => {
     result[id] = snaps[i].exists() ? snaps[i].data() : {};
   });
+  return result;
+}
+
+export function mergeStockByLatest(localData = {}, incomingData = {}) {
+  const merged = { ...localData };
+  Object.keys(incomingData || {}).forEach((docId) => {
+    const incomingDoc = incomingData[docId] || {};
+    const localDoc = merged[docId] || {};
+    const nextDoc = { ...localDoc };
+
+    Object.keys(incomingDoc).forEach((mainCat) => {
+      const incomingNode = incomingDoc[mainCat];
+      const localNode = localDoc[mainCat];
+      if (!localNode) {
+        nextDoc[mainCat] = incomingNode;
+        return;
+      }
+      if (!incomingNode) {
+        nextDoc[mainCat] = localNode;
+        return;
+      }
+
+      const localTs = localNode.lastUpdated ? Date.parse(localNode.lastUpdated) : 0;
+      const incomingTs = incomingNode.lastUpdated ? Date.parse(incomingNode.lastUpdated) : 0;
+      nextDoc[mainCat] = incomingTs >= localTs ? incomingNode : localNode;
+    });
+
+    merged[docId] = nextDoc;
+  });
+
+  return merged;
+}
+
+export function subscribeStocksRealtime(onData) {
+  const ref = collection(db, "stocks");
+  return onSnapshot(ref, (snap) => {
+    const incoming = {};
+    snap.forEach((d) => {
+      incoming[d.id] = d.data() || {};
+    });
+    onData(incoming);
+  });
+}
+
+export async function fetchStaffOptions({ force = false } = {}) {
+  if (!force) {
+    try {
+      const raw = localStorage.getItem(STAFF_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.timestamp && Array.isArray(parsed?.data)) {
+          const age = Date.now() - parsed.timestamp;
+          if (age < STAFF_CACHE_TTL) return parsed.data;
+        }
+      }
+    } catch {
+      // ignore malformed cache
+    }
+  }
+
+  let result = [];
+  try {
+    const staffQuery = query(collection(db, "salesStaff"), where("status", "==", "active"), orderBy("nama", "asc"));
+    const snap = await getDocs(staffQuery);
+    result = snap.docs.map((d) => (d.data()?.nama || "").trim()).filter(Boolean);
+  } catch {
+    result = [];
+  }
+
+  if (!result.length) {
+    try {
+      const usersSnap = await getDocs(collection(db, "users"));
+      result = usersSnap.docs
+        .map((d) => {
+          const data = d.data() || {};
+          return (data.displayName || data.username || "").trim();
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, "id"));
+    } catch {
+      result = [];
+    }
+  }
+
+  try {
+    localStorage.setItem(
+      STAFF_CACHE_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: result,
+      }),
+    );
+  } catch {
+    // ignore cache write failure
+  }
+
   return result;
 }
 
@@ -103,8 +252,9 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
   const snap = await getDoc(ref);
   const docData = snap.exists() ? snap.data() : {};
   const existing = docData[mainCat] || { quantity: 0, lastUpdated: null, history: [] };
-  const beforeQty = parseInt(existing.quantity) || 0;
+  const beforeQty = toInt(existing.quantity);
   const now = new Date().toISOString();
+  const detailTypes = getDetailTypes(mainCat);
 
   const updated = {
     quantity: 0,
@@ -112,25 +262,58 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
     history: Array.isArray(existing.history) ? [...existing.history] : [],
   };
 
-  if (newDetails != null) {
-    updated.details = { ...newDetails };
-    updated.quantity = Object.values(newDetails).reduce((s, v) => s + (parseInt(v) || 0), 0);
+  let detailChanges = [];
+
+  if (newDetails != null && detailTypes) {
+    const oldDetails = sanitizeDetails(detailTypes, existing.details || {});
+    const nextDetails = sanitizeDetails(detailTypes, newDetails);
+    updated.details = nextDetails;
+    updated.quantity = totalFromDetails(nextDetails);
+    detailChanges = detailTypes
+      .map((type) => {
+        const oldQty = toInt(oldDetails[type]);
+        const newQty = toInt(nextDetails[type]);
+        return {
+          type,
+          oldQty,
+          newQty,
+          diff: newQty - oldQty,
+        };
+      })
+      .filter((it) => it.diff !== 0);
   } else {
-    updated.quantity = parseInt(newQuantity) || 0;
+    updated.quantity = Math.max(0, toInt(newQuantity));
     if (existing.details) updated.details = existing.details;
   }
 
   const afterQty = updated.quantity;
   const netChange = afterQty - beforeQty;
+  const totalDiff = detailChanges.length
+    ? detailChanges.reduce((sum, it) => sum + Math.abs(it.diff), 0)
+    : Math.abs(netChange);
 
   if (petugas) {
-    updated.history.unshift({
+    const historyEntry = {
       date: now,
       action: netChange > 0 ? "Tambah" : netChange < 0 ? "Kurangi" : "Update",
-      quantity: Math.abs(netChange),
+      quantity: totalDiff,
+      oldQuantity: beforeQty,
+      newQuantity: afterQty,
       petugas,
       keterangan: keterangan || "",
-    });
+    };
+
+    if (detailChanges.length) {
+      historyEntry.items = detailChanges.map((it) => ({
+        jewelryType: it.type,
+        jewelryName: COLOR_LABELS[it.type] || HALA_LABELS[it.type] || it.type,
+        quantity: it.diff,
+        oldQuantity: it.oldQty,
+        newQuantity: it.newQty,
+      }));
+    }
+
+    updated.history.unshift(historyEntry);
     if (updated.history.length > 10) updated.history = updated.history.slice(0, 10);
   }
 
@@ -159,6 +342,28 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
       { merge: true },
     );
   }
+}
+
+export async function updateKomputerStock({ mainCat, newQuantity, newDetails = null }) {
+  const ref = doc(db, "stocks", "stok-komputer");
+  const snap = await getDoc(ref);
+  const docData = snap.exists() ? snap.data() : {};
+  const existing = docData[mainCat] || { quantity: 0, lastUpdated: null };
+
+  const next = {
+    quantity: Math.max(0, toInt(newQuantity)),
+    lastUpdated: new Date().toISOString(),
+  };
+
+  if (newDetails && TYPED_CATS.includes(mainCat)) {
+    const details = sanitizeDetails(COLOR_TYPES, newDetails);
+    next.details = details;
+    next.quantity = totalFromDetails(details);
+  } else if (existing.details && TYPED_CATS.includes(mainCat)) {
+    next.details = sanitizeDetails(COLOR_TYPES, existing.details);
+  }
+
+  await setDoc(ref, { [mainCat]: next }, { merge: true });
 }
 
 // ── Computed Helpers (pure, no Firestore) ─────────────────────────────────

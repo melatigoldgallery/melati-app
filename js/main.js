@@ -1,7 +1,6 @@
 import { sidebarToggle } from "./components/sidebar.js";
 import { initializeDateTime } from "./components/header.js";
 import { setupMenuVisibility } from "./menuControl.js";
-import { ensureDailySnapshotExists } from "./pages/laporanStok.js";
 
 // Authentication functions
 async function checkLoginStatus() {
@@ -129,20 +128,7 @@ try {
     setupMenuVisibility();
     setupPasswordVerification();
 
-    // Dashboard-specific initialization
-    if (window.location.pathname.includes("dashboard.html") || window.location.pathname.endsWith("/")) {
-      ensureDailySnapshotExists()
-        .then((result) => {
-          if (result.created) {
-            console.log("✅ Daily snapshot created successfully");
-          } else if (result.success) {
-            console.log("✅ Daily snapshot already exists or being processed");
-          }
-        })
-        .catch((error) => {
-          console.error("⚠️ Snapshot creation failed (non-critical):", error);
-        });
-    }
+    // Snapshot generation is handled by Cloud Functions only.
   });
 } catch (error) {
   console.error("Error initializing UI components:", error);

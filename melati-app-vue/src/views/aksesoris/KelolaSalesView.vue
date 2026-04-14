@@ -1,13 +1,23 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-people me-2 text-warning"></i>
+    <!-- Page Header -->
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-people me-2 text-dark"></i>
         Kelola Sales
-      </h4>
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/aksesoris/penjualan">Aksesoris</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Kelola Sales</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex justify-content-end mb-3">
       <button @click="openModal()" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i> Tambah Sales
+        <i class="bi bi-plus-lg me-1"></i>
+        Tambah Sales
       </button>
     </div>
 
@@ -18,7 +28,7 @@
           <i class="bi bi-person-lines-fill me-1"></i>
           Daftar Sales ({{ salesList.length }})
         </span>
-        <div class="input-group input-group-sm" style="width:220px">
+        <div class="input-group input-group-sm" style="width: 220px">
           <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
           <input v-model="search" type="text" class="form-control" placeholder="Cari nama..." />
         </div>
@@ -35,22 +45,19 @@
           <table class="table table-sm table-hover mb-0">
             <thead class="table-light sticky-top">
               <tr>
-                <th class="text-center" style="width:42px">No</th>
+                <th class="text-center" style="width: 42px">No</th>
                 <th>Nama Sales</th>
-                <th style="width:130px">Status</th>
-                <th style="width:160px">Tanggal Dibuat</th>
-                <th class="text-center" style="width:110px">Aksi</th>
+                <th style="width: 130px">Status</th>
+                <th style="width: 160px">Tanggal Dibuat</th>
+                <th class="text-center" style="width: 110px">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(s, idx) in filteredList" :key="s.id">
-                <td class="text-center text-muted small align-middle">{{ idx + 1 }}</td>
+              <tr v-for="(s, idx) in paginatedList" :key="s.id">
+                <td class="text-center text-muted small align-middle">{{ (page - 1) * pageSize + idx + 1 }}</td>
                 <td class="fw-semibold small align-middle">{{ s.nama }}</td>
                 <td class="align-middle">
-                  <span
-                    class="badge"
-                    :class="s.status === 'active' ? 'bg-success' : 'bg-secondary'"
-                  >
+                  <span class="badge" :class="s.status === 'active' ? 'bg-success' : 'bg-secondary'">
                     {{ s.status === "active" ? "Aktif" : "Tidak Aktif" }}
                   </span>
                 </td>
@@ -67,17 +74,40 @@
             </tbody>
           </table>
         </div>
+        <!-- Pagination -->
+        <div
+          v-if="!isLoading && filteredList.length"
+          class="d-flex align-items-center justify-content-between px-3 py-2 border-top flex-wrap gap-2"
+        >
+          <span class="text-muted small">
+            Menampilkan {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, filteredList.length) }} dari
+            {{ filteredList.length }} sales
+          </span>
+          <nav v-if="totalPages > 1">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" :class="{ disabled: page === 1 }">
+                <button class="page-link" @click="page = 1">&laquo;</button>
+              </li>
+              <li class="page-item" :class="{ disabled: page === 1 }">
+                <button class="page-link" @click="page--">&lsaquo;</button>
+              </li>
+              <li v-for="p in visiblePages" :key="p" class="page-item" :class="{ active: p === page }">
+                <button class="page-link" @click="page = p">{{ p }}</button>
+              </li>
+              <li class="page-item" :class="{ disabled: page === totalPages }">
+                <button class="page-link" @click="page++">&rsaquo;</button>
+              </li>
+              <li class="page-item" :class="{ disabled: page === totalPages }">
+                <button class="page-link" @click="page = totalPages">&raquo;</button>
+              </li>
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
 
     <!-- ── Modal Tambah / Edit ── -->
-    <div
-      class="modal fade"
-      id="salesModal"
-      tabindex="-1"
-      aria-labelledby="salesModalLabel"
-      aria-hidden="true"
-    >
+    <div class="modal fade" id="salesModal" tabindex="-1" aria-labelledby="salesModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header py-2">
@@ -90,7 +120,8 @@
           <div class="modal-body">
             <div class="mb-3">
               <label class="form-label small fw-semibold">
-                Nama Sales <span class="text-danger">*</span>
+                Nama Sales
+                <span class="text-danger">*</span>
               </label>
               <input
                 v-model="modalForm.nama"
@@ -121,23 +152,20 @@
     </div>
 
     <!-- ── Modal Konfirmasi Hapus ── -->
-    <div
-      class="modal fade"
-      id="deleteModal"
-      tabindex="-1"
-      aria-labelledby="deleteModalLabel"
-      aria-hidden="true"
-    >
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-sm">
         <div class="modal-content">
           <div class="modal-header bg-danger text-white py-2">
             <h6 class="modal-title" id="deleteModalLabel">
-              <i class="bi bi-exclamation-triangle me-2"></i> Konfirmasi Hapus
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              Konfirmasi Hapus
             </h6>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body small">
-            Hapus sales <strong>{{ deleteTarget?.nama }}</strong>? Tindakan ini tidak dapat dibatalkan.
+            Hapus sales
+            <strong>{{ deleteTarget?.nama }}</strong>
+            ? Tindakan ini tidak dapat dibatalkan.
           </div>
           <div class="modal-footer py-2">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
@@ -154,12 +182,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { Modal } from "bootstrap";
 import { fetchSalesList, addSalesStaff, updateSalesStaff, deleteSalesStaff } from "@/services/sales-service";
 import { useAlert } from "@/composables/useAlert";
 
-const { toast, error: showError } = useAlert();
+const { swal, error: showError } = useAlert();
 
 // ── State ─────────────────────────────────────────────────────────────────
 const salesList = ref([]);
@@ -170,6 +198,28 @@ const search = ref("");
 const filteredList = computed(() => {
   const q = search.value.toLowerCase();
   return q ? salesList.value.filter((s) => s.nama.toLowerCase().includes(q)) : salesList.value;
+});
+
+// Pagination
+const page = ref(1);
+const pageSize = 15;
+watch(filteredList, () => {
+  page.value = 1;
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredList.value.length / pageSize)));
+
+const paginatedList = computed(() => {
+  const start = (page.value - 1) * pageSize;
+  return filteredList.value.slice(start, start + pageSize);
+});
+
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const cur = page.value;
+  const pages = [];
+  for (let i = Math.max(1, cur - 2); i <= Math.min(total, cur + 2); i++) pages.push(i);
+  return pages;
 });
 
 // ── Load ─────────────────────────────────────────────────────────────────
@@ -211,9 +261,7 @@ async function saveSales() {
     return;
   }
   // Duplicate check
-  const existing = salesList.value.find(
-    (s) => s.nama === nama.toUpperCase() && s.id !== modalEditId.value,
-  );
+  const existing = salesList.value.find((s) => s.nama === nama.toUpperCase() && s.id !== modalEditId.value);
   if (existing) {
     showError("Duplikat", "Nama sales sudah ada.");
     return;
@@ -226,7 +274,7 @@ async function saveSales() {
     } else {
       await updateSalesStaff(modalEditId.value, { nama, status: modalForm.value.status });
     }
-    toast(modalMode.value === "add" ? "Sales berhasil ditambahkan" : "Sales berhasil diupdate");
+    swal(modalMode.value === "add" ? "Sales berhasil ditambahkan" : "Sales berhasil diupdate");
     salesModal.hide();
     await loadSales();
   } catch (e) {
@@ -251,7 +299,7 @@ async function doDelete() {
   isSaving.value = true;
   try {
     await deleteSalesStaff(deleteTarget.value.id);
-    toast(`Sales ${deleteTarget.value.nama} dihapus`);
+    swal(`Sales ${deleteTarget.value.nama} dihapus`);
     deleteModal.hide();
     await loadSales();
   } catch (e) {

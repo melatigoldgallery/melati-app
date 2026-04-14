@@ -32,7 +32,7 @@ service firebase.storage {
       allow write: if isAuthenticated()
                    && request.resource.metadata.uploadedBy == request.auth.uid
                    && request.resource.size < 2 * 1024 * 1024 // Max 2MB
-                   && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
+                   && request.resource.contentType in ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       
       // Only admin/hrd can delete medical certificates
       allow delete: if isAuthenticated() && (hasRole('admin') || hasRole('hrd'));

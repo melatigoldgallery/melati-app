@@ -1,14 +1,28 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-bar-chart me-2 text-warning"></i>Laporan Servis
-      </h4>
+    <!-- Page Header -->
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-bar-chart me-2 text-dark"></i>
+        Laporan Servis
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/servis/input">Servis</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Laporan Servis</li>
+        </ol>
+      </nav>
     </div>
 
     <!-- Filter -->
     <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header">
+        <h2>
+          <i class="fas fa-filter me-2"></i>
+          Filter Laporan
+        </h2>
+      </div>
       <div class="card-body py-2">
         <div class="row g-2 align-items-end">
           <div class="col-md-2">
@@ -19,18 +33,24 @@
             <label class="form-label small fw-semibold mb-1">Tanggal Akhir</label>
             <input v-model="filterEnd" type="date" class="form-control form-control-sm" />
           </div>
-          <div class="col-md-auto">
-            <button class="btn btn-warning btn-sm" @click="loadData" :disabled="loading">
-              <i class="bi bi-search me-1"></i>Tampilkan
-            </button>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Status Servis</label>
+            <select v-model="statusServisFilter" class="form-select form-select-sm">
+              <option value="Belum Selesai">Belum Selesai</option>
+              <option value="Sudah Selesai">Sudah Selesai</option>
+            </select>
           </div>
-          <div class="col-md-auto ms-auto d-flex gap-2 align-items-end">
-            <button
-              v-if="items.length > 0"
-              class="btn btn-success btn-sm"
-              @click="exportExcel"
-            >
-              <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export Excel
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Status Pengambilan</label>
+            <select v-model="statusPengambilanFilter" class="form-select form-select-sm">
+              <option value="Belum Diambil">Belum Diambil</option>
+              <option value="Sudah Diambil">Sudah Diambil</option>
+            </select>
+          </div>
+          <div class="col-md-auto">
+            <button class="btn btn-primary btn-sm" @click="loadData" :disabled="loading">
+              <i class="bi bi-search me-1"></i>
+              Tampilkan
             </button>
           </div>
         </div>
@@ -49,7 +69,7 @@
         <div class="col-6 col-md-3">
           <div class="card border-0 shadow-sm text-center p-2">
             <div class="small text-muted">Total Pekerjaan</div>
-            <div class="fs-4 fw-bold text-primary">{{ items.length }}</div>
+            <div class="fs-4 fw-bold text-primary">{{ filteredItems.length }}</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
@@ -67,50 +87,71 @@
         <div class="col-6 col-md-3">
           <div class="card border-0 shadow-sm text-center p-2">
             <div class="small text-muted">Belum Selesai</div>
-            <div class="fs-4 fw-bold text-warning">{{ items.length - selesaiCount }}</div>
+            <div class="fs-4 fw-bold text-warning">{{ filteredItems.length - selesaiCount }}</div>
           </div>
         </div>
       </div>
 
       <!-- By Jenis Servis Summary -->
       <div class="row g-2 mb-3">
-        <div class="col-md-6">
+        <div class="col-md-8">
           <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white small fw-semibold py-2">Rekap per Jenis Servis</div>
-            <div class="card-body p-0">
+            <div class="card-header bg-white fw-semibold py-2">
+              <span>
+                <i class="bi bi-grid-3x3-gap-fill me-1"></i>
+                Rekap per Jenis Servis
+              </span>
+            </div>
+            <div class="card-body p-2">
+              <div class="row g-2">
+                <div
+                  v-for="(columnRows, colIdx) in byJenisColumns"
+                  :key="`jenis-col-${colIdx}`"
+                  :class="byJenisColumns.length > 1 ? 'col-md-6' : 'col-12'"
+                >
+                  <table class="table table-sm mb-0">
+                    <thead class="table-primary">
+                      <tr>
+                        <th>Jenis</th>
+                        <th class="text-center">Jumlah</th>
+                        <th class="text-end">Total Ongkos</th>
+                      </tr>
+                    </thead>
+                    <tbody class="table-body-compact">
+                      <tr v-if="!columnRows.length">
+                        <td colspan="3" class="text-center text-muted">Belum ada data</td>
+                      </tr>
+                      <tr v-for="row in columnRows" :key="row.jenis">
+                        <td>{{ row.jenis }}</td>
+                        <td class="text-center fw-bold">{{ row.count }}</td>
+                        <td class="text-end">Rp {{ row.total.toLocaleString("id-ID") }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold py-2">
+              <span>
+                <i class="bi bi-clipboard2-check-fill me-1"></i>
+                Rekap per Status Pengambilan
+              </span>
+            </div>
+            <div class="card-body p-2">
               <table class="table table-sm mb-0">
-                <thead class="table-light">
+                <thead class="table-primary">
                   <tr>
-                    <th>Jenis</th>
+                    <th>Status Pengambilan</th>
                     <th class="text-center">Jumlah</th>
                     <th class="text-end">Total Ongkos</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr v-for="(row, jenis) in byJenis" :key="jenis">
-                    <td>{{ jenis }}</td>
-                    <td class="text-center fw-bold">{{ row.count }}</td>
-                    <td class="text-end">Rp {{ row.total.toLocaleString("id-ID") }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white small fw-semibold py-2">Rekap per Status Pembayaran</div>
-            <div class="card-body p-0">
-              <table class="table table-sm mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th>Status</th>
-                    <th class="text-center">Jumlah</th>
-                    <th class="text-end">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, status) in byPembayaran" :key="status">
+                <tbody class="table-body-compact">
+                  <tr v-for="(row, status) in byPengambilan" :key="status">
                     <td>{{ status }}</td>
                     <td class="text-center fw-bold">{{ row.count }}</td>
                     <td class="text-end">Rp {{ row.total.toLocaleString("id-ID") }}</td>
@@ -124,14 +165,35 @@
 
       <!-- Detail Table -->
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold py-2 small">
-          <i class="bi bi-table me-1"></i>Detail Servis ({{ items.length }} data)
+        <div class="card-header bg-white fw-semibold py-2 d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-table me-1"></i>
+            Detail Servis
+          </span>
+
+          <div class="col-md-auto ms-auto d-flex gap-2 align-items-end">
+            <button
+              v-if="filteredItems.length > 0"
+              class="btn btn-success btn-sm"
+              @click="exportReport"
+              :disabled="exporting"
+            >
+              <span
+                v-if="exporting"
+                class="spinner-border spinner-border-sm me-1"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              <i v-else class="bi bi-file-earmark-zip me-1"></i>
+              {{ exporting ? exportProgressText || "Mengekspor..." : "Export ZIP (Excel + Foto)" }}
+            </button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-sm table-hover mb-0">
             <thead class="table-light">
               <tr>
-                <th style="width:42px">#</th>
+                <th style="width: 42px">#</th>
                 <th>Tanggal</th>
                 <th>Customer</th>
                 <th>Barang</th>
@@ -140,22 +202,28 @@
                 <th class="text-end">Ongkos</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="(item, idx) in items" :key="item.id">
-                <td class="small text-muted align-middle">{{ idx + 1 }}</td>
-                <td class="small align-middle">{{ item.tanggal }}</td>
+            <tbody class="table-body-compact">
+              <tr v-for="(item, idx) in paginatedItems" :key="item.id">
+                <td class="small text-muted align-middle">{{ (page - 1) * pageSize + idx + 1 }}</td>
+                <td class="small align-middle">{{ formatTanggal(item.tanggal) }}</td>
                 <td class="align-middle">{{ item.namaCustomer }}</td>
                 <td class="small align-middle">{{ item.namaBarang }}</td>
                 <td class="align-middle">
                   <span class="badge bg-light text-dark border small">
-                    {{ item.jenisInput === "custom" ? "CUSTOM" : (item.jenisServis || item.detailBarang?.[0]?.jenisServis || "-") }}
+                    {{
+                      item.jenisInput === "custom"
+                        ? "CUSTOM"
+                        : item.jenisServis || item.detailBarang?.[0]?.jenisServis || "-"
+                    }}
                   </span>
                 </td>
                 <td class="text-center align-middle">
                   <span
                     class="badge"
                     :class="item.statusServis === 'Sudah Selesai' ? 'bg-success' : 'bg-warning text-dark'"
-                  >{{ item.statusServis }}</span>
+                  >
+                    {{ item.statusServis }}
+                  </span>
                 </td>
                 <td class="text-end align-middle small fw-semibold">
                   Rp {{ Number(item.totalOngkos || item.ongkos || 0).toLocaleString("id-ID") }}
@@ -169,6 +237,41 @@
               </tr>
             </tfoot>
           </table>
+        </div>
+        <div v-if="!filteredItems.length" class="text-center text-muted py-4 border-top">
+          Tidak ada data sesuai filter status.
+        </div>
+        <!-- Pagination -->
+        <div
+          v-if="totalPages > 1"
+          class="d-flex align-items-center justify-content-between px-3 py-2 border-top flex-wrap gap-2"
+        >
+          <span class="small text-muted">
+            Menampilkan {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, filteredItems.length) }} dari
+            {{ filteredItems.length }}
+          </span>
+          <div class="d-flex gap-3 align-items-center">
+            <span class="text-muted" style="font-size: 0.75rem">Halaman {{ page }} dari {{ totalPages }}</span>
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item" :class="{ disabled: page === 1 }">
+                  <button class="page-link" @click="page = 1">&laquo;</button>
+                </li>
+                <li class="page-item" :class="{ disabled: page === 1 }">
+                  <button class="page-link" @click="page--">&lsaquo;</button>
+                </li>
+                <li v-for="p in visiblePages" :key="p" class="page-item" :class="{ active: p === page }">
+                  <button class="page-link" @click="page = p">{{ p }}</button>
+                </li>
+                <li class="page-item" :class="{ disabled: page === totalPages }">
+                  <button class="page-link" @click="page++">&rsaquo;</button>
+                </li>
+                <li class="page-item" :class="{ disabled: page === totalPages }">
+                  <button class="page-link" @click="page = totalPages">&raquo;</button>
+                </li>
+              </ul>
+            </nav>
+          </div>
         </div>
       </div>
     </template>
@@ -184,13 +287,19 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
-import { fetchServisByRange, JENIS_SERVIS_OPTIONS, statusPembayaranLabel } from "@/services/servis-service";
+import { fetchServisByRange, JENIS_SERVIS_OPTIONS } from "@/services/servis-service";
 
-const { error: showError } = useAlert();
+const { error: showError, swal } = useAlert();
 const { todayStringWITA } = useWITA();
+
+// ── Date helper ───────────────────────────────────────────────────────────
+function formatTanggal(val) {
+  if (!val) return "-";
+  return String(val).substring(0, 10);
+}
 
 // ── Default to current month ──────────────────────────────────────────────
 function currentMonthStart() {
@@ -209,47 +318,76 @@ const loading = ref(false);
 const items = ref([]);
 const filterStart = ref(currentMonthStart());
 const filterEnd = ref(currentMonthEnd());
+const statusServisFilter = ref("Sudah Selesai");
+const statusPengambilanFilter = ref("Sudah Diambil");
+const exporting = ref(false);
+const exportProgressText = ref("");
+
+// Pagination
+const page = ref(1);
+const pageSize = 25;
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const totalPendapatan = computed(() =>
-  items.value.reduce((s, i) => s + Number(i.totalOngkos || i.ongkos || 0), 0),
+const filteredItems = computed(() =>
+  items.value.filter(
+    (i) => i.statusServis === statusServisFilter.value && i.statusPengambilan === statusPengambilanFilter.value,
+  ),
 );
 
-const selesaiCount = computed(() => items.value.filter((i) => i.statusServis === "Sudah Selesai").length);
+const totalPendapatan = computed(() =>
+  filteredItems.value.reduce((s, i) => s + Number(i.totalOngkos || i.ongkos || 0), 0),
+);
 
-const byJenis = computed(() => {
+const selesaiCount = computed(() => filteredItems.value.filter((i) => i.statusServis === "Sudah Selesai").length);
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / pageSize)));
+
+const paginatedItems = computed(() => {
+  const start = (page.value - 1) * pageSize;
+  return filteredItems.value.slice(start, start + pageSize);
+});
+
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const cur = page.value;
+  const pages = [];
+  for (let i = Math.max(1, cur - 2); i <= Math.min(total, cur + 2); i++) pages.push(i);
+  return pages;
+});
+
+const byJenisEntries = computed(() => {
+  const map = new Map();
+  filteredItems.value.forEach((item) => {
+    const jenis =
+      item.jenisInput === "custom" ? "CUSTOM" : item.jenisServis || item.detailBarang?.[0]?.jenisServis || "LAINNYA";
+    if (!map.has(jenis)) map.set(jenis, { jenis, count: 0, total: 0 });
+    const row = map.get(jenis);
+    row.count++;
+    row.total += Number(item.totalOngkos || item.ongkos || 0);
+  });
+  return [...map.values()];
+});
+
+const byJenisColumns = computed(() => {
+  const rows = byJenisEntries.value;
+  if (rows.length <= 10) return [rows];
+  const midpoint = Math.ceil(rows.length / 2);
+  return [rows.slice(0, midpoint), rows.slice(midpoint)];
+});
+
+const byPengambilan = computed(() => {
   const map = {};
-  items.value.forEach((item) => {
-    const jenis = item.jenisInput === "custom"
-      ? "CUSTOM"
-      : (item.jenisServis || item.detailBarang?.[0]?.jenisServis || "LAINNYA");
-    if (!map[jenis]) map[jenis] = { count: 0, total: 0 };
-    map[jenis].count++;
-    map[jenis].total += Number(item.totalOngkos || item.ongkos || 0);
+  filteredItems.value.forEach((item) => {
+    const status = item.statusPengambilan || "Belum Diambil";
+    if (!map[status]) map[status] = { count: 0, total: 0 };
+    map[status].count++;
+    map[status].total += Number(item.totalOngkos || item.ongkos || 0);
   });
   return map;
 });
 
-const byPembayaran = computed(() => {
-  const map = {};
-  items.value.forEach((item) => {
-    const details = item.jenisInput === "custom" ? item.detailBarangCustom : item.detailBarang;
-    if (Array.isArray(details)) {
-      details.forEach((d) => {
-        const label = statusPembayaranLabel(d.statusPembayaran) || "LAINNYA";
-        if (!map[label]) map[label] = { count: 0, total: 0 };
-        map[label].count++;
-        map[label].total += Number(d.ongkos || 0);
-      });
-    } else {
-      // No detail array - use root-level info
-      const label = "LUNAS";
-      if (!map[label]) map[label] = { count: 0, total: 0 };
-      map[label].count++;
-      map[label].total += Number(item.totalOngkos || item.ongkos || 0);
-    }
-  });
-  return map;
+watch([statusServisFilter, statusPengambilanFilter], () => {
+  page.value = 1;
 });
 
 // ── Data Loading ──────────────────────────────────────────────────────────
@@ -257,6 +395,7 @@ async function loadData() {
   if (!filterStart.value || !filterEnd.value) return;
   loading.value = true;
   items.value = [];
+  page.value = 1;
   try {
     items.value = await fetchServisByRange(filterStart.value, filterEnd.value);
   } catch (e) {
@@ -266,24 +405,229 @@ async function loadData() {
   }
 }
 
-// ── Export Excel ──────────────────────────────────────────────────────────
-async function exportExcel() {
-  const { utils, writeFileXLSX } = await import("xlsx");
-  const rows = items.value.map((item, idx) => ({
-    No: idx + 1,
-    Tanggal: item.tanggal,
-    Customer: item.namaCustomer,
-    "No HP": item.noHp,
-    Barang: item.namaBarang,
-    Jenis: item.jenisInput === "custom" ? "CUSTOM" : (item.jenisServis || item.detailBarang?.[0]?.jenisServis || "-"),
-    Sales: item.namaSales,
-    "Status Servis": item.statusServis,
-    "Status Pengambilan": item.statusPengambilan,
-    "Total Ongkos": Number(item.totalOngkos || item.ongkos || 0),
-  }));
-  const ws = utils.json_to_sheet(rows);
-  const wb = utils.book_new();
-  utils.book_append_sheet(wb, ws, "Laporan Servis");
-  writeFileXLSX(wb, `laporan-servis-${filterStart.value}_${filterEnd.value}.xlsx`);
+// ── Export Excel + ZIP Foto ───────────────────────────────────────────────
+function formatWaktuPengambilan(val) {
+  if (!val) return "-";
+  try {
+    let d;
+    if (typeof val?.toDate === "function") d = val.toDate();
+    else if (typeof val?.seconds === "number") d = new Date(val.seconds * 1000);
+    else d = new Date(val);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleString("id-ID");
+  } catch {
+    return "-";
+  }
+}
+
+function sanitizeName(value, fallback = "customer") {
+  const cleaned = String(value || fallback)
+    .replace(/[<>:"/\\|?*]/g, "")
+    .replace(/\s+/g, "_")
+    .trim();
+  return (cleaned || fallback).substring(0, 30);
+}
+
+function getPhotoExtension(url) {
+  try {
+    const withoutQuery = String(url || "").split("?")[0];
+    const fileName = decodeURIComponent(withoutQuery.split("/").pop() || "");
+    const dotIndex = fileName.lastIndexOf(".");
+    if (dotIndex > -1) return fileName.substring(dotIndex);
+    return ".jpg";
+  } catch {
+    return ".jpg";
+  }
+}
+
+function getPhotoFileName(item) {
+  const photoUrl = getExportPhotoUrl(item);
+  if (!photoUrl) return "-";
+  const customer = sanitizeName(item.namaCustomer, "customer");
+  const hp = sanitizeName(item.noHp || "nohp", "nohp");
+  const ext = getPhotoExtension(photoUrl);
+  return `${customer}_${hp}${ext}`;
+}
+
+function getExportPhotoUrl(item) {
+  return item?.buktiPengambilanLiteUrl || item?.buktiPengambilanUrl || "";
+}
+
+function getDownloadConcurrency(total) {
+  const conn =
+    typeof navigator !== "undefined"
+      ? navigator.connection || navigator.mozConnection || navigator.webkitConnection
+      : null;
+
+  if (conn?.saveData) return Math.min(2, total);
+  if (conn?.effectiveType === "slow-2g" || conn?.effectiveType === "2g") return Math.min(2, total);
+  if (conn?.effectiveType === "3g") return Math.min(3, total);
+
+  return Math.min(8, total);
+}
+
+async function fetchPhotoBlobWithRetry(url, maxRetry = 1) {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetry; attempt++) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.blob();
+    } catch (e) {
+      lastError = e;
+      if (attempt < maxRetry) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError || new Error("Gagal mengunduh foto");
+}
+
+function getItemJenis(item) {
+  return item.jenisInput === "custom" ? "CUSTOM" : item.jenisServis || item.detailBarang?.[0]?.jenisServis || "-";
+}
+
+function getItemNamaBarang(item) {
+  if (item.namaBarang) return item.namaBarang;
+  const details = item.jenisInput === "custom" ? item.detailBarangCustom || [] : item.detailBarang || [];
+  const names = details.map((d) => d?.namaBarang).filter(Boolean);
+  return names.length ? names.join(" / ") : "-";
+}
+
+function getItemOngkos(item) {
+  if (item.totalOngkos != null) return Number(item.totalOngkos);
+  return Number(item.ongkos || 0);
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportReport() {
+  const source = filteredItems.value;
+  if (!source.length) {
+    await swal("Tidak ada data untuk diekspor", "warning");
+    return;
+  }
+
+  exporting.value = true;
+  exportProgressText.value = "Membuat Excel...";
+
+  try {
+    const xlsx = await import("xlsx");
+    const { utils, write } = xlsx;
+    const exportBaseName = `laporan-servis-${filterStart.value}_${filterEnd.value}`;
+
+    const header = [
+      "No",
+      "Tanggal",
+      "Sales",
+      "Nama Customer",
+      "No HP",
+      "Nama Barang",
+      "Jenis",
+      "Status Servis",
+      "Status Pengambilan",
+      "Handle Pengambilan",
+      "Waktu Pengambilan",
+      "Total Ongkos",
+      "Nama File Foto",
+    ];
+
+    const rows = source.map((item, idx) => [
+      idx + 1,
+      formatTanggal(item.tanggal),
+      item.sales || item.namaSales || "-",
+      item.namaCustomer || "-",
+      item.noHp || "-",
+      getItemNamaBarang(item),
+      getItemJenis(item),
+      item.statusServis || "-",
+      item.statusPengambilan || "-",
+      item.stafHandle || "-",
+      formatWaktuPengambilan(item.waktuPengambilan),
+      getItemOngkos(item),
+      getPhotoFileName(item),
+    ]);
+
+    const worksheet = utils.aoa_to_sheet([
+      ["Laporan Servis"],
+      [`Periode: ${filterStart.value} s/d ${filterEnd.value}`],
+      [],
+      header,
+      ...rows,
+    ]);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Laporan Servis");
+
+    const excelBuffer = write(workbook, { bookType: "xlsx", type: "array" });
+    const excelBlob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const dataWithPhotos = source.filter((item) => getExportPhotoUrl(item));
+
+    if (!dataWithPhotos.length) {
+      triggerDownload(excelBlob, `${exportBaseName}.xlsx`);
+      await swal("File Excel berhasil diunduh (tanpa foto)", "success");
+      return;
+    }
+
+    const { default: JSZip } = await import("jszip");
+    const zip = new JSZip();
+    zip.file(`${exportBaseName}.xlsx`, excelBlob);
+    const photoFolder = zip.folder("bukti-pengambilan");
+
+    let successCount = 0;
+    let failedCount = 0;
+    let processedCount = 0;
+    const totalPhotos = dataWithPhotos.length;
+    const batchSize = getDownloadConcurrency(totalPhotos);
+
+    const downloadPhoto = async (item) => {
+      try {
+        const photoBlob = await fetchPhotoBlobWithRetry(getExportPhotoUrl(item), 1);
+        photoFolder.file(getPhotoFileName(item), photoBlob);
+        successCount++;
+      } catch {
+        failedCount++;
+      } finally {
+        processedCount++;
+        exportProgressText.value = `Mengunduh foto... (${processedCount}/${totalPhotos})`;
+      }
+    };
+
+    exportProgressText.value = `Mengunduh foto... (0/${totalPhotos})`;
+    for (let i = 0; i < totalPhotos; i += batchSize) {
+      const batch = dataWithPhotos.slice(i, i + batchSize);
+      await Promise.all(batch.map((item) => downloadPhoto(item)));
+    }
+
+    exportProgressText.value = "Membuat file ZIP...";
+    const zipBlob = await zip.generateAsync({ type: "blob", compression: "STORE", streamFiles: true });
+    triggerDownload(zipBlob, `${exportBaseName}.zip`);
+
+    if (failedCount > 0) {
+      await swal(`ZIP berhasil diunduh. ${successCount} foto berhasil, ${failedCount} foto gagal.`, "warning");
+    } else {
+      await swal(`ZIP berhasil diunduh dengan ${successCount} foto bukti.`, "success");
+    }
+  } catch (e) {
+    showError("Gagal mengekspor laporan", e?.message || String(e));
+  } finally {
+    exporting.value = false;
+    exportProgressText.value = "";
+  }
 }
 </script>
+
+<style scoped>
+.table-body-compact {
+  font-size: 0.82rem;
+}
+</style>

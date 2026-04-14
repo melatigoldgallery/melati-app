@@ -1,36 +1,49 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-plus-circle me-2 text-warning"></i>
+    <!-- Page Header -->
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-plus-circle me-2 text-dark"></i>
         Tambah Barang Aksesoris
-      </h4>
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/aksesoris/penjualan">Aksesoris</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Tambah Barang</li>
+        </ol>
+      </nav>
     </div>
 
-    <!-- Form Input -->
+    <!-- Card 1: Data Aksesoris -->
     <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold border-bottom">
-        <i class="bi bi-boxes me-2 text-primary"></i>
-        Data Penambahan Stok
+      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">
+          <i class="bi bi-boxes me-2 text-primary"></i>
+          Data Aksesoris
+        </span>
+        <button @click="openKelolaKode" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-pencil-square me-1"></i>
+          Edit Kode
+        </button>
       </div>
       <div class="card-body">
-        <div class="row g-2 mb-3">
+        <div class="row g-2">
           <div class="col-md-3">
-            <label class="form-label small fw-semibold">Tanggal <span class="text-danger">*</span></label>
-            <input v-model="form.tanggal" type="date" class="form-control form-control-sm" />
+            <label class="form-label small fw-semibold">
+              Tanggal
+              <span class="text-danger">*</span>
+            </label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+              <input v-model="form.tanggal" type="date" class="form-control form-control-sm" />
+            </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label small fw-semibold">Kasir <span class="text-danger">*</span></label>
-            <input
-              v-model="form.kasir"
-              type="text"
-              class="form-control form-control-sm"
-              placeholder="Nama kasir"
-            />
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold">Jenis Aksesoris <span class="text-danger">*</span></label>
+            <label class="form-label small fw-semibold">
+              Jenis Aksesoris
+              <span class="text-danger">*</span>
+            </label>
             <select v-model="form.jenis" class="form-select form-select-sm" @change="onJenisChange">
               <option value="">-- Pilih Jenis --</option>
               <option value="kotak">Kotak Perhiasan</option>
@@ -39,17 +52,31 @@
             </select>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- Item table -->
-        <div class="table-responsive mb-2">
-          <table class="table table-sm table-bordered mb-0">
+    <!-- Card 2: Detail Barang -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold small">
+          <i class="bi bi-list-ul me-1 text-primary"></i>
+          Detail Barang
+        </span>
+        <button @click="addRow" :disabled="!form.jenis" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>
+          Tambah
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0" id="tableTambahAksesoris">
             <thead class="table-light">
               <tr>
-                <th style="width:42px">No</th>
-                <th style="width:220px">Kode Barang</th>
+                <th style="width: 42px">No</th>
+                <th style="width: 220px">Kode Barang</th>
                 <th>Nama Barang</th>
-                <th style="width:120px">Jumlah</th>
-                <th style="width:60px" class="text-center">Aksi</th>
+                <th style="width: 120px">Jumlah</th>
+                <th style="width: 60px" class="text-center">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -58,23 +85,26 @@
                 <td>
                   <select
                     v-model="row.kode"
-                    class="form-select form-select-sm"
+                    class="form-select form-select-sm kode-barang"
                     @change="onKodeChange(row)"
+                    :disabled="isLoadingCodes || !form.jenis"
                   >
-                    <option value="">-- Pilih Kode --</option>
+                    <option value="">{{ isLoadingCodes ? "Memuat..." : "-- Pilih Kode --" }}</option>
                     <option
-                      v-for="item in filteredCatalog"
-                      :key="item.kode"
-                      :value="item.kode"
+                      v-for="item in kodeCatalog"
+                      :key="item.id"
+                      :value="item.kode || item.text"
                       :data-nama="item.nama"
-                    >{{ item.kode }}</option>
+                    >
+                      {{ item.kode || item.text }}
+                    </option>
                   </select>
                 </td>
                 <td>
                   <input
                     v-model="row.nama"
                     type="text"
-                    class="form-control form-control-sm"
+                    class="form-control form-control-sm nama-barang"
                     readonly
                     placeholder="Otomatis"
                   />
@@ -83,7 +113,7 @@
                   <input
                     v-model.number="row.jumlah"
                     type="number"
-                    class="form-control form-control-sm"
+                    class="form-control form-control-sm jumlah-barang"
                     min="1"
                     placeholder="0"
                   />
@@ -93,6 +123,7 @@
                     v-if="inputRows.length > 1"
                     @click="removeRow(idx)"
                     class="btn btn-sm btn-outline-danger py-0 px-1"
+                    title="Hapus baris"
                   >
                     <i class="bi bi-trash3 small"></i>
                   </button>
@@ -108,37 +139,45 @@
             </tfoot>
           </table>
         </div>
-
-        <div class="d-flex gap-2">
-          <button @click="addRow" :disabled="!form.jenis" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i> Tambah Baris
-          </button>
-          <button @click="simpanData" :disabled="isSaving" class="btn btn-primary btn-sm">
-            <span v-if="isSaving" class="spinner-border spinner-border-sm me-1"></span>
-            <i v-else class="bi bi-save me-1"></i>
-            Simpan Data
-          </button>
-          <button @click="resetForm" class="btn btn-secondary btn-sm">
-            <i class="bi bi-x-circle me-1"></i> Batal
-          </button>
-        </div>
+      </div>
+      <div class="card-footer bg-white border-top d-flex gap-2 py-2">
+        <button @click="simpanData" :disabled="isSaving" class="btn btn-primary btn-sm">
+          <span v-if="isSaving" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-save me-1"></i>
+          Simpan Data
+        </button>
+        <button @click="resetForm" class="btn btn-secondary btn-sm">
+          <i class="bi bi-x-circle me-1"></i>
+          Batal
+        </button>
       </div>
     </div>
 
-    <!-- Riwayat -->
+    <!-- Card 3: Riwayat Penambahan Stok -->
     <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2">
-        <span class="fw-semibold small">
-          <i class="bi bi-clock-history me-1"></i>
-          Riwayat Penambahan Stok
-        </span>
-        <div class="d-flex gap-2 align-items-center">
-          <input v-model="histStart" type="date" class="form-control form-control-sm" style="width:150px" />
-          <span class="text-muted small">s/d</span>
-          <input v-model="histEnd" type="date" class="form-control form-control-sm" style="width:150px" />
-          <button @click="loadHistory" class="btn btn-primary btn-sm">
-            <i class="bi bi-search me-1"></i> Cari
-          </button>
+      <div class="card-header bg-white border-bottom py-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+          <span class="fw-semibold small">
+            <i class="bi bi-clock-history me-1"></i>
+            Riwayat Penambahan Stok
+          </span>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input v-model="histStart" type="date" class="form-control form-control-sm" style="width: 145px" />
+            <span class="text-muted small">s/d</span>
+            <input v-model="histEnd" type="date" class="form-control form-control-sm" style="width: 145px" />
+            <button @click="loadHistory" class="btn btn-primary btn-sm">
+              <i class="bi bi-search me-1"></i>
+              Tampilkan
+            </button>
+            <button @click="printLaporan" :disabled="!history.length" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-printer me-1"></i>
+              Print
+            </button>
+            <button @click="exportExcel" :disabled="!history.length" class="btn btn-outline-success btn-sm">
+              <i class="bi bi-file-earmark-excel me-1"></i>
+              Excel
+            </button>
+          </div>
         </div>
       </div>
       <div class="card-body p-0">
@@ -150,28 +189,280 @@
           Belum ada riwayat
         </div>
         <div v-else class="table-responsive">
-          <table class="table table-sm table-hover mb-0">
+          <table class="table table-sm table-hover mb-0" id="tableRiwayatTambahStok">
             <thead class="table-light sticky-top">
               <tr>
+                <th>No</th>
                 <th>Tanggal</th>
-                <th>Kasir</th>
-                <th>Kode</th>
-                <th>Nama</th>
-                <th>Kategori</th>
+                <th>Kode Barang</th>
+                <th>Nama Barang</th>
                 <th class="text-center">Jumlah</th>
+                <th class="text-center" style="width: 50px">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="h in history" :key="h.id">
+              <tr v-for="(h, idx) in history" :key="h.id">
+                <td class="small text-muted">{{ idx + 1 }}</td>
                 <td class="small">{{ h.tanggal }}</td>
-                <td class="small">{{ h.kasir || '—' }}</td>
                 <td class="small fw-semibold text-primary">{{ h.kode }}</td>
                 <td class="small">{{ h.nama }}</td>
-                <td class="small">{{ h.kategori }}</td>
                 <td class="small text-center">{{ h.jumlah }}</td>
+                <td class="text-center">
+                  <button @click="openHapusTransaksi(h)" class="btn btn-sm btn-outline-danger py-0 px-1" title="Hapus">
+                    <i class="bi bi-trash3 small"></i>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal: Kelola Kode ── -->
+    <div
+      class="modal fade"
+      id="modalKelolaKode"
+      tabindex="-1"
+      aria-labelledby="modalKelolaKodeLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold" id="modalKelolaKodeLabel">
+              <i class="bi bi-tags me-2"></i>
+              Kelola Kode Barang
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <ul class="nav nav-tabs mb-3">
+              <li class="nav-item">
+                <button
+                  class="nav-link"
+                  :class="{ active: activeKodeTab === 'kotak' }"
+                  @click="onKodeTabChange('kotak')"
+                >
+                  Kotak
+                </button>
+              </li>
+              <li class="nav-item">
+                <button
+                  class="nav-link"
+                  :class="{ active: activeKodeTab === 'aksesoris' }"
+                  @click="onKodeTabChange('aksesoris')"
+                >
+                  Aksesoris
+                </button>
+              </li>
+              <li class="nav-item">
+                <button
+                  class="nav-link"
+                  :class="{ active: activeKodeTab === 'silver' }"
+                  @click="onKodeTabChange('silver')"
+                >
+                  Silver
+                </button>
+              </li>
+            </ul>
+            <div class="d-flex gap-2 mb-2">
+              <input
+                v-model="kodeSearch"
+                type="text"
+                class="form-control form-control-sm"
+                :placeholder="`Cari kode ${activeKodeTab}...`"
+              />
+              <button @click="openTambahKode" class="btn btn-primary btn-sm text-nowrap">
+                <i class="bi bi-plus-lg me-1"></i>
+                Tambah Kode
+              </button>
+            </div>
+            <div v-if="isLoadingKode" class="text-center py-3">
+              <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+            <div v-else-if="!filteredKodeList.length" class="text-center py-3 text-muted small">
+              Belum ada kode untuk kategori ini.
+            </div>
+            <div v-else class="table-responsive" style="max-height: 350px; overflow-y: auto">
+              <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>No</th>
+                    <th>Kode</th>
+                    <th>Nama</th>
+                    <th v-if="activeKodeTab === 'kotak'">Harga</th>
+                    <th v-if="activeKodeTab === 'silver'">Kadar</th>
+                    <th v-if="activeKodeTab === 'silver'">Berat</th>
+                    <th class="text-center" style="width: 80px">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(k, i) in filteredKodeList" :key="k.id">
+                    <td class="small text-muted">{{ i + 1 }}</td>
+                    <td class="small fw-semibold">{{ k.kode || k.text }}</td>
+                    <td class="small">{{ k.nama }}</td>
+                    <td v-if="activeKodeTab === 'kotak'" class="small">{{ k.harga || "-" }}</td>
+                    <td v-if="activeKodeTab === 'silver'" class="small">{{ k.kadar || "-" }}</td>
+                    <td v-if="activeKodeTab === 'silver'" class="small">{{ k.berat || "-" }}</td>
+                    <td class="text-center">
+                      <button
+                        @click="openEditKode(k)"
+                        class="btn btn-sm btn-outline-primary py-0 px-1 me-1"
+                        title="Edit"
+                      >
+                        <i class="bi bi-pencil small"></i>
+                      </button>
+                      <button @click="openHapusKode(k)" class="btn btn-sm btn-outline-danger py-0 px-1" title="Hapus">
+                        <i class="bi bi-trash3 small"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal: Form Kode ── -->
+    <div class="modal fade" id="modalFormKode" tabindex="-1" aria-labelledby="modalFormKodeLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold" id="modalFormKodeLabel">
+              <i class="bi bi-tag me-2"></i>
+              {{ kodeFormMode === "add" ? "Tambah" : "Edit" }} Kode {{ activeKodeTab }}
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">
+                Kode Barang
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                v-model="kodeForm.kode"
+                type="text"
+                class="form-control form-control-sm text-uppercase"
+                :readonly="kodeFormMode === 'edit'"
+                placeholder="Masukkan kode"
+                autocomplete="off"
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">
+                Nama Barang
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                v-model="kodeForm.nama"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Masukkan nama barang"
+                autocomplete="off"
+              />
+            </div>
+            <div v-if="activeKodeTab === 'silver'" class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Kadar</label>
+                <input v-model="kodeForm.kadar" type="text" class="form-control form-control-sm" placeholder="Kadar" />
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Berat (gr)</label>
+                <input v-model="kodeForm.berat" type="text" class="form-control form-control-sm" placeholder="Berat" />
+              </div>
+            </div>
+            <div v-if="activeKodeTab === 'kotak'" class="mb-3">
+              <label class="form-label small fw-semibold">Harga</label>
+              <input v-model="kodeForm.harga" type="number" class="form-control form-control-sm" placeholder="Harga" />
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button @click="simpanKode" :disabled="isKodeSaving" class="btn btn-primary btn-sm">
+              <span v-if="isKodeSaving" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-save me-1"></i>
+              Simpan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal: Hapus Kode ── -->
+    <div class="modal fade" id="modalHapusKode" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white py-2">
+            <h6 class="modal-title">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              Hapus Kode
+            </h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body small">
+            Hapus kode
+            <strong>{{ deleteKodeTarget?.kode || deleteKodeTarget?.text }}</strong>
+            ({{ deleteKodeTarget?.nama }})? Tindakan ini tidak dapat dibatalkan.
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button @click="hapusKode" :disabled="isKodeDeleting" class="btn btn-danger btn-sm">
+              <span v-if="isKodeDeleting" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-trash3 me-1"></i>
+              Ya, Hapus
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal: Hapus Transaksi ── -->
+    <div class="modal fade" id="modalHapusTransaksi" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white py-2">
+            <h6 class="modal-title">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              Hapus Transaksi
+            </h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body small">
+            <p class="mb-2">
+              Hapus transaksi kode
+              <strong>{{ deleteTarget?.kode }}</strong>
+              ({{ deleteTarget?.nama }}) sejumlah
+              <strong>{{ deleteTarget?.jumlah }}</strong>
+              ? Stok akan dikurangi kembali.
+            </p>
+            <div class="mb-1">
+              <label class="form-label small fw-semibold">
+                Kode Akses Hapus Riwayat Tambah Barang
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                v-model="deleteTxAccessCode"
+                type="password"
+                class="form-control form-control-sm"
+                placeholder="Masukkan kode akses"
+              />
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button @click="hapusTransaksi" :disabled="isDeleteTxSaving" class="btn btn-danger btn-sm">
+              <span v-if="isDeleteTxSaving" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-trash3 me-1"></i>
+              Ya, Hapus
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -180,53 +471,88 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  runTransaction,
+  serverTimestamp,
+  increment,
+  query,
+  where,
+  orderBy,
+  limit,
+} from "firebase/firestore";
+import { Modal } from "bootstrap";
+import { db } from "@/config/firebase";
 import { useAccessoriesStore } from "@/stores/accessories";
-import { addStock, fetchTransactionHistory } from "@/services/stock-service";
+import { addStock, fetchKodesByKategori, verifyDeleteTambahBarangPassword } from "@/services/stock-service";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
+import { useAuthStore } from "@/stores/auth";
 
 const store = useAccessoriesStore();
-const { toast, error: showError, confirm } = useAlert();
+const authStore = useAuthStore();
+const { swal, error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 
 // ── Form ─────────────────────────────────────────────────────────────────────
-const form = ref({ tanggal: todayStringWITA(), kasir: "", jenis: "" });
+const form = ref({ tanggal: todayStringWITA(), jenis: "" });
 
+// ── Kode Catalog (dari kodeAksesoris/kategori/{jenis}) ───────────────────────
+const kodeCatalog = ref([]);
+const isLoadingCodes = ref(false);
+
+async function loadKodeCatalog(jenis) {
+  if (!jenis) {
+    kodeCatalog.value = [];
+    return;
+  }
+  isLoadingCodes.value = true;
+  try {
+    kodeCatalog.value = await fetchKodesByKategori(jenis);
+  } catch (e) {
+    showError("Gagal memuat kode", e.message);
+  } finally {
+    isLoadingCodes.value = false;
+  }
+}
+
+// ── Input Rows ───────────────────────────────────────────────────────────────
 function defaultRow() {
   return { kode: "", nama: "", jumlah: null };
 }
 const inputRows = ref([defaultRow()]);
-
-const filteredCatalog = computed(() => {
-  if (!form.value.jenis) return [];
-  return store.activeItems.filter((item) => (item.kategori || "").toLowerCase() === form.value.jenis);
-});
-
 const totalJumlah = computed(() => inputRows.value.reduce((s, r) => s + (r.jumlah || 0), 0));
 
 function onJenisChange() {
   inputRows.value = [defaultRow()];
+  loadKodeCatalog(form.value.jenis);
 }
 
 function onKodeChange(row) {
-  const item = store.activeItems.find((c) => c.kode === row.kode);
+  const item = kodeCatalog.value.find((c) => (c.kode || c.text) === row.kode);
   row.nama = item ? item.nama : "";
 }
 
 function addRow() {
   inputRows.value.push(defaultRow());
 }
-
 function removeRow(idx) {
   inputRows.value.splice(idx, 1);
 }
 
-// ── Simpan ─────────────────────────────────────────────────────────────────
+// ── Simpan Data ──────────────────────────────────────────────────────────────
 const isSaving = ref(false);
 
 async function simpanData() {
-  if (!form.value.tanggal || !form.value.kasir || !form.value.jenis) {
-    showError("Data Belum Lengkap", "Tanggal, kasir, dan jenis harus diisi.");
+  if (!form.value.tanggal || !form.value.jenis) {
+    showError("Data Belum Lengkap", "Tanggal dan jenis aksesoris harus diisi.");
     return;
   }
   const validRows = inputRows.value.filter((r) => r.kode && r.jumlah > 0);
@@ -235,17 +561,20 @@ async function simpanData() {
     return;
   }
 
-  const items = validRows.map((r) => ({ kode: r.kode, nama: r.nama, jumlah: r.jumlah, kategori: form.value.jenis }));
+  const kasir = authStore.currentUser?.displayName || authStore.currentUser?.email || "-";
+  const items = validRows.map((r) => ({
+    kode: r.kode,
+    nama: r.nama,
+    jumlah: r.jumlah,
+    kategori: form.value.jenis,
+  }));
 
   isSaving.value = true;
   try {
-    await addStock(items, { tanggal: form.value.tanggal, kasir: form.value.kasir });
-
-    // Refresh affected catalog entries
+    await addStock(items, { tanggal: form.value.tanggal, kasir });
     await Promise.all(items.map((i) => store.refreshSingleStock(i.kode)));
     store.notifyStockChanged(items.map((i) => i.kode));
-
-    toast(`${items.reduce((s, i) => s + i.jumlah, 0)} item berhasil ditambahkan`);
+    swal(`${items.reduce((s, i) => s + i.jumlah, 0)} item berhasil ditambahkan`);
     resetForm();
     await loadHistory();
   } catch (e) {
@@ -256,20 +585,40 @@ async function simpanData() {
 }
 
 function resetForm() {
-  form.value = { tanggal: todayStringWITA(), kasir: form.value.kasir, jenis: "" };
+  form.value = { tanggal: todayStringWITA(), jenis: "" };
   inputRows.value = [defaultRow()];
+  kodeCatalog.value = [];
 }
 
-// ── Riwayat ───────────────────────────────────────────────────────────────
+// ── Riwayat ──────────────────────────────────────────────────────────────────
 const histStart = ref(todayStringWITA());
 const histEnd = ref(todayStringWITA());
 const history = ref([]);
 const histLoading = ref(false);
 
 async function loadHistory() {
+  if (!histStart.value || !histEnd.value) {
+    history.value = [];
+    return;
+  }
   histLoading.value = true;
   try {
-    history.value = await fetchTransactionHistory(histStart.value, histEnd.value, "tambah");
+    // ✅ Sama seperti tambahAksesoris.js: query by jenis equality + orderBy timestamp
+    // Menggunakan composite index (jenis, timestamp) yang sudah ada — tidak perlu index baru
+    // Filter tanggal dilakukan client-side (format YYYY-MM-DD → string comparison valid)
+    const snap = await getDocs(
+      query(
+        collection(db, "stokAksesorisTransaksi"),
+        where("jenis", "==", "tambah"),
+        orderBy("timestamp", "desc"),
+        limit(1000),
+      ),
+    );
+    const start = histStart.value; // YYYY-MM-DD
+    const end = histEnd.value; // YYYY-MM-DD
+    history.value = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((d) => d.tanggal && d.tanggal >= start && d.tanggal <= end);
   } catch (e) {
     showError("Gagal memuat riwayat", e.message);
   } finally {
@@ -277,9 +626,253 @@ async function loadHistory() {
   }
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
+// ── Print Laporan ─────────────────────────────────────────────────────────────
+function printLaporan() {
+  if (!history.value.length) return;
+  const rows = history.value
+    .map(
+      (h, i) => `<tr>
+        <td>${i + 1}</td>
+        <td>${h.tanggal}</td>
+        <td>${h.kode}</td>
+        <td>${h.nama || "-"}</td>
+        <td style="text-align:center">${h.jumlah}</td>
+      </tr>`,
+    )
+    .join("");
+  const html = `<!DOCTYPE html><html><head><title>Laporan Penambahan Stok</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 8px}
+    th{background:#f0f0f0}h3{margin-bottom:8px}</style></head>
+    <body><h3>Riwayat Penambahan Stok Aksesoris</h3>
+    <p>Periode: ${histStart.value} s/d ${histEnd.value}</p>
+    <table><thead><tr><th>No</th><th>Tanggal</th><th>Kode Barang</th><th>Nama Barang</th><th>Jumlah</th></tr></thead>
+    <tbody>${rows}</tbody></table></body></html>`;
+  const win = window.open("", "_blank");
+  if (!win) {
+    showError("Pop-up Diblokir", "Izinkan pop-up untuk mencetak laporan.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => {
+    win.print();
+  };
+}
+
+// ── Export Excel (CSV) ───────────────────────────────────────────────────────
+function exportExcel() {
+  if (!history.value.length) return;
+  const headers = ["No", "Tanggal", "Kode Barang", "Nama Barang", "Jumlah"];
+  const rows = history.value.map((h, i) => [
+    i + 1,
+    h.tanggal,
+    h.kode,
+    `"${(h.nama || "").replace(/"/g, '""')}"`,
+    h.jumlah,
+  ]);
+  const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `tambah-stok-${histStart.value}-sd-${histEnd.value}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// ── Hapus Transaksi ──────────────────────────────────────────────────────────
+const deleteTarget = ref(null);
+const isDeleteTxSaving = ref(false);
+const deleteTxAccessCode = ref("");
+let deleteModal = null;
+
+function openHapusTransaksi(h) {
+  deleteTarget.value = h;
+  deleteTxAccessCode.value = "";
+  if (!deleteModal) deleteModal = new Modal(document.getElementById("modalHapusTransaksi"));
+  deleteModal.show();
+}
+
+async function hapusTransaksi() {
+  if (!deleteTxAccessCode.value) {
+    swal("Kode akses wajib diisi", "warning");
+    return;
+  }
+
+  isDeleteTxSaving.value = true;
+  try {
+    const valid = await verifyDeleteTambahBarangPassword(deleteTxAccessCode.value);
+    if (!valid) {
+      swal("Kode akses salah", "error");
+      return;
+    }
+
+    await runTransaction(db, async (txn) => {
+      const txRef = doc(db, "stokAksesorisTransaksi", deleteTarget.value.id);
+      const stockRef = doc(db, "stokAksesoris", deleteTarget.value.kode);
+      const [txSnap, stockSnap] = await Promise.all([txn.get(txRef), txn.get(stockRef)]);
+      if (!txSnap.exists()) throw new Error("Transaksi tidak ditemukan");
+      if (stockSnap.exists()) {
+        txn.update(stockRef, { stok: increment(-deleteTarget.value.jumlah), updatedAt: serverTimestamp() });
+      }
+      txn.delete(txRef);
+    });
+    deleteModal.hide();
+    swal("Transaksi berhasil dihapus");
+    await loadHistory();
+  } catch (e) {
+    showError("Gagal menghapus transaksi", e.message);
+  } finally {
+    isDeleteTxSaving.value = false;
+  }
+}
+
+// ── Kelola Kode ──────────────────────────────────────────────────────────────
+const activeKodeTab = ref("kotak");
+const kodeList = ref([]);
+const isLoadingKode = ref(false);
+const kodeSearch = ref("");
+
+const filteredKodeList = computed(() => {
+  const q = kodeSearch.value.toLowerCase();
+  if (!q) return kodeList.value;
+  return kodeList.value.filter(
+    (k) => (k.kode || k.text || "").toLowerCase().includes(q) || (k.nama || "").toLowerCase().includes(q),
+  );
+});
+
+let kelolaKodeModal = null;
+
+function openKelolaKode() {
+  if (!kelolaKodeModal) kelolaKodeModal = new Modal(document.getElementById("modalKelolaKode"));
+  kelolaKodeModal.show();
+  loadKodeBarang(activeKodeTab.value);
+}
+
+async function onKodeTabChange(tab) {
+  activeKodeTab.value = tab;
+  kodeSearch.value = "";
+  await loadKodeBarang(tab);
+}
+
+async function loadKodeBarang(kategori) {
+  isLoadingKode.value = true;
+  try {
+    kodeList.value = await fetchKodesByKategori(kategori);
+  } catch (e) {
+    showError("Gagal memuat kode", e.message);
+  } finally {
+    isLoadingKode.value = false;
+  }
+}
+
+// ── Form Kode (Tambah / Edit) ─────────────────────────────────────────────────
+const kodeFormMode = ref("add");
+const kodeForm = ref({ id: null, kode: "", nama: "", kadar: "", berat: "", harga: "" });
+const isKodeSaving = ref(false);
+let formKodeModal = null;
+
+function openTambahKode() {
+  kodeFormMode.value = "add";
+  kodeForm.value = { id: null, kode: "", nama: "", kadar: "", berat: "", harga: "" };
+  if (!formKodeModal) formKodeModal = new Modal(document.getElementById("modalFormKode"));
+  formKodeModal.show();
+}
+
+function openEditKode(k) {
+  kodeFormMode.value = "edit";
+  kodeForm.value = {
+    id: k.id,
+    kode: k.kode || k.text || "",
+    nama: k.nama || "",
+    kadar: k.kadar || "",
+    berat: k.berat || "",
+    harga: k.harga || "",
+  };
+  if (!formKodeModal) formKodeModal = new Modal(document.getElementById("modalFormKode"));
+  formKodeModal.show();
+}
+
+async function simpanKode() {
+  if (!kodeForm.value.kode.trim() || !kodeForm.value.nama.trim()) {
+    showError("Data Tidak Lengkap", "Kode dan nama barang harus diisi.");
+    return;
+  }
+  isKodeSaving.value = true;
+  try {
+    const data = {
+      text: kodeForm.value.kode.trim().toUpperCase(),
+      nama: kodeForm.value.nama.trim(),
+      ...(activeKodeTab.value === "silver" ? { kadar: kodeForm.value.kadar, berat: kodeForm.value.berat } : {}),
+      ...(activeKodeTab.value === "kotak" ? { harga: kodeForm.value.harga } : {}),
+    };
+    if (kodeFormMode.value === "add") {
+      await addDoc(collection(db, "kodeAksesoris", "kategori", activeKodeTab.value), data);
+      // Inisialisasi stokAksesoris/{kode} jika belum ada, agar tambah barang
+      // hanya perlu increment (tidak membuat dokumen baru = sesuai behavior lama)
+      const kodeText = data.text;
+      const stokRef = doc(db, "stokAksesoris", kodeText);
+      const stokSnap = await getDoc(stokRef);
+      if (!stokSnap.exists()) {
+        await setDoc(stokRef, {
+          kode: kodeText,
+          nama: data.nama,
+          kategori: activeKodeTab.value,
+          kadar: activeKodeTab.value === "silver" ? kodeForm.value.kadar || null : null,
+          berat: activeKodeTab.value === "silver" ? kodeForm.value.berat || null : null,
+          stok: 0,
+          isActive: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } else {
+      const { text: _text, ...updateData } = data;
+      await updateDoc(doc(db, "kodeAksesoris", "kategori", activeKodeTab.value, kodeForm.value.id), updateData);
+    }
+    formKodeModal.hide();
+    swal("Kode berhasil disimpan");
+    await loadKodeBarang(activeKodeTab.value);
+    if (form.value.jenis === activeKodeTab.value) {
+      await loadKodeCatalog(activeKodeTab.value);
+    }
+  } catch (e) {
+    showError("Gagal menyimpan kode", e.message);
+  } finally {
+    isKodeSaving.value = false;
+  }
+}
+
+// ── Hapus Kode ────────────────────────────────────────────────────────────────
+const deleteKodeTarget = ref(null);
+const isKodeDeleting = ref(false);
+let deleteKodeModal = null;
+
+function openHapusKode(k) {
+  deleteKodeTarget.value = k;
+  if (!deleteKodeModal) deleteKodeModal = new Modal(document.getElementById("modalHapusKode"));
+  deleteKodeModal.show();
+}
+
+async function hapusKode() {
+  isKodeDeleting.value = true;
+  try {
+    await deleteDoc(doc(db, "kodeAksesoris", "kategori", activeKodeTab.value, deleteKodeTarget.value.id));
+    deleteKodeModal.hide();
+    swal("Kode berhasil dihapus");
+    await loadKodeBarang(activeKodeTab.value);
+    if (form.value.jenis === activeKodeTab.value) {
+      await loadKodeCatalog(activeKodeTab.value);
+    }
+  } catch (e) {
+    showError("Gagal menghapus kode", e.message);
+  } finally {
+    isKodeDeleting.value = false;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await store.loadCatalog();
   await loadHistory();
 });
 </script>

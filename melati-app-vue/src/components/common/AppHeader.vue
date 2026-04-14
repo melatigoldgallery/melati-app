@@ -14,8 +14,7 @@
 
       <!-- User badge -->
       <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-secondary text-uppercase small">{{ auth.userRole }}</span>
-        <span class="text-dark small fw-semibold">{{ auth.user?.displayName || auth.user?.email }}</span>
+        <span class="badge bg-primary text-uppercase small">{{ auth.userRole }}</span>
       </div>
     </div>
   </header>

@@ -1,11 +1,20 @@
 ﻿<template>
   <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-cart-plus me-2 text-primary"></i>
+    <!-- Page Header -->
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-cart-plus me-2 text-dark"></i>
         Restok Barang
-      </h4>
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Restok Barang</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex justify-content-end mb-3">
       <button class="btn btn-sm btn-primary" @click="openAddModal">
         <i class="bi bi-plus me-1"></i>
         Tambah Order
