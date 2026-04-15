@@ -1,23 +1,25 @@
 ﻿<template>
   <div class="container-fluid py-3 stock-page">
-    <div class="page-header mb-3">
-      <h1>
-        <i class="bi bi-archive me-2 text-dark"></i>
-        Manajemen Stok
-      </h1>
-      <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
-          <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
-          <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
-        </ol>
-      </nav>
-    </div>
-    <div class="d-flex justify-content-end mb-3">
-      <button class="btn btn-sm btn-outline-secondary" @click="refreshData" :disabled="loading">
-        <i class="bi bi-arrow-clockwise me-1"></i>
-        Refresh
-      </button>
+    <div class="page-header d-flex justify-content-between align-items-center mb-3">
+      <div class="">
+        <h1>
+          <i class="bi bi-archive me-2 text-dark"></i>
+          Manajemen Stok
+        </h1>
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+            <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
+            <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
+          </ol>
+        </nav>
+      </div>
+      <div class="">
+        <button class="btn btn-sm btn-outline-secondary" @click="refreshData" :disabled="loading">
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          Refresh
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="text-center py-5">
