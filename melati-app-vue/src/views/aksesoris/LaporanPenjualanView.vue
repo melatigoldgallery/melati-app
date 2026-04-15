@@ -99,14 +99,13 @@
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-white fw-semibold border-bottom py-2">
           <span class="fw-semibold">
-            <i class="bi bi-table me-2 text-warning"></i>
+            <i class="bi bi-table me-2 text-dark"></i>
             {{ reportType === "rekap" ? "Laporan Rekap" : "Laporan Detail" }}
           </span>
         </div>
         <div
           class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2 flex-wrap gap-2"
         >
-          <div class="d-flex align-items-center gap-2">
             <div class="d-flex gap-2">
               <button
                 @click="exportExcel"
@@ -126,7 +125,6 @@
               <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
               <input v-model="searchText" type="text" class="form-control" placeholder="Cari..." />
             </div>
-          </div>
         </div>
 
         <div class="card-body p-0">
