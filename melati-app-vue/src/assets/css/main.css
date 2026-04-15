@@ -22,6 +22,17 @@
   --border-radius: 8px;
   --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   --transition-speed: 0.3s;
+
+  /* Theme appearance variables (customizable via Pengaturan > Tema Warna) */
+  --theme-sidebar-start: #667eea;
+  --theme-sidebar-mid: #667eea;
+  --theme-sidebar-end: #002975;
+  --theme-tampilkan-start: #3f37c9;
+  --theme-tampilkan-end: #4361ee;
+  --theme-antrian-card-header-start: #3f37c9;
+  --theme-antrian-card-header-end: #4361ee;
+  --theme-surface-accent-start: #3f37c9;
+  --theme-surface-accent-end: #4361ee;
 }
 
 body {
@@ -37,7 +48,12 @@ body {
 .sidebar {
   width: 260px;
   min-height: 100vh;
-  background: linear-gradient(180deg, #667eea 0%, #667eea 50%, #002975 100%);
+  background: linear-gradient(
+    180deg,
+    var(--theme-sidebar-start) 0%,
+    var(--theme-sidebar-mid) 50%,
+    var(--theme-sidebar-end) 100%
+  );
   color: white;
   transition: width 0.25s ease;
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
@@ -68,6 +84,21 @@ body {
   background: linear-gradient(135deg, #342faa 0%, #3751d4 100%);
   border-color: #342faa;
   color: #fff;
+}
+
+.btn-tampilkan {
+  background: linear-gradient(135deg, var(--theme-tampilkan-start) 0%, var(--theme-tampilkan-end) 100%);
+  border-color: var(--theme-tampilkan-start);
+  color: #fff;
+}
+
+.btn-tampilkan:hover,
+.btn-tampilkan:focus,
+.btn-tampilkan:active {
+  background: linear-gradient(135deg, var(--theme-tampilkan-start) 0%, var(--theme-tampilkan-end) 100%);
+  border-color: var(--theme-tampilkan-start);
+  color: #fff;
+  filter: brightness(0.94);
 }
 
 .btn-danger {

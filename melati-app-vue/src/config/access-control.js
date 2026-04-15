@@ -80,6 +80,11 @@ export const PAGE_ACCESS_SECTIONS = [
         route: "/pengaturan/antrian-penutupan",
       },
       {
+        key: "admin.theme-appearance",
+        label: "Tema Warna",
+        route: "/pengaturan/tema-warna",
+      },
+      {
         key: "admin.maintenance",
         label: "Maintenance",
         route: "/pengaturan/maintenance",
@@ -97,6 +102,7 @@ const SENSITIVE_PAGE_KEYS = new Set([
   "admin.access-codes",
   "admin.jam-absensi",
   "admin.antrian-closing",
+  "admin.theme-appearance",
   "admin.maintenance",
 ]);
 
@@ -130,17 +136,13 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "admin.kode-akses": "admin.access-codes",
   "admin.jam-absensi": "admin.jam-absensi",
   "admin.antrian-penutupan": "admin.antrian-closing",
+  "admin.tema-warna": "admin.theme-appearance",
+  "admin.theme-appearance": "admin.theme-appearance",
   "admin.maintenance": "admin.maintenance",
 };
 
 export function getDefaultPageAccess(pageKey, role = "staf") {
   if (role === "supervisor") return true;
-  if (
-    role === "admin" &&
-    (pageKey === "admin.access-codes" || pageKey === "admin.antrian-closing" || pageKey === "admin.maintenance")
-  ) {
-    return true;
-  }
   if (SENSITIVE_PAGE_KEYS.has(pageKey)) return false;
   return true;
 }

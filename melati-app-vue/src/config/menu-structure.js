@@ -134,6 +134,12 @@ export const menuStructure = [
         roles: ALL,
       },
       {
+        label: "Tema Warna",
+        to: "/pengaturan/tema-warna",
+        pageKey: "admin.theme-appearance",
+        roles: ALL,
+      },
+      {
         label: "Maintenance",
         to: "/pengaturan/maintenance",
         pageKey: "admin.maintenance",

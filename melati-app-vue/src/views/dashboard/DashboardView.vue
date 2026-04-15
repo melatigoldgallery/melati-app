@@ -1,65 +1,171 @@
 <template>
-  <div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="mb-4">
-      <h4 class="fw-bold mb-1">Dashboard</h4>
-      <p class="text-muted mb-0 small">Selamat datang di Sistem Manajemen Melati Gold Shop</p>
+  <div class="container-fluid py-3 dashboard-page">
+    <div class="dashboard-desktop-content" :class="{ 'd-none d-md-block': showMobileRoleLayout }">
+      <header class="page-header mb-4">
+        <div class="header-content">
+          <h4 class="page-title mb-1">Dashboard</h4>
+          <p class="page-subtitle mb-0">Selamat datang di Sistem Manajemen Melati Gold Shop</p>
+        </div>
+      </header>
+
+      <section class="mb-4">
+        <div class="row g-3 dashboard-stats-grid">
+          <div v-for="sys in visibleSystems" :key="sys.label" class="col-12 col-sm-6 col-xl-3">
+            <RouterLink :to="sys.to" class="text-decoration-none d-block h-100 system-link">
+              <article class="system-card" :style="{ '--grad-start': sys.gradStart, '--grad-end': sys.gradEnd }">
+                <div class="system-icon" :style="{ background: sys.iconColor }">
+                  <i :class="['bi', sys.icon]"></i>
+                </div>
+                <div class="system-info">
+                  <h5>{{ sys.label }}</h5>
+                  <p>{{ sys.desc }}</p>
+                </div>
+              </article>
+            </RouterLink>
+          </div>
+        </div>
+      </section>
+
+      <section class="card border-0 shadow-sm quick-access-card mb-4">
+        <div class="card-header bg-white border-0 py-3">
+          <h5 class="fw-semibold mb-0">
+            <i class="bi bi-lightning-charge-fill text-warning me-1"></i>
+            Akses Cepat
+          </h5>
+        </div>
+        <div class="card-body pt-1">
+          <div class="row g-2">
+            <div v-for="link in visibleQuickLinks" :key="link.to" class="col-6 col-md-3">
+              <RouterLink :to="link.to" class="text-decoration-none d-block">
+                <div class="quick-btn" :style="{ background: link.color }">
+                  <i :class="['bi', link.icon]" aria-hidden="true"></i>
+                  <span>{{ link.label }}</span>
+                </div>
+              </RouterLink>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer-info text-muted small text-end">
+        Masuk sebagai:
+        <strong>{{ auth.user?.email || "-" }}</strong>
+        <span class="badge ms-1 text-capitalize role-badge">{{ auth.userRole }}</span>
+      </div>
     </div>
 
-    <!-- System overview cards -->
-    <div class="row g-3 mb-4">
-      <div v-for="sys in systems" :key="sys.label" class="col-6 col-md-3">
-        <RouterLink :to="sys.to" class="text-decoration-none">
-          <div class="card border-0 shadow-sm h-100 sys-card">
-            <div class="card-body d-flex align-items-center gap-3 py-3">
-              <div
-                class="sys-icon rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                :style="{ background: sys.color }"
-              >
-                <i :class="['bi', sys.icon, 'fs-4 text-white']"></i>
-              </div>
-              <div>
-                <div class="fw-semibold text-dark small lh-sm">{{ sys.label }}</div>
-                <div class="text-muted" style="font-size: 0.75rem">{{ sys.desc }}</div>
+    <div v-if="mobileDashboardVariant === 'staff'" class="dashboard-mobile-content d-md-none">
+      <div class="app-intro-container">
+        <div class="app-intro-header text-center mb-4">
+          <img src="/img/Melati.jfif" alt="Melati Gold Shop Logo" class="app-logo mb-3" />
+          <h1 class="app-title">Sistem Absensi</h1>
+          <p class="app-subtitle">Melati Gold Shop</p>
+        </div>
+
+        <div class="app-intro-card">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h2 class="card-title text-primary mb-3 fs-6">
+                <i class="bi bi-info-circle me-2"></i>
+                Tentang Aplikasi
+              </h2>
+              <p class="card-text small mb-0">
+                Sistem Absensi Melati Gold Shop digunakan untuk pencatatan kehadiran dan pengajuan izin karyawan.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-features mt-3">
+          <div class="row g-2">
+            <div class="col-12" v-for="feature in staffFeatures" :key="feature.title">
+              <div class="card shadow-sm border-0 feature-card">
+                <div class="card-body py-3">
+                  <div class="feature-icon" :style="{ background: feature.color }">
+                    <i :class="['bi', feature.icon]"></i>
+                  </div>
+                  <h3 class="feature-title">{{ feature.title }}</h3>
+                  <p class="feature-text">{{ feature.desc }}</p>
+                </div>
               </div>
             </div>
           </div>
-        </RouterLink>
+        </div>
+
+        <div class="app-action mt-4 mb-3 text-center">
+          <RouterLink to="/absensi/pengajuan-izin" class="btn btn-primary btn-md w-100">
+            <i class="bi bi-send me-2"></i>
+            Ajukan Izin
+          </RouterLink>
+        </div>
       </div>
     </div>
 
-    <!-- Quick access -->
-    <h5 class="fw-semibold mb-3">
-      <i class="bi bi-lightning-charge-fill text-warning me-1"></i>
-      Akses Cepat
-    </h5>
-    <div class="row g-2 mb-4">
-      <div v-for="link in quickLinks" :key="link.to" class="col-6 col-md-3">
-        <RouterLink :to="link.to" class="text-decoration-none">
-          <div
-            class="quick-btn d-flex align-items-center gap-2 rounded-3 px-3 py-3"
-            :style="{ background: link.color }"
-          >
-            <i :class="['bi', link.icon, 'fs-5 text-white flex-shrink-0']"></i>
-            <span class="text-white fw-semibold small">{{ link.label }}</span>
+    <div v-else-if="mobileDashboardVariant === 'admin'" class="dashboard-mobile-content d-md-none">
+      <div class="app-intro-container">
+        <div class="app-intro-header text-center mb-4">
+          <img src="/img/Melati.jfif" alt="Melati Gold Shop Logo" class="app-logo mb-3" />
+          <h1 class="app-title">Sistem Custom dan Servis</h1>
+          <p class="app-subtitle">Melati Gold Shop</p>
+        </div>
+
+        <div class="app-intro-card">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h2 class="card-title text-warning mb-3 fs-6">
+                <i class="bi bi-info-circle me-2"></i>
+                Tentang Aplikasi
+              </h2>
+              <p class="card-text small mb-0">
+                Sistem ini digunakan untuk memproses data servis, dokumentasi bukti pengambilan, dan update status
+                barang customer dengan mudah.
+              </p>
+            </div>
           </div>
-        </RouterLink>
-      </div>
-    </div>
+        </div>
 
-    <!-- Footer info -->
-    <div class="text-muted small text-end">
-      Masuk sebagai:
-      <strong>{{ auth.user?.email }}</strong>
-      <span class="badge ms-1 text-capitalize" :style="{ background: '#c8a96e' }">{{ auth.userRole }}</span>
+        <div class="app-features mt-3">
+          <div class="row g-2">
+            <div class="col-12" v-for="feature in adminFeatures" :key="feature.title">
+              <div class="card shadow-sm border-0 feature-card admin-feature-card">
+                <div class="card-body py-3">
+                  <div class="feature-icon" :style="{ background: feature.color }">
+                    <i :class="['bi', feature.icon]"></i>
+                  </div>
+                  <h3 class="feature-title">{{ feature.title }}</h3>
+                  <p class="feature-text">{{ feature.desc }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-servis mt-4 mb-3 text-center">
+          <RouterLink to="/servis/data" class="btn btn-warning btn-md w-100">
+            <i class="bi bi-box-arrow-in-right me-2"></i>
+            Data Servis
+          </RouterLink>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 
 const auth = useAuthStore();
+
+function canOpen(pageKey) {
+  return !pageKey || auth.canAccessPage(pageKey);
+}
+
+const normalizedRole = computed(() => {
+  const role = String(auth.userRole || "").toLowerCase();
+  if (role === "staff") return "staf";
+  return role;
+});
 
 const systems = [
   {
@@ -67,67 +173,431 @@ const systems = [
     desc: "Manajemen pelayanan customer",
     to: "/antrian/admin",
     icon: "bi-arrow-left-right",
-    color: "#3b5bdb",
+    iconColor: "linear-gradient(135deg,#0d6efd 0%,#6610f2 100%)",
+    gradStart: "#0d6efd",
+    gradEnd: "#6610f2",
+    pageKey: "antrian.admin",
   },
   {
     label: "Sistem Absensi",
-    desc: "Monitoring kehadiran dan izin staff",
+    desc: "Monitoring kehadiran dan izin staf",
     to: "/absensi/kehadiran",
     icon: "bi-person-badge",
-    color: "#e67700",
+    iconColor: "linear-gradient(135deg,#ffc107 0%,#fd7e14 100%)",
+    gradStart: "#ffc107",
+    gradEnd: "#fd7e14",
+    pageKey: "absensi.kehadiran",
   },
   {
     label: "Sistem Service",
     desc: "Pencatatan servis barang customer",
     to: "/servis/input",
     icon: "bi-tools",
-    color: "#2f9e44",
+    iconColor: "linear-gradient(135deg,#198754 0%,#20c997 100%)",
+    gradStart: "#198754",
+    gradEnd: "#20c997",
+    pageKey: "servis.input",
   },
   {
     label: "Penjualan Aksesoris",
     desc: "Input penjualan kotak, aksesoris, dan silver",
     to: "/aksesoris/penjualan",
     icon: "bi-bag-check",
-    color: "#0c8599",
+    iconColor: "linear-gradient(135deg,#0dcaf0 0%,#0d6efd 100%)",
+    gradStart: "#0dcaf0",
+    gradEnd: "#0d6efd",
+    pageKey: "aksesoris.penjualan",
   },
 ];
 
 const quickLinks = [
-  { label: "Admin Antrian", to: "/antrian/admin", icon: "bi-people-fill", color: "#3b5bdb" },
-  { label: "Absensi", to: "/absensi/kehadiran", icon: "bi-person-check-fill", color: "#e67700" },
-  { label: "Input Service", to: "/servis/input", icon: "bi-tools", color: "#2f9e44" },
-  { label: "Input Penjualan", to: "/aksesoris/penjualan", icon: "bi-gem", color: "#0c8599" },
-  { label: "Manajemen Stok", to: "/inventory/manajemen", icon: "bi-archive-fill", color: "#6741d9" },
-  { label: "Laporan Penjualan", to: "/aksesoris/laporan-penjualan", icon: "bi-bar-chart-fill", color: "#c8a96e" },
-  { label: "Display Antrian", to: "/antrian/display", icon: "bi-display", color: "#e03131" },
-  { label: "Kelola User", to: "/pengaturan/users", icon: "bi-person-gear", color: "#495057" },
+  { label: "Admin Antrian", to: "/antrian/admin", icon: "bi-people-fill", color: "#3b5bdb", pageKey: "antrian.admin" },
+  {
+    label: "Absensi",
+    to: "/absensi/kehadiran",
+    icon: "bi-person-check-fill",
+    color: "#e67700",
+    pageKey: "absensi.kehadiran",
+  },
+  { label: "Input Service", to: "/servis/input", icon: "bi-tools", color: "#2f9e44", pageKey: "servis.input" },
+  {
+    label: "Input Penjualan",
+    to: "/aksesoris/penjualan",
+    icon: "bi-gem",
+    color: "#0c8599",
+    pageKey: "aksesoris.penjualan",
+  },
+  {
+    label: "Manajemen Stok",
+    to: "/inventory/manajemen",
+    icon: "bi-archive-fill",
+    color: "#6741d9",
+    pageKey: "inventory.manajemen",
+  },
+  {
+    label: "Laporan Penjualan",
+    to: "/aksesoris/laporan-penjualan",
+    icon: "bi-bar-chart-fill",
+    color: "#c8a96e",
+    pageKey: "aksesoris.laporan-penjualan",
+  },
+  {
+    label: "Display Antrian",
+    to: "/antrian/display",
+    icon: "bi-display",
+    color: "#e03131",
+    pageKey: "antrian.display",
+  },
+  { label: "Data Servis", to: "/servis/data", icon: "bi-person-gear", color: "#495057", pageKey: "servis.data" },
+];
+
+const visibleSystems = computed(() => systems.filter((item) => canOpen(item.pageKey)));
+const visibleQuickLinks = computed(() => quickLinks.filter((item) => canOpen(item.pageKey)));
+
+const mobileDashboardVariant = computed(() => {
+  if (normalizedRole.value === "staf" && canOpen("absensi.pengajuan-izin")) return "staff";
+  if ((normalizedRole.value === "admin" || normalizedRole.value === "admin_custom") && canOpen("servis.data")) {
+    return "admin";
+  }
+  // Supervisor: gunakan dashboard desktop apa adanya.
+  return null;
+});
+
+const showMobileRoleLayout = computed(() => mobileDashboardVariant.value !== null);
+
+const staffFeatures = [
+  {
+    title: "Absensi Harian",
+    desc: "Scan barcode untuk absensi masuk dan pulan.",
+    icon: "bi-person-check",
+    color: "linear-gradient(135deg,#3b5bdb 0%,#5f3dc4 100%)",
+  },
+  {
+    title: "Laporan Kehadiran",
+    desc: "Lihat laporan kehadiran karyawan dengan mudahn.",
+    icon: "bi-bar-chart-line",
+    color: "linear-gradient(135deg,#0c8599 0%,#1c7ed6 100%)",
+  },
+  {
+    title: "Pengajuan Izin",
+    desc: "Ajukan izin libur  izin pulang lebih awal melalui aplikasi.",
+    icon: "bi-calendar-plus",
+    color: "linear-gradient(135deg,#2f9e44 0%,#12b886 100%)",
+  },
+];
+
+const adminFeatures = [
+  {
+    title: "Data Servis Harian",
+    desc: "Pantau daftar servis dan custom per tanggal agar proses pengecekan lebih cepat.",
+    icon: "bi-table",
+    color: "linear-gradient(135deg,#f59f00 0%,#f76707 100%)",
+  },
+  {
+    title: "Bukti Pengambilan",
+    desc: "Pastikan dokumentasi pengambilan tersimpan rapi untuk validasi dan arsip data.",
+    icon: "bi-camera",
+    color: "linear-gradient(135deg,#e67700 0%,#d9480f 100%)",
+  },
+  {
+    title: "Update Status Cepat",
+    desc: "Ubah status servis dan pengambilan langsung dari dashboard sesuai progres pekerjaan.",
+    icon: "bi-arrow-repeat",
+    color: "linear-gradient(135deg,#fd7e14 0%,#fa5252 100%)",
+  },
 ];
 </script>
 
 <style scoped>
-.sys-card {
+.dashboard-page {
+  --header-bg: linear-gradient(135deg, #ffffff 0%, #ececec 100%);
+}
+
+.page-header {
+  background: var(--header-bg);
+  border-radius: 16px;
+  padding: 1.1rem 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.page-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.page-subtitle {
+  font-size: 0.84rem;
+  color: #637083;
+}
+
+.dashboard-stats-grid {
+  margin-bottom: 0;
+}
+
+.system-card {
+  position: relative;
+  display: flex;
+  gap: 0.8rem;
+  width: 100%;
+  align-items: center;
+  min-height: 108px;
+  height: 100%;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 0.9rem;
+  overflow: hidden;
   transition:
-    transform 0.15s,
-    box-shadow 0.15s;
-  cursor: pointer;
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
 }
-.sys-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1) !important;
+
+.system-link {
+  min-width: 0;
 }
-.sys-icon {
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
+
+.system-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--grad-start), var(--grad-end));
 }
+
+.system-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.system-icon {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.35rem;
+}
+
+.system-info h5 {
+  margin-bottom: 0.3rem;
+  color: #273142;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.system-info p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.mobile-role-card {
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #eceff3;
+  padding: 0.95rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-role-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.mobile-role-head i {
+  font-size: 1.15rem;
+}
+
+.mobile-role-card h6 {
+  font-weight: 700;
+}
+
+.mobile-role-card p {
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.mobile-role-card.is-staff .mobile-role-head i,
+.mobile-role-card.is-staff h6 {
+  color: #0d6efd;
+}
+
+.mobile-role-card.is-admin .mobile-role-head i,
+.mobile-role-card.is-admin h6 {
+  color: #d97706;
+}
+
+.quick-access-card {
+  border-radius: 16px;
+}
+
 .quick-btn {
+  border-radius: 12px;
+  padding: 0.85rem;
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.3rem;
+  color: #fff;
   transition:
-    opacity 0.15s,
-    transform 0.15s;
-  cursor: pointer;
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
+
+.quick-btn i {
+  font-size: 1.15rem;
+}
+
+.quick-btn span {
+  font-size: 0.76rem;
+  text-align: center;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .quick-btn:hover {
-  opacity: 0.88;
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  opacity: 0.92;
+}
+
+.role-badge {
+  background: #c8a96e;
+}
+
+.dashboard-mobile-content {
+  animation: fadeInUp 0.35s ease-out;
+}
+
+.app-intro-header {
+  padding: 0.4rem 0.2rem;
+}
+
+.app-logo {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid rgba(200, 169, 110, 0.5);
+  object-fit: cover;
+}
+
+.app-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.15rem;
+  color: #1f2937;
+}
+
+.app-subtitle {
+  color: #64748b;
+  margin-bottom: 0;
+  font-size: 0.88rem;
+}
+
+.feature-card {
+  border-radius: 14px;
+}
+
+.feature-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-bottom: 0.55rem;
+}
+
+.feature-icon i {
+  font-size: 1.05rem;
+}
+
+.feature-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.3rem;
+}
+
+.feature-text {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.admin-feature-card {
+  border: 1px solid #ffe8cc;
+  background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%);
+}
+
+.admin-feature-card .feature-title {
+  color: #7c4a03;
+}
+
+.admin-feature-card .feature-text {
+  color: #6b5a3a;
+}
+
+.app-action .btn,
+.app-servis .btn {
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 768px) {
+  .page-header {
+    padding: 1.4rem 1.5rem;
+  }
+
+  .page-title {
+    font-size: 1.7rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.96rem;
+  }
+
+  .quick-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    min-height: 74px;
+    gap: 0.55rem;
+    padding: 0.9rem;
+  }
+
+  .quick-btn i {
+    font-size: 1.2rem;
+  }
+
+  .quick-btn span {
+    text-align: left;
+    font-size: 0.8rem;
+  }
 }
 </style>

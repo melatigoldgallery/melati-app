@@ -165,7 +165,7 @@
             <input v-model="histStart" type="date" class="form-control form-control-sm" style="width: 145px" />
             <span class="text-muted small">s/d</span>
             <input v-model="histEnd" type="date" class="form-control form-control-sm" style="width: 145px" />
-            <button @click="loadHistory" class="btn btn-primary btn-sm">
+            <button @click="loadHistory" class="btn btn-tampilkan btn-sm">
               <i class="bi bi-search me-1"></i>
               Tampilkan
             </button>

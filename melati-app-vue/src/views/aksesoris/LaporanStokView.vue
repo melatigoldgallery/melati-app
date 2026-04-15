@@ -18,11 +18,11 @@
     <!-- Filter -->
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header">
-          <h2>
-            <i class="fas fa-filter me-2"></i>
-            Filter Laporan
-          </h2>
-        </div>
+        <h2>
+          <i class="fas fa-filter me-2"></i>
+          Filter Laporan
+        </h2>
+      </div>
       <div class="card-body">
         <div class="row g-2 align-items-end">
           <div class="col-md-3">
@@ -41,7 +41,7 @@
             <input v-model="filter.end" type="date" class="form-control form-control-sm" />
           </div>
           <div class="col-md-3 d-flex gap-2">
-            <button @click="loadReport" :disabled="isLoading" class="btn btn-primary btn-sm">
+            <button @click="loadReport" :disabled="isLoading" class="btn btn-tampilkan btn-sm">
               <span v-if="isLoading" class="spinner-border spinner-border-sm me-1"></span>
               <i v-else class="bi bi-search me-1"></i>
               Tampilkan

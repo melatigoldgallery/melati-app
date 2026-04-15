@@ -248,6 +248,7 @@ const PERMISSION_GROUPS = {
     { key: "kode-akses", label: "Kode Akses" },
     { key: "jam-absensi", label: "Jam Absensi" },
     { key: "antrian-penutupan", label: "Setting Antrian" },
+    { key: "tema-warna", label: "Tema Warna" },
     { key: "maintenance", label: "Maintenance" },
   ],
 };
@@ -282,6 +283,7 @@ const PERMISSION_TO_PAGE = {
   "admin.kode-akses": "admin.access-codes",
   "admin.jam-absensi": "admin.jam-absensi",
   "admin.antrian-penutupan": "admin.antrian-closing",
+  "admin.tema-warna": "admin.theme-appearance",
   "admin.maintenance": "admin.maintenance",
 };
 

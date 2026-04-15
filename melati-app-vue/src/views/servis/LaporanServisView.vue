@@ -48,7 +48,7 @@
             </select>
           </div>
           <div class="col-md-auto">
-            <button class="btn btn-primary btn-sm" @click="loadData" :disabled="loading">
+            <button class="btn btn-tampilkan btn-sm" @click="loadData" :disabled="loading">
               <i class="bi bi-search me-1"></i>
               Tampilkan
             </button>

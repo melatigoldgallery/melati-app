@@ -60,7 +60,7 @@
               </select>
             </div>
             <div class="col-md-auto">
-              <button class="btn btn-primary btn-sm" @click="loadReport" :disabled="loading">
+              <button class="btn btn-tampilkan btn-sm" @click="loadReport" :disabled="loading">
                 <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
                 <i v-else class="fas fa-search me-1"></i>
                 Tampilkan

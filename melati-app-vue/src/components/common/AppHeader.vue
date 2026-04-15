@@ -13,8 +13,23 @@
       <span class="text-muted small d-none d-md-block">{{ currentTime }}</span>
 
       <!-- User badge -->
-      <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-primary text-uppercase small">{{ auth.userRole }}</span>
+      <div class="dropdown">
+        <button
+          class="btn p-0 border-0 bg-transparent d-flex align-items-center"
+          type="button"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <span class="badge btn-primary text-uppercase small">{{ auth.userRole }}</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+          <li>
+            <button class="dropdown-item text-danger" type="button" @click="handleLogout">
+              <i class="bi bi-box-arrow-right me-2"></i>
+              Logout
+            </button>
+          </li>
+        </ul>
       </div>
     </div>
   </header>
@@ -22,13 +37,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 
 defineEmits(["toggle-sidebar"]);
 
 const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 
 const pageTitle = computed(() => route.meta?.title || "");
 
@@ -46,6 +62,11 @@ function updateClock() {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+async function handleLogout() {
+  await auth.logout();
+  router.push("/login");
 }
 
 onMounted(() => {

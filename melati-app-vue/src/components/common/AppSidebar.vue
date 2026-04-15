@@ -29,35 +29,48 @@
             <span v-if="!collapsed" class="flex-grow-1">{{ item.label }}</span>
             <i
               v-if="!collapsed"
-              :class="['bi', openGroups.includes(item.label) ? 'bi-chevron-up' : 'bi-chevron-down', 'ms-auto small']"
+              :class="[
+                'bi',
+                'bi-chevron-down',
+                'ms-auto',
+                'sidebar-chevron',
+                { 'is-open': openGroups.includes(item.label) },
+              ]"
             ></i>
           </button>
 
-          <ul v-if="!collapsed && openGroups.includes(item.label)" class="nav flex-column ps-3">
-            <li v-for="child in visibleChildren(item.children)" :key="child.to" class="nav-item">
-              <RouterLink :to="child.to" class="nav-link sidebar-link-child" active-class="active" @click="onLinkClick">
-                <i class="bi bi-chevron-right me-1 small"></i>
-                {{ child.label }}
-              </RouterLink>
-            </li>
-          </ul>
+          <transition name="submenu-slide">
+            <ul v-if="!collapsed && openGroups.includes(item.label)" class="nav flex-column ps-3 sidebar-submenu">
+              <li v-for="child in visibleChildren(item.children)" :key="child.to" class="nav-item">
+                <RouterLink
+                  :to="child.to"
+                  class="nav-link sidebar-link-child"
+                  active-class="active"
+                  @click="onLinkClick"
+                >
+                  <i class="bi bi-chevron-right me-1 small"></i>
+                  {{ child.label }}
+                </RouterLink>
+              </li>
+            </ul>
+          </transition>
         </li>
       </template>
     </ul>
 
-    <!-- Logout -->
-    <div class="px-3 mt-2">
-      <button class="btn btn-sm btn-outline-danger w-100" @click="logout">
-        <i class="bi bi-box-arrow-right me-1"></i>
-        <span v-if="!collapsed">Logout</span>
-      </button>
+    <!-- Footer text -->
+    <div class="sidebar-footer px-3 text-center small text-white-50 border-top border-secondary p-2">
+      <p v-if="!collapsed" class="small">
+        &copy; 2025 Melati Gold Shop.
+        <br />
+        All rights reserved.
+      </p>
     </div>
   </nav>
 </template>
 
 <script setup>
 import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { menuStructure } from "@/config/menu-structure";
 
@@ -73,7 +86,6 @@ function onLinkClick() {
 }
 
 const auth = useAuthStore();
-const router = useRouter();
 
 // Filter menu berdasarkan role user
 function canOpenItem(item) {
@@ -95,21 +107,17 @@ const visibleMenu = computed(() =>
 // Accordion state
 const openGroups = ref([]);
 function toggleGroup(label) {
-  const idx = openGroups.value.indexOf(label);
-  if (idx === -1) openGroups.value.push(label);
-  else openGroups.value.splice(idx, 1);
-}
-
-async function logout() {
-  await auth.logout();
-  router.push("/login");
+  openGroups.value = openGroups.value.includes(label) ? [] : [label];
 }
 </script>
 
 <style scoped>
 .sidebar {
   width: 220px;
-  min-height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
   transition: width 0.25s ease;
   overflow-y: auto;
   overflow-x: hidden;
@@ -141,6 +149,54 @@ async function logout() {
 .sidebar-link-child.active {
   background-color: rgba(255, 255, 255, 0.1);
   color: white;
+}
+
+.sidebar-chevron {
+  font-size: 0.75rem;
+  transition: transform 0.22s ease;
+}
+
+.sidebar-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.sidebar-submenu {
+  overflow: hidden;
+}
+
+.submenu-slide-enter-active,
+.submenu-slide-leave-active {
+  transition:
+    max-height 0.28s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.submenu-slide-enter-from,
+.submenu-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.submenu-slide-enter-to,
+.submenu-slide-leave-from {
+  max-height: 420px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-chevron,
+  .submenu-slide-enter-active,
+  .submenu-slide-leave-active {
+    transition: none;
+  }
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  line-height: 1.3;
 }
 
 @media (max-width: 767px) {

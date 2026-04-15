@@ -31,7 +31,7 @@
           </div>
 
           <div class="col-md-5 col-sm-6 d-flex gap-2 mt-3 flex-wrap">
-            <button class="btn btn-primary" :disabled="loading" @click="loadReport">
+            <button class="btn btn-tampilkan" :disabled="loading" @click="loadReport">
               <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
               <i v-else class="bi bi-eye me-2"></i>
               Tampilkan

@@ -77,7 +77,7 @@
             </div>
 
             <!-- Reason -->
-            <div class="col-12">
+            <div class="col-12 col-md-4 ">
               <label class="form-label">Alasan Izin</label>
               <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-comment-alt"></i></span>
@@ -91,7 +91,7 @@
             </div>
 
             <!-- Leave Type -->
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label">Jenis Izin</label>
               <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-tag"></i></span>
@@ -106,7 +106,7 @@
             </div>
 
             <!-- Replacement Type -->
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label">Jenis Pengganti</label>
               <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-exchange-alt"></i></span>
@@ -299,13 +299,13 @@
             </div>
 
             <!-- Buttons -->
-            <div class="col-12 d-flex gap-2 mt-0">
-              <button class="btn btn-primary" @click="submitForm" :disabled="submitting">
+            <div class="col-12 d-flex gap-2 mt-2">
+              <button class="btn btn-sm btn-primary" @click="submitForm" :disabled="submitting">
                 <span v-if="submitting" class="spinner-border spinner-border-sm me-2"></span>
                 <i v-else class="fas fa-paper-plane me-2"></i>
                 Ajukan Izin
               </button>
-              <button class="btn btn-outline-secondary" @click="resetForm" :disabled="submitting">
+              <button class="btn btn-sm btn-outline-secondary" @click="resetForm" :disabled="submitting">
                 <i class="fas fa-undo me-2"></i>
                 Reset Form
               </button>
@@ -330,11 +330,11 @@
             </h6>
             <ul class="mb-0">
               <li>Pastikan alasan izin dijelaskan dengan detail</li>
-              <li>Pengajuan akan diproses oleh HRD maksimal dalam waktu 1x24 jam</li>
+              <li>Pengajuan akan segera diproses oleh HRD melati</li>
               <li>Status pengajuan dapat dilihat di menu "Laporan Izin"</li>
             </ul>
           </div>
-          <div class="row mt-4">
+          <div class="row mt-4 d-flex ">
             <div class="col-md-6">
               <div class="card h-100">
                 <div class="card-body">
@@ -365,52 +365,6 @@
           </div>
         </div>
       </div>
-
-      <!-- History Table -->
-      <div v-if="myRequests.length > 0" class="card">
-        <div class="card-header">
-          <h2>
-            <i class="fas fa-history"></i>
-            Riwayat Pengajuan (5 Terbaru)
-          </h2>
-        </div>
-        <div class="table-responsive">
-          <table class="table mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>Tgl Pengajuan</th>
-                <th>Tanggal Izin</th>
-                <th>Jenis &amp; Alasan</th>
-                <th>Pengganti</th>
-                <th class="text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="req in displayHistory" :key="req.id">
-                <td class="small">{{ formatDate(req.submissionDate) }}</td>
-                <td class="small">
-                  {{
-                    req.leaveStartDate === req.leaveEndDate
-                      ? formatDateShort(req.leaveStartDate)
-                      : `${formatDateShort(req.leaveStartDate)} - ${formatDateShort(req.leaveEndDate)}`
-                  }}
-                </td>
-                <td class="small">
-                  {{ leaveTypeLabel(req.leaveType) }}
-                  <br />
-                  <span class="text-muted">{{ req.reason }}</span>
-                </td>
-                <td class="small">{{ replacementTypeLabel(req.replacementType) }}</td>
-                <td class="text-center">
-                  <span class="status-badge" :class="statusClass(req.status)">
-                    {{ req.status || "Menunggu Persetujuan" }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -422,7 +376,6 @@ import { useWITA } from "@/composables/useWITA";
 import {
   findEmployeeByCode,
   submitLeaveRequest,
-  fetchLeavesByEmployee,
   uploadMedicalCertificate,
 } from "@/services/absensi-service";
 
@@ -454,9 +407,8 @@ const specialLeaveDetail = ref("");
 const replacementDates = ref([]); // [{ leaveDate, leaveFormatted, replacementDate }]
 const replacementJam = ref({ date: "", value: "", unit: "jam" });
 
-// ── Submission / history ──────────────────────────────────────────────────
+// ── Submission ────────────────────────────────────────────────────────────
 const submitting = ref(false);
-const myRequests = ref([]);
 
 // ── Feedback ──────────────────────────────────────────────────────────────
 const feedback = ref({ visible: false, bsType: "success", borderColor: "#198754", message: "" });
@@ -480,8 +432,6 @@ function showFeedback(type, message, autoHide = true) {
 const replacementDisabled = computed(
   () => form.value.leaveType === "cuti" || (form.value.leaveType === "sakit" && hasMedicalCert.value),
 );
-
-const displayHistory = computed(() => myRequests.value.slice(0, 5));
 
 // ── Watchers ──────────────────────────────────────────────────────────────
 
@@ -559,11 +509,9 @@ async function lookupEmployee(silentNotFound = false) {
     if (!emp) {
       if (!silentNotFound) showFeedback("error", "ID Karyawan tidak ditemukan!");
       employee.value = null;
-      myRequests.value = [];
       return;
     }
     employee.value = emp;
-    myRequests.value = await fetchLeavesByEmployee(emp.employeeId);
   } catch (e) {
     showFeedback("error", `Gagal mencari karyawan: ${e.message}`);
   } finally {
@@ -578,7 +526,6 @@ watch(employeeIdInput, (val) => {
   const code = (val || "").trim();
   if (code.length < 6) {
     employee.value = null;
-    myRequests.value = [];
     return;
   }
 
@@ -704,7 +651,7 @@ function removeMedicalFile() {
 // ── Validation ────────────────────────────────────────────────────────────
 function validate() {
   if (!employee.value) {
-    showFeedback("error", "Cari karyawan terlebih dahulu!");
+    showFeedback("error", "Masukkan ID karyawan terlebih dahulu!");
     return false;
   }
   if (!form.value.leaveStartDate || !form.value.leaveEndDate) {
@@ -842,7 +789,6 @@ async function submitForm() {
     });
 
     resetForm();
-    myRequests.value = await fetchLeavesByEmployee(emp.employeeId);
     await Swal.fire({
       icon: "success",
       title: "Berhasil!",
@@ -884,24 +830,6 @@ function resetForm() {
   feedback.value.visible = false;
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────
-function formatDate(isoStr) {
-  if (!isoStr) return "-";
-  return new Date(isoStr).toLocaleDateString("id-ID");
-}
-function formatDateShort(str) {
-  if (!str) return "-";
-  return new Date(str + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" });
-}
-function leaveTypeLabel(t) {
-  return { sakit: "Izin Sakit", cuti: "Cuti", normal: "Izin Lainnya" }[t] || t || "-";
-}
-function replacementTypeLabel(t) {
-  return { libur: "Ganti Libur", jam: "Ganti Jam", tidak: "Tidak Perlu Diganti" }[t] || t || "-";
-}
-function statusClass(s) {
-  return s === "Disetujui" ? "success" : s === "Ditolak" ? "danger" : "warning";
-}
 </script>
 
 <style scoped>
@@ -914,5 +842,115 @@ function statusClass(s) {
   padding: 16px;
   margin-bottom: 20px;
   font-weight: 500;
+}
+
+.page-header h1 {
+  font-size: clamp(1.15rem, 1.8vw, 1.65rem);
+  line-height: 1.25;
+}
+
+.card-header h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  line-height: 1.3;
+}
+
+.form-label {
+  font-weight: 600;
+}
+
+.form-text {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 767.98px) {
+  .page-content {
+    font-size: 0.92rem;
+  }
+
+  .page-header {
+    margin-bottom: 0.75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.1rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .breadcrumb {
+    margin-bottom: 0;
+    font-size: 0.74rem;
+  }
+
+  .card {
+    border-radius: 12px;
+  }
+
+  .card-header {
+    padding: 0.72rem 0.9rem;
+  }
+
+  .card-header h2 {
+    font-size: 0.98rem;
+  }
+
+  .card-body {
+    padding: 0.9rem;
+  }
+
+  .form-label {
+    font-size: 0.84rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .form-control,
+  .form-select,
+  .input-group-text,
+  .form-check-label,
+  .btn,
+  .alert,
+  .card-text {
+    font-size: 0.86rem;
+  }
+
+  .form-control,
+  .form-select {
+    min-height: 2.45rem;
+  }
+
+  textarea.form-control {
+    min-height: 96px;
+  }
+
+  .form-text {
+    font-size: 0.73rem;
+  }
+
+  .card-title {
+    font-size: 0.96rem;
+  }
+
+  .card-text {
+    line-height: 1.45;
+  }
+
+  .d-flex.gap-2.mt-0 {
+    flex-direction: column;
+  }
+
+  .d-flex.gap-2.mt-0 .btn {
+    width: 100%;
+  }
+
+  .feedback-popup {
+    top: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+    font-size: 0.86rem;
+  }
 }
 </style>

@@ -68,10 +68,6 @@ export const useAuthStore = defineStore("auth", {
     canAccessPage: (state) => (pageKey) => {
       if (!pageKey) return true;
       if (state.userRole === "supervisor") return true;
-      // Admin must always be able to open access settings page.
-      if (state.userRole === "admin" && (pageKey === "admin.access-codes" || pageKey === "admin.maintenance")) {
-        return true;
-      }
       if (typeof state.accessPages?.[pageKey] === "boolean") return state.accessPages[pageKey];
       return getDefaultPageAccess(pageKey, state.userRole || "staf");
     },
@@ -154,44 +150,65 @@ export const useAuthStore = defineStore("auth", {
       return new Promise((resolve) => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
           unsubscribe();
-          const sessionRaw = sessionStorage.getItem("currentUser");
-          const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
 
-          if (firebaseUser) {
-            if (sessionUser?.authMode === "legacy") {
-              this.user = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || sessionUser.email || null,
-                username: sessionUser.username || "",
-                displayName: sessionUser.displayName || sessionUser.username || firebaseUser.displayName,
-              };
-              this.userRole = sessionUser.role || "staf";
-              await this.loadAccessProfile(firebaseUser, sessionUser.username || "");
-            } else {
-              const token = await firebaseUser.getIdTokenResult();
-              this.user = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                username: token?.claims?.username ? String(token.claims.username) : "",
-                displayName: firebaseUser.displayName,
-              };
-              this.userRole = await this.fetchRole(firebaseUser);
-              await this.loadAccessProfile(firebaseUser, this.user.username || "");
+          try {
+            const sessionRaw = sessionStorage.getItem("currentUser");
+            let sessionUser = null;
+
+            if (sessionRaw) {
+              try {
+                sessionUser = JSON.parse(sessionRaw);
+              } catch (_) {
+                sessionStorage.removeItem("currentUser");
+              }
             }
-          } else {
-            // Fallback: cek sessionStorage (kompatibilitas sistem lama)
-            if (sessionUser) {
-              this.user = sessionUser;
-              this.userRole = sessionUser.role || "staf";
-              this.accessPages = buildUserAccessMap(null, this.userRole);
+
+            if (firebaseUser) {
+              if (sessionUser?.authMode === "legacy") {
+                this.user = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || sessionUser.email || null,
+                  username: sessionUser.username || "",
+                  displayName: sessionUser.displayName || sessionUser.username || firebaseUser.displayName,
+                };
+                this.userRole = sessionUser.role || "staf";
+                await this.loadAccessProfile(firebaseUser, sessionUser.username || "");
+              } else {
+                const token = await firebaseUser.getIdTokenResult();
+                this.user = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  username: token?.claims?.username ? String(token.claims.username) : "",
+                  displayName: firebaseUser.displayName,
+                };
+                this.userRole = await this.fetchRole(firebaseUser);
+                await this.loadAccessProfile(firebaseUser, this.user.username || "");
+              }
             } else {
-              this.user = null;
-              this.userRole = null;
-              this.accessPages = {};
+              // Fallback: cek sessionStorage (kompatibilitas sistem lama)
+              if (sessionUser) {
+                this.user = sessionUser;
+                this.userRole = sessionUser.role || "staf";
+                const sessionAccessProfile = {
+                  pagesAccess: sessionUser.pagesAccess,
+                  permissions: sessionUser.permissions,
+                };
+                this.accessPages = buildUserAccessMap(sessionAccessProfile, this.userRole);
+              } else {
+                this.user = null;
+                this.userRole = null;
+                this.accessPages = {};
+              }
             }
+          } catch (_) {
+            // Prevent first navigation from hanging if auth/session parsing fails.
+            this.user = null;
+            this.userRole = null;
+            this.accessPages = {};
+          } finally {
+            this.initialized = true;
+            resolve();
           }
-          this.initialized = true;
-          resolve();
         });
       });
     },
@@ -228,6 +245,7 @@ export const useAuthStore = defineStore("auth", {
             username: this.user.username,
             displayName: this.user.displayName,
             role: this.userRole,
+            pagesAccess: this.accessPages,
             authMode: "legacy",
           }),
         );
@@ -267,7 +285,10 @@ export const useAuthStore = defineStore("auth", {
         JSON.stringify({
           uid: this.user.uid,
           email: this.user.email,
+          username: this.user.username,
+          displayName: this.user.displayName,
           role: this.userRole,
+          pagesAccess: this.accessPages,
           authMode: "firebase",
         }),
       );

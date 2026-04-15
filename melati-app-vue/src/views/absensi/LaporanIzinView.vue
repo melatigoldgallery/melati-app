@@ -25,21 +25,21 @@
           </h2>
         </div>
         <div class="card-body">
-          <div class="row g-2 align-items-end">
-            <div class="col-md-2">
+          <div class="row g-2 align-items-end report-filter-row">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">Bulan</label>
               <select v-model="filter.month" class="form-select form-select-sm">
                 <option v-for="(nm, idx) in monthNames" :key="idx" :value="idx + 1">{{ nm }}</option>
               </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">Tahun</label>
               <select v-model="filter.year" class="form-select form-select-sm">
                 <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
               </select>
             </div>
-            <div class="col-md-auto">
-              <button class="btn btn-primary btn-sm" @click="loadReport" :disabled="loading">
+            <div class="col-12 col-md-auto">
+              <button class="btn btn-tampilkan btn-sm" @click="loadReport" :disabled="loading">
                 <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
                 <i v-else class="fas fa-search me-1"></i>
                 Tampilkan
@@ -50,7 +50,7 @@
       </div>
 
       <!-- Summary Cards -->
-      <div v-if="allRows.length > 0" class="row g-2 mb-4">
+      <div v-if="allRows.length > 0" class="row g-2 mb-4 d-none d-md-flex">
         <div class="col-md-3">
           <div class="card border-0 shadow-sm">
             <div class="card-body d-flex align-items-center gap-3 py-3">
@@ -112,8 +112,8 @@
             Data Izin
           </h2>
         </div>
-        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div v-if="allRows.length > 0" class="d-flex gap-2 mb-1">
+        <div class="card-header report-table-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div v-if="allRows.length > 0" class="report-actions d-none d-md-flex gap-2">
             <button class="btn btn-success btn-sm" style="font-size: 0.7rem" @click="exportExcel">
               <i class="fas fa-file-excel me-1"></i>
               Excel
@@ -123,32 +123,35 @@
               PDF
             </button>
           </div>
-          <div v-if="allRows.length > 0" class="d-flex gap-2 flex-wrap align-items-center">
-            <select
-              v-model="filterType"
-              class="form-select form-select-sm"
-              style="width: auto"
-              @change="currentPage = 1"
-            >
+
+          <div v-if="allRows.length > 0" class="d-flex gap-2 flex-wrap align-items-center report-table-filters">
+            <select v-model="filterType" class="form-select form-select-sm compact-select" @change="currentPage = 1">
               <option value="all">Semua Jenis Pengganti</option>
               <option value="libur">Ganti Libur</option>
               <option value="jam">Ganti Jam</option>
               <option value="tidak">Tidak Perlu Diganti</option>
             </select>
-            <select
-              v-model="filterStatus"
-              class="form-select form-select-sm"
-              style="width: auto"
-              @change="currentPage = 1"
-            >
+            <select v-model="filterStatus" class="form-select form-select-sm compact-select" @change="currentPage = 1">
               <option value="all">Semua Status Ganti</option>
               <option value="belum">Belum Diganti</option>
               <option value="sudah">Sudah Diganti</option>
             </select>
-            <span class="badge bg-secondary">{{ displayedTableRows.length }} data</span>
+
+            <div class="input-group input-group-sm report-search-input">
+              <span class="input-group-text">
+                <i class="fas fa-search"></i>
+              </span>
+              <input
+                v-model.trim="searchQuery"
+                type="search"
+                class="form-control"
+                placeholder="Cari nama, alasan, tanggal..."
+                @input="currentPage = 1"
+              />
+            </div>
           </div>
         </div>
-        <div class="card-body px-2">
+        <div class="card-body px-2 report-table-body">
           <div class="table-responsive">
             <table class="table table-hover table-sm mb-0">
               <thead class="table-light">
@@ -176,27 +179,27 @@
                   </td>
                 </tr>
                 <tr v-for="(row, i) in paginatedRows" :key="i">
-                  <td class="small">{{ row.rowNo }}</td>
-                  <td class="small fw-medium">{{ row.name }}</td>
-                  <td class="small" style="max-width: 100px">
+                  <td class="mobile-small">{{ row.rowNo }}</td>
+                  <td class="mobile-small fw-medium">{{ row.name }}</td>
+                  <td class="mobile-small" style="max-width: 100px">
                     <div class="text-truncate-cell" :title="row.leaveDate || ''">{{ row.leaveDate }}</div>
                   </td>
                   <td
-                    class="small text-muted"
+                    class="mobile-small"
                     style="max-width: 200px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis"
                     :title="row.reason || ''"
                   >
                     {{ row.reason }}
                   </td>
-                  <td class="small">{{ row.replacementTypeLabel }}</td>
-                  <td class="small" style="max-width: 140px">
+                  <td class="mobile-small">{{ row.replacementTypeLabel }}</td>
+                  <td class="mobile-small" style="max-width: 140px">
                     <div class="text-truncate-cell" :title="row.replacementInfo || ''">{{ row.replacementInfo }}</div>
                   </td>
                   <td class="text-center">
                     <span class="badge" :class="statusBadge(row.status)">{{ row.status }}</span>
                     <div
                       v-if="isRejectedStatus(row.status) && row.rejectedReason"
-                      class="small text-danger mt-1 text-truncate-1"
+                      class="mobile-small text-danger mt-1 text-truncate-1"
                       :title="row.rejectedReason"
                     >
                       Alasan ditolak: {{ row.rejectedReason }}
@@ -212,12 +215,15 @@
             </table>
           </div>
           <!-- Pagination -->
-          <div v-if="totalPages > 1" class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
-            <div class="d-flex align-items-center gap-2">
+          <div
+            v-if="totalPages > 1"
+            class="d-flex justify-content-between align-items-center px-3 py-2 border-top report-pagination"
+          >
+            <div class="d-flex align-items-center justify-content-between report-pagination-meta gap-2">
               <select
                 v-model="pageSize"
                 class="form-select form-select-sm"
-                style="width: auto"
+                style="width: auto; font-size: small"
                 @change="currentPage = 1"
               >
                 <option :value="10">10</option>
@@ -225,7 +231,7 @@
                 <option :value="50">50</option>
                 <option :value="100">100</option>
               </select>
-              <small class="text-muted">
+              <small class="text-muted report-pagination-text">
                 Menampilkan {{ (currentPage - 1) * pageSize + 1 }}–{{
                   Math.min(currentPage * pageSize, displayedTableRows.length)
                 }}
@@ -302,6 +308,7 @@ const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
 
 const filterType = ref("all");
 const filterStatus = ref("all");
+const searchQuery = ref("");
 
 // ── Pagination ─────────────────────────────────────────────────────────────
 const currentPage = ref(1);
@@ -435,6 +442,16 @@ const tableRows = computed(() => {
 
 const displayedTableRows = computed(() => {
   let rows = tableRows.value;
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase();
+    rows = rows.filter((r) => {
+      return [r.name, r.leaveDate, r.reason, r.replacementTypeLabel, r.replacementInfo, r.status, r.replacementStatus]
+        .map((v) => String(v || "").toLowerCase())
+        .some((v) => v.includes(q));
+    });
+  }
+
   if (filterType.value !== "all") {
     rows = rows.filter((r) => r._replacementType === filterType.value);
   }
@@ -603,6 +620,51 @@ async function exportPDF() {
 </script>
 
 <style scoped>
+.page-header h1 {
+  font-size: clamp(1.1rem, 1.8vw, 1.6rem);
+  line-height: 1.25;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+  line-height: 1.3;
+}
+
+.report-table-toolbar {
+  padding: 0.75rem 0.95rem;
+}
+
+.report-actions .btn {
+  min-width: 84px;
+}
+
+.report-table-filters {
+  margin-left: auto;
+}
+
+.report-table-filters .compact-select {
+  min-width: 190px;
+  width: 190px;
+}
+
+.report-search-input {
+  width: 300px;
+}
+
+.report-search-input .input-group-text,
+.report-search-input .form-control {
+  font-size: 0.8rem;
+}
+
+.report-table-body .table {
+  font-size: 0.8rem;
+}
+
+.report-table-body .table thead th {
+  font-weight: 700;
+}
+
 .text-truncate-1 {
   overflow: hidden;
   white-space: nowrap;
@@ -616,5 +678,111 @@ async function exportPDF() {
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: 220px;
+}
+
+.mobile-small {
+  font-size: inherit;
+}
+
+@media (max-width: 767.98px) {
+  .page-header {
+    margin-bottom: 0.8rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.1rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .breadcrumb {
+    margin-bottom: 0;
+    font-size: 0.74rem;
+  }
+
+  .card {
+    border-radius: 12px;
+  }
+
+  .card-header {
+    padding: 0.72rem 0.85rem;
+  }
+
+  .card-body {
+    padding: 0.85rem;
+  }
+
+  .report-filter-row .form-label {
+    font-size: 0.76rem;
+  }
+
+  .report-filter-row .form-select,
+  .report-filter-row .btn {
+    min-height: 2.35rem;
+    font-size: 0.86rem;
+  }
+
+  .report-filter-row .btn {
+    width: 100%;
+  }
+
+  .report-table-filters .compact-select {
+    width: 100%;
+    font-size: 0.8rem;
+  }
+
+  .report-search-input {
+    width: 100%;
+  }
+
+  .data-count-badge {
+    font-size: 0.72rem;
+  }
+
+  .report-table-body {
+    padding-left: 0.45rem !important;
+    padding-right: 0.45rem !important;
+  }
+
+  .table {
+    font-size: 0.78rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.45rem 0.35rem;
+    white-space: nowrap;
+  }
+
+  .text-truncate-cell,
+  .text-truncate-1 {
+    max-width: 160px;
+  }
+
+  .mobile-small {
+    font-size: 0.875em;
+  }
+
+  .report-pagination {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.65rem;
+    padding-left: 0.55rem !important;
+    padding-right: 0.55rem !important;
+  }
+
+  .report-pagination-text {
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .page-link {
+    padding: 0.22rem 0.5rem;
+    font-size: 0.78rem;
+  }
 }
 </style>

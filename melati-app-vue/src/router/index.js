@@ -49,12 +49,13 @@ const KelolUserView = () => import("@/views/pengaturan/KelolUserView.vue");
 const KodeAksesView = () => import("@/views/pengaturan/KodeAksesView.vue");
 const JamAbsensiView = () => import("@/views/pengaturan/JamAbsensiView.vue");
 const AntrianClosingSettingView = () => import("@/views/pengaturan/AntrianSettingView.vue");
+const TemaWarnaView = () => import("@/views/pengaturan/TemaWarnaView.vue");
 const MaintenanceView = () => import("@/views/pengaturan/MaintenanceView.vue");
 
 // ─── Route definitions ────────────────────────────────────────────────────────
 const routes = [
   // Public
-  { path: "/", redirect: "/login" },
+  { path: "/", component: LoginView, meta: { layout: "blank", public: true } },
   { path: "/login", component: LoginView, meta: { layout: "blank", public: true } },
   { path: "/unauthorized", component: UnauthorizedView, meta: { layout: "blank", public: true } },
 
@@ -199,6 +200,11 @@ const routes = [
     meta: { requiresAuth: true, pageKey: "admin.antrian-closing" },
   },
   {
+    path: "/pengaturan/tema-warna",
+    component: TemaWarnaView,
+    meta: { requiresAuth: true, pageKey: "admin.theme-appearance" },
+  },
+  {
     path: "/pengaturan/maintenance",
     component: MaintenanceView,
     meta: { requiresAuth: true, pageKey: "admin.maintenance" },
@@ -209,10 +215,11 @@ const routes = [
   { path: "/admin/access-codes", redirect: "/pengaturan/access-codes" },
   { path: "/admin/jam-absensi", redirect: "/pengaturan/jam-absensi" },
   { path: "/admin/antrian-penutupan", redirect: "/pengaturan/antrian-penutupan" },
+  { path: "/admin/tema-warna", redirect: "/pengaturan/tema-warna" },
   { path: "/maintenance", redirect: "/pengaturan/maintenance" },
 
   // 404 catch-all
-  { path: "/:pathMatch(.*)*", redirect: "/dashboard" },
+  { path: "/:pathMatch(.*)*", redirect: "/login" },
 ];
 
 const router = createRouter({

@@ -37,7 +37,7 @@
               <option value="">Semua Sales</option>
               <option v-for="s in salesOptions" :key="s" :value="s">{{ s }}</option>
             </select>
-            <button @click="loadData" class="btn btn-primary btn-sm">
+            <button @click="loadData" class="btn btn-tampilkan btn-sm">
               <i class="bi bi-search me-1"></i>
               Tampilkan
             </button>

@@ -62,7 +62,7 @@
             />
           </div>
           <div class="col-12 col-md-auto d-flex align-items-end gap-2 flex-wrap">
-            <button class="btn btn-primary btn-sm fw-semibold flex-fill flex-md-grow-0" @click="loadData">
+            <button class="btn btn-tampilkan btn-sm fw-semibold flex-fill flex-md-grow-0" @click="loadData">
               <i class="bi bi-search me-1"></i>
               Tampilkan
             </button>
@@ -97,64 +97,74 @@
     <!-- Content -->
     <div v-else>
       <!-- Mobile card view -->
-      <div class="d-md-none">
+      <div class="d-md-none mobile-servis-list">
         <div v-if="filteredList.length === 0" class="text-center text-muted py-5">
           <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
           <p class="small">Tidak ada data servis.</p>
         </div>
-        <div v-for="(item, idx) in paginatedList" :key="item.id" class="card border-0 shadow-sm mb-2 rounded-3">
-          <div class="card-body py-2 px-3">
+        <div
+          v-for="item in paginatedList"
+          :key="item.id"
+          class="card border-0 shadow-sm mb-2 rounded-3 mobile-servis-card"
+        >
+          <div class="card-body mobile-servis-card-body">
             <!-- Row 1: customer + tanggal -->
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <span class="fw-bold text-dark">{{ item.namaCustomer }}</span>
-              <span class="text-muted" style="font-size: 0.75rem">{{ formatTanggal(item.tanggal) }}</span>
+            <div class="d-flex justify-content-between align-items-start mb-1 mobile-top-row">
+              <span class="fw-bold text-dark mobile-customer">{{ item.namaCustomer }}</span>
+              <span class="text-muted mobile-date">{{ formatTanggal(item.tanggal) }}</span>
             </div>
             <!-- Row 2: nama barang + jenis -->
-            <div class="d-flex align-items-center gap-1 mb-1" style="font-size: 0.82rem">
-              <span class="text-truncate flex-grow-1">{{ getItemNama(item) }}</span>
-              <span class="badge text-muted flex-shrink-0" style="font-size: 0.7rem">
+            <div class="d-flex align-items-center gap-1 mb-1 mobile-item-row">
+              <span class="text-truncate flex-grow-1 mobile-item-name">{{ getItemNama(item) }}</span>
+              <span class="badge text-muted flex-shrink-0 mobile-item-kind">
                 {{ item.jenisInput === "custom" ? "CUSTOM" : getItemJenisServis(item) }}
               </span>
             </div>
             <!-- Row 3: sales + rincian -->
-            <div class="text-muted mb-1" style="font-size: 0.75rem">
+            <div class="text-muted mb-1 mobile-sales-row">
               <span v-if="item.namaSales && getItemRincian(item) !== '-'">SALES :</span>
               <span v-if="item.namaSales">{{ item.namaSales }}</span>
             </div>
             <!-- Row 4: badges + ongkos -->
-            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1 mobile-status-row">
               <div class="d-flex gap-1 flex-wrap">
-                <span class="badge" :class="statusServisBadge(item.statusServis)" style="font-size: 0.7rem">
+                <span class="badge mobile-status-badge" :class="statusServisBadge(item.statusServis)">
                   {{ item.statusServis }}
                 </span>
-                <span class="badge" :class="statusPengambilanBadge(item.statusPengambilan)" style="font-size: 0.7rem">
+                <span class="badge mobile-status-badge" :class="statusPengambilanBadge(item.statusPengambilan)">
                   {{ item.statusPengambilan }}
                 </span>
-                <span
-                  class="badge"
-                  :class="statusPembayaranBadge(getItemStatusPembayaran(item))"
-                  style="font-size: 0.7rem"
-                >
+                <span class="badge mobile-status-badge" :class="statusPembayaranBadge(getItemStatusPembayaran(item))">
                   {{ statusPembayaranLabel(getItemStatusPembayaran(item)) }}
                 </span>
               </div>
-              <span class="fw-bold text-dark" style="font-size: 0.85rem">
+              <span class="fw-bold text-dark mobile-price">
                 Rp {{ Number(getItemOngkos(item)).toLocaleString("id-ID") }}
               </span>
             </div>
-            <!-- Row 5: actions (update status + WA only) -->
-            <div class="d-flex gap-2">
-              <button class="btn btn-warning btn-sm flex-fill" @click="openStatusModal(item)">
-                <i class="bi bi-arrow-repeat me-1"></i>
-                Update Status
-              </button>
+            <!-- Row 5: actions -->
+            <div class="d-grid gap-2 mobile-action-grid">
+              <div class="d-flex gap-2">
+                <button class="btn btn-warning btn-sm flex-fill" @click="openStatusModal(item)">
+                  <i class="bi bi-arrow-repeat me-1"></i>
+                  Update Status
+                </button>
+                <button
+                  v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
+                  class="btn btn-success btn-sm flex-fill"
+                  @click="sendWA(item)"
+                >
+                  <i class="bi bi-whatsapp me-1"></i>
+                  WhatsApp
+                </button>
+              </div>
               <button
-                v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
-                class="btn btn-success btn-sm flex-fill"
-                @click="sendWA(item)"
+                v-if="item.buktiPengambilanUrl || item.buktiPengambilanLiteUrl"
+                class="btn btn-outline-info btn-sm w-100"
+                @click="openBuktiModal(item)"
               >
-                <i class="bi bi-whatsapp me-1"></i>
-                WhatsApp
+                <i class="bi bi-eye me-1"></i>
+                Lihat Bukti Pengambilan
               </button>
             </div>
           </div>
@@ -1256,6 +1266,16 @@ function sendWA(item) {
   else swal("Nomor HP tidak tersedia", "warning");
 }
 
+function openBuktiModal(item) {
+  const url = item?.buktiPengambilanLiteUrl || item?.buktiPengambilanUrl || "";
+  if (!url) {
+    swal("Bukti pengambilan belum tersedia", "warning");
+    return;
+  }
+  buktiViewUrl.value = url;
+  Modal.getOrCreateInstance(document.getElementById("buktiModal")).show();
+}
+
 async function rePrint(item) {
   try {
     await printServisSlip(item);
@@ -1547,5 +1567,91 @@ onUnmounted(() => {
 .table td {
   white-space: nowrap;
   vertical-align: middle;
+}
+
+.mobile-servis-card {
+  border-radius: 0.9rem !important;
+}
+
+.mobile-servis-card-body {
+  padding: 0.75rem 0.8rem;
+}
+
+.mobile-top-row {
+  gap: 0.5rem;
+}
+
+.mobile-customer {
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.mobile-date {
+  font-size: 0.73rem;
+  white-space: nowrap;
+}
+
+.mobile-item-row {
+  font-size: 0.82rem;
+}
+
+.mobile-item-name {
+  line-height: 1.3;
+}
+
+.mobile-item-kind {
+  font-size: 0.68rem;
+  border: 1px solid #d8dee6;
+}
+
+.mobile-sales-row {
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.mobile-status-row {
+  align-items: flex-start;
+}
+
+.mobile-status-badge {
+  font-size: 0.68rem;
+}
+
+.mobile-price {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.mobile-action-grid .btn {
+  font-size: 0.77rem;
+  font-weight: 600;
+}
+
+@media (max-width: 420px) {
+  .mobile-servis-card-body {
+    padding: 0.68rem 0.72rem;
+  }
+
+  .mobile-customer {
+    font-size: 0.88rem;
+  }
+
+  .mobile-item-row {
+    font-size: 0.79rem;
+  }
+
+  .mobile-status-badge {
+    font-size: 0.64rem;
+  }
+
+  .mobile-price {
+    font-size: 0.78rem;
+  }
+
+  .mobile-action-grid .btn {
+    font-size: 0.73rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
 }
 </style>

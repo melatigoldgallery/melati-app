@@ -15,12 +15,12 @@
     </div>
 
     <div class="card border-0 shadow-sm mb-3">
-        <div class="card-header">
-          <h2>
-            <i class="fas fa-filter me-2"></i>
-            Filter Laporan
-          </h2>
-        </div>
+      <div class="card-header">
+        <h2>
+          <i class="fas fa-filter me-2"></i>
+          Filter Laporan
+        </h2>
+      </div>
       <div class="card-body">
         <div class="d-flex gap-2 align-items-center flex-wrap">
           <input v-model="filterStart" type="date" class="form-control form-control-sm" style="width: 155px" />
@@ -41,7 +41,7 @@
             <option value="rekap">Rekap (Per Kode)</option>
             <option value="detail">Detail (Per Transaksi)</option>
           </select>
-          <button @click="loadReport()" :disabled="store.isLoading" class="btn btn-primary btn-sm">
+          <button @click="loadReport()" :disabled="store.isLoading" class="btn btn-tampilkan btn-sm">
             <span v-if="store.isLoading" class="spinner-border spinner-border-sm me-1"></span>
             <i v-else class="bi bi-search me-1"></i>
             Tampilkan
@@ -106,25 +106,25 @@
         <div
           class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2 flex-wrap gap-2"
         >
-            <div class="d-flex gap-2">
-              <button
-                @click="exportExcel"
-                :disabled="!hasLoaded"
-                class="btn btn-success btn-sm"
-                style="font-size: 0.7rem"
-              >
-                <i class="bi bi-file-earmark-excel me-1"></i>
-                Excel
-              </button>
-              <button @click="exportPdf" :disabled="!hasLoaded" class="btn btn-danger btn-sm" style="font-size: 0.7rem">
-                <i class="bi bi-file-earmark-pdf me-1"></i>
-                PDF
-              </button>
-            </div>
-            <div class="input-group input-group-sm" style="width: 240px">
-              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-              <input v-model="searchText" type="text" class="form-control" placeholder="Cari..." />
-            </div>
+          <div class="d-flex gap-2">
+            <button
+              @click="exportExcel"
+              :disabled="!hasLoaded"
+              class="btn btn-success btn-sm"
+              style="font-size: 0.7rem"
+            >
+              <i class="bi bi-file-earmark-excel me-1"></i>
+              Excel
+            </button>
+            <button @click="exportPdf" :disabled="!hasLoaded" class="btn btn-danger btn-sm" style="font-size: 0.7rem">
+              <i class="bi bi-file-earmark-pdf me-1"></i>
+              PDF
+            </button>
+          </div>
+          <div class="input-group input-group-sm" style="width: 240px">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input v-model="searchText" type="text" class="form-control" placeholder="Cari..." />
+          </div>
         </div>
 
         <div class="card-body p-0">

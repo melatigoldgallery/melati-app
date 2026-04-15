@@ -997,7 +997,11 @@ onUnmounted(() => {
 }
 
 .queue-card .card-header {
-  background: linear-gradient(135deg, #3f37c9 0%, #4361ee 100%);
+  background: linear-gradient(
+    135deg,
+    var(--theme-antrian-card-header-start) 0%,
+    var(--theme-antrian-card-header-end) 100%
+  );
   color: white;
   font-weight: 600;
   border-top-left-radius: 8px;
