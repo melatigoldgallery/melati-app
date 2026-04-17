@@ -1,6 +1,6 @@
 // Struktur menu sidebar — digunakan oleh AppSidebar.vue
 // roles: array role yang boleh melihat menu ini
-const ALL = ["admin", "supervisor", "staf", "admin_custom"];
+const ALL = ["admin", "supervisor", "staff", "hrd", "admin_custom"];
 
 export const menuStructure = [
   { label: "Dashboard", icon: "bi-house-door", to: "/dashboard", pageKey: "dashboard", roles: ALL },

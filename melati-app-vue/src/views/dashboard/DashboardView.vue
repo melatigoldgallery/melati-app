@@ -10,7 +10,7 @@
 
       <section class="mb-4">
         <div class="row g-3 dashboard-stats-grid">
-          <div v-for="sys in visibleSystems" :key="sys.label" class="col-12 col-sm-6 col-xl-3">
+          <div v-for="sys in desktopSystems" :key="sys.label" class="col-12 col-sm-6 col-xl-3">
             <RouterLink :to="sys.to" class="text-decoration-none d-block h-100 system-link">
               <article class="system-card" :style="{ '--grad-start': sys.gradStart, '--grad-end': sys.gradEnd }">
                 <div class="system-icon" :style="{ background: sys.iconColor }">
@@ -35,7 +35,7 @@
         </div>
         <div class="card-body pt-1">
           <div class="row g-2">
-            <div v-for="link in visibleQuickLinks" :key="link.to" class="col-6 col-md-3">
+            <div v-for="link in desktopQuickLinks" :key="link.to" class="col-6 col-md-3">
               <RouterLink :to="link.to" class="text-decoration-none d-block">
                 <div class="quick-btn" :style="{ background: link.color }">
                   <i :class="['bi', link.icon]" aria-hidden="true"></i>
@@ -116,7 +116,7 @@
                 <i class="bi bi-info-circle me-2"></i>
                 Tentang Aplikasi
               </h2>
-              <p class="card-text small mb-0">
+              <p class="card-text small mb-0 text-center">
                 Sistem ini digunakan untuk memproses data servis, dokumentasi bukti pengambilan, dan update status
                 barang customer dengan mudah.
               </p>
@@ -154,6 +154,7 @@
 <script setup>
 import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { normalizeUserRole } from "@/config/access-control";
 
 const auth = useAuthStore();
 
@@ -162,9 +163,7 @@ function canOpen(pageKey) {
 }
 
 const normalizedRole = computed(() => {
-  const role = String(auth.userRole || "").toLowerCase();
-  if (role === "staff") return "staf";
-  return role;
+  return normalizeUserRole(auth.userRole, "staff");
 });
 
 const systems = [
@@ -210,6 +209,49 @@ const systems = [
   },
 ];
 
+const hrdSystems = [
+  {
+    label: "Kehadiran Harian",
+    desc: "Pantau absensi masuk dan pulang karyawan setiap hari.",
+    to: "/absensi/kehadiran",
+    icon: "bi-person-check",
+    iconColor: "linear-gradient(135deg,#0d6efd 0%,#3b5bdb 100%)",
+    gradStart: "#0d6efd",
+    gradEnd: "#3b5bdb",
+    pageKey: "absensi.kehadiran",
+  },
+  {
+    label: "Pengajuan Izin",
+    desc: "Tinjau dan dokumentasikan pengajuan izin karyawan.",
+    to: "/absensi/pengajuan-izin",
+    icon: "bi-calendar-plus",
+    iconColor: "linear-gradient(135deg,#2f9e44 0%,#12b886 100%)",
+    gradStart: "#2f9e44",
+    gradEnd: "#12b886",
+    pageKey: "absensi.pengajuan-izin",
+  },
+  {
+    label: "Laporan Kehadiran",
+    desc: "Analisis ringkasan kehadiran karyawan per periode.",
+    to: "/absensi/laporan-kehadiran",
+    icon: "bi-clipboard-data",
+    iconColor: "linear-gradient(135deg,#f59f00 0%,#f76707 100%)",
+    gradStart: "#f59f00",
+    gradEnd: "#f76707",
+    pageKey: "absensi.laporan-kehadiran",
+  },
+  {
+    label: "Laporan Izin",
+    desc: "Lihat histori dan status persetujuan izin karyawan.",
+    to: "/absensi/laporan-izin",
+    icon: "bi-journal-check",
+    iconColor: "linear-gradient(135deg,#845ef7 0%,#5f3dc4 100%)",
+    gradStart: "#845ef7",
+    gradEnd: "#5f3dc4",
+    pageKey: "absensi.laporan-izin",
+  },
+];
+
 const quickLinks = [
   { label: "Admin Antrian", to: "/antrian/admin", icon: "bi-people-fill", color: "#3b5bdb", pageKey: "antrian.admin" },
   {
@@ -251,11 +293,51 @@ const quickLinks = [
   { label: "Data Servis", to: "/servis/data", icon: "bi-person-gear", color: "#495057", pageKey: "servis.data" },
 ];
 
-const visibleSystems = computed(() => systems.filter((item) => canOpen(item.pageKey)));
-const visibleQuickLinks = computed(() => quickLinks.filter((item) => canOpen(item.pageKey)));
+const hrdQuickLinks = [
+  {
+    label: "Kehadiran",
+    to: "/absensi/kehadiran",
+    icon: "bi-person-check-fill",
+    color: "#2b59c3",
+    pageKey: "absensi.kehadiran",
+  },
+  {
+    label: "Pengajuan Izin",
+    to: "/absensi/pengajuan-izin",
+    icon: "bi-calendar-plus-fill",
+    color: "#2f9e44",
+    pageKey: "absensi.pengajuan-izin",
+  },
+  {
+    label: "Laporan Kehadiran",
+    to: "/absensi/laporan-kehadiran",
+    icon: "bi-clipboard-data-fill",
+    color: "#e67700",
+    pageKey: "absensi.laporan-kehadiran",
+  },
+  {
+    label: "Laporan Izin",
+    to: "/absensi/laporan-izin",
+    icon: "bi-journal-check",
+    color: "#5f3dc4",
+    pageKey: "absensi.laporan-izin",
+  },
+];
+
+const desktopSystems = computed(() => {
+  const source = normalizedRole.value === "hrd" ? hrdSystems : systems;
+  return source.filter((item) => canOpen(item.pageKey));
+});
+
+const desktopQuickLinks = computed(() => {
+  const source = normalizedRole.value === "hrd" ? hrdQuickLinks : quickLinks;
+  return source.filter((item) => canOpen(item.pageKey));
+});
 
 const mobileDashboardVariant = computed(() => {
-  if (normalizedRole.value === "staf" && canOpen("absensi.pengajuan-izin")) return "staff";
+  if ((normalizedRole.value === "staff" || normalizedRole.value === "hrd") && canOpen("absensi.pengajuan-izin")) {
+    return "staff";
+  }
   if ((normalizedRole.value === "admin" || normalizedRole.value === "admin_custom") && canOpen("servis.data")) {
     return "admin";
   }
@@ -268,19 +350,19 @@ const showMobileRoleLayout = computed(() => mobileDashboardVariant.value !== nul
 const staffFeatures = [
   {
     title: "Absensi Harian",
-    desc: "Scan barcode untuk absensi masuk dan pulan.",
+    desc: "Scan barcode untuk absensi masuk dan pulang.",
     icon: "bi-person-check",
     color: "linear-gradient(135deg,#3b5bdb 0%,#5f3dc4 100%)",
   },
   {
     title: "Laporan Kehadiran",
-    desc: "Lihat laporan kehadiran karyawan dengan mudahn.",
+    desc: "Lihat laporan kehadiran karyawan dengan mudah.",
     icon: "bi-bar-chart-line",
     color: "linear-gradient(135deg,#0c8599 0%,#1c7ed6 100%)",
   },
   {
     title: "Pengajuan Izin",
-    desc: "Ajukan izin libur  izin pulang lebih awal melalui aplikasi.",
+    desc: "Ajukan izin libur, izin sakit, dan keperluan lainnya melalui aplikasi.",
     icon: "bi-calendar-plus",
     color: "linear-gradient(135deg,#2f9e44 0%,#12b886 100%)",
   },

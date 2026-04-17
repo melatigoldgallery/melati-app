@@ -15,12 +15,13 @@
       <!-- User badge -->
       <div class="dropdown">
         <button
-          class="btn p-0 border-0 bg-transparent d-flex align-items-center"
+          class="btn p-0 border-0 bg-transparent d-flex align-items-center role-dropdown-trigger"
           type="button"
           data-bs-toggle="dropdown"
           aria-expanded="false"
         >
           <span class="badge btn-primary text-uppercase small">{{ auth.userRole }}</span>
+          <i class="bi bi-chevron-down role-dropdown-icon ms-1" aria-hidden="true"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
           <li>
@@ -83,5 +84,19 @@ onUnmounted(() => clearInterval(clockInterval));
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+.role-dropdown-trigger {
+  cursor: pointer;
+}
+
+.role-dropdown-icon {
+  font-size: 0.75rem;
+  color: #6c757d;
+  transition: transform 0.2s ease;
+}
+
+.role-dropdown-trigger[aria-expanded="true"] .role-dropdown-icon {
+  transform: rotate(180deg);
 }
 </style>

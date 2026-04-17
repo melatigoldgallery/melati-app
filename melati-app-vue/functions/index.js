@@ -37,6 +37,20 @@ function buildLegacyUid(username) {
   return `legacy_${safe || "user"}`;
 }
 
+function normalizeUserRole(role, fallback = "staff") {
+  const raw = String(role || "")
+    .trim()
+    .toLowerCase();
+  const normalizedFallback =
+    fallback === null || fallback === undefined ? "staff" : String(fallback).trim().toLowerCase();
+
+  if (!raw) return normalizedFallback;
+  if (raw === "staf") return "staff";
+  if (raw === "hr") return "hrd";
+  if (["admin", "supervisor", "staff", "hrd", "admin_custom"].includes(raw)) return raw;
+  return normalizedFallback;
+}
+
 function normalizeMaintenanceCollectionKey(value) {
   return String(value || "")
     .toLowerCase()
@@ -233,9 +247,7 @@ async function resolveCallerRole(request) {
     throw new HttpsError("unauthenticated", "Anda harus login.");
   }
 
-  const directRole = String(authData.token?.role || "")
-    .trim()
-    .toLowerCase();
+  const directRole = normalizeUserRole(authData.token?.role, "");
   if (directRole) return directRole;
 
   const email = String(authData.token?.email || "").trim();
@@ -243,16 +255,14 @@ async function resolveCallerRole(request) {
     try {
       const snap = await db.collection("userRoles").doc(email).get();
       if (snap.exists) {
-        return String(snap.data()?.role || "staf")
-          .trim()
-          .toLowerCase();
+        return normalizeUserRole(snap.data()?.role, "staff");
       }
     } catch (_) {
       // noop
     }
   }
 
-  return "staf";
+  return "staff";
 }
 
 export const maintenanceMonthlyCleanup = onCall(
@@ -432,7 +442,7 @@ export const loginWithUsername = onCall(
     }
 
     const usernameValue = String(userData.username || userSnap.id);
-    const role = String(userData.role || "staf");
+    const role = normalizeUserRole(userData.role, "staff");
     const displayName = String(userData.displayName || usernameValue);
     const email = userData.email ? String(userData.email) : null;
     const uid = userData.uid ? String(userData.uid) : buildLegacyUid(usernameValue);

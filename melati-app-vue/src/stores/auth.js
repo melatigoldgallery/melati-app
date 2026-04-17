@@ -3,7 +3,15 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCust
 import { auth, db, functions } from "@/config/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { buildUserAccessMap, getDefaultPageAccess } from "@/config/access-control";
+import { buildUserAccessMap, getDefaultPageAccess, normalizeUserRole } from "@/config/access-control";
+
+function normalizeRoleForCompare(role) {
+  const raw = String(role || "")
+    .trim()
+    .toLowerCase();
+  if (raw === "staf") return "staff";
+  return raw;
+}
 
 function mapUsernameLoginError(err) {
   const code = err?.code || "";
@@ -57,7 +65,7 @@ function mapUsernameLoginError(err) {
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     user: null, // Firebase Auth user object
-    userRole: null, // 'admin' | 'supervisor' | 'staf' | 'admin_custom'
+    userRole: null, // 'admin' | 'supervisor' | 'staff' | 'hrd' | 'admin_custom'
     accessPages: {}, // pageKey -> boolean
     initialized: false, // true setelah onAuthStateChanged pertama kali resolve
   }),
@@ -67,9 +75,10 @@ export const useAuthStore = defineStore("auth", {
     currentUser: (state) => state.user,
     canAccessPage: (state) => (pageKey) => {
       if (!pageKey) return true;
-      if (state.userRole === "supervisor") return true;
+      const role = normalizeUserRole(state.userRole, "staff");
+      if (role === "supervisor") return true;
       if (typeof state.accessPages?.[pageKey] === "boolean") return state.accessPages[pageKey];
-      return getDefaultPageAccess(pageKey, state.userRole || "staf");
+      return getDefaultPageAccess(pageKey, role);
     },
   },
 
@@ -78,7 +87,7 @@ export const useAuthStore = defineStore("auth", {
     async fetchRole(firebaseUser) {
       try {
         const token = await firebaseUser.getIdTokenResult();
-        if (token?.claims?.role) return String(token.claims.role);
+        if (token?.claims?.role) return normalizeUserRole(token.claims.role, "staff");
       } catch (_) {
         /* ignore token read errors */
       }
@@ -86,12 +95,12 @@ export const useAuthStore = defineStore("auth", {
       try {
         if (firebaseUser.email) {
           const snap = await getDoc(doc(db, "userRoles", firebaseUser.email));
-          if (snap.exists()) return snap.data().role || "staf";
+          if (snap.exists()) return normalizeUserRole(snap.data().role, "staff");
         }
       } catch (_) {
         /* jaringan/permission error — gunakan fallback */
       }
-      return firebaseUser.displayName || "staf";
+      return normalizeUserRole(firebaseUser.displayName, "staff");
     },
 
     async resolveUsername(firebaseUser, fallbackUsername = "") {
@@ -124,7 +133,7 @@ export const useAuthStore = defineStore("auth", {
       if (this.user) this.user.username = username || this.user.username || "";
 
       if (!username) {
-        this.accessPages = buildUserAccessMap(null, this.userRole || "staf");
+        this.accessPages = buildUserAccessMap(null, this.userRole || "staff");
         return;
       }
 
@@ -132,7 +141,7 @@ export const useAuthStore = defineStore("auth", {
         const snap = await getDoc(doc(db, "users", username));
         if (snap.exists()) {
           const userData = snap.data() || {};
-          this.accessPages = buildUserAccessMap(userData, this.userRole || userData.role || "staf");
+          this.accessPages = buildUserAccessMap(userData, this.userRole || userData.role || "staff");
           if (this.user && !this.user.displayName) {
             this.user.displayName = userData.displayName || username;
           }
@@ -142,7 +151,7 @@ export const useAuthStore = defineStore("auth", {
         /* ignore */
       }
 
-      this.accessPages = buildUserAccessMap(null, this.userRole || "staf");
+      this.accessPages = buildUserAccessMap(null, this.userRole || "staff");
     },
 
     // ── Dipanggil sekali saat app mount (main.js) ───────────────────────────
@@ -171,7 +180,7 @@ export const useAuthStore = defineStore("auth", {
                   username: sessionUser.username || "",
                   displayName: sessionUser.displayName || sessionUser.username || firebaseUser.displayName,
                 };
-                this.userRole = sessionUser.role || "staf";
+                this.userRole = normalizeUserRole(sessionUser.role, "staff");
                 await this.loadAccessProfile(firebaseUser, sessionUser.username || "");
               } else {
                 const token = await firebaseUser.getIdTokenResult();
@@ -187,13 +196,16 @@ export const useAuthStore = defineStore("auth", {
             } else {
               // Fallback: cek sessionStorage (kompatibilitas sistem lama)
               if (sessionUser) {
-                this.user = sessionUser;
-                this.userRole = sessionUser.role || "staf";
+                this.user = {
+                  ...sessionUser,
+                  role: normalizeUserRole(sessionUser.role, "staff"),
+                };
+                this.userRole = normalizeUserRole(sessionUser.role, "staff");
                 const sessionAccessProfile = {
                   pagesAccess: sessionUser.pagesAccess,
                   permissions: sessionUser.permissions,
                 };
-                this.accessPages = buildUserAccessMap(sessionAccessProfile, this.userRole);
+                this.accessPages = buildUserAccessMap(sessionAccessProfile, this.userRole || "staff");
               } else {
                 this.user = null;
                 this.userRole = null;
@@ -234,7 +246,7 @@ export const useAuthStore = defineStore("auth", {
           username: payload.username || username,
           displayName: payload.displayName || payload.username || username,
         };
-        this.userRole = payload.role || "staf";
+        this.userRole = normalizeUserRole(payload.role, "staff");
         await this.loadAccessProfile(firebaseUser, this.user.username || username);
 
         sessionStorage.setItem(
@@ -305,7 +317,11 @@ export const useAuthStore = defineStore("auth", {
 
     // ── Cek role helper ──────────────────────────────────────────────────────
     hasRole(roles) {
-      return Array.isArray(roles) ? roles.includes(this.userRole) : this.userRole === roles;
+      const currentRole = normalizeRoleForCompare(this.userRole);
+      if (Array.isArray(roles)) {
+        return roles.some((role) => normalizeRoleForCompare(role) === currentRole);
+      }
+      return normalizeRoleForCompare(roles) === currentRole;
     },
   },
 });

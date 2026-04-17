@@ -13,22 +13,28 @@
 
     <!-- Stats -->
     <div class="row g-2 mb-3">
-      <div class="col-4">
+      <div class="col-6 col-md-3">
         <div class="card border-0 shadow-sm text-center py-2">
           <div class="fw-bold fs-5">{{ users.length }}</div>
           <div class="small text-muted">Total User</div>
         </div>
       </div>
-      <div class="col-4">
+      <div class="col-6 col-md-3">
         <div class="card border-0 shadow-sm text-center py-2">
           <div class="fw-bold fs-5 text-primary">{{ countRole("admin") }}</div>
           <div class="small text-muted">Admin</div>
         </div>
       </div>
-      <div class="col-4">
+      <div class="col-6 col-md-3">
         <div class="card border-0 shadow-sm text-center py-2">
-          <div class="fw-bold fs-5 text-secondary">{{ countRole("staf") }}</div>
+          <div class="fw-bold fs-5 text-secondary">{{ countRole("staff") }}</div>
           <div class="small text-muted">Staff</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-2">
+          <div class="fw-bold fs-5 text-info">{{ countRole("hrd") }}</div>
+          <div class="small text-muted">HRD</div>
         </div>
       </div>
     </div>
@@ -61,22 +67,26 @@
               <td class="small fw-semibold">{{ u.username }}</td>
               <td class="small">{{ u.displayName || "-" }}</td>
               <td>
-                <span
-                  class="badge"
-                  :class="u.role === 'admin' ? 'bg-warning' : u.role === 'supervisor' ? 'bg-primary' : 'bg-secondary'"
-                >
-                  {{ u.role }}
+                <span class="badge" :class="getRoleBadgeClass(u.role)">
+                  {{ getRoleLabel(u.role) }}
                 </span>
               </td>
               <td class="small text-muted">{{ formatTs(u.createdAt) }}</td>
               <td class="text-center">
-                <span v-if="u.username === 'supervisor'" class="badge bg-warning text-dark small">Protected</span>
-                <div v-else class="btn-group btn-group-sm">
+                <div class="btn-group btn-group-sm">
                   <button class="btn btn-outline-primary btn-sm" @click="openEdit(u)">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <button class="btn btn-outline-danger btn-sm" @click="removeUser(u)">
+                  <button v-if="!isProtectedUser(u)" class="btn btn-outline-danger btn-sm" @click="removeUser(u)">
                     <i class="bi bi-trash"></i>
+                  </button>
+                  <button
+                    v-else
+                    class="btn btn-outline-secondary btn-sm"
+                    disabled
+                    title="Akun supervisor tidak dapat dihapus"
+                  >
+                    <i class="bi bi-shield-lock"></i>
                   </button>
                 </div>
               </td>
@@ -105,7 +115,6 @@
                   v-model="form.username"
                   type="text"
                   class="form-control form-control-sm"
-                  :readonly="!!editTarget"
                   placeholder="min 3 karakter, tanpa spasi"
                 />
               </div>
@@ -121,7 +130,8 @@
                 <select v-model="form.role" class="form-select form-select-sm">
                   <option value="admin">Admin</option>
                   <option value="supervisor">Supervisor</option>
-                  <option value="staf">Staff</option>
+                  <option value="staff">Staff</option>
+                  <option value="hrd">HRD</option>
                 </select>
               </div>
               <div class="col-12">
@@ -161,7 +171,7 @@
               </div>
             </div>
 
-            <!-- Permissions (for admin/staf) -->
+            <!-- Permissions (for admin/staff/hrd) -->
             <div v-if="form.role !== 'supervisor'" class="mt-3">
               <div class="fw-semibold small mb-2">Hak Akses</div>
               <div class="row g-1">
@@ -203,7 +213,12 @@ import { db } from "@/config/firebase";
 import { collection, getDocs, setDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
 import { useAlert } from "@/composables/useAlert";
 import { hashSecret } from "@/utils/security";
-import { buildUserAccessMap, createDefaultAccessMap, normalizeAccessMap } from "@/config/access-control";
+import {
+  buildUserAccessMap,
+  createDefaultAccessMap,
+  normalizeAccessMap,
+  normalizeUserRole,
+} from "@/config/access-control";
 
 const { toast, error: showError, confirm } = useAlert();
 
@@ -307,7 +322,7 @@ function permissionsFromPagesAccess(pagesAccess) {
   return p;
 }
 
-function pagesAccessFromPermissions(permissions, role = "staf") {
+function pagesAccessFromPermissions(permissions, role = "staff") {
   const mapped = {};
   Object.entries(PERMISSION_TO_PAGE).forEach(([legacyKey, pageKey]) => {
     const [group, key] = legacyKey.split(".");
@@ -321,12 +336,13 @@ const saving = ref(false);
 const users = ref([]);
 const searchQ = ref("");
 const editTarget = ref(null);
+const originalUsername = ref("");
 const formError = ref("");
 const form = ref({
   username: "",
   email: "",
   displayName: "",
-  role: "staf",
+  role: "staff",
   password: "",
   confirmPassword: "",
   permissions: defaultPermissions(),
@@ -338,12 +354,43 @@ const filtered = computed(() => {
 });
 
 function countRole(role) {
-  return users.value.filter((u) => u.role === role).length;
+  const targetRole = normalizeUserRole(role, "staff");
+  return users.value.filter((u) => normalizeUserRole(u.role, "staff") === targetRole).length;
+}
+
+function getRoleBadgeClass(role) {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  if (normalizedRole === "admin") return "bg-warning text-dark";
+  if (normalizedRole === "supervisor") return "bg-primary";
+  if (normalizedRole === "hrd") return "bg-info text-dark";
+  if (normalizedRole === "admin_custom") return "bg-dark";
+  return "bg-secondary";
+}
+
+function getRoleLabel(role) {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  if (normalizedRole === "staff") return "Staff";
+  if (normalizedRole === "hrd") return "HRD";
+  if (normalizedRole === "admin_custom") return "Admin Custom";
+  return normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1);
 }
 
 function getPermissionGroupLabel(group) {
   if (group === "admin") return "pengaturan";
   return group.replace(/-/g, " ");
+}
+
+function isProtectedUser(user) {
+  return normalizeUserRole(user?.role, "staff") === "supervisor";
+}
+
+function normalizeUsername(value) {
+  return String(value || "").trim();
+}
+
+function findUserByUsername(username) {
+  const normalized = normalizeUsername(username).toLowerCase();
+  return users.value.find((u) => normalizeUsername(u.username).toLowerCase() === normalized);
 }
 
 function formatTs(ts) {
@@ -356,7 +403,14 @@ async function loadUsers() {
   loading.value = true;
   try {
     const snap = await getDocs(collection(db, "users"));
-    users.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    users.value = snap.docs.map((d) => {
+      const data = d.data() || {};
+      return {
+        id: d.id,
+        ...data,
+        role: normalizeUserRole(data.role, "staff"),
+      };
+    });
   } catch (e) {
     showError("Gagal memuat pengguna", e.message);
   } finally {
@@ -366,11 +420,12 @@ async function loadUsers() {
 
 function openAdd() {
   editTarget.value = null;
+  originalUsername.value = "";
   form.value = {
     username: "",
     email: "",
     displayName: "",
-    role: "staf",
+    role: "staff",
     password: "",
     confirmPassword: "",
     permissions: defaultPermissions(),
@@ -380,13 +435,15 @@ function openAdd() {
 }
 
 function openEdit(u) {
-  const pagesAccess = buildUserAccessMap(u, u.role || "staf");
+  const userRole = normalizeUserRole(u.role, "staff");
+  const pagesAccess = buildUserAccessMap(u, userRole);
   editTarget.value = u;
+  originalUsername.value = u.username;
   form.value = {
     username: u.username,
     email: u.email || "",
     displayName: u.displayName || "",
-    role: u.role,
+    role: userRole,
     password: "",
     confirmPassword: "",
     permissions: permissionsFromPagesAccess(pagesAccess),
@@ -398,11 +455,14 @@ function openEdit(u) {
 async function saveUser() {
   formError.value = "";
   const { username, email, displayName, role, password, confirmPassword, permissions } = form.value;
-  if (!username.trim() || username.length < 3) {
+  const normalizedUsername = normalizeUsername(username);
+  const normalizedEmail = String(email || "").trim();
+  const normalizedRole = normalizeUserRole(role, "staff");
+  if (!normalizedUsername || normalizedUsername.length < 3) {
     formError.value = "Username minimal 3 karakter.";
     return;
   }
-  if (username.includes(" ")) {
+  if (normalizedUsername.includes(" ")) {
     formError.value = "Username tidak boleh mengandung spasi.";
     return;
   }
@@ -418,38 +478,82 @@ async function saveUser() {
   saving.value = true;
   try {
     const effectivePagesAccess =
-      role === "supervisor"
+      normalizedRole === "supervisor"
         ? createDefaultAccessMap("supervisor")
-        : pagesAccessFromPermissions(permissions, role || "staf");
+        : pagesAccessFromPermissions(permissions, normalizedRole);
+
+    const now = Timestamp.now();
 
     const data = {
-      username,
-      email: email || null,
+      username: normalizedUsername,
+      email: normalizedEmail || null,
       displayName,
-      role,
-      permissions: role === "supervisor" ? null : permissions,
+      role: normalizedRole,
+      permissions: normalizedRole === "supervisor" ? null : permissions,
       pagesAccess: effectivePagesAccess,
-      updatedAt: Timestamp.now(),
+      updatedAt: now,
     };
-    if (password) data.passwordHash = await hashSecret(password);
+
     if (!editTarget.value) {
       // Check duplicate
-      const existing = users.value.find((u) => u.username === username);
+      const existing = findUserByUsername(normalizedUsername);
       if (existing) {
         formError.value = "Username sudah digunakan.";
         return;
       }
-      data.createdAt = Timestamp.now();
-      await setDoc(doc(db, "users", username), data);
+      data.createdAt = now;
+      if (password) data.passwordHash = await hashSecret(password);
+      await setDoc(doc(db, "users", normalizedUsername), data);
     } else {
-      await updateDoc(doc(db, "users", username), data);
+      const previousUsername = normalizeUsername(originalUsername.value || editTarget.value.username);
+      const isUsernameChanged = normalizedUsername.toLowerCase() !== previousUsername.toLowerCase();
+
+      if (isUsernameChanged) {
+        const existingTarget = findUserByUsername(normalizedUsername);
+        if (
+          existingTarget &&
+          normalizeUsername(existingTarget.username).toLowerCase() !== previousUsername.toLowerCase()
+        ) {
+          formError.value = "Username sudah digunakan.";
+          return;
+        }
+
+        const { id, ...existingData } = editTarget.value || {};
+        const payload = {
+          ...existingData,
+          ...data,
+          username: normalizedUsername,
+          createdAt: existingData.createdAt || now,
+        };
+
+        if (password) {
+          payload.passwordHash = await hashSecret(password);
+        } else if (!payload.passwordHash) {
+          formError.value = "Password hash lama tidak ditemukan. Isi password baru untuk melanjutkan.";
+          return;
+        }
+
+        await setDoc(doc(db, "users", normalizedUsername), payload);
+        await deleteDoc(doc(db, "users", previousUsername));
+      } else {
+        if (password) data.passwordHash = await hashSecret(password);
+        await updateDoc(doc(db, "users", previousUsername), data);
+      }
     }
+
     // Sync role ke userRoles/{email} agar Firebase Auth login bisa membaca role
-    if (email && email.trim()) {
-      await setDoc(doc(db, "userRoles", email.trim()), { role, username }, { merge: true });
+    if (normalizedEmail) {
+      await setDoc(
+        doc(db, "userRoles", normalizedEmail),
+        { role: normalizedRole, username: normalizedUsername },
+        {
+          merge: true,
+        },
+      );
     }
+
     Modal.getInstance(document.getElementById("userModal"))?.hide();
-    toast(`User ${username} berhasil ${editTarget.value ? "diperbarui" : "ditambahkan"}`);
+    toast(`User ${normalizedUsername} berhasil ${editTarget.value ? "diperbarui" : "ditambahkan"}`);
     await loadUsers();
   } catch (e) {
     showError("Gagal menyimpan", e.message);

@@ -24,7 +24,7 @@
         </h2>
       </div>
       <div class="card-body py-2">
-        <div class="row g-2 align-items-end">
+        <div class="row g-2 align-items-end py-3">
           <div class="col-6 col-md-2">
             <label class="form-label small fw-semibold mb-1">Tanggal</label>
             <input v-model="filterDate" type="date" class="form-control form-control-sm" />
@@ -57,8 +57,17 @@
             <input
               v-model="searchText"
               type="search"
+              name="servisSearch"
               class="form-control form-control-sm"
               placeholder="Customer / barang..."
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              data-form-type="other"
+              :readonly="searchReadonly"
+              @focus="unlockSearchInput"
+              @pointerdown="unlockSearchInput"
             />
           </div>
           <div class="col-12 col-md-auto d-flex align-items-end gap-2 flex-wrap">
@@ -70,15 +79,29 @@
         </div>
       </div>
     </div>
-    <div class="d-none d-md-flex justify-content-start py-2 gap-2 border-bottom mb-3">
-      <button class="btn btn-danger btn-sm" @click="exportPDF" title="Export PDF sesuai filter">
-        <i class="bi bi-file-earmark-pdf me-1"></i>
-        Export PDF
-      </button>
-      <button class="btn btn-success btn-sm" @click="printAllLabels" title="Print semua label">
-        <i class="bi bi-tags me-1"></i>
-        Print Label
-      </button>
+    <div class="d-none d-md-flex justify-content-between py-2 border-bottom mb-3">
+      <div class="">
+        <button
+          v-if="hasLoaded"
+          class="btn btn-outline-success btn-sm fw-semibold flex-fill flex-md-grow-0"
+          :disabled="isFinishSelectedDisabled"
+          @click="updateSelectedServisSelesai"
+        >
+          <span v-if="bulkUpdatingStatusServis" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-check2-square me-1"></i>
+          Selesaikan Terpilih ({{ selectedServisCount }})
+        </button>
+      </div>
+      <div class="gap-2 d-flex flex-wrap">
+        <button v-if="hasLoaded" class="btn btn-danger btn-sm" @click="exportPDF" title="Export PDF sesuai filter">
+          <i class="bi bi-file-earmark-pdf me-1"></i>
+          Export PDF
+        </button>
+        <button v-if="hasLoaded" class="btn btn-success btn-sm" @click="printAllLabels" title="Print semua label">
+          <i class="bi bi-tags me-1"></i>
+          Print Label
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -89,7 +112,7 @@
 
     <div v-else-if="!hasLoaded" class="card border-0 shadow-sm">
       <div class="card-body text-center text-muted py-5">
-        <i class="bi bi-search display-4 d-block mb-2 opacity-25"></i>
+        <i class="bi bi-search display-6 d-block mb-2 opacity-25"></i>
         Klik tombol Tampilkan untuk memuat data servis.
       </div>
     </div>
@@ -110,8 +133,17 @@
           <div class="card-body mobile-servis-card-body">
             <!-- Row 1: customer + tanggal -->
             <div class="d-flex justify-content-between align-items-start mb-1 mobile-top-row">
-              <span class="fw-bold text-dark mobile-customer">{{ item.namaCustomer }}</span>
-              <span class="text-muted mobile-date">{{ formatTanggal(item.tanggal) }}</span>
+              <div class="d-flex align-items-start gap-2">
+                <input
+                  v-if="isItemSelectable(item)"
+                  type="checkbox"
+                  class="form-check-input mobile-select-checkbox"
+                  :checked="isItemSelected(item.id)"
+                  @change="toggleItemSelection(item.id, $event.target.checked)"
+                />
+                <span class="fw-bold text-dark mobile-customer">{{ item.namaCustomer }}</span>
+              </div>
+              <span class="text-muted mobile-date">{{ formatTanggalJam(item.tanggal, item.createdAt) }}</span>
             </div>
             <!-- Row 2: nama barang + jenis -->
             <div class="d-flex align-items-center gap-1 mb-1 mobile-item-row">
@@ -177,8 +209,18 @@
           <table class="table table-hover table-sm mb-0" style="font-size: 0.8rem">
             <thead class="table-light">
               <tr>
+                <th class="text-center" style="width: 42px">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    :checked="isCurrentPageFullySelected"
+                    :disabled="currentPageSelectableItems.length === 0"
+                    title="Pilih semua data Belum Selesai di halaman ini"
+                    @change="toggleCurrentPageSelection($event.target.checked)"
+                  />
+                </th>
                 <th style="width: 38px">No</th>
-                <th style="min-width: 90px">Tanggal</th>
+                <th style="min-width: 130px">Tanggal/Jam</th>
                 <th style="min-width: 90px">Sales</th>
                 <th style="min-width: 110px">Customer</th>
                 <th style="min-width: 100px">No HP</th>
@@ -197,14 +239,24 @@
             </thead>
             <tbody>
               <tr v-if="filteredList.length === 0">
-                <td colspan="16" class="text-center text-muted py-5">
+                <td colspan="17" class="text-center text-muted py-5">
                   <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
                   Tidak ada data servis.
                 </td>
               </tr>
               <tr v-for="(item, idx) in paginatedList" :key="item.id">
+                <td class="text-center align-middle">
+                  <input
+                    v-if="isItemSelectable(item)"
+                    type="checkbox"
+                    class="form-check-input"
+                    :checked="isItemSelected(item.id)"
+                    @change="toggleItemSelection(item.id, $event.target.checked)"
+                  />
+                  <span v-else class="text-muted">-</span>
+                </td>
                 <td class="text-muted align-middle">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
-                <td class="align-middle">{{ formatTanggal(item.tanggal) }}</td>
+                <td class="align-middle">{{ formatTanggalJam(item.tanggal, item.createdAt) }}</td>
                 <td class="align-middle">{{ item.namaSales || "-" }}</td>
                 <td class="align-middle fw-semibold">{{ item.namaCustomer }}</td>
                 <td class="align-middle">{{ item.noHp || "-" }}</td>
@@ -366,6 +418,14 @@
                 <option value="Sudah Diambil">Sudah Diambil</option>
               </select>
             </div>
+            <div v-if="showPelunasanField" class="mb-2">
+              <label class="form-label small fw-semibold">Status Pembayaran Saat Pengambilan</label>
+              <select v-model="statusForm.statusPembayaranUpdate" class="form-select form-select-sm">
+                <option value="belum_lunas">Belum Lunas</option>
+                <option value="nominal">Sudah Lunas</option>
+              </select>
+              <div class="small text-muted mt-1">Data hanya bisa disimpan jika pembayaran sudah LUNAS.</div>
+            </div>
             <div v-if="statusForm.statusPengambilan === 'Sudah Diambil'" class="mb-2">
               <label class="form-label small fw-semibold">Nama Staf Handle</label>
               <input
@@ -438,6 +498,8 @@
             <input
               v-model="editPassword"
               type="password"
+              name="supervisorVerifyPassword"
+              autocomplete="new-password"
               class="form-control form-control-sm"
               placeholder="Password supervisor"
               @keydown.enter="unlockEdit"
@@ -757,6 +819,8 @@
             <input
               v-model="deletePassword"
               type="password"
+              name="supervisorDeletePassword"
+              autocomplete="new-password"
               class="form-control form-control-sm"
               placeholder="Password supervisor"
             />
@@ -816,6 +880,7 @@ import {
   fetchServisByRange,
   subscribeServisByRange,
   updateServisStatus,
+  bulkMarkServisSelesai,
   updateServisData,
   deleteServis,
   verifySupervisorPassword,
@@ -834,8 +899,8 @@ import {
   STATUS_PEMBAYARAN_CUSTOM,
 } from "@/services/servis-service";
 
-const { swal, error: showError } = useAlert();
-const { todayStringWITA } = useWITA();
+const { swal, confirm, error: showError } = useAlert();
+const { toWITA, todayStringWITA } = useWITA();
 
 // ── State ─────────────────────────────────────────────────────────────────
 const loading = ref(false);
@@ -845,7 +910,10 @@ const filterJenis = ref("servis");
 const filterStatus = ref("Belum Selesai");
 const filterPengambilan = ref("Belum Diambil");
 const searchText = ref("");
+const searchReadonly = ref(true);
 const hasLoaded = ref(false);
+const bulkUpdatingStatusServis = ref(false);
+const selectedServisIds = ref([]);
 
 // Pagination
 const currentPage = ref(1);
@@ -866,12 +934,24 @@ const statusForm = ref({
   statusPengambilan: "",
   stafHandle: "",
   existingBuktiUrl: "",
+  hasBelumLunas: false,
+  statusPembayaranUpdate: "",
 });
+const statusTargetItem = ref(null);
 
 const hasPhotoEvidence = computed(() => Boolean(photoFile.value || statusForm.value.existingBuktiUrl));
+const showPelunasanField = computed(
+  () => statusForm.value.statusPengambilan === "Sudah Diambil" && statusForm.value.hasBelumLunas,
+);
+const isLunasRequiredButUnselected = computed(
+  () => showPelunasanField.value && statusForm.value.statusPembayaranUpdate !== "nominal",
+);
 
 const isStatusSaveDisabled = computed(
-  () => statusSaving.value || (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value),
+  () =>
+    statusSaving.value ||
+    (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value) ||
+    isLunasRequiredButUnselected.value,
 );
 
 // Edit modal
@@ -970,6 +1050,12 @@ function getItemStatusPembayaran(item) {
   return items[0]?.statusPembayaran || "";
 }
 
+function hasBelumLunasPembayaran(item) {
+  const items = getItems(item);
+  if (!items.length) return item.statusPembayaran === "belum_lunas";
+  return items.some((row) => row?.statusPembayaran === "belum_lunas");
+}
+
 function getItemOngkos(item) {
   if (item.totalOngkos != null) return item.totalOngkos;
   const items = getItems(item);
@@ -983,18 +1069,52 @@ function formatTanggal(val) {
   return String(val).substring(0, 10);
 }
 
+function parseToMillis(val) {
+  if (!val) return NaN;
+  if (val && typeof val === "object" && val.seconds != null) {
+    return Number(val.seconds) * 1000;
+  }
+  if (val && typeof val === "object" && typeof val.toDate === "function") {
+    const d = val.toDate();
+    return d instanceof Date ? d.getTime() : NaN;
+  }
+  return new Date(val).getTime();
+}
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function isDateOnlyString(val) {
+  return typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
+}
+
+function formatTanggalJam(val, fallbackTimestamp = null) {
+  const datePartFromValue = val ? String(val).substring(0, 10) : "";
+
+  let ms = isDateOnlyString(val) ? parseToMillis(fallbackTimestamp) : parseToMillis(val);
+  if (isNaN(ms)) {
+    ms = parseToMillis(fallbackTimestamp);
+  }
+
+  let datePart = datePartFromValue;
+  if (!datePart && !isNaN(ms)) {
+    const d = toWITA(new Date(ms));
+    datePart = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+  if (!datePart) return "-";
+
+  if (isNaN(ms)) return datePart;
+  const d = toWITA(new Date(ms));
+  return `${datePart} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
 function formatWaktu(val) {
   if (!val) return "";
   try {
-    // Firestore Timestamp object
-    let ms;
-    if (val && typeof val === "object" && val.seconds != null) {
-      ms = val.seconds * 1000;
-    } else {
-      ms = new Date(val).getTime();
-    }
+    const ms = parseToMillis(val);
     if (isNaN(ms)) return String(val);
-    const d = new Date(ms);
+    const d = toWITA(new Date(ms));
     return (
       d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) +
       " " +
@@ -1027,12 +1147,30 @@ const filteredList = computed(() => {
   return list;
 });
 
+const selectableServisIdSet = computed(
+  () => new Set(filteredList.value.filter((i) => i.statusServis === "Belum Selesai").map((i) => i.id)),
+);
+const selectedServisCount = computed(() => selectedServisIds.value.length);
+
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredList.value.length / pageSize)));
 
 const paginatedList = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return filteredList.value.slice(start, start + pageSize);
 });
+
+const currentPageSelectableItems = computed(() =>
+  paginatedList.value.filter((i) => i.statusServis === "Belum Selesai"),
+);
+
+const isCurrentPageFullySelected = computed(() => {
+  if (!currentPageSelectableItems.value.length) return false;
+  return currentPageSelectableItems.value.every((item) => selectedServisIds.value.includes(item.id));
+});
+
+const isFinishSelectedDisabled = computed(
+  () => loading.value || !hasLoaded.value || bulkUpdatingStatusServis.value || selectedServisCount.value === 0,
+);
 
 const visiblePages = computed(() => {
   const total = totalPages.value;
@@ -1050,6 +1188,39 @@ function resetPage() {
   currentPage.value = 1;
 }
 
+function unlockSearchInput() {
+  searchReadonly.value = false;
+}
+
+function isItemSelectable(item) {
+  return item.statusServis === "Belum Selesai";
+}
+
+function isItemSelected(id) {
+  return selectedServisIds.value.includes(id);
+}
+
+function toggleItemSelection(id, checked) {
+  if (!selectableServisIdSet.value.has(id)) return;
+
+  const next = new Set(selectedServisIds.value);
+  if (checked) next.add(id);
+  else next.delete(id);
+  selectedServisIds.value = [...next];
+}
+
+function toggleCurrentPageSelection(checked) {
+  const pageIds = currentPageSelectableItems.value.map((item) => item.id);
+  if (!pageIds.length) return;
+
+  const next = new Set(selectedServisIds.value);
+  pageIds.forEach((id) => {
+    if (checked) next.add(id);
+    else next.delete(id);
+  });
+  selectedServisIds.value = [...next];
+}
+
 // ── Data Loading ──────────────────────────────────────────────────────────
 function cleanupListener() {
   if (unsubscribe) {
@@ -1064,6 +1235,7 @@ async function loadData() {
   cleanupListener();
   loading.value = true;
   hasLoaded.value = false;
+  selectedServisIds.value = [];
   resetPage();
 
   try {
@@ -1087,8 +1259,42 @@ async function loadData() {
   }
 }
 
+// ── Bulk Status Servis ───────────────────────────────────────────────────
+async function updateSelectedServisSelesai() {
+  const targetIds = selectedServisIds.value.filter((id) => selectableServisIdSet.value.has(id));
+  if (!targetIds.length) {
+    return swal("Pilih data yang ingin diselesaikan terlebih dahulu", "warning");
+  }
+
+  const result = await confirm({
+    title: "Selesaikan data terpilih?",
+    text:
+      `${targetIds.length} data yang dicentang akan diubah ke status servis 'Sudah Selesai'. ` +
+      "Status pengambilan tetap tidak diubah.",
+    confirmText: "Ya, selesaikan terpilih",
+  });
+  if (!result.isConfirmed) return;
+
+  bulkUpdatingStatusServis.value = true;
+  try {
+    const updatedCount = await bulkMarkServisSelesai(targetIds);
+    selectedServisIds.value = [];
+    invalidateCachedServis(filterDate.value, filterDate.value);
+    swal(`${updatedCount} data terpilih berhasil diubah ke status 'Sudah Selesai'`);
+
+    // For non-today date, fetch again because this view is not real-time.
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("Gagal update massal status servis", e.message);
+  } finally {
+    bulkUpdatingStatusServis.value = false;
+  }
+}
+
 // ── Status Modal ──────────────────────────────────────────────────────────
 function openStatusModal(item) {
+  const hasBelumLunas = hasBelumLunasPembayaran(item);
+  statusTargetItem.value = item;
   photoFile.value = null;
   photoPreviewUrl.value = "";
   if (photoInputRef.value) photoInputRef.value.value = "";
@@ -1100,6 +1306,8 @@ function openStatusModal(item) {
     statusPengambilan: item.statusPengambilan,
     stafHandle: item.stafHandle || "",
     existingBuktiUrl: item.buktiPengambilanUrl || "",
+    hasBelumLunas,
+    statusPembayaranUpdate: hasBelumLunas ? "belum_lunas" : "",
   };
   new Modal(document.getElementById("statusModal")).show();
 }
@@ -1131,13 +1339,40 @@ async function saveStatus() {
   if (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value) {
     return swal("Upload foto bukti pengambilan terlebih dahulu", "warning");
   }
+  if (isLunasRequiredButUnselected.value) {
+    return swal("Data hanya bisa disimpan jika status pembayaran diubah menjadi LUNAS", "warning");
+  }
 
   statusSaving.value = true;
   try {
+    const targetItem = statusTargetItem.value;
     const updates = {
       statusServis: statusForm.value.statusServis,
       statusPengambilan: statusForm.value.statusPengambilan,
     };
+
+    if (
+      statusForm.value.statusPengambilan === "Sudah Diambil" &&
+      statusForm.value.hasBelumLunas &&
+      statusForm.value.statusPembayaranUpdate === "nominal" &&
+      targetItem
+    ) {
+      const detailBarang = (targetItem.detailBarang || []).map((row) => {
+        const next = { ...row };
+        if (next.statusPembayaran === "belum_lunas") next.statusPembayaran = "nominal";
+        return next;
+      });
+      const detailBarangCustom = (targetItem.detailBarangCustom || []).map((row) => {
+        const next = { ...row };
+        if (next.statusPembayaran === "belum_lunas") next.statusPembayaran = "nominal";
+        return next;
+      });
+
+      if (detailBarang.length) updates.detailBarang = detailBarang;
+      if (detailBarangCustom.length) updates.detailBarangCustom = detailBarangCustom;
+      if (targetItem.statusPembayaran === "belum_lunas") updates.statusPembayaran = "nominal";
+    }
+
     if (statusForm.value.statusPengambilan === "Sudah Diambil") {
       updates.stafHandle = statusForm.value.stafHandle || null;
       updates.waktuPengambilan = new Date().toISOString();
@@ -1162,6 +1397,7 @@ async function saveStatus() {
     showError("Gagal memperbarui status", e.message);
   } finally {
     statusSaving.value = false;
+    statusTargetItem.value = null;
   }
 }
 
@@ -1466,7 +1702,7 @@ async function exportCustomPDF() {
       "No HP",
       "Nama Barang",
       "Berat",
-      "Panjang",
+      "Size / Panjang",
       "Kadar",
       "Warna",
       "Rincian",
@@ -1542,11 +1778,19 @@ function handleStorageSync(e) {
 watch(filterDate, () => {
   hasLoaded.value = false;
   allItems.value = [];
+  selectedServisIds.value = [];
   cleanupListener();
   resetPage();
 });
 
+watch(filteredList, (list) => {
+  const allowed = new Set(list.filter((item) => item.statusServis === "Belum Selesai").map((item) => item.id));
+  selectedServisIds.value = selectedServisIds.value.filter((id) => allowed.has(id));
+});
+
 onMounted(() => {
+  // Hindari browser password manager mengisi field pencarian dengan username tersimpan.
+  searchText.value = "";
   window.addEventListener("storage", handleStorageSync);
 });
 
@@ -1579,6 +1823,11 @@ onUnmounted(() => {
 
 .mobile-top-row {
   gap: 0.5rem;
+}
+
+.mobile-select-checkbox {
+  flex-shrink: 0;
+  margin-top: 0.18rem;
 }
 
 .mobile-customer {

@@ -222,7 +222,7 @@
                   <th style="width: 50px">Jml</th>
                   <th>Nama Barang</th>
                   <th style="width: 80px">Berat</th>
-                  <th style="width: 80px">Panjang</th>
+                  <th class="text-center" style="width: 80px">Size / Panjang</th>
                   <th style="width: 70px">Kadar</th>
                   <th style="width: 80px">Warna</th>
                   <th style="width: 110px">DP (Rp)</th>

@@ -35,12 +35,18 @@ async function initThemeAppearance() {
   });
 }
 
-const pinia = createPinia();
-const app = createApp(App);
+async function bootstrap() {
+  const pinia = createPinia();
+  const app = createApp(App);
 
-app.use(pinia);
-app.use(router);
+  app.use(pinia);
+  app.use(router);
 
-initThemeAppearance();
+  initThemeAppearance();
 
-app.mount("#app");
+  // Tunggu resolusi navigasi awal agar layout tidak sempat menampilkan sidebar sebelum guard redirect.
+  await router.isReady();
+  app.mount("#app");
+}
+
+bootstrap();

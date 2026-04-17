@@ -11,6 +11,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -173,6 +174,33 @@ export async function updateServisStatus(id, updates) {
     ...updates,
     updatedAt: Timestamp.now(),
   });
+}
+
+export async function bulkMarkServisSelesai(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (!uniqueIds.length) return 0;
+
+  // Firestore batched writes are limited to 500 operations per commit.
+  const chunkSize = 450;
+  let updatedCount = 0;
+
+  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+    const chunk = uniqueIds.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    const updatedAt = Timestamp.now();
+
+    chunk.forEach((id) => {
+      batch.update(doc(db, "servis", id), {
+        statusServis: "Sudah Selesai",
+        updatedAt,
+      });
+    });
+
+    await batch.commit();
+    updatedCount += chunk.length;
+  }
+
+  return updatedCount;
 }
 
 export async function updateServisData(id, data) {

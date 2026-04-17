@@ -4,7 +4,6 @@ import { useAuthStore } from "@/stores/auth";
 // ─── Lazy-loaded views ────────────────────────────────────────────────────────
 const LoginView = () => import("@/views/auth/LoginView.vue");
 const DashboardView = () => import("@/views/dashboard/DashboardView.vue");
-const UnauthorizedView = () => import("@/views/auth/UnauthorizedView.vue");
 
 // Absensi
 const KehadiranView = () => import("@/views/absensi/KehadiranView.vue");
@@ -57,7 +56,6 @@ const routes = [
   // Public
   { path: "/", component: LoginView, meta: { layout: "blank", public: true } },
   { path: "/login", component: LoginView, meta: { layout: "blank", public: true } },
-  { path: "/unauthorized", component: UnauthorizedView, meta: { layout: "blank", public: true } },
 
   // Display-only (no sidebar, no login)
   { path: "/antrian/display", component: DisplayAntrianView, meta: { layout: "blank", public: true } },
@@ -231,13 +229,13 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
+  // Public routes — allow immediately without waiting auth bootstrap.
+  if (to.meta.public) return true;
+
   // Delay initialization: ensure auth is resolved on first load
   if (!auth.initialized) {
     await auth.init();
   }
-
-  // Public routes — always allow
-  if (to.meta.public) return true;
 
   // Needs auth but not logged in
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
@@ -246,12 +244,12 @@ router.beforeEach(async (to) => {
 
   // Page-based access check (KISS: supervisor is root)
   if (to.meta.pageKey && !auth.canAccessPage(to.meta.pageKey)) {
-    return { path: "/unauthorized" };
+    return { path: "/login" };
   }
 
   // Role check
   if (to.meta.roles && !to.meta.roles.includes(auth.userRole)) {
-    return { path: "/unauthorized" };
+    return { path: "/login" };
   }
 
   return true;

@@ -59,7 +59,7 @@
     </ul>
 
     <!-- Footer text -->
-    <div class="sidebar-footer px-3 text-center small text-white-50 border-top border-secondary p-2">
+    <div class="sidebar-footer px-3 text-center small text-white-50">
       <p v-if="!collapsed" class="small">
         &copy; 2025 Melati Gold Shop.
         <br />

@@ -95,6 +95,22 @@ export const PAGE_ACCESS_SECTIONS = [
 
 export const PAGE_ACCESS_KEYS = PAGE_ACCESS_SECTIONS.flatMap((section) => section.pages.map((page) => page.key));
 
+const KNOWN_USER_ROLES = new Set(["admin", "supervisor", "staff", "hrd", "admin_custom"]);
+
+export function normalizeUserRole(role, fallback = "staff") {
+  const raw = String(role || "")
+    .trim()
+    .toLowerCase();
+  const normalizedFallback =
+    fallback === null || fallback === undefined ? "staff" : String(fallback).trim().toLowerCase();
+
+  if (!raw) return normalizedFallback;
+  if (raw === "staf") return "staff";
+  if (raw === "hr") return "hrd";
+  if (KNOWN_USER_ROLES.has(raw)) return raw;
+  return normalizedFallback;
+}
+
 const SENSITIVE_PAGE_KEYS = new Set([
   "absensi.supervisor",
   "absensi.tambah-pengguna",
@@ -141,22 +157,25 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "admin.maintenance": "admin.maintenance",
 };
 
-export function getDefaultPageAccess(pageKey, role = "staf") {
-  if (role === "supervisor") return true;
+export function getDefaultPageAccess(pageKey, role = "staff") {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  if (normalizedRole === "supervisor") return true;
   if (SENSITIVE_PAGE_KEYS.has(pageKey)) return false;
   return true;
 }
 
-export function createDefaultAccessMap(role = "staf") {
+export function createDefaultAccessMap(role = "staff") {
+  const normalizedRole = normalizeUserRole(role, "staff");
   const map = {};
   PAGE_ACCESS_KEYS.forEach((key) => {
-    map[key] = getDefaultPageAccess(key, role);
+    map[key] = getDefaultPageAccess(key, normalizedRole);
   });
   return map;
 }
 
-export function normalizeAccessMap(inputMap, role = "staf") {
-  const map = createDefaultAccessMap(role);
+export function normalizeAccessMap(inputMap, role = "staff") {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  const map = createDefaultAccessMap(normalizedRole);
   if (!inputMap || typeof inputMap !== "object") return map;
 
   PAGE_ACCESS_KEYS.forEach((key) => {
@@ -179,11 +198,12 @@ export function mapLegacyPermissions(legacyPermissions) {
   return mapped;
 }
 
-export function buildUserAccessMap(userData, role = "staf") {
-  const normalizedPages = normalizeAccessMap(userData?.pagesAccess, role);
+export function buildUserAccessMap(userData, role = "staff") {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  const normalizedPages = normalizeAccessMap(userData?.pagesAccess, normalizedRole);
   const hasExplicitPages = userData?.pagesAccess && typeof userData.pagesAccess === "object";
   if (hasExplicitPages) return normalizedPages;
 
   const legacyMapped = mapLegacyPermissions(userData?.permissions);
-  return normalizeAccessMap({ ...normalizedPages, ...legacyMapped }, role);
+  return normalizeAccessMap({ ...normalizedPages, ...legacyMapped }, normalizedRole);
 }
