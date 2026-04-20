@@ -133,14 +133,7 @@
           <div class="card-body mobile-servis-card-body">
             <!-- Row 1: customer + tanggal -->
             <div class="d-flex justify-content-between align-items-start mb-1 mobile-top-row">
-              <div class="d-flex align-items-start gap-2">
-                <input
-                  v-if="isItemSelectable(item)"
-                  type="checkbox"
-                  class="form-check-input mobile-select-checkbox"
-                  :checked="isItemSelected(item.id)"
-                  @change="toggleItemSelection(item.id, $event.target.checked)"
-                />
+              <div class="d-flex align-items-start">
                 <span class="fw-bold text-dark mobile-customer">{{ item.namaCustomer }}</span>
               </div>
               <span class="text-muted mobile-date">{{ formatTanggalJam(item.tanggal, item.createdAt) }}</span>
@@ -1349,6 +1342,12 @@ function clearPhoto() {
 }
 
 async function saveStatus() {
+  const targetItem = statusTargetItem.value;
+
+  if (targetItem?.statusServis === "Belum Selesai" && statusForm.value.statusServis === "Belum Selesai") {
+    return swal("Data tidak bisa disimpan jika status belum selesai", "warning");
+  }
+
   if (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value) {
     return swal("Upload foto bukti pengambilan terlebih dahulu", "warning");
   }
@@ -1358,7 +1357,6 @@ async function saveStatus() {
 
   statusSaving.value = true;
   try {
-    const targetItem = statusTargetItem.value;
     const updates = {
       statusServis: statusForm.value.statusServis,
       statusPengambilan: statusForm.value.statusPengambilan,

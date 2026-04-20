@@ -1461,6 +1461,18 @@ async function printReceipt() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+
+    if (!res.ok) {
+      let message = `Print gagal (${res.status})`;
+      try {
+        const errorBody = await res.json();
+        message = errorBody?.error || errorBody?.message || message;
+      } catch (_) {
+        // ignore parse error, keep fallback message
+      }
+      throw new Error(message);
+    }
+
     const result = await res.json();
     if (!result.success) throw new Error(result.error || "Print gagal");
     swal("Struk dikirim ke printer");
@@ -1507,6 +1519,18 @@ async function printInvoice() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+
+    if (!res.ok) {
+      let message = `Print gagal (${res.status})`;
+      try {
+        const errorBody = await res.json();
+        message = errorBody?.error || errorBody?.message || message;
+      } catch (_) {
+        // ignore parse error, keep fallback message
+      }
+      throw new Error(message);
+    }
+
     const result = await res.json();
     if (!result.success) throw new Error(result.error || "Print gagal");
     swal("Invoice dikirim ke printer");

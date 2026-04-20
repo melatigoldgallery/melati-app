@@ -138,10 +138,6 @@
             Export PDF
           </button>
         </div>
-        <button v-if="isSupervisor" class="btn btn-outline-danger btn-sm" @click="showDeleteConfirm">
-          <i class="fas fa-trash-alt me-1"></i>
-          Hapus Data
-        </button>
       </div>
 
       <!-- Table Card -->
@@ -411,58 +407,6 @@
       </div>
     </div>
 
-    <!-- ── Modal: Delete Confirm ─────────────────────────────────────── -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-danger text-white">
-            <h5 class="modal-title">
-              <i class="fas fa-exclamation-triangle me-2"></i>
-              Konfirmasi Hapus Data
-            </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              <i class="fas fa-exclamation-circle me-2"></i>
-              <strong>Perhatian!</strong>
-              Tindakan ini tidak dapat dibatalkan.
-            </div>
-            <p>
-              Anda yakin ingin menghapus semua data kehadiran periode
-              <strong>{{ filter.startDate }}</strong>
-              s/d
-              <strong>{{ filter.endDate }}</strong>
-              ?
-            </p>
-            <p class="text-muted small">
-              Data yang dihapus tidak dapat dikembalikan. Pastikan Anda telah mengekspor data terlebih dahulu.
-            </p>
-            <div class="mb-0">
-              <label class="form-label small fw-semibold">Kode Akses Hapus</label>
-              <input
-                v-model="deletePassword"
-                type="password"
-                class="form-control form-control-sm"
-                :class="{ 'is-invalid': deletePwdError }"
-                placeholder="Masukkan kode akses"
-                @keypress.enter="deleteData"
-              />
-              <div class="invalid-feedback">{{ deletePwdError }}</div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button class="btn btn-danger" @click="deleteData" :disabled="deleting">
-              <span v-if="deleting" class="spinner-border spinner-border-sm me-1"></span>
-              <i v-else class="fas fa-trash-alt me-1"></i>
-              Ya, Hapus Data
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ── Modal: Delete Row Confirm ────────────────────────────────── -->
     <div class="modal fade" id="deleteRowModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -523,18 +467,15 @@
 import { ref, computed, nextTick } from "vue";
 import { Modal } from "bootstrap";
 import Swal from "sweetalert2";
-import { useAuthStore } from "@/stores/auth";
 import { useWITA } from "@/composables/useWITA";
 import {
   fetchAttendanceByRange,
   updateAttendanceRecord,
-  deleteAttendanceByDateRange,
   deleteAttendanceRecord,
   verifyEditLaporanKehadiranPassword,
   verifyDeleteLaporanKehadiranPassword,
 } from "@/services/absensi-service";
 
-const auth = useAuthStore();
 const { todayStringWITA } = useWITA();
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -552,9 +493,7 @@ const showPwd = ref(false);
 const pwdError = ref("");
 const pendingEditRow = ref(null);
 const pendingEditIndex = ref(null);
-const deletePassword = ref("");
 const deleteRowPassword = ref("");
-const deletePwdError = ref("");
 const deleteRowPwdError = ref("");
 
 // Edit modal
@@ -569,8 +508,6 @@ const currentPage = ref(1);
 const itemsPerPage = ref(10);
 
 // ── Computed ───────────────────────────────────────────────────────────────
-const isSupervisor = computed(() => auth.userRole === "supervisor");
-
 const filteredRows = computed(() => {
   if (!filter.value.empType) return allRows.value;
   return allRows.value.filter((r) => (r.type || "").toLowerCase() === filter.value.empType);
@@ -815,50 +752,6 @@ async function saveEdit() {
   }
 }
 
-// ── Delete ─────────────────────────────────────────────────────────────────
-function showDeleteConfirm() {
-  deletePassword.value = "";
-  deletePwdError.value = "";
-  getModal("deleteModal")?.show();
-}
-
-async function deleteData() {
-  deletePwdError.value = "";
-  const password = String(deletePassword.value ?? "").trim();
-  deletePassword.value = password;
-  if (!password) {
-    deletePwdError.value = "Kode akses wajib diisi.";
-    return;
-  }
-
-  try {
-    const valid = await verifyDeleteLaporanKehadiranPassword(password);
-    if (!valid) {
-      deletePwdError.value = "Kode akses salah.";
-      return;
-    }
-  } catch (e) {
-    deletePwdError.value = "Gagal memverifikasi kode akses. Coba lagi.";
-    showSwal("danger", `Gagal memverifikasi kode akses: ${e.message}`);
-    return;
-  }
-
-  deleting.value = true;
-  try {
-    const count = await deleteAttendanceByDateRange(filter.value.startDate, filter.value.endDate);
-    allRows.value = [];
-    currentPage.value = 1;
-    getModal("deleteModal")?.hide();
-    deletePassword.value = "";
-    deletePwdError.value = "";
-    showSwal("success", `Berhasil menghapus ${count} data kehadiran.`);
-  } catch (e) {
-    showSwal("danger", `Gagal menghapus data: ${e.message}`);
-  } finally {
-    deleting.value = false;
-  }
-}
-
 // ── Delete Single Row ──────────────────────────────────────────────
 function showDeleteConfirmRow(row) {
   deleteRowRecord.value = row;
@@ -939,7 +832,7 @@ async function exportExcel() {
       "Durasi Kerja",
       "Status",
     ],
-    ...displayRows.value.map((r, i) => [
+    ...filteredRows.value.map((r, i) => [
       i + 1,
       r.employeeId || "-",
       r.name,
@@ -974,7 +867,7 @@ async function exportPDF() {
   autoTable(doc, {
     startY: 35,
     head: [["No", "ID", "Nama", "Tanggal", "Tipe", "Shift", "Masuk", "Keluar", "Durasi", "Status"]],
-    body: displayRows.value.map((r, i) => [
+    body: filteredRows.value.map((r, i) => [
       i + 1,
       r.employeeId || "-",
       r.name,

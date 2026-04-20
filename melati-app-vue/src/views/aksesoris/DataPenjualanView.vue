@@ -170,7 +170,7 @@
                     title="Cetak Ulang"
                   >
                     <span v-if="isPrinting && printingTransactionId === row.trx.id" class="spinner-border spinner-border-sm"></span>
-                    <i v-else class="bi bi-receipt small"></i>
+                    <i v-else class="bi bi-printer"></i>
                   </button>
                   <button @click="openEditVerify(row.trx)" class="btn btn-sm btn-primary py-0 px-1 me-1" title="Edit">
                     <i class="bi bi-pencil small"></i>
@@ -907,13 +907,7 @@ async function reprintTransaction(trx, type = "receipt") {
     const health = await fetch(`${PRINT_BASE}/api/health`, { signal: ctrl.signal });
     clearTimeout(t);
     if (!health.ok) throw new Error("unhealthy");
-  } catch (err) {
-    failedPrintContext.value = { trx, type };
-    printOfflineMessage.value = err?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
-    showPrintOfflineModal.value = true;
-    return;
-  }
-  try {
+
     const endpoint = type === "invoice" ? "/api/print/invoice" : "/api/print/receipt";
     const data = {
       transactionId: trx.id,
@@ -942,6 +936,18 @@ async function reprintTransaction(trx, type = "receipt") {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+
+    if (!res.ok) {
+      let message = `Print gagal (${res.status})`;
+      try {
+        const errorBody = await res.json();
+        message = errorBody?.error || errorBody?.message || message;
+      } catch (_) {
+        // ignore parse error, keep fallback message
+      }
+      throw new Error(message);
+    }
+
     const result = await res.json();
     if (!result.success) throw new Error(result.error || "Print gagal");
     swal(type === "invoice" ? "Invoice dikirim ke printer" : "Struk dikirim ke printer", "success");

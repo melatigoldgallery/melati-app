@@ -112,7 +112,7 @@
         <div class="app-intro-card">
           <div class="card shadow-sm border-0">
             <div class="card-body">
-              <h2 class="card-title text-warning mb-3 fs-6">
+              <h2 class="card-title text-dark mb-3 fs-6">
                 <i class="bi bi-info-circle me-2"></i>
                 Tentang Aplikasi
               </h2>

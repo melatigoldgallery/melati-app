@@ -771,10 +771,6 @@ async function confirmServed() {
 }
 
 function openSkip() {
-  if (state.value.missedQueue.length > 0) {
-    warnMissedFirst();
-    return;
-  }
   modal("skipQueueModal").show();
 }
 
@@ -835,6 +831,16 @@ async function confirmCustom() {
 }
 
 function openReset() {
+  if (state.value.missedQueue.length > 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "Antrian Terlewat Masih Ada",
+      text: "Selesaikan semua antrian terlewat terlebih dahulu sebelum reset nomor antrian.",
+      confirmButtonText: "Mengerti",
+      confirmButtonColor: "#f44336",
+    });
+    return;
+  }
   modal("resetModal").show();
 }
 

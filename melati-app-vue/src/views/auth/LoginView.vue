@@ -271,7 +271,7 @@ function mapFirebaseError(code) {
   background: transparent;
   color: var(--ink-900);
   padding: 12px 10px 12px 0;
-  font-size: 0.92rem;
+  font-size: 0.8rem;
 }
 
 .field-input::placeholder {
@@ -303,7 +303,7 @@ function mapFirebaseError(code) {
   margin-top: 4px;
   border: 1px solid var(--gold-secondary);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 5px 12px;
   width: 100%;
   font-weight: 700;
   background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-secondary) 100%);
@@ -364,7 +364,7 @@ function mapFirebaseError(code) {
   }
 
   .field-input {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
   }
 }
 
