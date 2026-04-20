@@ -165,10 +165,12 @@
                 <td class="text-center">
                   <button
                     @click="openPrintChoice(row.trx)"
+                    :disabled="isPrinting"
                     class="btn btn-sm btn-warning py-0 px-1 me-1"
                     title="Cetak Ulang"
                   >
-                    <i class="bi bi-receipt small"></i>
+                    <span v-if="isPrinting && printingTransactionId === row.trx.id" class="spinner-border spinner-border-sm"></span>
+                    <i v-else class="bi bi-receipt small"></i>
                   </button>
                   <button @click="openEditVerify(row.trx)" class="btn btn-sm btn-primary py-0 px-1 me-1" title="Edit">
                     <i class="bi bi-pencil small"></i>
@@ -389,18 +391,20 @@
       <template #default>
         <p class="text-muted small mb-3">Pilih jenis cetakan:</p>
         <div class="d-grid gap-2">
-          <button @click="doPrint('receipt')" class="btn btn-primary">
-            <i class="bi bi-receipt me-2"></i>
+          <button @click="doPrint('receipt')" :disabled="isPrinting" class="btn btn-primary">
+            <span v-if="isPrinting && printingType === 'receipt'" class="spinner-border spinner-border-sm me-2"></span>
+            <i v-else class="bi bi-receipt me-2"></i>
             Struk Kasir
           </button>
-          <button @click="doPrint('invoice')" class="btn btn-success">
-            <i class="bi bi-file-earmark-text me-2"></i>
+          <button @click="doPrint('invoice')" :disabled="isPrinting" class="btn btn-success">
+            <span v-if="isPrinting && printingType === 'invoice'" class="spinner-border spinner-border-sm me-2"></span>
+            <i v-else class="bi bi-file-earmark-text me-2"></i>
             Invoice Customer
           </button>
         </div>
       </template>
       <template #footer>
-        <button @click="showPrintChoiceModal = false" class="btn btn-secondary btn-sm">Tutup</button>
+        <button @click="showPrintChoiceModal = false" :disabled="isPrinting" class="btn btn-secondary btn-sm">Tutup</button>
       </template>
     </AppModal>
 
@@ -409,6 +413,7 @@
       v-model="showPrintOfflineModal"
       failed-title="Gagal Cetak Invoice / Struk"
       :message="printOfflineMessage"
+      :retrying="isPrinting"
       @retry="retryPrint"
     />
   </div>
@@ -463,6 +468,9 @@ const printChoiceTarget = ref(null);
 const showPrintOfflineModal = ref(false);
 const printOfflineMessage = ref("Pastikan printing service sudah dijalankan di komputer ini.");
 const failedPrintContext = ref(null);
+const isPrinting = ref(false);
+const printingType = ref("receipt");
+const printingTransactionId = ref(null);
 const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3001";
 
 // --- Computed -----------------------------------------------------------------
@@ -877,16 +885,22 @@ async function saveEdit() {
 
 // --- Print --------------------------------------------------------------------
 function openPrintChoice(trx) {
+  if (isPrinting.value) return;
   printChoiceTarget.value = trx;
   showPrintChoiceModal.value = true;
 }
 
 async function doPrint(type) {
+  printingType.value = type;
   showPrintChoiceModal.value = false;
   await reprintTransaction(printChoiceTarget.value, type);
 }
 
 async function reprintTransaction(trx, type = "receipt") {
+  if (isPrinting.value) return;
+  isPrinting.value = true;
+  printingType.value = type;
+  printingTransactionId.value = trx?.id || null;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 3000);
@@ -935,6 +949,9 @@ async function reprintTransaction(trx, type = "receipt") {
     failedPrintContext.value = { trx, type };
     printOfflineMessage.value = err?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
     showPrintOfflineModal.value = true;
+  } finally {
+    isPrinting.value = false;
+    printingTransactionId.value = null;
   }
 }
 

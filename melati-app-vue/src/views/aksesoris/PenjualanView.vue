@@ -661,7 +661,11 @@
         <div class="text-center py-3">
           <i class="bi bi-check-circle-fill text-success mb-3 d-block" style="font-size: 3rem"></i>
           <p class="fw-semibold mb-1">Transaksi berhasil disimpan!</p>
-          <p class="text-muted small">Pilih format cetak atau tutup untuk melanjutkan</p>
+          <p v-if="isPrinting" class="text-primary small mb-1">
+            <span class="spinner-border spinner-border-sm me-1"></span>
+            Sedang mengirim {{ lastPrintType === "invoice" ? "invoice" : "struk" }} ke printer...
+          </p>
+          <p v-else class="text-muted small">Pilih format cetak atau tutup untuk melanjutkan</p>
         </div>
       </template>
       <template #footer>
@@ -675,7 +679,7 @@
           <i v-else class="bi bi-file-earmark-text me-1"></i>
           Cetak Invoice
         </button>
-        <button @click="closePrintModal" class="btn btn-secondary btn-sm me-1">Tutup</button>
+        <button @click="closePrintModal" :disabled="isPrinting" class="btn btn-secondary btn-sm me-1">Tutup</button>
       </template>
     </AppModal>
 
@@ -684,6 +688,7 @@
       v-model="showPrintOfflineModal"
       failed-title="Gagal Cetak Invoice / Struk"
       :message="printOfflineMessage"
+      :retrying="isPrinting"
       @retry="retryPrint"
     />
   </div>

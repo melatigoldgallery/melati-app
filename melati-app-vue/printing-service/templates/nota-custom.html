@@ -5,31 +5,31 @@
     <title>Nota Custom</title>
     <style>
       @page {
-        size: 17cm 12cm landscape;
+        size: 20cm 12cm landscape;
         margin: 0mm;
       }
       body {
         margin: 0;
         padding: 0mm;
-        width: 17cm;
+        width: 20cm;
         height: 12cm;
         font-family: Arial, sans-serif;
-        font-size: 12px;
+        font-size: 11px;
         position: relative;
       }
       .customer-info {
         position: absolute;
-        top: 0.3cm;
-        right: -1cm;
-        line-height: 2.8;
-        text-align: right;
+        top: 0.9cm;
+        left: 15.1cm;
+        line-height: 2.9;
+        text-align: left;
         font-size: 12px;
       }
       .nota-table {
         position: absolute;
-        top: 4cm;
-        left: 3cm;
-        right: -2cm;
+        top: 4.7cm;
+        left: 1cm;
+        right: 0.3cm;
       }
       table {
         width: 100%;
@@ -38,38 +38,38 @@
       td {
         padding: 2px 4px;
         vertical-align: top;
-        font-size: 12px;
-        line-height: 2;
+        font-size: 11px;
+        line-height: 1.2;
       }
       td:nth-child(1) {
         width: 2cm; /* Jumlah */
       }
       td:nth-child(2) {
-        width: 5.4cm; /* Nama Barang */
+        width: 6.7cm; /* Nama Barang */
       }
       td:nth-child(3) {
         width: 2cm; /* Berat */
         text-align: center;
       }
       td:nth-child(4) {
-        width: 1.6cm; /* Total DP */
-        text-align: center;
+        width: 2cm; /* Total DP */
       }
       td:nth-child(5) {
-        width: 1.6cm; /* Ongkos */
-      }
-      td:nth-child(6) {
-        width: 2.5cm; /* Rincian */
+        width: 2cm; /* Ongkos */
         text-align: center;
       }
-      .bayar-awal-section {
-        position: absolute;
-        top: 7.4cm;
-        right: 0.8cm;
-        display: flex;
-        gap: 2px;
-        font-size: 12px;
+      td:nth-child(6) {
+        width: 5cm; /* Rincian */
+        text-align: left;
       }
+      /* .bayar-awal-section {
+        position: absolute;
+        top: 8cm;
+        right: 5cm;
+        display: flex;
+        gap: 1px;
+        font-size: 11px;
+      } */
       .bayar-awal-label {
         text-align: right;
       }
@@ -79,16 +79,15 @@
       }
       .total-dp-info {
         position: absolute;
-        top: 9cm;
-        right: -0.8cm;
-        font-size: 12px;
+        top: 9.5cm;
+        left: 15.5cm;
+        font-size: 11px;
         font-weight: bold;
         text-align: right;
-        line-height: 2;
       }
       .note-info {
         position: absolute;
-        top: 10.8cm;
+        top: 11.5cm;
         right: 0.5cm;
         font-size: 10px;
         font-weight: bold;
@@ -98,8 +97,8 @@
       }
       .signature-section {
         position: absolute;
-        top: 10.8cm;
-        left: 3cm;
+        top: 11.5cm;
+        left: 1cm;
         font-size: 12px;
       }
       .signature-sales {
@@ -135,12 +134,12 @@
       </table>
     </div>
 
-    <div class="bayar-awal-section">
+    <!-- <div class="bayar-awal-section">
       <span class="bayar-awal-label">BAYAR AWAL</span>
       <span class="bayar-awal-value">{{formatRupiah grandTotal}}</span>
-    </div>
+    </div> -->
 
-    <div class="total-dp-info">{{formatRupiah totalDP}} ({{dpLabel}})</div>
+    <div class="total-dp-info">{{formatRupiah grandTotal}}</div>
 
     <div class="note-info">Note : Ongkos tidak termasuk hitungan pelunasan</div>
 
