@@ -137,29 +137,29 @@ function mapFirebaseError(code) {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(900px 520px at 88% -120px, rgba(255, 212, 71, 0.34), transparent 70%),
-    radial-gradient(820px 520px at -10% 120%, rgba(255, 193, 7, 0.24), transparent 70%),
-    linear-gradient(140deg, #1f2937 0%, #243b55 55%, #5e4a1f 100%);
+    radial-gradient(1000px 600px at 80% -100px, rgba(255, 215, 0, 0.25), transparent 70%),
+    radial-gradient(800px 500px at -10% 120%, rgba(255, 193, 7, 0.18), transparent 70%),
+    linear-gradient(135deg, #000000 0%, #0d0d0d 60%, #111111 100%);
 }
 
 .login-overlay {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(rgba(7, 12, 22, 0.18), rgba(7, 12, 22, 0.28)),
+    linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)),
     repeating-linear-gradient(
       0deg,
-      rgba(255, 212, 71, 0.045) 0px,
-      rgba(255, 212, 71, 0.045) 1px,
+      rgba(255, 215, 0, 0.05) 0px,
+      rgba(255, 215, 0, 0.05) 1px,
       transparent 1px,
-      transparent 20px
+      transparent 16px
     ),
     repeating-linear-gradient(
       90deg,
-      rgba(255, 212, 71, 0.045) 0px,
-      rgba(255, 212, 71, 0.045) 1px,
+      rgba(255, 215, 0, 0.05) 0px,
+      rgba(255, 215, 0, 0.05) 1px,
       transparent 1px,
-      transparent 20px
+      transparent 16px
     );
 }
 
@@ -370,7 +370,7 @@ function mapFirebaseError(code) {
 
 @media (min-width: 1100px) {
   .login-card {
-    max-width: 400px;
+    max-width: 325px;
   }
 }
 </style>

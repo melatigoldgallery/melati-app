@@ -232,6 +232,145 @@ export async function verifySupervisorPassword(inputPassword) {
 
 const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3001";
 
+function toDateObject(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "object") {
+    if (typeof value.toDate === "function") {
+      const date = value.toDate();
+      return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
+    }
+    if (value.seconds != null) {
+      const date = new Date(Number(value.seconds) * 1000);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return null;
+
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymd) {
+      const [, y, m, d] = ymd;
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+
+    const dmy = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (dmy) {
+      const [, d, m, y] = dmy;
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatPrintDate(value) {
+  const date = toDateObject(value);
+  if (!date) return "";
+
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+function addDays(value, days) {
+  const date = toDateObject(value);
+  if (!date) return null;
+  const result = new Date(date);
+  result.setDate(result.getDate() + Number(days || 0));
+  return result;
+}
+
+function normalizeServisPrintPayload(servisData) {
+  const isCustom = servisData?.jenisInput === "custom";
+  const detailRows = isCustom ? servisData?.detailBarangCustom || [] : servisData?.detailBarang || [];
+
+  const fallbackRow = isCustom
+    ? {
+        jumlah: 1,
+        namaBarang: servisData?.namaBarang || "",
+        berat: servisData?.berat || "",
+        panjang: servisData?.panjang || "",
+        kadar: servisData?.kadar || "",
+        warna: servisData?.warna || "",
+        totalDP: Number(servisData?.totalDP || 0),
+        ongkos: Number(servisData?.ongkos || servisData?.totalOngkos || 0),
+        statusPembayaran: servisData?.statusPembayaran || "nominal",
+        rincianServis: servisData?.rincianServis || "",
+      }
+    : {
+        jumlah: 1,
+        namaBarang: servisData?.namaBarang || "",
+        berat: servisData?.berat || "",
+        karat: servisData?.karat || "",
+        jenisServis: servisData?.jenisServis || "",
+        rincianServis: servisData?.rincianServis || "",
+        ongkos: Number(servisData?.ongkos || servisData?.totalOngkos || 0),
+        statusPembayaran: servisData?.statusPembayaran || "nominal",
+      };
+
+  const rows = detailRows.length ? detailRows : [fallbackRow];
+
+  const items = rows.map((row) => {
+    if (isCustom) {
+      return {
+        jumlah: Number(row?.jumlah || 1),
+        namaBarang: row?.namaBarang || "",
+        berat: row?.berat || "",
+        panjang: row?.panjang || "",
+        kadar: row?.kadar || "",
+        warna: row?.warna || "",
+        totalDP: Number(row?.totalDP || 0),
+        ongkos: Number(row?.ongkos || 0),
+        statusPembayaran: row?.statusPembayaran || "nominal",
+        rincianServis: row?.rincianServis || "",
+      };
+    }
+
+    return {
+      jumlah: Number(row?.jumlah || 1),
+      namaBarang: row?.namaBarang || "",
+      berat: row?.berat || "",
+      karat: row?.karat || "",
+      jenisServis: row?.jenisServis || "",
+      rincianServis: row?.rincianServis || "",
+      ongkos: Number(row?.ongkos || 0),
+      statusPembayaran: row?.statusPembayaran || "nominal",
+    };
+  });
+
+  const totalOngkos = items.reduce((sum, item) => sum + Number(item?.ongkos || 0), 0);
+  const totalDP = isCustom
+    ? items.reduce((sum, item) => sum + Number(item?.totalDP || 0), 0)
+    : Number(servisData?.totalDP || 0);
+  const baseTanggal = servisData?.tanggal || servisData?.createdAt || servisData?.timestamp;
+  const tanggalSelesaiSource = servisData?.tanggalSelesai || servisData?.estimasiSelesai || addDays(baseTanggal, 3);
+
+  return {
+    id: servisData?.id || "",
+    tanggal: formatPrintDate(baseTanggal),
+    tanggalSelesai: formatPrintDate(tanggalSelesaiSource),
+    customerName: servisData?.customerName || servisData?.namaCustomer || "Pelanggan",
+    customerPhone: servisData?.customerPhone || servisData?.noHp || "",
+    salesName: servisData?.salesName || servisData?.namaSales || "",
+    items,
+    totalOngkos,
+    totalDP,
+    grandTotal: totalDP + totalOngkos,
+  };
+}
+
 /**
  * Try to print via local print service (localhost:3001).
  * Throws if print service unreachable — caller should catch and show SweetAlert.
@@ -239,17 +378,27 @@ const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3
 export async function printServisSlip(servisData) {
   const isCustom = servisData.jenisInput === "custom";
   const endpoint = isCustom ? "/api/print/nota-custom" : "/api/print/nota-servis";
+  const payload = normalizeServisPrintPayload(servisData);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 4000);
   try {
     const res = await fetch(`${PRINT_BASE}${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(servisData),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) throw new Error(`Print service error: ${res.status}`);
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = await res.json();
+        detail = body?.error || body?.message || "";
+      } catch {
+        // ignore parse error
+      }
+      throw new Error(detail ? `Print service error: ${detail}` : `Print service error: ${res.status}`);
+    }
   } catch (e) {
     clearTimeout(timeout);
     throw e; // caller handles with SweetAlert

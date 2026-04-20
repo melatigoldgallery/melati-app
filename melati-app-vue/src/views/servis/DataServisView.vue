@@ -336,8 +336,19 @@
                     >
                       <i class="bi bi-whatsapp"></i>
                     </button>
-                    <button class="btn btn-primary" @click="rePrint(item)" title="Cetak ulang">
-                      <i class="bi bi-printer"></i>
+                    <button
+                      class="btn btn-primary"
+                      @click="rePrint(item)"
+                      :disabled="Boolean(printingServisId)"
+                      title="Cetak ulang"
+                    >
+                      <span
+                        v-if="printingServisId === item.id"
+                        class="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      <i v-else class="bi bi-printer"></i>
                     </button>
                     <button class="btn btn-secondary" @click="printSingleLabel(item)" title="Print label">
                       <i class="bi bi-tag"></i>
@@ -865,6 +876,7 @@
       v-model="showPrintFailedModal"
       failed-title="Gagal Cetak Nota Servis"
       :message="printFailedMessage"
+      :retrying="Boolean(printingServisId)"
       @retry="retryPrintServis"
     />
   </div>
@@ -1008,6 +1020,7 @@ const buktiViewUrl = ref("");
 const showPrintFailedModal = ref(false);
 const printFailedMessage = ref("Pastikan printing service sudah dijalankan di komputer ini.");
 const failedPrintItem = ref(null);
+const printingServisId = ref("");
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function getItems(item) {
@@ -1513,13 +1526,18 @@ function openBuktiModal(item) {
 }
 
 async function rePrint(item) {
+  if (printingServisId.value) return;
+  printingServisId.value = item?.id || "progress";
   try {
     await printServisSlip(item);
     failedPrintItem.value = null;
+    swal("Nota servis dikirim ke printer", "success");
   } catch (e) {
     failedPrintItem.value = item;
     printFailedMessage.value = e?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
     showPrintFailedModal.value = true;
+  } finally {
+    printingServisId.value = "";
   }
 }
 

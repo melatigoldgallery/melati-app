@@ -23,9 +23,12 @@
       </div>
     </template>
     <template #footer>
-      <button @click="onUpdateModelValue(false)" class="btn btn-secondary btn-sm me-2">Tutup</button>
-      <button v-if="showRetry" @click="onRetry" class="btn btn-primary btn-sm">
-        <i class="bi bi-arrow-clockwise me-1"></i>
+      <button @click="onUpdateModelValue(false)" class="btn btn-secondary btn-sm me-2" :disabled="retrying">
+        Tutup
+      </button>
+      <button v-if="showRetry" @click="onRetry" class="btn btn-primary btn-sm" :disabled="retrying">
+        <span v-if="retrying" class="spinner-border spinner-border-sm me-1"></span>
+        <i v-else class="bi bi-arrow-clockwise me-1"></i>
         {{ retryLabel }}
       </button>
     </template>
@@ -41,6 +44,7 @@ defineProps({
   failedTitle: { type: String, default: "Gagal Cetak Invoice / Struk" },
   message: { type: String, default: "Pastikan printing service sudah dijalankan di komputer ini." },
   showRetry: { type: Boolean, default: true },
+  retrying: { type: Boolean, default: false },
   retryLabel: { type: String, default: "Coba Lagi" },
 });
 
