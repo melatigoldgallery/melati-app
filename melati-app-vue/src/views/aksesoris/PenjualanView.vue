@@ -1413,6 +1413,86 @@ function resetForm() {
 // --- Print Service ------------------------------------------------------------
 const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3001";
 
+function getSafeAmount(value) {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+function mapPrintItem(item) {
+  const rawQty = Number(item?.qty ?? item?.jumlah ?? 1);
+  const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+  const totalHarga = getSafeAmount(item?.totalHarga ?? item?.subtotal ?? item?.harga);
+
+  return {
+    nama: item?.namaBarang || item?.nama || "",
+    kode: item?.kodeText || item?.kode || "",
+    kadar: item?.kadar || "-",
+    berat: item?.berat || "-",
+    qty,
+    jumlah: qty,
+    harga: totalHarga,
+    subtotal: totalHarga,
+    totalHarga,
+    keterangan: item?.keterangan || "",
+  };
+}
+
+async function postPrintRequest(endpoint, data) {
+  const res = await fetch(`${PRINT_BASE}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    let message = `Print gagal (${res.status})`;
+    try {
+      const errorBody = await res.json();
+      message = errorBody?.error || errorBody?.message || message;
+    } catch (_) {
+      // ignore parse error, keep fallback message
+    }
+    throw new Error(message);
+  }
+
+  const result = await res.json();
+  if (!result.success) throw new Error(result.error || "Print gagal");
+  return result;
+}
+
+function shouldSplitInvoiceByItem(items) {
+  return items.length > 1;
+}
+
+async function printInvoicePerItem(baseData, items) {
+  let successCount = 0;
+  let failedCount = 0;
+  let lastErrorMessage = "";
+
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+
+    try {
+      await postPrintRequest("/api/print/invoice", {
+        ...baseData,
+        items: [item],
+        totalHarga: getSafeAmount(item.totalHarga),
+        notes: item.keterangan || "",
+      });
+      successCount += 1;
+    } catch (error) {
+      failedCount += 1;
+      lastErrorMessage = error?.message || "Print gagal";
+    }
+
+    if (i < items.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  return { successCount, failedCount, lastErrorMessage };
+}
+
 async function checkPrintService() {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 3000);
@@ -1432,6 +1512,9 @@ async function printReceipt() {
   isPrinting.value = true;
   try {
     await checkPrintService();
+    const items = (lastSaleData.value?.items ?? []).map(mapPrintItem);
+    if (!items.length) throw new Error("Tidak ada item untuk dicetak");
+
     const now = new Date();
     const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     const data = {
@@ -1440,15 +1523,7 @@ async function printReceipt() {
       jam,
       sales: form.salesName,
       customerName: form.customerName || "",
-      items: lastSaleData.value.items.map((i) => ({
-        nama: i.namaBarang,
-        kode: i.kodeText || i.kode,
-        kadar: i.kadar || "-",
-        berat: i.berat || "-",
-        qty: i.qty,
-        totalHarga: i.totalHarga || i.subtotal,
-        keterangan: i.keterangan || "",
-      })),
+      items,
       totalHarga: lastSaleData.value.totalHarga,
       metodeBayar: form.metodePembayaran.toLowerCase(),
       nominalDP: form.metodePembayaran === "DP" ? nominalDP.value : 0,
@@ -1456,25 +1531,8 @@ async function printReceipt() {
       jumlahBayar: form.metodePembayaran !== "DP" && form.metodePembayaran !== "FREE" ? jumlahBayar.value : 0,
       kembalian: form.metodePembayaran !== "DP" && form.metodePembayaran !== "FREE" ? kembalian.value : 0,
     };
-    const res = await fetch(`${PRINT_BASE}/api/print/receipt`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
 
-    if (!res.ok) {
-      let message = `Print gagal (${res.status})`;
-      try {
-        const errorBody = await res.json();
-        message = errorBody?.error || errorBody?.message || message;
-      } catch (_) {
-        // ignore parse error, keep fallback message
-      }
-      throw new Error(message);
-    }
-
-    const result = await res.json();
-    if (!result.success) throw new Error(result.error || "Print gagal");
+    await postPrintRequest("/api/print/receipt", data);
     swal("Struk dikirim ke printer");
   } catch (err) {
     printOfflineMessage.value = err?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
@@ -1490,50 +1548,46 @@ async function printInvoice() {
   isPrinting.value = true;
   try {
     await checkPrintService();
+    const transactionType = form.tipe.toUpperCase();
+    const items = (lastSaleData.value?.items ?? []).map(mapPrintItem);
+    if (!items.length) throw new Error("Tidak ada item untuk dicetak");
+
     const now = new Date();
     const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    const data = {
+    const baseData = {
       transactionId: lastSaleData.value.saleId,
-      transactionType: form.tipe.toUpperCase(),
+      transactionType,
       tanggal: form.tanggal,
       jam,
       sales: form.salesName,
       customerName: form.customerName || "",
       customerPhone: form.customerPhone || "",
-      items: lastSaleData.value.items.map((i) => ({
-        nama: i.namaBarang,
-        kode: i.kodeText || i.kode,
-        kadar: i.kadar || "-",
-        berat: i.berat || "-",
-        qty: i.qty,
-        totalHarga: i.totalHarga || i.subtotal,
-        keterangan: i.keterangan || "",
-      })),
-      totalHarga: lastSaleData.value.totalHarga,
       metodeBayar: form.metodePembayaran,
       nominalDP: form.metodePembayaran === "DP" ? nominalDP.value : 0,
       sisaPembayaran: form.metodePembayaran === "DP" ? lastSaleData.value.sisaPembayaran : 0,
     };
-    const res = await fetch(`${PRINT_BASE}/api/print/invoice`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
 
-    if (!res.ok) {
-      let message = `Print gagal (${res.status})`;
-      try {
-        const errorBody = await res.json();
-        message = errorBody?.error || errorBody?.message || message;
-      } catch (_) {
-        // ignore parse error, keep fallback message
-      }
-      throw new Error(message);
+    if (!shouldSplitInvoiceByItem(items)) {
+      await postPrintRequest("/api/print/invoice", {
+        ...baseData,
+        items,
+        totalHarga: getSafeAmount(lastSaleData.value?.totalHarga),
+      });
+      swal("Invoice dikirim ke printer");
+      return;
     }
 
-    const result = await res.json();
-    if (!result.success) throw new Error(result.error || "Print gagal");
-    swal("Invoice dikirim ke printer");
+    const { successCount, failedCount, lastErrorMessage } = await printInvoicePerItem(baseData, items);
+
+    if (failedCount > 0) {
+      if (successCount > 0) {
+        swal(`${successCount} invoice berhasil, ${failedCount} gagal`, "warning");
+        return;
+      }
+      throw new Error(lastErrorMessage || "Semua invoice gagal dicetak");
+    }
+
+    swal(`${successCount} invoice dikirim ke printer`, "success");
   } catch (err) {
     printOfflineMessage.value = err?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
     showPrintOfflineModal.value = true;

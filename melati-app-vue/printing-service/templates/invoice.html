@@ -27,8 +27,8 @@
       .customer-section {
         position: absolute;
         top: 1.1cm;
-        right: 1cm;
-        text-align: right;
+        left: 15cm;
+        text-align: left;
         font-size: 12px;
         line-height: 1.4;
       }
@@ -50,30 +50,61 @@
         left: 1cm;
         width: 19cm;
       }
-      .item-row {
-        display: grid;
-        grid-template-columns: 2cm 2cm 5cm 1.7cm 1.7cm 2.6cm;
-        column-gap: 0.3cm;
-        margin-bottom: 0.15cm;
+      .items-table table {
+        width: 16.5cm;
+        border-collapse: separate;
+        border-spacing: 0 0.15cm;
+        table-layout: fixed;
+      }
+      .items-table td {
         font-size: 12px;
-        align-items: start;
+        line-height: 1.2;
+        padding: 0;
+        vertical-align: top;
       }
-      .item-row span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .item-row span:nth-child(1),
-      .item-row span:nth-child(2),
-      .item-row span:nth-child(3),
-      .item-row span:nth-child(4),
-      .item-row span:nth-child(5),
-      .item-row span:nth-child(6) {
+      .items-table .col-code {
+        width: 2cm;
         text-align: center;
+        padding-right: 0.3cm;
       }
-      .item-row .item-name {
+      .items-table .col-qty {
+        width: 2cm;
+        text-align: left;
+        padding-right: 0.3cm;
+      }
+      .items-table .col-name {
+        width: 5cm;
+        text-align: left;
         white-space: normal;
         word-wrap: break-word;
-        overflow: visible;
+        padding-right: 0.3cm;
+      }
+      .items-table .col-purity {
+        width: 1.7cm;
+        text-align: center;
+        padding-right: 0.3cm;
+      }
+      .items-table .col-weight {
+        width: 1.7cm;
+        text-align: center;
+        padding-right: 0.3cm;
+      }
+      .items-table .col-price {
+        width: 2.6cm;
+        text-align: center;
+      }
+
+      /* Barcode Section - Kiri Tengah */
+      .barcode-section {
+        position: absolute;
+        top: 5.5cm;
+        left: 0.7cm;
+        text-align: center;
+      }
+      .barcode-section img {
+        width: 3.2cm;
+        height: 0.8cm;
+        object-fit: contain;
       }
 
       /* Total Section - Kanan Bawah */
@@ -89,7 +120,7 @@
       /* Keterangan Section */
       .keterangan-section {
         position: absolute;
-        top: 6.8cm;
+        top: 7cm;
         left: 0.9cm;
         right: 5cm;
         font-size: 10px;
@@ -118,19 +149,30 @@
 
       <!-- Items Table - Area Tengah -->
       <div class="items-table">
-        {{#each items}}
-        <div class="item-row">
-          <span class="item-code">{{code}}{{kode}}</span>
-          <span class="item-qty">
-            {{#if quantity}}{{quantity}}{{else}}{{#if jumlah}}{{jumlah}}{{else}}1{{/if}}{{/if}}pcs
-          </span>
-          <span class="item-name">{{name}}{{nama}}</span>
-          <span class="item-purity">{{purity}}{{kadar}}</span>
-          <span class="item-weight">{{weight}}{{berat}}gr</span>
-          <span class="item-price">{{formatRupiah price}}</span>
-        </div>
-        {{/each}}
+        <table>
+          <tbody>
+            {{#each items}}
+            <tr>
+              <td class="col-code">{{code}}{{kode}}</td>
+              <td class="col-qty">
+                {{#if quantity}}{{quantity}}{{else}}{{#if jumlah}}{{jumlah}}{{else}}1{{/if}}{{/if}}pcs
+              </td>
+              <td class="col-name">{{name}}{{nama}}</td>
+              <td class="col-purity">{{purity}}{{kadar}}</td>
+              <td class="col-weight">{{weight}}{{berat}}gr</td>
+              <td class="col-price">{{formatRupiah price}}</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
       </div>
+
+      <!-- Barcode Item Code -->
+      {{#if barcodeDataUrl}}
+      <div class="barcode-section">
+        <img src="{{barcodeDataUrl}}" alt="Item Barcode" />
+      </div>
+      {{/if}}
 
       <!-- Keterangan - Di bawah items -->
       {{#if notes}}

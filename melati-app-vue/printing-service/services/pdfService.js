@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs").promises;
 const logger = require("../utils/logger");
 const Handlebars = require("handlebars");
+const bwipjs = require("bwip-js");
 
 class PDFService {
   constructor() {
@@ -153,6 +154,25 @@ class PDFService {
       // Clear template cache to ensure latest version is loaded
       this.templateCache.clear();
 
+      const normalizedItems = (data.items || []).map((item) => ({
+        code: item.kode || item.kodeText || item.code || "-",
+        quantity: item.jumlah || item.quantity || 1,
+        name: item.nama || item.name || "-",
+        purity: item.kadar || item.purity || "-",
+        weight:
+          item.berat || (typeof item.weight === "string" ? item.weight.replace(" gr", "").trim() : item.weight) || "-",
+        price: item.totalHarga || item.harga || item.price || 0,
+      }));
+
+      const barcodeValue = String(normalizedItems[0]?.code || "").trim();
+      const barcodeDataUrl = await this.generateBarcodeDataUrl(barcodeValue);
+      const resolvedNotes =
+        String(data.notes || data.keterangan || "").trim() ||
+        (data.items || [])
+          .map((item) => String(item.keterangan || item.notes || "").trim())
+          .filter(Boolean)
+          .join("; ");
+
       // Transform data to match template format
       const templateData = {
         date: data.tanggal || data.date || "",
@@ -160,18 +180,10 @@ class PDFService {
         customerPhone: data.customerPhone || "",
         sales: data.sales || "Admin",
         total: data.totalHarga || data.total || 0,
-        items: (data.items || []).map((item) => ({
-          code: item.kode || item.kodeText || item.code || "-",
-          quantity: item.jumlah || item.quantity || 1,
-          name: item.nama || item.name || "-",
-          purity: item.kadar || item.purity || "-",
-          weight:
-            item.berat ||
-            (typeof item.weight === "string" ? item.weight.replace(" gr", "").trim() : item.weight) ||
-            "-",
-          price: item.totalHarga || item.harga || item.price || 0,
-        })),
-        notes: data.notes || "",
+        items: normalizedItems,
+        barcodeDataUrl,
+        barcodeValue,
+        notes: resolvedNotes,
       };
 
       // Load and compile template
@@ -272,6 +284,34 @@ class PDFService {
     } catch (error) {
       logger.error(`Error loading template ${templateName}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Generate a Code 128 barcode as a PNG data URL
+   * @param {string} value - Barcode value
+   * @returns {Promise<string>} Data URL or empty string when invalid
+   */
+  async generateBarcodeDataUrl(value) {
+    if (!value || value === "-") {
+      return "";
+    }
+
+    try {
+      const pngBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: value,
+        scale: 2,
+        height: 8,
+        includetext: false,
+        paddingwidth: 0,
+        paddingheight: 0,
+      });
+
+      return `data:image/png;base64,${pngBuffer.toString("base64")}`;
+    } catch (error) {
+      logger.warn(`Failed to generate barcode for value '${value}': ${error.message}`);
+      return "";
     }
   }
 

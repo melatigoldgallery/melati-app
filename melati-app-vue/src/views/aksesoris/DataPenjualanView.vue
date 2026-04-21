@@ -91,7 +91,23 @@
         <div class="d-flex gap-2 align-items-center">
           <div class="input-group input-group-sm" style="width: 200px">
             <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-            <input v-model="searchText" type="text" class="form-control" placeholder="Cari..." />
+            <input
+              v-model="searchText"
+              type="search"
+              class="form-control"
+              placeholder="Cari..."
+              name="transaction-search"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              :readonly="searchInputLocked"
+              @focus="unlockSearchInput"
+              @mousedown="unlockSearchInput"
+              @touchstart="unlockSearchInput"
+            />
           </div>
         </div>
       </div>
@@ -148,7 +164,7 @@
                     )
                   }}
                 </td>
-                <td class="text-center">
+                <td class="text-center small">
                   <span class="badge" :class="statusClass(getStatusText(row.trx))">
                     <template v-if="getStatusInfo(row.trx).line2">
                       <div>{{ getStatusInfo(row.trx).line1 }}</div>
@@ -162,7 +178,7 @@
                 <td class="small text-muted" style="max-width: 120px; white-space: normal; word-break: break-word">
                   {{ row.item ? row.item.keterangan || "" : row.trx.keterangan || "" }}
                 </td>
-                <td class="text-center">
+                <td class="text-center small">
                   <button
                     @click="openPrintChoice(row.trx)"
                     :disabled="isPrinting"
@@ -437,6 +453,7 @@ const filterDate = ref(todayISO);
 const filterJenis = ref("");
 const filterSales = ref("");
 const searchText = ref("");
+const searchInputLocked = ref(true);
 const hasLoaded = ref(false);
 
 // Pagination
@@ -693,6 +710,11 @@ function getRestorableItems(trx) {
   return [];
 }
 
+function unlockSearchInput() {
+  if (!searchInputLocked.value) return;
+  searchInputLocked.value = false;
+}
+
 // --- Data loading -------------------------------------------------------------
 async function loadData() {
   store.stopTodayListener();
@@ -884,6 +906,86 @@ async function saveEdit() {
 }
 
 // --- Print --------------------------------------------------------------------
+function getSafeAmount(value) {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+function mapPrintItem(item) {
+  const rawQty = Number(item?.qty ?? item?.jumlah ?? 1);
+  const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+  const totalHarga = getSafeAmount(item?.subtotal ?? item?.totalHarga ?? item?.harga);
+
+  return {
+    nama: item?.namaBarang || item?.nama || "",
+    kode: item?.kodeText || item?.kode || "",
+    kadar: item?.kadar || "-",
+    berat: item?.totalBerat ?? item?.berat ?? "-",
+    qty,
+    jumlah: qty,
+    harga: totalHarga,
+    subtotal: totalHarga,
+    totalHarga,
+    keterangan: item?.keterangan || "",
+  };
+}
+
+async function postPrintRequest(endpoint, data) {
+  const res = await fetch(`${PRINT_BASE}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    let message = `Print gagal (${res.status})`;
+    try {
+      const errorBody = await res.json();
+      message = errorBody?.error || errorBody?.message || message;
+    } catch (_) {
+      // ignore parse error, keep fallback message
+    }
+    throw new Error(message);
+  }
+
+  const result = await res.json();
+  if (!result.success) throw new Error(result.error || "Print gagal");
+  return result;
+}
+
+function shouldSplitInvoiceByItem(items) {
+  return items.length > 1;
+}
+
+async function reprintInvoicePerItem(endpoint, baseData, items) {
+  let successCount = 0;
+  let failedCount = 0;
+  let lastErrorMessage = "";
+
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+
+    try {
+      await postPrintRequest(endpoint, {
+        ...baseData,
+        items: [item],
+        totalHarga: getSafeAmount(item.totalHarga),
+        notes: item.keterangan || "",
+      });
+      successCount += 1;
+    } catch (error) {
+      failedCount += 1;
+      lastErrorMessage = error?.message || "Print gagal";
+    }
+
+    if (i < items.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  return { successCount, failedCount, lastErrorMessage };
+}
+
 function openPrintChoice(trx) {
   if (isPrinting.value) return;
   printChoiceTarget.value = trx;
@@ -908,49 +1010,54 @@ async function reprintTransaction(trx, type = "receipt") {
     clearTimeout(t);
     if (!health.ok) throw new Error("unhealthy");
 
+    const transactionType = (trx.jenisPenjualan ?? "").toUpperCase();
+    const items = (trx.items ?? []).map(mapPrintItem);
+    if (!items.length) throw new Error("Tidak ada item untuk dicetak");
+
     const endpoint = type === "invoice" ? "/api/print/invoice" : "/api/print/receipt";
-    const data = {
+    const baseData = {
       transactionId: trx.id,
-      transactionType: (trx.jenisPenjualan ?? "").toUpperCase(),
+      transactionType,
       tanggal: trx.tanggal,
       jam: trx.jam ?? "",
       sales: trx.salesName ?? "",
       customerName: trx.customerName ?? "",
       customerPhone: trx.customerPhone ?? "",
-      items: (trx.items ?? []).map((i) => ({
-        nama: i.namaBarang || i.nama,
-        kode: i.kodeText || i.kode,
-        kadar: i.kadar || "-",
-        berat: i.totalBerat ?? i.berat ?? "-",
-        qty: i.qty ?? i.jumlah,
-        totalHarga: i.subtotal ?? i.totalHarga,
-        keterangan: i.keterangan || "",
-      })),
-      totalHarga: trx.totalHarga,
       metodeBayar: trx.metodePembayaran ?? "",
       nominalDP: trx.nominalDP ?? 0,
       sisaPembayaran: trx.sisaPembayaran ?? 0,
+      notes: trx.keterangan || "",
     };
-    const res = await fetch(`${PRINT_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
 
-    if (!res.ok) {
-      let message = `Print gagal (${res.status})`;
-      try {
-        const errorBody = await res.json();
-        message = errorBody?.error || errorBody?.message || message;
-      } catch (_) {
-        // ignore parse error, keep fallback message
-      }
-      throw new Error(message);
+    if (type !== "invoice" || !shouldSplitInvoiceByItem(items)) {
+      const mergedNotes =
+        trx.keterangan ||
+        items
+          .map((item) => item.keterangan || "")
+          .filter(Boolean)
+          .join("; ");
+
+      await postPrintRequest(endpoint, {
+        ...baseData,
+        items,
+        totalHarga: getSafeAmount(trx.totalHarga),
+        notes: mergedNotes,
+      });
+      swal(type === "invoice" ? "Invoice dikirim ke printer" : "Struk dikirim ke printer", "success");
+      return;
     }
 
-    const result = await res.json();
-    if (!result.success) throw new Error(result.error || "Print gagal");
-    swal(type === "invoice" ? "Invoice dikirim ke printer" : "Struk dikirim ke printer", "success");
+    const { successCount, failedCount, lastErrorMessage } = await reprintInvoicePerItem(endpoint, baseData, items);
+
+    if (failedCount > 0) {
+      if (successCount > 0) {
+        swal(`${successCount} invoice berhasil, ${failedCount} gagal`, "warning");
+        return;
+      }
+      throw new Error(lastErrorMessage || "Semua invoice gagal dicetak");
+    }
+
+    swal(`${successCount} invoice dikirim ke printer`, "success");
   } catch (err) {
     failedPrintContext.value = { trx, type };
     printOfflineMessage.value = err?.message || "Pastikan printing service sudah dijalankan di komputer ini.";
@@ -989,3 +1096,26 @@ onUnmounted(() => {
   window.removeEventListener("storage", handleStockSync);
 });
 </script>
+
+<style scoped>
+/* Optimize table display for compact data visualization */
+.table-responsive .table {
+  font-size: 0.85rem;
+  margin-bottom: 0;
+}
+
+.table-responsive .table th,
+.table-responsive .table td {
+  padding: 0.45rem 0.25rem;
+  vertical-align: middle;
+}
+
+.table-responsive .table tbody tr {
+  line-height: 1.2;
+}
+
+.table-responsive .btn-sm {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.70rem;
+}
+</style>
