@@ -177,21 +177,62 @@ export async function saveFaceDescriptor(employeeId, descriptorArray) {
 function toFloat32Descriptor(data) {
   if (!data) return null;
 
-  const source = data.faceDescriptor ?? data.descriptor ?? null;
-  if (!source) return null;
+  const toFiniteFloat32Array = (value) => {
+    if (value instanceof Float32Array) return value;
 
-  if (source instanceof Float32Array) return source;
-  if (Array.isArray(source)) return new Float32Array(source);
+    if (ArrayBuffer.isView(value) && value?.buffer) {
+      return new Float32Array(value.buffer, value.byteOffset, value.length);
+    }
 
-  // Legacy/malformed shape: numeric-key object {0:...,1:...}
-  if (typeof source === "object") {
-    const values = Object.keys(source)
-      .sort((a, b) => Number(a) - Number(b))
-      .map((k) => source[k]);
-    if (values.length) return new Float32Array(values);
-  }
+    if (Array.isArray(value)) {
+      const numeric = value.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+      return numeric.length ? new Float32Array(numeric) : null;
+    }
 
-  return null;
+    return null;
+  };
+
+  const parseDescriptorSource = (source) => {
+    if (!source) return null;
+
+    const direct = toFiniteFloat32Array(source);
+    if (direct) return direct;
+
+    if (typeof source === "string") {
+      const raw = source.trim();
+      if (!raw) return null;
+      try {
+        return parseDescriptorSource(JSON.parse(raw));
+      } catch {
+        return null;
+      }
+    }
+
+    if (typeof source === "object") {
+      // Legacy payload: { type: "Float32Array", data: [...] }
+      if (Array.isArray(source.data)) {
+        const fromData = toFiniteFloat32Array(source.data);
+        if (fromData) return fromData;
+      }
+
+      // Legacy/malformed shape: numeric-key object {0:...,1:...}
+      const numericKeys = Object.keys(source).filter((k) => /^\d+$/.test(k));
+      if (numericKeys.length) {
+        const values = numericKeys.sort((a, b) => Number(a) - Number(b)).map((k) => source[k]);
+        const fromObject = toFiniteFloat32Array(values);
+        if (fromObject) return fromObject;
+      }
+    }
+
+    return null;
+  };
+
+  return (
+    parseDescriptorSource(data.faceDescriptor) ||
+    parseDescriptorSource(data.descriptor) ||
+    parseDescriptorSource(data.faceDescriptorArray) ||
+    parseDescriptorSource(data.faceDescriptorJson)
+  );
 }
 
 export async function getFaceDescriptor(employeeId, options = {}) {
@@ -208,23 +249,29 @@ export async function getFaceDescriptor(employeeId, options = {}) {
   addCandidate(employeeId);
   addCandidate(options.docId);
   addCandidate(options.barcode);
+  const candidateIds = [...candidates];
 
   // 1) Fast path: try by possible document IDs
-  for (const id of candidates) {
-    const snap = await getDoc(doc(db, "employeeFaces", id));
+  const directSnaps = await Promise.all(candidateIds.map((id) => getDoc(doc(db, "employeeFaces", id))));
+  for (let i = 0; i < candidateIds.length; i += 1) {
+    const snap = directSnaps[i];
     if (!snap.exists()) continue;
     const descriptor = toFloat32Descriptor(snap.data());
     if (descriptor) return descriptor;
   }
 
   // 2) Fallback: scan by embedded employeeId field for legacy records
-  for (const id of candidates) {
-    const q = query(collection(db, "employeeFaces"), where("employeeId", "==", id), limit(1));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      const descriptor = toFloat32Descriptor(snap.docs[0].data());
-      if (descriptor) return descriptor;
-    }
+  const fallbackSnaps = await Promise.all(
+    candidateIds.map((id) => {
+      const q = query(collection(db, "employeeFaces"), where("employeeId", "==", id), limit(1));
+      return getDocs(q);
+    }),
+  );
+  for (let i = 0; i < candidateIds.length; i += 1) {
+    const snap = fallbackSnaps[i];
+    if (snap.empty) continue;
+    const descriptor = toFloat32Descriptor(snap.docs[0].data());
+    if (descriptor) return descriptor;
   }
 
   return null;

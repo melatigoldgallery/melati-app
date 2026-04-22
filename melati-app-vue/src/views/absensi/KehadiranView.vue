@@ -382,15 +382,25 @@ const SCANNER_CHAR_DELAY = 50; // ms kecepatan scanner
 const SCANNER_DONE_DELAY = 500; // ms jeda selesai scan
 const ENTER_DEBOUNCE = 1000; // ms debounce Enter
 const FACE_MATCH_THRESHOLD = 0.5;
+const FACE_DETECT_MAX_ATTEMPTS = 8;
+const FACE_DETECT_INTERVAL = 250;
+const FACE_DETECT_INPUT_SIZE = 224;
+const FACE_DETECT_SCORE_THRESHOLD = 0.5;
+const FACE_MODEL_URL_CANDIDATES = ["/face-api/models"];
+const FACE_API_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
 const SUCCESS_AUDIO_FILE = "/audio/notifOn.mp3";
 const ERROR_AUDIO_FILE = "/audio/failed.mp3";
 const SOUND_ENABLED = true;
 const MODAL_FONT_SIZE = "13px";
 
 let faceApiLib = null;
+let faceApiLoadPromise = null;
 let faceModelsLoaded = false;
+let faceModelsLoadPromise = null;
 let faceVideoStream = null;
 let indonesianVoice = null;
+let faceWarmupStarted = false;
+const faceDescriptorCache = new Map();
 // Guard for stale HMR/runtime references from older speech code.
 let testUtterance = null;
 
@@ -992,10 +1002,32 @@ function isFaceVerificationRequired(scanMode, shift) {
   return false;
 }
 
+function addFaceApiPreconnectHints() {
+  if (document.querySelector('link[data-faceapi-preconnect="1"]')) return;
+
+  const preconnect = document.createElement("link");
+  preconnect.rel = "preconnect";
+  preconnect.href = "https://cdn.jsdelivr.net";
+  preconnect.crossOrigin = "anonymous";
+  preconnect.setAttribute("data-faceapi-preconnect", "1");
+
+  const dnsPrefetch = document.createElement("link");
+  dnsPrefetch.rel = "dns-prefetch";
+  dnsPrefetch.href = "https://cdn.jsdelivr.net";
+  dnsPrefetch.setAttribute("data-faceapi-preconnect", "1");
+
+  document.head.appendChild(preconnect);
+  document.head.appendChild(dnsPrefetch);
+}
+
 async function loadFaceApiLibrary() {
   if (faceApiLib) return faceApiLib;
+  if (faceApiLoadPromise) {
+    await faceApiLoadPromise;
+    return faceApiLib;
+  }
 
-  await new Promise((resolve, reject) => {
+  faceApiLoadPromise = new Promise((resolve, reject) => {
     const existing = document.getElementById("face-api-script");
     if (existing) {
       if (window.faceapi) {
@@ -1009,29 +1041,140 @@ async function loadFaceApiLibrary() {
 
     const script = document.createElement("script");
     script.id = "face-api-script";
-    script.src = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+    script.src = FACE_API_SCRIPT_URL;
     script.onload = resolve;
     script.onerror = reject;
     document.head.appendChild(script);
   });
 
-  faceApiLib = window.faceapi;
+  try {
+    await faceApiLoadPromise;
+    faceApiLib = window.faceapi;
+  } catch (error) {
+    faceApiLoadPromise = null;
+    throw error;
+  }
+
   return faceApiLib;
 }
 
 async function ensureFaceModelsLoaded() {
   const faceapi = await loadFaceApiLibrary();
   if (faceModelsLoaded) return faceapi;
+  if (faceModelsLoadPromise) {
+    await faceModelsLoadPromise;
+    return faceapi;
+  }
 
-  const modelUrl = "/face-api/models";
-  await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
-    faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl),
-    faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl),
-  ]);
+  faceModelsLoadPromise = (async () => {
+    let lastError = null;
+    for (const modelUrl of FACE_MODEL_URL_CANDIDATES) {
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
+          faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl),
+          faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl),
+        ]);
+        faceModelsLoaded = true;
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
 
-  faceModelsLoaded = true;
-  return faceapi;
+    throw new Error(
+      `Model verifikasi wajah gagal dimuat dari semua path (${FACE_MODEL_URL_CANDIDATES.join(", ")}). ${lastError?.message || ""}`,
+    );
+  })();
+
+  try {
+    await faceModelsLoadPromise;
+    return faceapi;
+  } catch (error) {
+    faceModelsLoadPromise = null;
+    throw error;
+  }
+}
+
+function normalizeFaceDescriptorCacheKey(value) {
+  if (!value || typeof value !== "string") return "";
+  return value.trim().toLowerCase();
+}
+
+function getFaceDescriptorCacheKeys(employee) {
+  const keys = new Set();
+  const add = (value) => {
+    const key = normalizeFaceDescriptorCacheKey(value);
+    if (key) keys.add(key);
+  };
+
+  add(employee?.employeeId);
+  add(employee?.id);
+  add(employee?.barcode);
+  return [...keys];
+}
+
+async function getEmployeeFaceDescriptor(employee) {
+  const cacheKeys = getFaceDescriptorCacheKeys(employee);
+  for (const key of cacheKeys) {
+    const cached = faceDescriptorCache.get(key);
+    if (cached) return cached;
+  }
+
+  const descriptor = await getFaceDescriptor(employee.employeeId, {
+    docId: employee.id,
+    barcode: employee.barcode,
+  });
+
+  if (descriptor) {
+    cacheKeys.forEach((key) => {
+      faceDescriptorCache.set(key, descriptor);
+    });
+  }
+
+  return descriptor;
+}
+
+async function warmupFaceDetection(faceapi) {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 120;
+    await faceapi.detectAllFaces(
+      canvas,
+      new faceapi.TinyFaceDetectorOptions({
+        inputSize: 160,
+        scoreThreshold: FACE_DETECT_SCORE_THRESHOLD,
+      }),
+    );
+  } catch {
+    // Warmup bersifat best effort agar deteksi pertama lebih responsif.
+  }
+}
+
+async function primeFaceVerificationResources() {
+  if (faceWarmupStarted) return;
+  faceWarmupStarted = true;
+
+  try {
+    const faceapi = await ensureFaceModelsLoaded();
+    await warmupFaceDetection(faceapi);
+  } catch (error) {
+    console.warn("Face verification warmup failed:", error);
+  }
+}
+
+function scheduleFaceVerificationWarmup() {
+  const runWarmup = () => {
+    void primeFaceVerificationResources();
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(runWarmup, { timeout: 2500 });
+    return;
+  }
+
+  setTimeout(runWarmup, 500);
 }
 
 async function startFaceCamera(videoElement) {
@@ -1040,15 +1183,54 @@ async function startFaceCamera(videoElement) {
     faceVideoStream = null;
   }
 
-  faceVideoStream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      width: { ideal: 640 },
-      height: { ideal: 480 },
-      facingMode: "user",
+  const cameraConstraints = [
+    {
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: "user",
+      },
     },
-  });
+    {
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      },
+    },
+    { video: true },
+  ];
+
+  let lastError = null;
+  for (const constraints of cameraConstraints) {
+    try {
+      faceVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!faceVideoStream) {
+    throw lastError || new Error("Gagal mengakses kamera.");
+  }
 
   videoElement.srcObject = faceVideoStream;
+  await new Promise((resolve, reject) => {
+    const onLoadedMetadata = () => {
+      videoElement.removeEventListener("loadedmetadata", onLoadedMetadata);
+      videoElement.removeEventListener("error", onVideoError);
+      resolve();
+    };
+    const onVideoError = () => {
+      videoElement.removeEventListener("loadedmetadata", onLoadedMetadata);
+      videoElement.removeEventListener("error", onVideoError);
+      reject(new Error("Gagal membaca stream kamera."));
+    };
+
+    videoElement.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
+    videoElement.addEventListener("error", onVideoError, { once: true });
+  });
+
   await videoElement.play();
 }
 
@@ -1059,10 +1241,44 @@ function stopFaceCamera() {
   }
 }
 
-async function verifyFaceForEmployee(employee) {
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function detectSingleFaceDescriptor(faceapi, videoElement) {
+  for (let attempt = 1; attempt <= FACE_DETECT_MAX_ATTEMPTS; attempt += 1) {
+    const detections = await faceapi
+      .detectAllFaces(
+        videoElement,
+        new faceapi.TinyFaceDetectorOptions({
+          inputSize: FACE_DETECT_INPUT_SIZE,
+          scoreThreshold: FACE_DETECT_SCORE_THRESHOLD,
+        }),
+      )
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    if (detections.length > 1) {
+      throw new Error("Terdeteksi lebih dari satu wajah.");
+    }
+    if (detections.length === 1) {
+      return detections[0].descriptor;
+    }
+
+    if (attempt < FACE_DETECT_MAX_ATTEMPTS) {
+      await delay(FACE_DETECT_INTERVAL);
+    }
+  }
+
+  throw new Error("Wajah tidak terdeteksi.");
+}
+
+async function verifyFaceForEmployee(employee, prefetchedDescriptorPromise = null) {
   let videoElement = null;
   let modalActive = true;
   let verificationPassed = false;
+  let storedDescriptor = null;
+  let faceapiInstance = null;
 
   const getFaceVerifyErrorMessage = (error) => {
     const msg = String(error?.message || "");
@@ -1075,17 +1291,20 @@ async function verifyFaceForEmployee(employee) {
     if (msg.includes("Could not start video source") || msg.includes("NotReadableError")) {
       return "Kamera sedang dipakai aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.";
     }
+    if (msg.includes("Unexpected token") && msg.toLowerCase().includes("json")) {
+      return "File model wajah tidak valid. Pastikan path model benar dan file manifest JSON bisa diakses.";
+    }
     if (msg.includes("face-api") || msg.includes("loadFromUri") || msg.includes("Failed to fetch")) {
       return "Model verifikasi wajah gagal dimuat. Cek koneksi/model files lalu coba lagi.";
     }
     return msg || "Terjadi kesalahan verifikasi wajah.";
   };
 
-  const result = await Swal.fire({
+  await Swal.fire({
     title: `Verifikasi Wajah - ${employee.name}`,
     html: `
       <div class="text-start">
-        <p class="mb-2 small text-muted">Posisikan wajah di depan kamera, lalu klik Verifikasi.</p>
+        <p class="mb-2 small text-muted">Posisikan wajah tepat di depan kamera, verifikasi berjalan otomatis.</p>
         <video id="faceVerificationVideo" autoplay muted playsinline style="width:100%;border-radius:8px;background:#111;"></video>
         <div id="faceVerificationStatus" class="small mt-2 text-muted">Menyiapkan kamera...</div>
       </div>
@@ -1095,44 +1314,32 @@ async function verifyFaceForEmployee(employee) {
     showConfirmButton: false,
     cancelButtonText: "Batal",
     allowOutsideClick: false,
+    allowEscapeKey: true,
     didOpen: async () => {
       try {
         const statusEl = document.getElementById("faceVerificationStatus");
-        if (statusEl) statusEl.textContent = "Menyiapkan kamera...";
+        if (statusEl) statusEl.textContent = "Menyiapkan model, kamera, dan data wajah...";
 
-        await ensureFaceModelsLoaded();
-        if (!modalActive) return;
-
+        const faceapiPromise = ensureFaceModelsLoaded();
+        const descriptorPromise = prefetchedDescriptorPromise || getEmployeeFaceDescriptor(employee);
         videoElement = document.getElementById("faceVerificationVideo");
-        await startFaceCamera(videoElement);
+        const [faceapi, descriptor] = await Promise.all([
+          faceapiPromise,
+          descriptorPromise,
+          startFaceCamera(videoElement),
+        ]);
         if (!modalActive) return;
 
-        if (statusEl) statusEl.textContent = "Mendeteksi wajah...";
-
-        const faceapi = await ensureFaceModelsLoaded();
-        if (!modalActive) return;
-
-        const stored = await getFaceDescriptor(employee.employeeId, {
-          docId: employee.id,
-          barcode: employee.barcode,
-        });
-        if (!stored) {
+        faceapiInstance = faceapi;
+        storedDescriptor = descriptor;
+        if (!storedDescriptor) {
           throw new Error("Data wajah karyawan belum terdaftar.");
         }
 
-        const detections = await faceapi
-          .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
-          .withFaceLandmarks()
-          .withFaceDescriptors();
+        if (statusEl) statusEl.textContent = "Mendeteksi dan mencocokkan wajah...";
+        const detectedDescriptor = await detectSingleFaceDescriptor(faceapiInstance, videoElement);
 
-        if (!detections.length) {
-          throw new Error("Wajah tidak terdeteksi.");
-        }
-        if (detections.length > 1) {
-          throw new Error("Terdeteksi lebih dari satu wajah.");
-        }
-
-        const distance = faceapi.euclideanDistance(detections[0].descriptor, stored);
+        const distance = faceapiInstance.euclideanDistance(detectedDescriptor, storedDescriptor);
         const similarity = 1 - distance;
         if (similarity < FACE_MATCH_THRESHOLD) {
           throw new Error(`Wajah tidak cocok (${Math.round(similarity * 100)}%).`);
@@ -1149,11 +1356,12 @@ async function verifyFaceForEmployee(employee) {
       } catch (error) {
         const statusEl = document.getElementById("faceVerificationStatus");
         const message = getFaceVerifyErrorMessage(error);
-        if (statusEl) statusEl.textContent = `Verifikasi gagal: ${message} (silakan coba lagi).`;
+        if (statusEl) statusEl.textContent = `Verifikasi gagal: ${message}`;
+
         if (Swal.isVisible()) {
           setTimeout(() => {
             if (Swal.isVisible()) Swal.close();
-          }, 1200);
+          }, 1400);
         }
       }
 
@@ -1227,7 +1435,8 @@ async function submitBarcode({ source = "manual" } = {}) {
     }
 
     if (requiresFace) {
-      const verified = await verifyFaceForEmployee(employee);
+      const descriptorPrefetchPromise = getEmployeeFaceDescriptor(employee);
+      const verified = await verifyFaceForEmployee(employee, descriptorPrefetchPromise);
       if (!verified) {
         showScanResult("error", employee.name, "Verifikasi wajah dibatalkan atau gagal.");
         playAttendanceNotification("error", "", "Verifikasi wajah gagal");
@@ -1334,6 +1543,8 @@ async function processAttendance(employee, options = {}) {
 onMounted(async () => {
   autoSetRadio();
   initSpeechSynthesis();
+  addFaceApiPreconnectHints();
+  scheduleFaceVerificationWarmup();
 
   // Preload audio notifikasi untuk mengurangi jeda saat scan pertama.
   try {
@@ -1386,6 +1597,7 @@ onUnmounted(() => {
   if (unsubManualOvertime) unsubManualOvertime();
   if (unsubSettings) unsubSettings();
   stopFaceCamera();
+  faceDescriptorCache.clear();
   if (scannerTimeout) clearTimeout(scannerTimeout);
   if (resultTimer) clearTimeout(resultTimer);
 });
