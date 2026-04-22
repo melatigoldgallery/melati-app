@@ -18,4 +18,16 @@ export default defineConfig({
   optimizeDeps: {
     include: ["firebase/app", "firebase/firestore", "firebase/database", "firebase/storage", "firebase/auth"],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          firebase: ["firebase/app", "firebase/firestore", "firebase/auth", "firebase/storage"],
+          vendor: ["vue", "vue-router", "pinia"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1500,
+    reportCompressedSize: false,
+  },
 });
