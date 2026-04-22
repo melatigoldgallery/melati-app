@@ -26,8 +26,12 @@
       <div class="card-body py-2">
         <div class="row g-2 align-items-end py-3">
           <div class="col-6 col-md-2">
-            <label class="form-label small fw-semibold mb-1">Tanggal</label>
-            <input v-model="filterDate" type="date" class="form-control form-control-sm" />
+            <label class="form-label small fw-semibold mb-1">Tanggal Dari</label>
+            <input v-model="filterStartDate" type="date" class="form-control form-control-sm" />
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small fw-semibold mb-1">Tanggal Sampai</label>
+            <input v-model="filterEndDate" type="date" class="form-control form-control-sm" />
           </div>
           <div class="col-6 col-md-2">
             <label class="form-label small fw-semibold mb-1">Jenis</label>
@@ -52,7 +56,7 @@
               <option value="Sudah Diambil">Sudah Diambil</option>
             </select>
           </div>
-          <div class="col-12 col-md-2">
+          <div class="col-6 d-md-none">
             <label class="form-label small fw-semibold mb-1">Cari</label>
             <input
               v-model="searchText"
@@ -80,7 +84,7 @@
       </div>
     </div>
     <div class="d-none d-md-flex justify-content-between py-2 border-bottom mb-3">
-      <div class="">
+      <div class="d-flex gap-2 flex-wrap">
         <button
           v-if="hasLoaded"
           class="btn btn-outline-success btn-sm fw-semibold flex-fill flex-md-grow-0"
@@ -91,6 +95,23 @@
           <i v-else class="bi bi-check2-square me-1"></i>
           Selesaikan Terpilih ({{ selectedServisCount }})
         </button>
+        <div class="" v-if="hasLoaded">
+          <input
+            v-model="searchText"
+            type="search"
+            name="servisSearch"
+            class="form-control form-control-sm"
+            placeholder="Customer / barang..."
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            data-form-type="other"
+            :readonly="searchReadonly"
+            @focus="unlockSearchInput"
+            @pointerdown="unlockSearchInput"
+          />
+        </div>
       </div>
       <div class="gap-2 d-flex flex-wrap">
         <button v-if="hasLoaded" class="btn btn-danger btn-sm" @click="exportPDF" title="Export PDF sesuai filter">
@@ -906,11 +927,13 @@ import {
 
 const { swal, confirm, error: showError } = useAlert();
 const { toWITA, todayStringWITA } = useWITA();
+const DEFAULT_DATE = todayStringWITA();
 
 // ── State ─────────────────────────────────────────────────────────────────
 const loading = ref(false);
 const allItems = ref([]);
-const filterDate = ref(todayStringWITA());
+const filterStartDate = ref(DEFAULT_DATE);
+const filterEndDate = ref(DEFAULT_DATE);
 const filterJenis = ref("servis");
 const filterStatus = ref("Belum Selesai");
 const filterPengambilan = ref("Belum Diambil");
@@ -1132,7 +1155,34 @@ function formatWaktu(val) {
 }
 
 function isToday() {
-  return filterDate.value === todayStringWITA();
+  const today = todayStringWITA();
+  return filterStartDate.value === today && filterEndDate.value === today;
+}
+
+function getDateRangeLabel() {
+  if (filterStartDate.value === filterEndDate.value) return filterStartDate.value;
+  return `${filterStartDate.value} s/d ${filterEndDate.value}`;
+}
+
+function getDateRangeFileSuffix() {
+  if (filterStartDate.value === filterEndDate.value) return filterStartDate.value;
+  return `${filterStartDate.value}_sd_${filterEndDate.value}`;
+}
+
+function validateDateRange() {
+  if (!filterStartDate.value || !filterEndDate.value) {
+    swal("Pilih tanggal awal dan tanggal akhir", "warning");
+    return false;
+  }
+  if (filterStartDate.value > filterEndDate.value) {
+    swal("Tanggal awal tidak boleh lebih besar dari tanggal akhir", "warning");
+    return false;
+  }
+  return true;
+}
+
+function invalidateCurrentRangeCache() {
+  invalidateCachedServis(filterStartDate.value, filterEndDate.value);
 }
 
 // ── Computed ──────────────────────────────────────────────────────────────
@@ -1236,7 +1286,7 @@ function cleanupListener() {
 }
 
 async function loadData() {
-  if (!filterDate.value) return swal("Pilih tanggal", "warning");
+  if (!validateDateRange()) return;
 
   cleanupListener();
   loading.value = true;
@@ -1247,13 +1297,13 @@ async function loadData() {
   try {
     if (isToday()) {
       // Real-time for today
-      unsubscribe = subscribeServisByRange(filterDate.value, filterDate.value, (data) => {
+      unsubscribe = subscribeServisByRange(filterStartDate.value, filterEndDate.value, (data) => {
         allItems.value = data;
         loading.value = false;
         hasLoaded.value = true;
       });
     } else {
-      const data = await fetchServisByRange(filterDate.value, filterDate.value);
+      const data = await fetchServisByRange(filterStartDate.value, filterEndDate.value);
       allItems.value = data;
       loading.value = false;
       hasLoaded.value = true;
@@ -1285,7 +1335,7 @@ async function updateSelectedServisSelesai() {
   try {
     const updatedCount = await bulkMarkServisSelesai(targetIds);
     selectedServisIds.value = [];
-    invalidateCachedServis(filterDate.value, filterDate.value);
+    invalidateCurrentRangeCache();
     swal(`${updatedCount} data terpilih berhasil diubah ke status 'Sudah Selesai'`);
 
     // For non-today date, fetch again because this view is not real-time.
@@ -1400,7 +1450,7 @@ async function saveStatus() {
       updates.waktuPengambilan = null;
     }
     await updateServisStatus(statusForm.value.id, updates);
-    invalidateCachedServis(filterDate.value, filterDate.value);
+    invalidateCurrentRangeCache();
     Modal.getInstance(document.getElementById("statusModal"))?.hide();
     swal("Status berhasil diperbarui");
     if (!isToday()) loadData();
@@ -1471,7 +1521,7 @@ async function saveEdit() {
       payload.detailBarang = rows;
     }
     await updateServisData(editForm.value.id, payload);
-    invalidateCachedServis(filterDate.value, filterDate.value);
+    invalidateCurrentRangeCache();
     Modal.getInstance(document.getElementById("editModal"))?.hide();
     swal("Data berhasil diperbarui");
     if (!isToday()) loadData();
@@ -1495,7 +1545,7 @@ async function doDelete() {
   try {
     await verifySupervisorPassword(deletePassword.value);
     await deleteServis(deleteTarget.value.id);
-    invalidateCachedServis(filterDate.value, filterDate.value);
+    invalidateCurrentRangeCache();
     Modal.getInstance(document.getElementById("deleteModal"))?.hide();
     swal("Data servis berhasil dihapus");
     if (!isToday()) loadData();
@@ -1635,7 +1685,7 @@ async function exportServisPDF() {
   doc.setFontSize(14);
   doc.text("LAPORAN SERVIS MELATI GOLD SHOP", 14, 15);
   doc.setFontSize(10);
-  doc.text(`Tanggal: ${filterDate.value}`, 14, 22);
+  doc.text(`Rentang Tanggal: ${getDateRangeLabel()}`, 14, 22);
 
   const head = [
     [
@@ -1696,7 +1746,7 @@ async function exportServisPDF() {
       9: { cellWidth: 28, halign: "right" },
     },
   });
-  doc.save(`Laporan_Servis_${filterDate.value}.pdf`);
+  doc.save(`Laporan_Servis_${getDateRangeFileSuffix()}.pdf`);
 }
 
 async function exportCustomPDF() {
@@ -1708,7 +1758,7 @@ async function exportCustomPDF() {
   doc.setFontSize(14);
   doc.text("LAPORAN CUSTOM MELATI GOLD SHOP", 14, 15);
   doc.setFontSize(10);
-  doc.text(`Tanggal: ${filterDate.value}`, 14, 22);
+  doc.text(`Rentang Tanggal: ${getDateRangeLabel()}`, 14, 22);
 
   const head = [
     [
@@ -1780,18 +1830,18 @@ async function exportCustomPDF() {
       11: { cellWidth: 28, halign: "right" },
     },
   });
-  doc.save(`Laporan_Custom_${filterDate.value}.pdf`);
+  doc.save(`Laporan_Custom_${getDateRangeFileSuffix()}.pdf`);
 }
 
 // ── Cross-tab sync ────────────────────────────────────────────────────────
 function handleStorageSync(e) {
   if (e.key === "servisDataChanged") {
-    invalidateCachedServis(filterDate.value, filterDate.value);
+    invalidateCurrentRangeCache();
     if (hasLoaded.value && !isToday()) loadData();
   }
 }
 
-watch(filterDate, () => {
+watch([filterStartDate, filterEndDate], () => {
   hasLoaded.value = false;
   allItems.value = [];
   selectedServisIds.value = [];
