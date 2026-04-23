@@ -703,6 +703,7 @@ import { useAccessoriesStore } from "@/stores/accessories";
 import { useAlert } from "@/composables/useAlert";
 import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
+import { getSafeAmount, resolveReceiptPayment } from "@/utils/print-payment";
 
 const store = useAccessoriesStore();
 const { swal, error: showError } = useAlert();
@@ -1413,11 +1414,6 @@ function resetForm() {
 // --- Print Service ------------------------------------------------------------
 const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3001";
 
-function getSafeAmount(value) {
-  const n = Number(value ?? 0);
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
-}
-
 function mapPrintItem(item) {
   const rawQty = Number(item?.qty ?? item?.jumlah ?? 1);
   const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
@@ -1517,6 +1513,13 @@ async function printReceipt() {
 
     const now = new Date();
     const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    const payment = resolveReceiptPayment({
+      metodeBayar: form.metodePembayaran,
+      totalHarga: lastSaleData.value?.totalHarga,
+      jumlahBayar: jumlahBayar.value,
+      kembalian: kembalian.value,
+    });
+
     const data = {
       transactionType: form.tipe.toUpperCase(),
       tanggal: form.tanggal,
@@ -1524,12 +1527,12 @@ async function printReceipt() {
       sales: form.salesName,
       customerName: form.customerName || "",
       items,
-      totalHarga: lastSaleData.value.totalHarga,
-      metodeBayar: form.metodePembayaran.toLowerCase(),
+      totalHarga: payment.totalHarga,
+      metodeBayar: payment.metodeBayar,
       nominalDP: form.metodePembayaran === "DP" ? nominalDP.value : 0,
       sisaPembayaran: form.metodePembayaran === "DP" ? lastSaleData.value.sisaPembayaran : 0,
-      jumlahBayar: form.metodePembayaran !== "DP" && form.metodePembayaran !== "FREE" ? jumlahBayar.value : 0,
-      kembalian: form.metodePembayaran !== "DP" && form.metodePembayaran !== "FREE" ? kembalian.value : 0,
+      jumlahBayar: payment.jumlahBayar,
+      kembalian: payment.kembalian,
     };
 
     await postPrintRequest("/api/print/receipt", data);

@@ -1,10 +1,10 @@
-const logger = require('../utils/logger');
+const logger = require("../utils/logger");
 
 class ESCPOSService {
   constructor() {
     // ESC/POS command constants
-    this.ESC = '\x1B';
-    this.GS = '\x1D';
+    this.ESC = "\x1B";
+    this.GS = "\x1D";
   }
 
   /**
@@ -13,27 +13,39 @@ class ESCPOSService {
    * @returns {string} Plain text receipt
    */
   generateReceiptCommands(data) {
-    const { 
-      items = [], 
+    const {
+      items = [],
       totalHarga = 0,
-      jumlahBayar = 0, 
-      kembalian = 0, 
-      sales = '', 
-      tanggal = '',
-      jam = '',
-      metodeBayar = 'tunai',
+      jumlahBayar = 0,
+      kembalian = 0,
+      sales = "",
+      tanggal = "",
+      jam = "",
+      metodeBayar = "tunai",
       nominalDP = 0,
       sisaPembayaran = 0,
-      transactionType = 'AKSESORIS'
+      transactionType = "AKSESORIS",
     } = data;
 
-    let output = '';
+    const metode = String(metodeBayar || "").toLowerCase();
+    const totalNum = Number(totalHarga || 0) || 0;
+    const bayarNum = Number(jumlahBayar || 0) || 0;
+    const effectiveJumlahBayar = metode !== "dp" && metode !== "free" && bayarNum <= 0 ? totalNum : bayarNum;
+    const kembalianNum = Number(kembalian);
+    const effectiveKembalian =
+      metode !== "dp" && metode !== "free"
+        ? Number.isFinite(kembalianNum) && kembalianNum >= 0
+          ? kembalianNum
+          : Math.max(0, effectiveJumlahBayar - totalNum)
+        : 0;
+
+    let output = "";
     const width = 38; // Character width for 76mm paper
 
     // Helper function to center text
     const centerText = (text) => {
       const padding = Math.max(0, Math.floor((width - text.length) / 2));
-      return ' '.repeat(padding) + text + '\n';
+      return " ".repeat(padding) + text + "\n";
     };
 
     // Helper function to pad line with right margin
@@ -41,96 +53,98 @@ class ESCPOSService {
       const rightMargin = 4; // Margin from right edge
       const maxWidth = width - rightMargin;
       const spaces = Math.max(1, maxWidth - left.length - right.length);
-      return left + ' '.repeat(spaces) + right + '\n';
+      return left + " ".repeat(spaces) + right + "\n";
     };
 
     // Header - Centered
-    output += '\n';
-    output += centerText('==================================');
-    output += centerText('M E L A T I   3');
-    output += centerText('JL. DIPONEGORO NO. 116');
-    output += centerText('NOTA PENJUALAN ' + transactionType);
-    output += centerText('==================================');
-    output += '\n';
+    output += "\n";
+    output += centerText("==================================");
+    output += centerText("M E L A T I   3");
+    output += centerText("JL. DIPONEGORO NO. 116");
+    output += centerText("NOTA PENJUALAN " + transactionType);
+    output += centerText("==================================");
+    output += "\n";
 
     // Transaction info
-    output += 'Tanggal: ' + tanggal + '\n';
-    output += 'Sales  : ' + sales + '\n';
-    output += '==================================\n';
+    output += "Tanggal: " + tanggal + "\n";
+    output += "Sales  : " + sales + "\n";
+    output += "==================================\n";
 
     // Items
     let hasKeterangan = false;
-    let keteranganText = '';
+    let keteranganText = "";
 
     items.forEach((item, index) => {
       const isLastItem = index === items.length - 1;
-      
+
       // Nama barang (uppercase)
-      const namaBarang = (item.nama || item.kode || 'Item').toUpperCase();
-      output += namaBarang + '\n\n';
-      
+      const namaBarang = (item.nama || item.kode || "Item").toUpperCase();
+      output += namaBarang + "\n\n";
+
       // Detail barang
-      const kode = item.kode || item.kodeText || '-';
-      const kadar = item.kadar || '-';
-      const berat = item.berat ? item.berat + 'gr' : '-';
+      const kode = item.kode || item.kodeText || "-";
+      const kadar = item.kadar || "-";
+      const berat = item.berat ? item.berat + "gr" : "-";
       const harga = this.formatRupiah(item.totalHarga || item.harga || 0);
-      
-      const detailBarang = kode + '|' + kadar + '|' + berat + `|`;
+
+      const detailBarang = kode + "|" + kadar + "|" + berat + `|`;
       output += padLine(detailBarang, harga);
-      output += '\n';
-      
+      output += "\n";
+
       // Separator
       if (!isLastItem) {
-        output += '- - - - - - - - - - - - - - - - - -\n';
+        output += "- - - - - - - - - - - - - - - - - -\n";
       }
-      
+
       // Collect keterangan
-      if (item.keterangan && item.keterangan.trim() !== '') {
+      if (item.keterangan && item.keterangan.trim() !== "") {
         hasKeterangan = true;
-        keteranganText += item.keterangan + ' ';
+        keteranganText += item.keterangan + " ";
       }
     });
 
-    output += '==================================\n';
+    output += "==================================\n";
 
     // Total
-    output += padLine('TOTAL:', this.formatRupiah(totalHarga));
-    output += '==================================\n';
+    output += padLine("TOTAL:", this.formatRupiah(totalHarga));
+    output += "==================================\n";
     // Payment details
-    if (metodeBayar === 'dp') {
+    if (metode === "dp") {
       const dpAmount = parseInt(nominalDP || 0);
       const total = parseInt(totalHarga || 0);
-      
-      output += padLine('Total Harga:', this.formatRupiah(total));
-      output += padLine('DP:', this.formatRupiah(dpAmount));
-      
+
+      output += padLine("Total Harga:", this.formatRupiah(total));
+      output += padLine("DP:", this.formatRupiah(dpAmount));
+
       if (dpAmount >= total) {
-        output += centerText('* * *  Lunas  * * *');
+        output += centerText("* * *  Lunas  * * *");
       } else {
         const sisa = parseInt(sisaPembayaran || 0);
-        output += padLine('Sisa:', this.formatRupiah(sisa));
+        output += padLine("Sisa:", this.formatRupiah(sisa));
       }
-    } else if (metodeBayar !== 'free') {
-      output += padLine('Bayar:', this.formatRupiah(jumlahBayar));
+    } else if (metode !== "free") {
+      output += padLine("Bayar:", this.formatRupiah(effectiveJumlahBayar));
+      if (effectiveKembalian > 0) {
+        output += padLine("Kembalian:", this.formatRupiah(effectiveKembalian));
+      }
     }
 
-    output += '==================================\n';
+    output += "==================================\n";
 
     // Keterangan
     if (hasKeterangan) {
-      output += '\n';
-      output += 'Keterangan:\n';
-      output += keteranganText.trim() + '\n';
-      output += '==================================\n';
+      output += "\n";
+      output += "Keterangan: " + keteranganText.trim() + "\n";
+      output += "==================================\n";
     }
 
     // Footer - Centered
-    output += '\n';
-    output += centerText('Terima Kasih');
-    output += centerText('Atas Kunjungan Anda');
-    output += '\n';
-    output += centerText('==================================');
-    output += '\n\n\n\n\n';
+    output += "\n";
+    output += centerText("Terima Kasih");
+    output += centerText("Atas Kunjungan Anda");
+    output += "\n";
+    output += centerText("==================================");
+    output += "\n\n\n\n\n";
 
     return output;
   }
@@ -141,10 +155,9 @@ class ESCPOSService {
    * @returns {string} Formatted currency
    */
   formatRupiah(angka) {
-    if (!angka && angka !== 0) return 'Rp 0';
-    const number = typeof angka === 'string' ? 
-      parseInt(angka.replace(/\./g, '')) : angka;
-    return 'Rp ' + new Intl.NumberFormat('id-ID').format(number);
+    if (!angka && angka !== 0) return "Rp 0";
+    const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : angka;
+    return "Rp " + new Intl.NumberFormat("id-ID").format(number);
   }
 
   /**
@@ -154,9 +167,9 @@ class ESCPOSService {
    */
   formatMetodeBayar(metode) {
     const mapping = {
-      'tunai': 'Tunai',
-      'dp': 'Down Payment (DP)',
-      'free': 'Gratis'
+      tunai: "Tunai",
+      dp: "Down Payment (DP)",
+      free: "Gratis",
     };
     return mapping[metode] || metode;
   }

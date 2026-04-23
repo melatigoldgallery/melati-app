@@ -441,6 +441,7 @@ import { useAccessoriesStore } from "@/stores/accessories";
 import { useAlert } from "@/composables/useAlert";
 import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
+import { getSafeAmount, resolveReprintReceiptPayment } from "@/utils/print-payment";
 
 const store = useAccessoriesStore();
 const { swal, error: showError } = useAlert();
@@ -906,10 +907,6 @@ async function saveEdit() {
 }
 
 // --- Print --------------------------------------------------------------------
-function getSafeAmount(value) {
-  const n = Number(value ?? 0);
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
-}
 
 function mapPrintItem(item) {
   const rawQty = Number(item?.qty ?? item?.jumlah ?? 1);
@@ -1015,6 +1012,7 @@ async function reprintTransaction(trx, type = "receipt") {
     if (!items.length) throw new Error("Tidak ada item untuk dicetak");
 
     const endpoint = type === "invoice" ? "/api/print/invoice" : "/api/print/receipt";
+    const { jumlahBayar, kembalian } = resolveReprintReceiptPayment(trx);
     const baseData = {
       transactionId: trx.id,
       transactionType,
@@ -1026,6 +1024,8 @@ async function reprintTransaction(trx, type = "receipt") {
       metodeBayar: trx.metodePembayaran ?? "",
       nominalDP: trx.nominalDP ?? 0,
       sisaPembayaran: trx.sisaPembayaran ?? 0,
+      jumlahBayar,
+      kembalian,
       notes: trx.keterangan || "",
     };
 

@@ -299,7 +299,7 @@
             </div>
 
             <!-- Buttons -->
-            <div class="col-12 d-flex gap-2 mt-2">
+            <div class="col-12 d-flex gap-2 mt-3">
               <button class="btn btn-sm btn-primary" @click="submitForm" :disabled="submitting">
                 <span v-if="submitting" class="spinner-border spinner-border-sm me-2"></span>
                 <i v-else class="fas fa-paper-plane me-2"></i>
@@ -334,7 +334,7 @@
               <li>Status pengajuan dapat dilihat di menu "Laporan Izin"</li>
             </ul>
           </div>
-          <div class="row mt-4 d-flex ">
+          <div class="row mt-4 d-flex gap-3 ">
             <div class="col-md-6">
               <div class="card h-100">
                 <div class="card-body">

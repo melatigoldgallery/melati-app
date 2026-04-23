@@ -401,6 +401,9 @@ let faceVideoStream = null;
 let indonesianVoice = null;
 let faceWarmupStarted = false;
 const faceDescriptorCache = new Map();
+let lastSpeechKey = "";
+let lastSpeechAt = 0;
+const SPEECH_DEDUPE_WINDOW = 3500;
 // Guard for stale HMR/runtime references from older speech code.
 let testUtterance = null;
 
@@ -929,9 +932,28 @@ function initSpeechSynthesis() {
 function playAttendanceNotification(type, staffName = "", customText = "") {
   if (!SOUND_ENABLED) return;
 
+  const dedupeKey = `${type}|${String(staffName || "")
+    .trim()
+    .toLowerCase()}|${String(customText || "")
+    .trim()
+    .toLowerCase()}`;
+  const now = Date.now();
+  if (dedupeKey === lastSpeechKey && now - lastSpeechAt < SPEECH_DEDUPE_WINDOW) {
+    return;
+  }
+  lastSpeechKey = dedupeKey;
+  lastSpeechAt = now;
+
   const speechText = getNotificationSpeechText(type, staffName, customText);
   const useErrorTone = type === "error" || type === "not-found";
   const audioFile = useErrorTone ? ERROR_AUDIO_FILE : SUCCESS_AUDIO_FILE;
+  let speechTriggered = false;
+
+  const speakOnce = (speakFn) => {
+    if (speechTriggered) return;
+    speechTriggered = true;
+    speakFn();
+  };
 
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
@@ -971,17 +993,25 @@ function playAttendanceNotification(type, staffName = "", customText = "") {
   try {
     const openingAudio = new Audio(audioFile);
     openingAudio.volume = 0.7;
-    openingAudio.onended = () => {
-      setTimeout(speakText, 100);
-    };
-    openingAudio.onerror = () => {
-      speakText();
-    };
+    openingAudio.addEventListener(
+      "ended",
+      () => {
+        setTimeout(() => speakOnce(speakText), 100);
+      },
+      { once: true },
+    );
+    openingAudio.addEventListener(
+      "error",
+      () => {
+        speakOnce(speakText);
+      },
+      { once: true },
+    );
     openingAudio.play().catch(() => {
-      speakText();
+      speakOnce(speakText);
     });
   } catch {
-    speakText();
+    speakOnce(speakText);
   }
 }
 
