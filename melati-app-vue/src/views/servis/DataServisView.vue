@@ -470,7 +470,6 @@
                 ref="photoInputRef"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 class="form-control form-control-sm"
                 @change="onPhotoChange"
               />
@@ -1352,6 +1351,7 @@ function openStatusModal(item) {
   const hasBelumLunas = hasBelumLunasPembayaran(item);
   statusTargetItem.value = item;
   photoFile.value = null;
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   photoPreviewUrl.value = "";
   if (photoInputRef.value) photoInputRef.value.value = "";
   statusForm.value = {
@@ -1368,7 +1368,49 @@ function openStatusModal(item) {
   new Modal(document.getElementById("statusModal")).show();
 }
 
-function onPhotoChange(e) {
+async function compressImageFile(file, options = {}) {
+  const maxSide = options.maxSide ?? 1920;
+  const quality = options.quality ?? 0.82;
+
+  const img = await new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Gagal membaca gambar"));
+    };
+    image.src = objectUrl;
+  });
+
+  const srcW = img.naturalWidth || img.width || 1;
+  const srcH = img.naturalHeight || img.height || 1;
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
+  const targetW = Math.max(1, Math.round(srcW * scale));
+  const targetH = Math.max(1, Math.round(srcH * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return file;
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+
+  const compressedBlob = await new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob || null), "image/jpeg", quality);
+  });
+  if (!compressedBlob || compressedBlob.size >= file.size) return file;
+
+  return new File([compressedBlob], file.name.replace(/\.[^./\\]+$/, ".jpg"), {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
+
+async function onPhotoChange(e) {
   const file = e.target.files?.[0];
   if (!file) return;
   if (!file.type.startsWith("image/")) {
@@ -1381,11 +1423,20 @@ function onPhotoChange(e) {
     e.target.value = "";
     return;
   }
-  photoFile.value = file;
-  photoPreviewUrl.value = URL.createObjectURL(file);
+
+  try {
+    const compressedFile = await compressImageFile(file);
+    photoFile.value = compressedFile;
+    if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
+    photoPreviewUrl.value = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    swal("Gagal memproses gambar. Coba pilih ulang.", "warning");
+    e.target.value = "";
+  }
 }
 
 function clearPhoto() {
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   photoFile.value = null;
   photoPreviewUrl.value = "";
   if (photoInputRef.value) photoInputRef.value.value = "";
@@ -1862,6 +1913,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupListener();
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   window.removeEventListener("storage", handleStorageSync);
 });
 </script>
