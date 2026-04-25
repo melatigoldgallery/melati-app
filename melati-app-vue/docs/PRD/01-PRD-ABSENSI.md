@@ -23,7 +23,7 @@ Modul Absensi mengelola pencatatan kehadiran karyawan secara digital dengan duku
 | `pengajuan-izin.html`    | `/absensi/pengajuan-izin`    | Karyawan mengajukan izin/cuti/sakit       |
 | `laporan-kehadiran.html` | `/absensi/laporan-kehadiran` | Laporan harian & bulanan Admin/Supervisor |
 | `laporan-izin.html`      | `/absensi/laporan-izin`      | Laporan pengajuan izin                    |
-| `supervisor.html`        | `/absensi/supervisor`        | Daftar approval izin untuk Supervisor     |
+| `supervisor.html`        | `/absensi/status-pengajuan`  | Status pengajuan izin (approval)          |
 | `tambah-pengguna.html`   | `/absensi/tambah-pengguna`   | Manajemen data karyawan + scan wajah      |
 | `jam-absensi.html`       | `/admin/jam-absensi`         | Setting jam kerja & batas absensi         |
 
@@ -128,7 +128,7 @@ Modul Absensi mengelola pencatatan kehadiran karyawan secara digital dengan duku
 | US-IZ-03 | Karyawan | Isi jadwal pengganti                       | Admin tahu kapan saya mengganti  |
 | US-IZ-04 | Karyawan | Lihat status pengajuan saya                | Tahu sudah di-approve atau belum |
 
-### 4.3 Supervisor Approval (absensi/supervisor)
+### 4.3 Status Pengajuan (absensi/status-pengajuan)
 
 | ID       | Sebagai    | Saya ingin                         | Agar                           |
 | -------- | ---------- | ---------------------------------- | ------------------------------ |
@@ -356,7 +356,7 @@ Semua listener di-cleanup di `onUnmounted()`. Settings **tidak menggunakan** `on
   meta: { requiresAuth: true, roles: ['admin'] }
 },
 {
-  path: '/absensi/supervisor',
+  path: '/absensi/status-pengajuan',
   component: SupervisorView,
   meta: { requiresAuth: true, roles: ['admin', 'supervisor'] }
 },

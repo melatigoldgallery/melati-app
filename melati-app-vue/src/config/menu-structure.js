@@ -12,19 +12,25 @@ export const menuStructure = [
       { label: "Kehadiran", to: "/absensi/kehadiran", pageKey: "absensi.kehadiran", roles: ALL },
       { label: "Pengajuan Izin", to: "/absensi/pengajuan-izin", pageKey: "absensi.pengajuan-izin", roles: ALL },
       {
+        label: "Status Pengajuan",
+        to: "/absensi/status-pengajuan",
+        pageKey: "absensi.status-pengajuan",
+        roles: ALL,
+      },
+      { label: "Manajemen Absensi", to: "/absensi/manajemen", pageKey: "absensi.manajemen", roles: ALL },
+      {
+        label: "Tambah Staff",
+        to: "/absensi/tambah-staff",
+        pageKey: "absensi.tambah-staff",
+        roles: ALL,
+      },
+      {
         label: "Laporan Kehadiran",
         to: "/absensi/laporan-kehadiran",
         pageKey: "absensi.laporan-kehadiran",
         roles: ALL,
       },
       { label: "Laporan Izin", to: "/absensi/laporan-izin", pageKey: "absensi.laporan-izin", roles: ALL },
-      { label: "Supervisor", to: "/absensi/supervisor", pageKey: "absensi.supervisor", roles: ALL },
-      {
-        label: "Tambah Pengguna",
-        to: "/absensi/tambah-pengguna",
-        pageKey: "absensi.tambah-pengguna",
-        roles: ALL,
-      },
     ],
   },
   {

@@ -12,8 +12,9 @@ export const PAGE_ACCESS_SECTIONS = [
       { key: "absensi.pengajuan-izin", label: "Pengajuan Izin", route: "/absensi/pengajuan-izin" },
       { key: "absensi.laporan-kehadiran", label: "Laporan Kehadiran", route: "/absensi/laporan-kehadiran" },
       { key: "absensi.laporan-izin", label: "Laporan Izin", route: "/absensi/laporan-izin" },
-      { key: "absensi.supervisor", label: "Supervisor", route: "/absensi/supervisor" },
-      { key: "absensi.tambah-pengguna", label: "Tambah Pengguna", route: "/absensi/tambah-pengguna" },
+      { key: "absensi.status-pengajuan", label: "Status Pengajuan", route: "/absensi/status-pengajuan" },
+      { key: "absensi.manajemen", label: "Manajemen Absensi", route: "/absensi/manajemen" },
+      { key: "absensi.tambah-staff", label: "Tambah Staff", route: "/absensi/tambah-staff" },
     ],
   },
   {
@@ -112,8 +113,9 @@ export function normalizeUserRole(role, fallback = "staff") {
 }
 
 const SENSITIVE_PAGE_KEYS = new Set([
-  "absensi.supervisor",
-  "absensi.tambah-pengguna",
+  "absensi.status-pengajuan",
+  "absensi.manajemen",
+  "absensi.tambah-staff",
   "admin.users",
   "admin.access-codes",
   "admin.jam-absensi",
@@ -142,8 +144,11 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "absensi.pengajuan-izin": "absensi.pengajuan-izin",
   "absensi.laporan-kehadiran": "absensi.laporan-kehadiran",
   "absensi.laporan-izin": "absensi.laporan-izin",
-  "absensi.supervisor": "absensi.supervisor",
-  "absensi.tambah-pengguna": "absensi.tambah-pengguna",
+  "absensi.supervisor": "absensi.status-pengajuan",
+  "absensi.status-pengajuan": "absensi.status-pengajuan",
+  "absensi.manajemen": "absensi.manajemen",
+  "absensi.tambah-pengguna": "absensi.tambah-staff",
+  "absensi.tambah-staff": "absensi.tambah-staff",
   "servis.input-servis": "servis.input",
   "servis.data-servis": "servis.data",
   "servis.laporan-servis": "servis.laporan",
@@ -177,6 +182,13 @@ export function normalizeAccessMap(inputMap, role = "staff") {
   const normalizedRole = normalizeUserRole(role, "staff");
   const map = createDefaultAccessMap(normalizedRole);
   if (!inputMap || typeof inputMap !== "object") return map;
+
+  // Migrate legacy page keys when old access maps are loaded from Firestore.
+  Object.entries(LEGACY_PERMISSION_TO_PAGE).forEach(([legacyKey, mappedKey]) => {
+    if (typeof inputMap[legacyKey] === "boolean" && PAGE_ACCESS_KEYS.includes(mappedKey)) {
+      map[mappedKey] = inputMap[legacyKey];
+    }
+  });
 
   PAGE_ACCESS_KEYS.forEach((key) => {
     if (typeof inputMap[key] === "boolean") map[key] = inputMap[key];

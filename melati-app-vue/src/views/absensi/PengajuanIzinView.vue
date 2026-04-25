@@ -77,7 +77,7 @@
             </div>
 
             <!-- Reason -->
-            <div class="col-12 col-md-4 ">
+            <div class="col-12 col-md-4">
               <label class="form-label">Alasan Izin</label>
               <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-comment-alt"></i></span>
@@ -114,6 +114,7 @@
                   <option value="" disabled>Pilih Jenis Pengganti</option>
                   <option value="libur" :disabled="form.leaveType === 'cuti'">Ganti Libur</option>
                   <option value="jam" :disabled="form.leaveType === 'cuti'">Ganti Jam</option>
+                  <option value="lembur" :disabled="form.leaveType === 'cuti'">Lembur</option>
                   <option
                     value="tidak"
                     :disabled="form.leaveType === 'normal' || (form.leaveType === 'sakit' && !hasMedicalCert)"
@@ -122,7 +123,7 @@
                   </option>
                 </select>
               </div>
-              <div class="form-text">Pilih bagaimana Anda akan mengganti waktu izin</div>
+              <div class="form-text">Pilih metode pengganti: ganti libur, ganti jam, atau lembur</div>
             </div>
 
             <!-- Sick Leave Section -->
@@ -258,22 +259,26 @@
               </div>
             </div>
 
-            <!-- Replacement Jam Section -->
-            <div v-if="form.replacementType === 'jam'" class="col-12">
+            <!-- Replacement Time Section -->
+            <div v-if="form.replacementType === 'jam' || form.replacementType === 'lembur'" class="col-12">
               <div class="card mt-2">
                 <div class="card-body">
                   <h6 class="mb-3">
-                    <i class="fas fa-clock me-2"></i>
-                    Detail Ganti Waktu
+                    <i
+                      :class="form.replacementType === 'lembur' ? 'fas fa-business-time me-2' : 'fas fa-clock me-2'"
+                    ></i>
+                    {{ form.replacementType === "lembur" ? "Detail Lembur" : "Detail Ganti Waktu" }}
                   </h6>
                   <div class="mb-3">
-                    <label class="form-label">Tanggal Ganti Waktu</label>
+                    <label class="form-label">
+                      {{ form.replacementType === "lembur" ? "Tanggal Lembur" : "Tanggal Ganti Waktu" }}
+                    </label>
                     <div class="input-group">
                       <span class="input-group-text"><i class="fas fa-calendar-check"></i></span>
                       <input v-model="replacementJam.date" type="date" class="form-control" />
                     </div>
                   </div>
-                  <div class="mb-3">
+                  <div v-if="form.replacementType === 'jam'" class="mb-3">
                     <label class="form-label">Durasi Pengganti</label>
                     <div class="input-group">
                       <span class="input-group-text"><i class="fas fa-hourglass-half"></i></span>
@@ -281,7 +286,7 @@
                         v-model.number="replacementJam.value"
                         type="number"
                         class="form-control"
-                        :max="replacementJam.unit === 'jam' ? 12 : 300"
+                        :max="replacementJam.unit === 'jam' ? MAX_GANTI_JAM_HOURS : MAX_GANTI_JAM_MINUTES"
                         min="1"
                         placeholder="Masukkan durasi"
                       />
@@ -291,7 +296,11 @@
                       </select>
                     </div>
                     <div class="form-text">
-                      {{ replacementJam.unit === "jam" ? "Maksimal 12 jam per hari" : "Maksimal 300 menit per hari" }}
+                      {{
+                        replacementJam.unit === "jam"
+                          ? `Maksimal ${MAX_GANTI_JAM_HOURS} jam per hari`
+                          : `Maksimal ${MAX_GANTI_JAM_MINUTES} menit per hari`
+                      }}
                     </div>
                   </div>
                 </div>
@@ -334,8 +343,8 @@
               <li>Status pengajuan dapat dilihat di menu "Laporan Izin"</li>
             </ul>
           </div>
-          <div class="row mt-4 d-flex gap-3 ">
-            <div class="col-md-6">
+          <div class="row mt-4 d-flex">
+            <div class="col-md-4 mt-2">
               <div class="card h-100">
                 <div class="card-body">
                   <h5 class="card-title">
@@ -349,7 +358,7 @@
                 </div>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4 mt-2">
               <div class="card h-100">
                 <div class="card-body">
                   <h5 class="card-title">
@@ -358,6 +367,19 @@
                   </h5>
                   <p class="card-text">
                     Digunakan untuk mengganti jam kerja dengan bekerja lebih lama di hari yang ditentukan.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 mt-2">
+              <div class="card h-100">
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <i class="fas fa-business-time me-2 text-primary"></i>
+                    Lembur
+                  </h5>
+                  <p class="card-text">
+                    Digunakan untuk penjadwalan lembur pada tanggal tertentu sesuai persetujuan HRD.
                   </p>
                 </div>
               </div>
@@ -373,11 +395,7 @@
 import { ref, computed, watch } from "vue";
 import Swal from "sweetalert2";
 import { useWITA } from "@/composables/useWITA";
-import {
-  findEmployeeByCode,
-  submitLeaveRequest,
-  uploadMedicalCertificate,
-} from "@/services/absensi-service";
+import { findEmployeeByCode, submitLeaveRequest, uploadMedicalCertificate } from "@/services/absensi-service";
 
 const { todayStringWITA } = useWITA();
 
@@ -406,6 +424,8 @@ const cutiType = ref("");
 const specialLeaveDetail = ref("");
 const replacementDates = ref([]); // [{ leaveDate, leaveFormatted, replacementDate }]
 const replacementJam = ref({ date: "", value: "", unit: "jam" });
+const MAX_GANTI_JAM_HOURS = 7;
+const MAX_GANTI_JAM_MINUTES = 420;
 
 // ── Submission ────────────────────────────────────────────────────────────
 const submitting = ref(false);
@@ -459,6 +479,21 @@ watch(hasMedicalCert, (val) => {
     uploadProgress.value = 0;
   }
 });
+
+/** Keep replacement input clean when switching replacement type. */
+watch(
+  () => form.value.replacementType,
+  (type) => {
+    if (type === "lembur") {
+      replacementJam.value.value = "";
+      replacementJam.value.unit = "jam";
+      return;
+    }
+    if (type !== "jam") {
+      replacementJam.value = { date: "", value: "", unit: "jam" };
+    }
+  },
+);
 
 /** Rebuild replacement dates array when dates or replacementType changes. */
 watch(
@@ -681,18 +716,25 @@ function validate() {
       return false;
     }
   }
+  if (form.value.replacementType === "lembur") {
+    if (!replacementJam.value.date) {
+      showFeedback("error", "Mohon pilih tanggal lembur!");
+      return false;
+    }
+  }
+
   if (form.value.replacementType === "jam") {
     if (!replacementJam.value.date || !replacementJam.value.value) {
       showFeedback("error", "Mohon lengkapi tanggal dan durasi pengganti!");
       return false;
     }
     const v = Number(replacementJam.value.value);
-    if (replacementJam.value.unit === "jam" && v > 12) {
-      showFeedback("error", "Jumlah jam maksimal adalah 12 jam per hari!");
+    if (replacementJam.value.unit === "jam" && v > MAX_GANTI_JAM_HOURS) {
+      showFeedback("error", `Jumlah jam maksimal adalah ${MAX_GANTI_JAM_HOURS} jam per hari!`);
       return false;
     }
-    if (replacementJam.value.unit === "menit" && v > 300) {
-      showFeedback("error", "Jumlah menit maksimal adalah 300 menit per hari!");
+    if (replacementJam.value.unit === "menit" && v > MAX_GANTI_JAM_MINUTES) {
+      showFeedback("error", `Jumlah menit maksimal adalah ${MAX_GANTI_JAM_MINUTES} menit per hari!`);
       return false;
     }
   }
@@ -764,6 +806,16 @@ async function submitForm() {
       replacementDetails.timeUnit = replacementJam.value.unit;
       replacementDetails.timeValue = v;
       replacementDetails.formattedValue = `${v} ${replacementJam.value.unit}`;
+      replacementDetails.timeCategory = replacementType;
+    } else if (replacementType === "lembur") {
+      replacementDetails.date = replacementJam.value.date;
+      replacementDetails.formattedDate = new Date(replacementJam.value.date).toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      replacementDetails.timeCategory = replacementType;
     }
 
     const startParts = leaveStartDate.split("-");
@@ -829,7 +881,6 @@ function resetForm() {
   replacementJam.value = { date: "", value: "", unit: "jam" };
   feedback.value.visible = false;
 }
-
 </script>
 
 <style scoped>
@@ -938,11 +989,11 @@ function resetForm() {
     line-height: 1.45;
   }
 
-  .d-flex.gap-2.mt-0 {
+  .d-flex.gap-2.mt-3 {
     flex-direction: column;
   }
 
-  .d-flex.gap-2.mt-0 .btn {
+  .d-flex.gap-2.mt-3 .btn {
     width: 100%;
   }
 

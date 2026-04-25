@@ -333,6 +333,7 @@ import {
   recordCheckIn,
   recordCheckOut,
   recordLatePermission,
+  consumeLatePermissionCode,
   computeCheckInStatus,
   autoDetectScanTypeAndShift,
   getFaceDescriptor,
@@ -464,8 +465,10 @@ const latePermissionDetails = computed(() =>
     })),
 );
 
+const jamOnlyReplacementList = computed(() => jamReplacementList.value.filter((r) => r.replacementType === "jam"));
+
 const jamReplacementDetails = computed(() =>
-  jamReplacementList.value.map((r) => {
+  jamOnlyReplacementList.value.map((r) => {
     const d = r.replacementDetails || {};
     const value = d.timeValue ?? d.value ?? d.hours ?? "";
     const unit = d.timeUnit || d.unit || (String(d.formattedValue || "").includes("menit") ? "menit" : "jam");
@@ -503,12 +506,12 @@ function getReplacementHours(details) {
 
 const overtimeDetails = computed(() => {
   const autoRows = jamReplacementList.value
-    .filter((r) => getReplacementHours(r.replacementDetails) >= 8)
+    .filter((r) => r.replacementType === "lembur" || getReplacementHours(r.replacementDetails) >= 8)
     .map((r) => ({
       key: `auto-${r.id}`,
       employeeId: r.employeeId || "",
       name: r.name || "-",
-      reason: r.reason || "Ganti jam disetujui (>= 8 jam)",
+      reason: r.reason || (r.replacementType === "lembur" ? "Lembur terjadwal" : "Ganti jam disetujui (>= 8 jam)"),
     }));
 
   const manualRows = manualOvertimeList.value.map((r) => ({
@@ -1492,28 +1495,36 @@ async function processAttendance(employee, options = {}) {
   const type = scanType.value;
 
   if (type === "latepermission") {
-    if (!existing) {
-      showScanResult("error", employee.name, "Belum ada data absensi masuk hari ini.");
-      playAttendanceNotification("error", "", `${employee.name} belum absen masuk`);
-      return;
-    }
-    if (existing.latePermission) {
+    if (existing?.latePermission) {
       showScanResult("warning", employee.name, "Izin terlambat sudah dicatat sebelumnya.");
       playAttendanceNotification("late-permission", employee.name, `${employee.name} sudah izin terlambat`);
       return;
     }
 
-    // Format wajib: YYYYMMDD-XX (XX = 2 digit terakhir employeeId)
-    const inputCode = latePermissionCode.value.trim();
-    const dateFormatted = today.replace(/-/g, "");
-    const expectedCode = `${dateFormatted}-${String(employee.employeeId || "").slice(-2)}`;
-    if (inputCode !== expectedCode) {
-      showScanResult("error", employee.name, `Kode verifikasi tidak valid. Gunakan format ${expectedCode}.`);
-      playAttendanceNotification("error", "", "Kode verifikasi tidak valid");
-      return;
-    }
+    const verifiedCode = latePermissionCode.value.trim();
+    await consumeLatePermissionCode({
+      code: verifiedCode,
+      date: today,
+      shift,
+      employeeId: employee.employeeId,
+      employeeName: employee.name,
+      attendanceId: existing?.id || "",
+    });
 
-    await recordLatePermission(existing.id, latePermissionCode.value.trim());
+    if (existing) {
+      await recordLatePermission(existing.id, verifiedCode);
+    } else {
+      await recordLatePermission(
+        {
+          employeeId: employee.employeeId,
+          name: employee.name,
+          type: employee.type || "staff",
+          shift,
+          date: today,
+        },
+        verifiedCode,
+      );
+    }
     latePermissionCode.value = "";
     showScanResult("success", employee.name, "Izin Terlambat.");
     playAttendanceNotification("late-permission", employee.name, `Oke, ${employee.name} izin terlambat`);
@@ -1549,7 +1560,7 @@ async function processAttendance(employee, options = {}) {
   }
 
   if (type === "out") {
-    if (!existing) {
+    if (!existing || !existing.timeIn) {
       showScanResult("warning", employee.name, "Belum absen masuk. Silakan absen masuk dulu.");
       playAttendanceNotification("error", "", `${employee.name} belum absen masuk`);
       return;

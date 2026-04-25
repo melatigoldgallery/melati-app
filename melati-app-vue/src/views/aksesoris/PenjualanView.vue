@@ -1147,85 +1147,85 @@ const lastPrintType = ref("receipt");
 const lastSaleData = ref(null);
 
 async function savePenjualan() {
-  // Sync validations
-  if (!form.salesName) {
-    swal("Sales harus dipilih!", "warning");
-    return;
-  }
-  if (form.tipe === "manual" && !form.jenisManual) {
-    swal("Jenis Manual harus dipilih!", "warning");
-    return;
-  }
-
-  const rowCount = {
-    aksesoris: aksesorisRows.value.length,
-    silver: silverRows.value.length,
-    kotak: kotakRows.value.length,
-    manual: manualRows.value.length,
-  }[form.tipe];
-
-  if (!rowCount) {
-    swal("Tidak ada barang yang ditambahkan!", "warning");
-    return;
-  }
-
-  if (["aksesoris", "silver", "kotak"].includes(form.tipe) && rowCount > MAX_KODE_PER_TRANSACTION) {
-    await showMaxKodeAlert();
-    return;
-  }
-
-  // Validate row fields for aksesoris / silver
-  if (form.tipe === "aksesoris" || form.tipe === "silver") {
-    const rows = form.tipe === "aksesoris" ? aksesorisRows.value : silverRows.value;
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row.kadar) {
-        swal(`Baris ${i + 1}: Kadar harus diisi!`, "warning");
-        return;
-      }
-      if (!parseFloat(row.berat) || parseFloat(row.berat) <= 0) {
-        swal(`Baris ${i + 1}: Berat harus diisi!`, "warning");
-        return;
-      }
-      if (!parseNum(row.totalHargaStr) || parseNum(row.totalHargaStr) <= 0) {
-        swal(`Baris ${i + 1}: Total harga harus diisi!`, "warning");
-        return;
-      }
-    }
-  }
-
-  // Payment validation
-  if (form.metodePembayaran === "DP") {
-    if (nominalDP.value <= 0) {
-      swal("Nominal DP harus diisi!", "warning");
-      return;
-    }
-  } else if (form.metodePembayaran !== "FREE") {
-    if (jumlahBayar.value < grandTotal.value) {
-      swal("Jumlah bayar kurang dari total!", "warning");
-      return;
-    }
-  }
-
-  if (form.tipe === "manual") {
-    const confirmSave = await Swal.fire({
-      icon: "question",
-      title: "Yakin simpan data?",
-      text: "Tekan Enter untuk simpan atau Esc untuk batal.",
-      showCancelButton: true,
-      confirmButtonText: "Simpan",
-      cancelButtonText: "Batal",
-      reverseButtons: true,
-      allowEnterKey: true,
-    });
-
-    if (!confirmSave.isConfirmed) return;
-  }
-
   if (isSaving.value) return;
   isSaving.value = true;
 
   try {
+    // Sync validations
+    if (!form.salesName) {
+      swal("Sales harus dipilih!", "warning");
+      return;
+    }
+    if (form.tipe === "manual" && !form.jenisManual) {
+      swal("Jenis Manual harus dipilih!", "warning");
+      return;
+    }
+
+    const rowCount = {
+      aksesoris: aksesorisRows.value.length,
+      silver: silverRows.value.length,
+      kotak: kotakRows.value.length,
+      manual: manualRows.value.length,
+    }[form.tipe];
+
+    if (!rowCount) {
+      swal("Tidak ada barang yang ditambahkan!", "warning");
+      return;
+    }
+
+    if (["aksesoris", "silver", "kotak"].includes(form.tipe) && rowCount > MAX_KODE_PER_TRANSACTION) {
+      await showMaxKodeAlert();
+      return;
+    }
+
+    // Validate row fields for aksesoris / silver
+    if (form.tipe === "aksesoris" || form.tipe === "silver") {
+      const rows = form.tipe === "aksesoris" ? aksesorisRows.value : silverRows.value;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.kadar) {
+          swal(`Baris ${i + 1}: Kadar harus diisi!`, "warning");
+          return;
+        }
+        if (!parseFloat(row.berat) || parseFloat(row.berat) <= 0) {
+          swal(`Baris ${i + 1}: Berat harus diisi!`, "warning");
+          return;
+        }
+        if (!parseNum(row.totalHargaStr) || parseNum(row.totalHargaStr) <= 0) {
+          swal(`Baris ${i + 1}: Total harga harus diisi!`, "warning");
+          return;
+        }
+      }
+    }
+
+    // Payment validation
+    if (form.metodePembayaran === "DP") {
+      if (nominalDP.value <= 0) {
+        swal("Nominal DP harus diisi!", "warning");
+        return;
+      }
+    } else if (form.metodePembayaran !== "FREE") {
+      if (jumlahBayar.value < grandTotal.value) {
+        swal("Jumlah bayar kurang dari total!", "warning");
+        return;
+      }
+    }
+
+    if (form.tipe === "manual") {
+      const confirmSave = await Swal.fire({
+        icon: "question",
+        title: "Yakin simpan data?",
+        text: "Tekan Enter untuk simpan atau Esc untuk batal.",
+        showCancelButton: true,
+        confirmButtonText: "Simpan",
+        cancelButtonText: "Batal",
+        reverseButtons: true,
+        allowEnterKey: true,
+      });
+
+      if (!confirmSave.isConfirmed) return;
+    }
+
     const now = new Date();
     const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     const cartItems = buildCartItems();
@@ -1277,16 +1277,17 @@ async function savePenjualan() {
         Z: "HALA & SDW",
         V: "HALA & SDW",
       };
-      const mutasiItems = cartItems.filter((item) => {
-        const kode = item.kode || item.kodeText;
-        return kode && kode !== "-" && jenisBarang[kode.charAt(0).toUpperCase()];
-      });
+
+      const mutasiItems = cartItems;
       await Promise.all(
         mutasiItems.map((item) => {
-          const kode = item.kode || item.kodeText;
-          const prefix = kode.charAt(0).toUpperCase();
+          const rawKode = String(item.kode || item.kodeText || "").trim();
+          const prefix = rawKode.charAt(0).toUpperCase();
+          const hasKnownPrefix = !!jenisBarang[prefix];
+          const jenisPrefix = hasKnownPrefix ? prefix : "LAIN";
+
           return addDoc(collection(db, "mutasiKode"), {
-            kode,
+            kode: rawKode || "-",
             namaBarang: item.namaBarang || "Tidak ada nama",
             kadar: item.kadar || "-",
             berat: parseFloat(item.berat) || 0,
@@ -1302,8 +1303,8 @@ async function savePenjualan() {
             mutasiHistory: [],
             timestamp: serverTimestamp(),
             lastUpdated: serverTimestamp(),
-            jenisPrefix: prefix,
-            jenisNama: jenisBarang[prefix],
+            jenisPrefix,
+            jenisNama: jenisBarang[prefix] || "Lainnya",
           });
         }),
       );

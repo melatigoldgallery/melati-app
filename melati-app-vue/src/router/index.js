@@ -10,8 +10,9 @@ const KehadiranView = () => import("@/views/absensi/KehadiranView.vue");
 const PengajuanIzinView = () => import("@/views/absensi/PengajuanIzinView.vue");
 const LaporanKehadiranView = () => import("@/views/absensi/LaporanKehadiranView.vue");
 const LaporanIzinView = () => import("@/views/absensi/LaporanIzinView.vue");
-const SupervisorView = () => import("@/views/absensi/SupervisorView.vue");
-const TambahPenggunaView = () => import("@/views/absensi/TambahPenggunaView.vue");
+const StatusPengajuanView = () => import("@/views/absensi/SupervisorView.vue");
+const ManajemenAbsensiView = () => import("@/views/absensi/ManajemenAbsensiView.vue");
+const TambahStaffView = () => import("@/views/absensi/TambahPenggunaView.vue");
 
 // Antrian
 const AdminAntrianView = () => import("@/views/antrian/AdminAntrianView.vue");
@@ -82,14 +83,19 @@ const routes = [
     meta: { requiresAuth: true, pageKey: "absensi.laporan-izin" },
   },
   {
-    path: "/absensi/supervisor",
-    component: SupervisorView,
-    meta: { requiresAuth: true, pageKey: "absensi.supervisor" },
+    path: "/absensi/status-pengajuan",
+    component: StatusPengajuanView,
+    meta: { requiresAuth: true, pageKey: "absensi.status-pengajuan" },
   },
   {
-    path: "/absensi/tambah-pengguna",
-    component: TambahPenggunaView,
-    meta: { requiresAuth: true, pageKey: "absensi.tambah-pengguna" },
+    path: "/absensi/manajemen",
+    component: ManajemenAbsensiView,
+    meta: { requiresAuth: true, pageKey: "absensi.manajemen" },
+  },
+  {
+    path: "/absensi/tambah-staff",
+    component: TambahStaffView,
+    meta: { requiresAuth: true, pageKey: "absensi.tambah-staff" },
   },
 
   // Antrian
@@ -215,6 +221,8 @@ const routes = [
   { path: "/admin/antrian-penutupan", redirect: "/pengaturan/antrian-penutupan" },
   { path: "/admin/tema-warna", redirect: "/pengaturan/tema-warna" },
   { path: "/maintenance", redirect: "/pengaturan/maintenance" },
+  { path: "/absensi/supervisor", redirect: "/absensi/status-pengajuan" },
+  { path: "/absensi/tambah-pengguna", redirect: "/absensi/tambah-staff" },
 
   // 404 catch-all
   { path: "/:pathMatch(.*)*", redirect: "/login" },

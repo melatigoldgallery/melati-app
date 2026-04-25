@@ -17,6 +17,7 @@ import {
   limit,
   onSnapshot,
   Timestamp,
+  runTransaction,
 } from "firebase/firestore";
 import { db, storage, auth } from "@/config/firebase";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -654,14 +655,193 @@ export function detectShift(now = new Date()) {
   return now.getHours() < 12 ? "morning" : "afternoon";
 }
 
-/** Record late permission on an existing attendance doc. */
-export async function recordLatePermission(docId, verificationCode) {
-  await updateDoc(doc(db, "attendance", docId), {
+/**
+ * Record late permission.
+ * - If docIdOrPayload is a string docId, updates existing attendance doc.
+ * - If docIdOrPayload is an object payload, creates new attendance doc.
+ */
+export async function recordLatePermission(docIdOrPayload, verificationCode) {
+  const payload = {
     latePermission: true,
     latePermissionCode: verificationCode || "",
     latePermissionAt: Timestamp.now(),
     status: "Izin Terlambat",
+  };
+
+  if (typeof docIdOrPayload === "string" && docIdOrPayload.trim()) {
+    await updateDoc(doc(db, "attendance", docIdOrPayload), payload);
+    return docIdOrPayload;
+  }
+
+  const data = docIdOrPayload || {};
+  const ref = await addDoc(collection(db, "attendance"), {
+    employeeId: data.employeeId || "",
+    name: data.name || "",
+    type: data.type || "staff",
+    shift: data.shift || "morning",
+    date: data.date || "",
+    timeIn: Timestamp.now(),
+    timeOut: null,
+    lateMinutes: 0,
+    faceVerified: false,
+    faceVerificationRequired: false,
+    ...payload,
   });
+  return ref.id;
+}
+
+const LATE_PERMISSION_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateLatePermissionCode(length = 8) {
+  let out = "";
+  for (let i = 0; i < length; i += 1) {
+    const idx = Math.floor(Math.random() * LATE_PERMISSION_CODE_CHARS.length);
+    out += LATE_PERMISSION_CODE_CHARS[idx];
+  }
+  return out;
+}
+
+/** Create random one-time late-permission verification code (no expiry). */
+export async function createLatePermissionCode(payload = {}) {
+  const date = String(payload.date || "").trim();
+  if (!date) throw new Error("Tanggal kode verifikasi wajib diisi.");
+  const employeeId = String(payload.employeeId || "").trim();
+  if (!employeeId) throw new Error("ID Sales wajib diisi untuk membuat kode verifikasi.");
+
+  let attempt = 0;
+  while (attempt < 8) {
+    attempt += 1;
+    const code = generateLatePermissionCode(8);
+    const ref = doc(db, "latePermissionCodes", code);
+    const exists = await getDoc(ref);
+    if (exists.exists()) continue;
+
+    await setDoc(ref, {
+      code,
+      date,
+      shift: payload.shift || "morning",
+      employeeId,
+      employeeName: String(payload.employeeName || "").trim(),
+      note: String(payload.note || "").trim(),
+      used: false,
+      usedAt: null,
+      usedByEmployeeId: "",
+      usedByName: "",
+      usedByAttendanceId: "",
+      createdAt: Timestamp.now(),
+      createdBy: String(payload.createdBy || "").trim(),
+      revoked: false,
+    });
+
+    return code;
+  }
+
+  throw new Error("Gagal membuat kode verifikasi unik. Silakan coba lagi.");
+}
+
+/** Subscribe verification codes by date (sorted client-side by newest first). */
+export function subscribeLatePermissionCodesByDate(date, callback) {
+  const q = query(collection(db, "latePermissionCodes"), where("date", "==", date));
+  return onSnapshot(q, (snap) => {
+    const rows = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const aMs = typeof a.createdAt?.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
+        const bMs = typeof b.createdAt?.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
+        return bMs - aMs;
+      });
+    callback(rows);
+  });
+}
+
+/** Subscribe verification codes by date range (sorted client-side by newest first). */
+export function subscribeLatePermissionCodesByDateRange(startDate, endDate, callback) {
+  const q = query(
+    collection(db, "latePermissionCodes"),
+    where("date", ">=", startDate),
+    where("date", "<=", endDate),
+    orderBy("date", "desc"),
+  );
+
+  return onSnapshot(q, (snap) => {
+    const rows = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const dateCmp = String(b.date || "").localeCompare(String(a.date || ""));
+        if (dateCmp !== 0) return dateCmp;
+        const aMs = typeof a.createdAt?.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
+        const bMs = typeof b.createdAt?.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
+        return bMs - aMs;
+      });
+    callback(rows);
+  });
+}
+
+/** Delete a late-permission verification code by document ID/code. */
+export async function deleteLatePermissionCode(id) {
+  await deleteDoc(doc(db, "latePermissionCodes", id));
+}
+
+/**
+ * Validate and consume one verification code.
+ * No expiry, but strictly one-time and stores who used it.
+ */
+export async function consumeLatePermissionCode({ code, date, shift, employeeId, employeeName, attendanceId = "" }) {
+  const normalizedCode = String(code || "")
+    .trim()
+    .toUpperCase();
+  if (!normalizedCode) throw new Error("Kode verifikasi wajib diisi.");
+
+  const ref = doc(db, "latePermissionCodes", normalizedCode);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) {
+      throw new Error("Kode verifikasi tidak ditemukan.");
+    }
+
+    const data = snap.data() || {};
+    if (data.revoked) {
+      throw new Error("Kode verifikasi sudah dinonaktifkan.");
+    }
+    if (data.used) {
+      const usedBy = data.usedByName || data.usedByEmployeeId || "staf lain";
+      throw new Error(`Kode sudah digunakan oleh: ${usedBy}.`);
+    }
+
+    const codeDate = String(data.date || "");
+    if (codeDate && date && codeDate !== date) {
+      throw new Error("Kode verifikasi bukan untuk tanggal hari ini.");
+    }
+
+    const codeShift = String(data.shift || "");
+    if (codeShift && shift && codeShift !== shift) {
+      throw new Error("Kode verifikasi tidak sesuai shift yang dipilih.");
+    }
+
+    const targetEmployeeId = String(data.employeeId || "")
+      .trim()
+      .toLowerCase();
+    const currentEmployeeId = String(employeeId || "")
+      .trim()
+      .toLowerCase();
+    if (!targetEmployeeId) {
+      throw new Error("Kode verifikasi tidak memiliki target ID sales.");
+    }
+    if (!currentEmployeeId || targetEmployeeId !== currentEmployeeId) {
+      throw new Error("Kode verifikasi ini bukan untuk staf tersebut.");
+    }
+
+    tx.update(ref, {
+      used: true,
+      usedAt: Timestamp.now(),
+      usedByEmployeeId: String(employeeId || "").trim(),
+      usedByName: String(employeeName || "").trim(),
+      usedByAttendanceId: String(attendanceId || "").trim(),
+    });
+  });
+
+  return { code: normalizedCode, used: true };
 }
 
 /** Subscribe to today's approved leave requests (izin libur). Returns unsubscribe fn.
@@ -675,11 +855,11 @@ export function subscribeTodayLeaves(today, callback) {
   });
 }
 
-/** Subscribe to today's "ganti jam" leaves with low-read query (no full history scan). */
+/** Subscribe to today's time-based replacements (ganti jam + lembur) with low-read query. */
 export function subscribeTodayJamReplacements(today, callback) {
   const q = query(
     collection(db, "leaveRequests"),
-    where("replacementType", "==", "jam"),
+    where("replacementType", "in", ["jam", "lembur"]),
     where("replacementDetails.date", "==", today),
   );
 
@@ -707,6 +887,21 @@ export async function addManualOvertimeEntry(data) {
 /** Subscribe manual overtime entries by date (low-read equality filter). */
 export function subscribeManualOvertimeByDate(date, callback) {
   const q = query(collection(db, "manualOvertime"), where("date", "==", date), orderBy("createdAt", "desc"));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  });
+}
+
+/** Subscribe manual overtime entries within a date range for headcount history. */
+export function subscribeManualOvertimeByDateRange(startDate, endDate, callback) {
+  const q = query(
+    collection(db, "manualOvertime"),
+    where("date", ">=", startDate),
+    where("date", "<=", endDate),
+    orderBy("date", "desc"),
+    orderBy("createdAt", "desc"),
+  );
+
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });

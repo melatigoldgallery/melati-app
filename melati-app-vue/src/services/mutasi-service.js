@@ -298,21 +298,26 @@ function processMutasiKodeData(docs) {
 
   docs.forEach((snap) => {
     const data = { id: snap.id, ...snap.data() };
-    if (!data.kode || !data.namaBarang) return;
+    if (!data.namaBarang) return;
 
-    const prefix = data.kode.charAt(0).toUpperCase();
-    if (!(prefix in JENIS_BARANG)) return;
+    const kode = String(data.kode || "").trim() || "-";
+    const kodePrefix = kode !== "-" ? kode.charAt(0).toUpperCase() : "";
+    const explicitPrefix = String(data.jenisPrefix || "")
+      .trim()
+      .toUpperCase();
+    const resolvedPrefix = explicitPrefix || kodePrefix || "LAIN";
+    const resolvedJenisNama = data.jenisNama || JENIS_BARANG[resolvedPrefix] || "Lainnya";
 
     const kodeItem = {
       id: data.id,
-      kode: data.kode,
+      kode,
       nama: data.namaBarang || "Tidak ada nama",
       kadar: data.kadar || "-",
       berat: data.berat || 0,
       tanggalInput: data.tanggalInput || formatTimestamp(data.timestamp || data.createdAt),
       keterangan: data.keterangan || "",
-      jenisPrefix: prefix,
-      jenisNama: JENIS_BARANG[prefix],
+      jenisPrefix: resolvedPrefix,
+      jenisNama: resolvedJenisNama,
       penjualanId: data.penjualanId || data.id,
       isMutated: data.isMutated || false,
       tanggalMutasi: data.tanggalMutasi || null,
@@ -401,8 +406,12 @@ export function filterKodeData(data, jenisFilter, searchText) {
   return (data || []).filter((item) => {
     if (jenisFilter && item.jenisPrefix !== jenisFilter) return false;
     if (queryText) {
-      const matchesKode = item.kode.toLowerCase().includes(queryText);
-      const matchesNama = item.nama.toLowerCase().includes(queryText);
+      const matchesKode = String(item.kode || "")
+        .toLowerCase()
+        .includes(queryText);
+      const matchesNama = String(item.nama || "")
+        .toLowerCase()
+        .includes(queryText);
       if (!matchesKode && !matchesNama) return false;
     }
     return true;

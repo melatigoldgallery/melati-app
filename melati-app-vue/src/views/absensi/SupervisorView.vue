@@ -84,74 +84,6 @@
       </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header py-2">
-        <h6 class="mb-0">
-          <i class="fas fa-user-clock me-2 text-primary"></i>
-          Staf Lembur (Manual)
-        </h6>
-      </div>
-      <div class="card-body">
-        <div class="row g-2 align-items-end">
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Tanggal</label>
-            <input v-model="overtimeDate" type="date" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Nama Staf</label>
-            <input
-              v-model="overtimeName"
-              type="text"
-              class="form-control form-control-sm"
-              placeholder="Masukkan nama staf"
-            />
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Alasan</label>
-            <input v-model="overtimeReason" type="text" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-2 d-grid">
-            <button class="btn btn-primary btn-sm" @click="saveManualOvertime" :disabled="overtimeSaving">
-              <span v-if="overtimeSaving" class="spinner-border spinner-border-sm me-1"></span>
-              Simpan
-            </button>
-          </div>
-        </div>
-
-        <div class="table-responsive mt-3">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr>
-                <th>Nama Staf</th>
-                <th>Alasan</th>
-                <th class="text-center" style="width: 96px">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="overtimeManualList.length === 0">
-                <td colspan="3" class="text-center text-muted py-3">Belum ada data lembur manual.</td>
-              </tr>
-              <tr v-for="row in overtimeManualList" :key="row.id">
-                <td>{{ row.name || "-" }}</td>
-                <td>{{ row.reason || "Penambahan Headcount" }}</td>
-                <td class="text-center">
-                  <button
-                    class="btn btn-danger btn-xs"
-                    @click="deleteManualOvertime(row)"
-                    :disabled="deletingOvertimeId === row.id"
-                    title="Hapus data lembur manual"
-                  >
-                    <span v-if="deletingOvertimeId === row.id" class="spinner-border spinner-border-sm"></span>
-                    <i v-else class="fas fa-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
     <!-- Main Card with Tabs -->
     <div class="card shadow-sm mb-4">
       <div class="card-header p-3">
@@ -586,9 +518,6 @@ import {
   fetchAllLeaves,
   fetchLeaveById,
   updateLeaveReplacementStatus,
-  addManualOvertimeEntry,
-  deleteManualOvertimeEntry,
-  subscribeManualOvertimeByDate,
 } from "@/services/absensi-service";
 
 const auth = useAuthStore();
@@ -607,14 +536,6 @@ function todayYearMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function todayDateLocal() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 const statsMonth = ref(todayYearMonth());
 
 const pendingSearch = ref("");
@@ -627,15 +548,7 @@ const deletingPendingId = ref(null);
 const medicalCertLoading = ref(false);
 const medicalCertFile = ref(null);
 
-const overtimeDate = ref(todayDateLocal());
-const overtimeName = ref("");
-const overtimeReason = ref("Penambahan Headcount");
-const overtimeSaving = ref(false);
-const overtimeManualList = ref([]);
-const deletingOvertimeId = ref(null);
-
 let unsubPending = null;
-let unsubOvertimeManual = null;
 
 // ── Computed: Stats ────────────────────────────────────────────────────────
 const stats = computed(() => ({
@@ -706,8 +619,12 @@ const expandedAllRows = computed(() => {
         let dayInfo = replacementInfo;
         if (!hasMC && record.replacementType === "libur" && record.replacementDetails?.dates?.[i]) {
           dayInfo = `Ganti libur pada ${record.replacementDetails.dates[i].formattedDate}`;
-        } else if (!hasMC && record.replacementType === "jam" && record.replacementDetails) {
-          dayInfo = getReplacementJamText(record.replacementDetails);
+        } else if (
+          !hasMC &&
+          (record.replacementType === "jam" || record.replacementType === "lembur") &&
+          record.replacementDetails
+        ) {
+          dayInfo = getReplacementJamText(record.replacementDetails, record.replacementType);
         }
 
         rows.push({
@@ -797,8 +714,9 @@ function formatDateId(dateStr) {
   return dateStr;
 }
 
-function getReplacementJamText(details) {
-  if (!details) return "Ganti jam";
+function getReplacementJamText(details, type = "jam") {
+  const prefix = type === "lembur" ? "Lembur" : "Ganti";
+  if (!details) return type === "lembur" ? "Lembur" : "Ganti jam";
 
   const rawValue =
     details.timeValue ??
@@ -809,10 +727,10 @@ function getReplacementJamText(details) {
   const date = details.date || details.formattedDate;
   const formattedDate = formatDateId(date);
 
-  if (rawValue && formattedDate) return `Ganti ${rawValue} ${unit} pada ${formattedDate}`;
-  if (rawValue) return `Ganti ${rawValue} ${unit}`;
-  if (formattedDate) return `Ganti jam pada ${formattedDate}`;
-  return "Ganti jam";
+  if (rawValue && formattedDate) return `${prefix} ${rawValue} ${unit} pada ${formattedDate}`;
+  if (rawValue) return `${prefix} ${rawValue} ${unit}`;
+  if (formattedDate) return `${prefix} pada ${formattedDate}`;
+  return type === "lembur" ? "Lembur" : "Ganti jam";
 }
 
 /** Mirrors getReplacementInfo() from supervisor.js */
@@ -826,8 +744,8 @@ function getReplacementInfo(record) {
     if (d?.formattedDate) return `Ganti libur pada ${d.formattedDate}`;
     return isMultiDay ? "Ganti libur (multi-hari)" : "Ganti libur";
   }
-  if (record.replacementType === "jam") {
-    return getReplacementJamText(record.replacementDetails);
+  if (record.replacementType === "jam" || record.replacementType === "lembur") {
+    return getReplacementJamText(record.replacementDetails, record.replacementType);
   }
   return "-";
 }
@@ -890,79 +808,6 @@ function showSwal(type, message) {
   });
 }
 
-function subscribeManualOvertime() {
-  if (!overtimeDate.value) return;
-  if (unsubOvertimeManual) unsubOvertimeManual();
-  unsubOvertimeManual = subscribeManualOvertimeByDate(overtimeDate.value, (rows) => {
-    overtimeManualList.value = rows;
-  });
-}
-
-async function saveManualOvertime() {
-  const name = overtimeName.value.trim();
-  const date = overtimeDate.value;
-  const reason = overtimeReason.value.trim() || "Penambahan Headcount";
-
-  if (!date || !name) {
-    showSwal("warning", "Tanggal dan nama staf wajib diisi.");
-    return;
-  }
-
-  overtimeSaving.value = true;
-  try {
-    await addManualOvertimeEntry({
-      date,
-      name,
-      reason,
-      createdBy: auth.user?.uid || "",
-    });
-    overtimeName.value = "";
-    overtimeReason.value = "Penambahan Headcount";
-    showSwal("success", "Data lembur manual berhasil disimpan.");
-  } catch (e) {
-    showSwal("danger", `Gagal menyimpan data lembur manual: ${e.message}`);
-  } finally {
-    overtimeSaving.value = false;
-  }
-}
-
-async function deleteManualOvertime(row) {
-  if (!row?.id) return;
-
-  const result = await Swal.fire({
-    icon: "warning",
-    title: "Hapus Data Lembur?",
-    text: `Data lembur untuk ${row.name || "staf ini"} akan dihapus permanen.`,
-    showCancelButton: true,
-    confirmButtonText: "Ya, Hapus",
-    cancelButtonText: "Batal",
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#6c757d",
-  });
-
-  if (!result.isConfirmed) return;
-
-  deletingOvertimeId.value = row.id;
-  try {
-    await deleteManualOvertimeEntry(row.id);
-    await Swal.fire({
-      icon: "success",
-      title: "Berhasil",
-      text: "Data lembur manual berhasil dihapus.",
-      confirmButtonColor: "#198754",
-    });
-  } catch (e) {
-    await Swal.fire({
-      icon: "error",
-      title: "Gagal",
-      text: e.message || "Gagal menghapus data lembur manual.",
-      confirmButtonColor: "#dc3545",
-    });
-  } finally {
-    deletingOvertimeId.value = null;
-  }
-}
-
 function getModal(id) {
   const el = document.getElementById(id);
   return el ? Modal.getOrCreateInstance(el) : null;
@@ -998,10 +843,6 @@ async function refreshAll() {
 
 watch(statsMonth, (newMonth) => {
   loadAllByMonth(newMonth);
-});
-
-watch(overtimeDate, () => {
-  subscribeManualOvertime();
 });
 
 // ── Approve / Reject Pending ───────────────────────────────────────────────
@@ -1189,12 +1030,10 @@ onMounted(() => {
     loadingPending.value = false;
   });
   loadAllByMonth(statsMonth.value);
-  subscribeManualOvertime();
 });
 
 onUnmounted(() => {
   unsubPending?.();
-  unsubOvertimeManual?.();
 });
 </script>
 

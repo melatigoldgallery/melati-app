@@ -129,6 +129,7 @@
               <option value="all">Semua Jenis Pengganti</option>
               <option value="libur">Ganti Libur</option>
               <option value="jam">Ganti Jam</option>
+              <option value="lembur">Lembur</option>
               <option value="tidak">Tidak Perlu Diganti</option>
             </select>
             <select v-model="filterStatus" class="form-select form-select-sm compact-select" @change="currentPage = 1">
@@ -331,6 +332,7 @@ const tableRows = computed(() => {
       if (isCuti) return "Cuti";
       if (leave.replacementType === "libur") return "Ganti Libur";
       if (leave.replacementType === "jam") return "Ganti Jam";
+      if (leave.replacementType === "lembur") return "Lembur";
       if (leave.replacementType === "tidak") return "Tidak Perlu Diganti";
       return "-";
     })();
@@ -350,6 +352,12 @@ const tableRows = computed(() => {
         const unit = d.timeUnit || d.unit || "jam";
         const tgl = d.formattedDate || (d.date ? new Date(d.date).toLocaleDateString("id-ID") : "-");
         return val ? `${val} ${unit} pada ${tgl}` : "-";
+      }
+      if (leave.replacementType === "lembur") {
+        const d = leave.replacementDetails;
+        if (!d) return "-";
+        const tgl = d.formattedDate || (d.date ? new Date(d.date).toLocaleDateString("id-ID") : "-");
+        return tgl !== "-" ? `Lembur pada ${tgl}` : "Lembur";
       }
       return "-";
     })();
