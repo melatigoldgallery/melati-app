@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "sistem-antrian-76aa8"
+  },
+  "targets": {
+    "sistem-antrian-76aa8": {
+      "hosting": {
+        "melatigold": [
+          "melatigold"
+        ]
+      }
+    }
   }
 }
