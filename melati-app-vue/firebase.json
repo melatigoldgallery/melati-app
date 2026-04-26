@@ -13,8 +13,7 @@
     "source": "functions"
   },
   "hosting": {
-    "site": "melatigold",
-    "public": "dist",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
