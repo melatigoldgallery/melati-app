@@ -330,7 +330,9 @@ function pagesAccessFromPermissions(permissions, role = "staff") {
   const mapped = {};
   Object.entries(PERMISSION_TO_PAGE).forEach(([legacyKey, pageKey]) => {
     const [group, key] = legacyKey.split(".");
-    mapped[pageKey] = !!permissions?.[group]?.[key];
+    if (permissions?.[group] && Object.prototype.hasOwnProperty.call(permissions[group], key)) {
+      mapped[pageKey] = !!permissions[group][key];
+    }
   });
   return normalizeAccessMap(mapped, role);
 }
