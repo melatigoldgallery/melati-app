@@ -832,12 +832,25 @@ export async function consumeLatePermissionCode({ code, date, shift, employeeId,
       throw new Error("Kode verifikasi ini bukan untuk staf tersebut.");
     }
 
+    let usedAt = Timestamp.now();
+    const normalizedAttendanceId = String(attendanceId || "").trim();
+    if (normalizedAttendanceId) {
+      const attendanceRef = doc(db, "attendance", normalizedAttendanceId);
+      const attendanceSnap = await tx.get(attendanceRef);
+      if (attendanceSnap.exists()) {
+        const attendanceData = attendanceSnap.data() || {};
+        if (attendanceData.timeIn) {
+          usedAt = attendanceData.timeIn;
+        }
+      }
+    }
+
     tx.update(ref, {
       used: true,
-      usedAt: Timestamp.now(),
+      usedAt,
       usedByEmployeeId: String(employeeId || "").trim(),
       usedByName: String(employeeName || "").trim(),
-      usedByAttendanceId: String(attendanceId || "").trim(),
+      usedByAttendanceId: normalizedAttendanceId,
     });
   });
 
