@@ -728,8 +728,8 @@ function setupPrimeUnlockListeners() {
 function warnMissedFirst() {
   Swal.fire({
     icon: "warning",
-    title: "Antrian Terlewat",
-    text: "Panggil antrian terlewat terlebih dahulu sebelum memproses antrian saat ini.",
+    title: "Tidak Bisa Diproses",
+    text: "Selesaikan antrian terlewat terlebih dahulu.",
     confirmButtonText: "Mengerti",
     confirmButtonColor: "#f44336",
   });
@@ -832,13 +832,7 @@ async function confirmCustom() {
 
 function openReset() {
   if (state.value.missedQueue.length > 0) {
-    Swal.fire({
-      icon: "warning",
-      title: "Antrian Terlewat Masih Ada",
-      text: "Selesaikan semua antrian terlewat terlebih dahulu sebelum reset nomor antrian.",
-      confirmButtonText: "Mengerti",
-      confirmButtonColor: "#f44336",
-    });
+    warnMissedFirst();
     return;
   }
   modal("resetModal").show();

@@ -13,13 +13,9 @@
     "source": "functions"
   },
   "hosting": {
-    "site": "melatigold",
+    "target": "melatigold",
     "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
         "source": "**",

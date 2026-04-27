@@ -1,11 +1,15 @@
 // Audio service untuk sistem antrian — ported dari audioHandlers.js
-// File audio harus ada di /public/audio/
+// Import audio files as Vite modules for proper resolution
+import informasiAudio from "@/public/audio/informasi.mp3?url";
+import antrianAudio from "@/public/audio/antrian.mp3?url";
+import informasiEndAudio from "@/public/audio/informasiEnd.mp3?url";
+import notifOnAudio from "@/public/audio/notifOn.mp3?url";
 
 const AUDIO_PATHS = {
-  informasi: "/audio/informasi.mp3",
-  antrian: "/audio/antrian.mp3",
-  informasiEnd: "/audio/informasiEnd.mp3",
-  notifOn: "/audio/notifOn.mp3",
+  informasi: informasiAudio,
+  antrian: antrianAudio,
+  informasiEnd: informasiEndAudio,
+  notifOn: notifOnAudio,
 };
 
 let isAudioPlaying = false;
