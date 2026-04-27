@@ -16,7 +16,7 @@
 
     <div class="card shadow-sm mb-4">
       <div class="card-header p-3">
-        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+        <ul class="nav nav-tabs card-header-tabs absensi-tabs" role="tablist">
           <li class="nav-item" role="presentation">
             <button class="nav-link" :class="{ active: activeTab === 'headcount' }" @click="activeTab = 'headcount'">
               <i class="fas fa-user-clock me-1"></i>
@@ -35,11 +35,11 @@
       <div class="card-body">
         <div v-show="activeTab === 'headcount'">
           <div class="row g-2 align-items-end">
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">Tanggal</label>
               <input v-model="overtimeDate" type="date" class="form-control form-control-sm" />
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">Nama Staf</label>
               <input
                 v-model="overtimeName"
@@ -48,11 +48,11 @@
                 placeholder="Masukkan nama staf"
               />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-md-3">
               <label class="form-label small fw-semibold mb-1">Alasan</label>
               <input v-model="overtimeReason" type="text" class="form-control form-control-sm" />
             </div>
-            <div class="col-md-1 d-grid">
+            <div class="col-12 col-md-1 d-grid">
               <button class="btn btn-primary btn-sm" @click="saveManualOvertime" :disabled="overtimeSaving">
                 <span v-if="overtimeSaving" class="spinner-border spinner-border-sm me-1"></span>
                 Simpan
@@ -69,11 +69,11 @@
             </div>
 
             <div class="row g-2 align-items-end">
-              <div class="col-md-2">
+              <div class="col-6 col-md-2">
                 <label class="form-label small fw-semibold mb-1">Tanggal Mulai</label>
                 <input v-model="historyStartDate" type="date" class="form-control form-control-sm" />
               </div>
-              <div class="col-md-2">
+              <div class="col-6 col-md-2">
                 <label class="form-label small fw-semibold mb-1">Tanggal Akhir</label>
                 <input v-model="historyEndDate" type="date" class="form-control form-control-sm" />
               </div>
@@ -86,7 +86,7 @@
                     <th>Tanggal</th>
                     <th>Nama Staf</th>
                     <th>Alasan</th>
-                    <th>Dibuat Oleh</th>
+                    <th class="d-none d-md-table-cell">Dibuat Oleh</th>
                     <th class="text-center" style="width: 90px">Aksi</th>
                   </tr>
                 </thead>
@@ -100,7 +100,7 @@
                     <td>{{ formatDateId(row.date) }}</td>
                     <td>{{ row.name || "-" }}</td>
                     <td>{{ row.reason || "Penambahan Headcount" }}</td>
-                    <td class="text-muted">{{ row.createdBy || "-" }}</td>
+                    <td class="text-muted d-none d-md-table-cell">{{ row.createdBy || "-" }}</td>
                     <td class="text-center">
                       <button
                         class="btn btn-outline-danger btn-xs"
@@ -121,36 +121,57 @@
 
         <div v-show="activeTab === 'code'">
           <div class="row g-2 align-items-end">
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">Tanggal</label>
               <input v-model="codeDate" type="date" class="form-control form-control-sm" />
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">Shift</label>
               <select v-model="codeShift" class="form-select form-select-sm">
                 <option value="morning">Shift Pagi</option>
                 <option value="afternoon">Shift Sore</option>
               </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
               <label class="form-label small fw-semibold mb-1">ID Sales (Wajib)</label>
               <input
                 v-model="codeEmployeeId"
                 type="text"
                 class="form-control form-control-sm"
                 placeholder="Contoh: EMP123"
+                readonly
               />
             </div>
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
               <label class="form-label small fw-semibold mb-1">Nama Sales</label>
-              <input
-                v-model="codeEmployeeName"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Nama sales"
-              />
+              <div class="position-relative">
+                <input
+                  v-model="salesSearchQuery"
+                  type="text"
+                  class="form-control form-control-sm"
+                  placeholder="Ketik nama atau ID sales"
+                  @focus="showSalesSuggestions = true"
+                  @blur="handleSalesSearchBlur"
+                  @input="handleSalesSearchInput"
+                />
+                <div
+                  v-if="showSalesSuggestions && filteredSalesSuggestions.length"
+                  class="list-group position-absolute w-100 shadow-sm sales-suggestion-list"
+                >
+                  <button
+                    v-for="staff in filteredSalesSuggestions"
+                    :key="staff.id"
+                    type="button"
+                    class="list-group-item list-group-item-action py-1"
+                    @mousedown.prevent="selectSalesStaff(staff)"
+                  >
+                    <div class="fw-semibold small">{{ staff.name || "-" }}</div>
+                    <div class="text-muted" style="font-size: 0.72rem">{{ staff.employeeId || "-" }}</div>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div class="col-md-1 d-grid">
+            <div class="col-12 col-md-1 d-grid">
               <button class="btn btn-primary btn-sm text-white" @click="generateLateCode" :disabled="codeGenerating">
                 <span v-if="codeGenerating" class="spinner-border spinner-border-sm"></span>
                 <span v-else>Buat</span>
@@ -167,11 +188,11 @@
             </div>
 
             <div class="row g-2 align-items-end">
-              <div class="col-md-2">
+              <div class="col-6 col-md-2">
                 <label class="form-label small fw-semibold mb-1">Tanggal Mulai</label>
                 <input v-model="codeStartDate" type="date" class="form-control form-control-sm" />
               </div>
-              <div class="col-md-2">
+              <div class="col-6 col-md-2">
                 <label class="form-label small fw-semibold mb-1">Tanggal Akhir</label>
                 <input v-model="codeEndDate" type="date" class="form-control form-control-sm" />
               </div>
@@ -185,8 +206,8 @@
                     <th>Shift</th>
                     <th>Pengguna</th>
                     <th>Status</th>
-                    <th>Sudah Digunakan Oleh</th>
-                    <th>Waktu Digunakan</th>
+                    <th class="d-none d-md-table-cell">Sudah Digunakan Oleh</th>
+                    <th class="d-none d-md-table-cell">Waktu Digunakan</th>
                     <th class="text-center" style="width: 90px">Aksi</th>
                   </tr>
                 </thead>
@@ -195,7 +216,20 @@
                     <td colspan="7" class="text-center text-muted py-3">Belum ada kode pada rentang tanggal ini.</td>
                   </tr>
                   <tr v-for="row in latePermissionCodes" :key="row.id">
-                    <td class="fw-semibold" style="letter-spacing: 0.5px">{{ row.code || row.id }}</td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold" style="letter-spacing: 0.5px">{{ row.code || row.id }}</span>
+                        <button
+                          class="btn btn-outline-secondary btn-xs"
+                          @click="copyVerificationCode(row)"
+                          :disabled="copyingCodeId === row.id"
+                          title="Salin kode"
+                        >
+                          <span v-if="copyingCodeId === row.id" class="spinner-border spinner-border-sm"></span>
+                          <i v-else class="bi bi-clipboard"></i>
+                        </button>
+                      </div>
+                    </td>
                     <td>{{ row.shift === "afternoon" ? "Shift Sore" : "Shift Pagi" }}</td>
                     <td>
                       <span v-if="row.employeeId || row.employeeName">
@@ -209,8 +243,8 @@
                         {{ row.used ? "Sudah Digunakan" : "Belum Digunakan" }}
                       </span>
                     </td>
-                    <td>{{ row.usedByName || "-" }}</td>
-                    <td>{{ formatDateTimeId(row.usedAt) }}</td>
+                    <td class="d-none d-md-table-cell">{{ row.usedByName || "-" }}</td>
+                    <td class="d-none d-md-table-cell">{{ formatDateTimeId(row.usedAt) }}</td>
                     <td class="text-center">
                       <button
                         class="btn btn-outline-danger btn-xs"
@@ -240,6 +274,7 @@ import { useAuthStore } from "@/stores/auth";
 import {
   addManualOvertimeEntry,
   deleteManualOvertimeEntry,
+  fetchEmployees,
   subscribeManualOvertimeByDate,
   subscribeManualOvertimeByDateRange,
   createLatePermissionCode,
@@ -272,6 +307,10 @@ const codeDate = ref(todayDateLocal());
 const codeShift = ref("morning");
 const codeEmployeeId = ref("");
 const codeEmployeeName = ref("");
+const selectedSalesStaffId = ref("");
+const salesStaffOptions = ref([]);
+const salesSearchQuery = ref("");
+const showSalesSuggestions = ref(false);
 const codeNote = ref("");
 const codeDataFilter = ref("");
 const codeStartDate = ref(todayDateLocal());
@@ -279,6 +318,7 @@ const codeEndDate = ref(todayDateLocal());
 const codeGenerating = ref(false);
 const latePermissionCodesRaw = ref([]);
 const deletingCodeId = ref(null);
+const copyingCodeId = ref(null);
 
 const latePermissionCodes = computed(() => {
   const keyword = codeDataFilter.value.trim().toUpperCase();
@@ -288,6 +328,21 @@ const latePermissionCodes = computed(() => {
     const codeValue = String(row.code || row.id || "").toUpperCase();
     return codeValue.includes(keyword);
   });
+});
+
+const filteredSalesSuggestions = computed(() => {
+  const keyword = salesSearchQuery.value.trim().toLowerCase();
+  const list = salesStaffOptions.value;
+
+  if (!keyword) return list.slice(0, 8);
+
+  return list
+    .filter((staff) => {
+      const name = String(staff.name || "").toLowerCase();
+      const employeeId = String(staff.employeeId || "").toLowerCase();
+      return name.includes(keyword) || employeeId.includes(keyword);
+    })
+    .slice(0, 8);
 });
 
 const activeTab = ref("headcount");
@@ -450,6 +505,42 @@ function subscribeLatePermissionCodes() {
   });
 }
 
+async function loadSalesStaffOptions() {
+  try {
+    const employees = await fetchEmployees();
+    salesStaffOptions.value = employees
+      .filter((emp) => String(emp.type || "").toLowerCase() === "staff")
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "id"));
+  } catch (e) {
+    salesStaffOptions.value = [];
+    showSwal("danger", `Gagal memuat data staff: ${e.message || e}`);
+  }
+}
+
+function salesStaffLabel(staff) {
+  return `${staff?.name || "-"} (${staff?.employeeId || "-"})`;
+}
+
+function selectSalesStaff(staff) {
+  selectedSalesStaffId.value = staff?.id || "";
+  showSalesSuggestions.value = false;
+}
+
+function handleSalesSearchInput() {
+  showSalesSuggestions.value = true;
+  const keyword = salesSearchQuery.value.trim();
+
+  if (!keyword) {
+    selectedSalesStaffId.value = "";
+  }
+}
+
+function handleSalesSearchBlur() {
+  setTimeout(() => {
+    showSalesSuggestions.value = false;
+  }, 120);
+}
+
 async function generateLateCode() {
   if (!codeDate.value) {
     showSwal("warning", "Tanggal kode verifikasi wajib diisi.");
@@ -485,6 +576,37 @@ async function generateLateCode() {
     showSwal("danger", `Gagal membuat kode verifikasi: ${e.message}`);
   } finally {
     codeGenerating.value = false;
+  }
+}
+
+async function copyVerificationCode(row) {
+  const codeValue = String(row?.code || row?.id || "").trim();
+  if (!codeValue) {
+    showSwal("warning", "Kode tidak tersedia untuk disalin.");
+    return;
+  }
+
+  copyingCodeId.value = row.id;
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(codeValue);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = codeValue;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "absolute";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    }
+
+    showSwal("success", `Kode ${codeValue} berhasil disalin.`);
+  } catch (e) {
+    showSwal("danger", `Gagal menyalin kode: ${e.message || e}`);
+  } finally {
+    copyingCodeId.value = null;
   }
 }
 
@@ -529,6 +651,20 @@ watch(overtimeDate, () => {
   subscribeManualOvertime();
 });
 
+watch(selectedSalesStaffId, (staffId) => {
+  if (!staffId) {
+    codeEmployeeId.value = "";
+    codeEmployeeName.value = "";
+    salesSearchQuery.value = "";
+    return;
+  }
+
+  const selected = salesStaffOptions.value.find((item) => item.id === staffId);
+  codeEmployeeId.value = String(selected?.employeeId || "").trim();
+  codeEmployeeName.value = String(selected?.name || "").trim();
+  salesSearchQuery.value = salesStaffLabel(selected);
+});
+
 watch([codeStartDate, codeEndDate], () => {
   subscribeLatePermissionCodes();
 });
@@ -541,6 +677,7 @@ onMounted(() => {
   subscribeManualOvertime();
   subscribeHeadcountHistory();
   subscribeLatePermissionCodes();
+  loadSalesStaffOptions();
 });
 
 onUnmounted(() => {
@@ -555,5 +692,93 @@ onUnmounted(() => {
   padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
   line-height: 1.2;
+}
+
+.sales-suggestion-list {
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+@media (max-width: 767.98px) {
+  .page-header {
+    margin-bottom: 0.75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .page-header .breadcrumb {
+    margin-bottom: 0;
+    font-size: 0.76rem;
+  }
+
+  .absensi-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    max-width: 100%;
+    gap: 0.4rem;
+    border-bottom: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .absensi-tabs.card-header-tabs {
+    margin-bottom: 0;
+  }
+
+  .absensi-tabs .nav-item {
+    width: 100%;
+  }
+
+  .absensi-tabs .nav-link {
+    width: 100%;
+    border-radius: 0.45rem;
+    text-align: center;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.4rem;
+    border: 1px solid var(--bs-border-color);
+    margin-bottom: 0;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .card-body {
+    padding: 0.85rem;
+  }
+
+  .form-label {
+    font-size: 0.72rem;
+  }
+
+  .form-control-sm,
+  .form-select-sm,
+  .btn-sm {
+    min-height: 2rem;
+    font-size: 0.8rem;
+  }
+
+  .table-responsive {
+    margin-left: -0.2rem;
+    margin-right: -0.2rem;
+  }
+
+  .table {
+    font-size: 0.78rem;
+  }
+
+  .table th,
+  .table td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .btn-xs {
+    padding: 0.18rem 0.4rem;
+    font-size: 0.72rem;
+  }
 }
 </style>
