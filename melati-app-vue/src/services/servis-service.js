@@ -203,6 +203,35 @@ export async function bulkMarkServisSelesai(ids = []) {
   return updatedCount;
 }
 
+export async function bulkMarkServisSudahDiambil(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (!uniqueIds.length) return 0;
+
+  // Firestore batched writes are limited to 500 operations per commit.
+  const chunkSize = 450;
+  let updatedCount = 0;
+
+  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+    const chunk = uniqueIds.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    const updatedAt = Timestamp.now();
+    const waktuPengambilan = new Date().toISOString();
+
+    chunk.forEach((id) => {
+      batch.update(doc(db, "servis", id), {
+        statusPengambilan: "Sudah Diambil",
+        waktuPengambilan,
+        updatedAt,
+      });
+    });
+
+    await batch.commit();
+    updatedCount += chunk.length;
+  }
+
+  return updatedCount;
+}
+
 export async function updateServisData(id, data) {
   await updateDoc(doc(db, "servis", id), {
     ...data,

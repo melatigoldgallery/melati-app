@@ -36,6 +36,7 @@
           <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Status Servis</label>
             <select v-model="statusServisFilter" class="form-select form-select-sm">
+              <option value="">Semua</option>
               <option value="Belum Selesai">Belum Selesai</option>
               <option value="Sudah Selesai">Sudah Selesai</option>
             </select>
@@ -43,8 +44,17 @@
           <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Status Pengambilan</label>
             <select v-model="statusPengambilanFilter" class="form-select form-select-sm">
+              <option value="">Semua</option>
               <option value="Belum Diambil">Belum Diambil</option>
               <option value="Sudah Diambil">Sudah Diambil</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Jenis</label>
+            <select v-model="jenisFilter" class="form-select form-select-sm">
+              <option value="">Semua</option>
+              <option value="servis">Servis</option>
+              <option value="custom">Custom</option>
             </select>
           </div>
           <div class="col-md-auto">
@@ -320,6 +330,7 @@ const filterStart = ref(currentMonthStart());
 const filterEnd = ref(currentMonthEnd());
 const statusServisFilter = ref("Sudah Selesai");
 const statusPengambilanFilter = ref("Sudah Diambil");
+const jenisFilter = ref("");
 const exporting = ref(false);
 const exportProgressText = ref("");
 
@@ -329,9 +340,14 @@ const pageSize = 25;
 
 // ── Computed ──────────────────────────────────────────────────────────────
 const filteredItems = computed(() =>
-  items.value.filter(
-    (i) => i.statusServis === statusServisFilter.value && i.statusPengambilan === statusPengambilanFilter.value,
-  ),
+  items.value.filter((i) => {
+    const matchesStatusServis = statusServisFilter.value ? i.statusServis === statusServisFilter.value : true;
+    const matchesStatusPengambilan = statusPengambilanFilter.value
+      ? i.statusPengambilan === statusPengambilanFilter.value
+      : true;
+    const matchesJenis = jenisFilter.value ? (i.jenisInput || "servis") === jenisFilter.value : true;
+    return matchesStatusServis && matchesStatusPengambilan && matchesJenis;
+  }),
 );
 
 const totalPendapatan = computed(() =>
@@ -386,7 +402,7 @@ const byPengambilan = computed(() => {
   return map;
 });
 
-watch([statusServisFilter, statusPengambilanFilter], () => {
+watch([statusServisFilter, statusPengambilanFilter, jenisFilter], () => {
   page.value = 1;
 });
 

@@ -222,34 +222,60 @@ Ketentuan fase ini:
 
 ### 12.1 Firestore
 
-Path operasional berbasis lantai:
+Struktur final (canonical):
 
-- `floors/{floorId}/penjualan/{docId}`
+- `floors/{floorId}/penjualanAksesoris/{docId}`
 - `floors/{floorId}/antrian/{docId}`
 - `floors/{floorId}/inventory/{docId}`
 - `floors/{floorId}/promosi/{docId}`
 - `floors/{floorId}/pengaturan/{docId}`
+- `floors/{floorId}/mutasiKode/{docId}`
+- `floors/{floorId}/restokBarang/{docId}`
+- `floors/{floorId}/stocks/{docId}`
+- `floors/{floorId}/stokAksesoris/{docId}`
+- `floors/{floorId}/stokAksesorisTransaksi/{docId}`
+- `floors/{floorId}/dailyStockLogs/{docId}`
+- `floors/{floorId}/dailyStockReports/{docId}`
+- `floors/{floorId}/dailyStockSnapshot/{docId}`
+- `floors/{floorId}/maintenanceLogs/{docId}`
+- `floors/{floorId}/systemLocks/{docId}`
 
 Khusus L1 saja:
 
 - `floors/L1/servis/{docId}`
-- `floors/L1/absensi/{docId}`
+- `floors/L1/absensi/attendance/{docId}`
+- `floors/L1/absensi/leaveRequests/{docId}`
+- `floors/L1/absensi/manualOvertime/{docId}`
+- `floors/L1/absensi/latePermissionCodes/{code}`
+- `floors/L1/absensi/employees/{docId}`
+- `floors/L1/absensi/employeeFaces/{employeeId}`
 
 Data sensitif per lantai:
 
 - `floors/{floorId}/settings/passwords`
 - `floors/{floorId}/settings/authorization`
+- `floors/{floorId}/settings/attendanceThresholds`
+- `floors/{floorId}/settings/antrianClosingAnnouncement`
+- `floors/{floorId}/settings/whatsapp`
 
-Data global:
+Data global yang diperbolehkan (non-operasional):
 
-- Tidak digunakan untuk data operasional pada fase ini.
-- Semua data (termasuk data master yang dipakai operasional) diperlakukan floor-scoped.
+- `users`
+- `userRoles`
+- `floorProfiles` (opsional, metadata lantai)
+
+Keputusan arsitektur:
+
+- Gunakan isolasi data berbasis path `floors/{floorId}/...`.
+- Hindari pola `penjualanAksesoris/L1/L2/data` sebagai struktur utama karena meningkatkan kompleksitas query/rules lintas modul.
 
 ### 12.2 Realtime Database
 
 Node berbasis lantai:
 
-- `floorData/{floorId}/queue/*`
+- `floorData/{floorId}/queue/state`
+- `floorData/{floorId}/queue/customerCount`
+- `floorData/{floorId}/queue/analytics/{yyyy}/{mm}/{dd}/{pushId}`
 - `floorData/{floorId}/content/promotion/*`
 - `floorData/{floorId}/settings/promotion/*`
 
@@ -326,9 +352,49 @@ Scheduler/trigger global harus dievaluasi:
 - Untuk data operasional floor-scoped, proses per floor.
 - Logging hasil per floor untuk audit.
 
+Kontrak implementasi Functions (wajib):
+
+- Semua callable/HTTP operasional menerima `floorId` pada payload.
+- Jika `floorId` kosong atau tidak valid, return `invalid-argument`.
+- Jika `floorId` tidak termasuk `allowedFloors`, return `permission-denied`.
+- Validasi role dari `floorRoles[floorId]` untuk aksi sensitif.
+- Validasi capability per floor (termasuk no-storage untuk L2).
+- Semua log operasional function menyertakan `floorId`, `uid`, `action`, `status`.
+
+Pattern trigger/scheduler:
+
+- Trigger Firestore gunakan wildcard floor, contoh: `floors/{floorId}/stokAksesorisTransaksi/{txId}`.
+- Scheduler harian/jam-an melakukan iterasi daftar floor aktif, lalu proses per floor.
+- Hasil job disimpan per floor agar mudah audit dan rollback.
+
 ---
 
 ## 16. Rencana Migrasi dan Cutover
+
+Matriks mapping awal (global -> floor-scoped):
+
+- `penjualanAksesoris` -> `floors/{floorId}/penjualanAksesoris`
+- `mutasiKode` -> `floors/{floorId}/mutasiKode`
+- `restokBarang` -> `floors/{floorId}/restokBarang`
+- `stocks` -> `floors/{floorId}/stocks`
+- `stokAksesoris` -> `floors/{floorId}/stokAksesoris`
+- `stokAksesorisTransaksi` -> `floors/{floorId}/stokAksesorisTransaksi`
+- `daily_stock_logs` -> `floors/{floorId}/dailyStockLogs`
+- `daily_stock_reports` -> `floors/{floorId}/dailyStockReports`
+- `dailyStockSnapshot` -> `floors/{floorId}/dailyStockSnapshot`
+- `servis` -> `floors/L1/servis`
+- `attendance` -> `floors/L1/absensi/attendance`
+- `leaveRequests` -> `floors/L1/absensi/leaveRequests`
+- `manualOvertime` -> `floors/L1/absensi/manualOvertime`
+- `latePermissionCodes` -> `floors/L1/absensi/latePermissionCodes`
+- `employees` -> `floors/L1/absensi/employees`
+- `employeeFaces` -> `floors/L1/absensi/employeeFaces`
+
+Matriks mapping RTDB:
+
+- `queue` -> `floorData/{floorId}/queue/state`
+- `customerCount` -> `floorData/{floorId}/queue/customerCount`
+- `analytics/{yyyy}/{mm}` -> `floorData/{floorId}/queue/analytics/{yyyy}/{mm}/{dd}`
 
 ### Fase 0 - Inventarisasi dan Mapping
 
@@ -340,17 +406,20 @@ Scheduler/trigger global harus dievaluasi:
 - Implement claims (`allowedFloors`, `floorRoles`).
 - Implement floor context manager dan capability guard.
 - Draft rules baru + emulator tests.
+- Tambahkan helper path terpusat agar tidak ada string path hardcoded di service.
 
 ### Fase 2 - Migrasi Read/Write Vue
 
 - Pindahkan query/write modul yang dipakai L2 dulu: aksesoris, antrian, inventory, promosi, pengaturan.
 - Lanjut modul L1-only: servis, absensi.
+- Terapkan dual-read sementara (fallback old path) hanya selama masa transisi pendek.
 
 ### Fase 3 - Hard Cutover Vue-Only
 
 - Aktifkan strict rules floor-scoped.
 - Bekukan perubahan di kode legacy.
 - Verifikasi parity dan UAT.
+- Matikan fallback old path setelah parity terkonfirmasi.
 
 ### Fase 4 - Cleanup Legacy
 
@@ -360,6 +429,14 @@ Scheduler/trigger global harus dievaluasi:
 Catatan:
 
 - Dual write hanya dipakai jika diperlukan untuk data kritikal tertentu, bukan default.
+
+Checklist best practice cutover:
+
+- Semua query Firestore di codebase mengandung `floorId` di path.
+- Semua key cache/localStorage/session menyertakan suffix `floorId`.
+- Semua function operasional menolak request tanpa `floorId`.
+- Semua rules emulator test mencakup kasus negatif lintas floor.
+- Semua flow Storage memiliki guard eksplisit untuk L2.
 
 ---
 

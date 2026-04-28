@@ -93,7 +93,17 @@
         >
           <span v-if="bulkUpdatingStatusServis" class="spinner-border spinner-border-sm me-1"></span>
           <i v-else class="bi bi-check2-square me-1"></i>
-          Selesaikan Terpilih ({{ selectedServisCount }})
+          Selesaikan Terpilih ({{ selectedServisFinishCount }})
+        </button>
+        <button
+          v-if="hasLoaded && isSupervisor"
+          class="btn btn-outline-primary btn-sm fw-semibold flex-fill flex-md-grow-0"
+          :disabled="isMarkTakenSelectedDisabled"
+          @click="updateSelectedServisSudahDiambil"
+        >
+          <span v-if="bulkUpdatingStatusServis" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-box-arrow-in-down me-1"></i>
+          Sudah Diambil ({{ selectedServisPickupCount }})
         </button>
         <div class="" v-if="hasLoaded">
           <input
@@ -220,7 +230,7 @@
       <!-- Desktop table view -->
       <div class="d-none d-md-block card border-0 shadow-sm">
         <div class="table-responsive">
-          <table class="table table-hover table-sm mb-0" style="font-size: 0.8rem">
+          <table class="table table-hover table-sm table-bordered mb-0" style="font-size: 0.8rem">
             <thead class="table-light">
               <tr>
                 <th class="text-center" style="width: 42px">
@@ -229,7 +239,7 @@
                     class="form-check-input"
                     :checked="isCurrentPageFullySelected"
                     :disabled="currentPageSelectableItems.length === 0"
-                    title="Pilih semua data Belum Selesai di halaman ini"
+                    title="Pilih semua data yang bisa diproses di halaman ini"
                     @change="toggleCurrentPageSelection($event.target.checked)"
                   />
                 </th>
@@ -239,9 +249,9 @@
                 <th style="min-width: 110px">Customer</th>
                 <th style="min-width: 100px">No HP</th>
                 <th style="min-width: 110px">Nama Barang</th>
-                <th style="min-width: 70px">Berat</th>
-                <th style="min-width: 70px">Kadar</th>
-                <th style="min-width: 90px">Barang/Jenis</th>
+                <th style="width: 72px; min-width: 72px">Berat</th>
+                <th style="width: 72px; min-width: 72px">Kadar</th>
+                <th style="width: 120px; min-width: 120px">Jenis Servis</th>
                 <th style="min-width: 200px">Rincian</th>
                 <th style="min-width: 90px">Pembayaran</th>
                 <th class="text-end" style="min-width: 80px">Ongkos</th>
@@ -281,10 +291,21 @@
                 >
                   {{ getItemNama(item) }}
                 </td>
-                <td class="align-middle">{{ getItemBerat(item) }}</td>
-                <td class="align-middle">{{ getItemKarat(item) }}</td>
-                <td class="align-middle">
-                  <span class="badge bg-light text-dark border">
+                <td class="align-middle servis-truncate-cell">
+                  <span class="d-inline-block text-truncate servis-truncate-value" :title="getItemBerat(item)">
+                    {{ getItemBerat(item) }}
+                  </span>
+                </td>
+                <td class="align-middle servis-truncate-cell">
+                  <span class="d-inline-block text-truncate servis-truncate-value" :title="getItemKarat(item)">
+                    {{ getItemKarat(item) }}
+                  </span>
+                </td>
+                <td class="align-middle servis-truncate-cell">
+                  <span
+                    class="badge bg-light text-dark border text-truncate servis-jenis-badge"
+                    :title="item.jenisInput === 'custom' ? 'CUSTOM' : getItemJenisServis(item)"
+                  >
                     {{ item.jenisInput === "custom" ? "CUSTOM" : getItemJenisServis(item) }}
                   </span>
                 </td>
@@ -900,12 +921,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { Modal } from "bootstrap";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
+import { useAuthStore } from "@/stores/auth";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import {
   fetchServisByRange,
   subscribeServisByRange,
   updateServisStatus,
   bulkMarkServisSelesai,
+  bulkMarkServisSudahDiambil,
   updateServisData,
   deleteServis,
   verifySupervisorPassword,
@@ -926,6 +949,7 @@ import {
 
 const { swal, confirm, error: showError } = useAlert();
 const { toWITA, todayStringWITA } = useWITA();
+const authStore = useAuthStore();
 const DEFAULT_DATE = todayStringWITA();
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -941,6 +965,7 @@ const searchReadonly = ref(true);
 const hasLoaded = ref(false);
 const bulkUpdatingStatusServis = ref(false);
 const selectedServisIds = ref([]);
+const isSupervisor = computed(() => authStore.userRole === "supervisor");
 
 // Pagination
 const currentPage = ref(1);
@@ -1202,10 +1227,31 @@ const filteredList = computed(() => {
   return list;
 });
 
-const selectableServisIdSet = computed(
-  () => new Set(filteredList.value.filter((i) => i.statusServis === "Belum Selesai").map((i) => i.id)),
+function isFinishSelectable(item) {
+  return item.statusServis === "Belum Selesai";
+}
+
+function isPickupSelectable(item) {
+  return isSupervisor.value && item.statusServis === "Sudah Selesai" && item.statusPengambilan === "Belum Diambil";
+}
+
+function isBulkSelectable(item) {
+  return isFinishSelectable(item) || isPickupSelectable(item);
+}
+
+const selectableServisIdSet = computed(() => new Set(filteredList.value.filter(isBulkSelectable).map((i) => i.id)));
+const selectedServisFinishCount = computed(
+  () =>
+    selectedServisIds.value.filter((id) =>
+      filteredList.value.some((item) => item.id === id && isFinishSelectable(item)),
+    ).length,
 );
-const selectedServisCount = computed(() => selectedServisIds.value.length);
+const selectedServisPickupCount = computed(
+  () =>
+    selectedServisIds.value.filter((id) =>
+      filteredList.value.some((item) => item.id === id && isPickupSelectable(item)),
+    ).length,
+);
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredList.value.length / pageSize)));
 
@@ -1214,9 +1260,7 @@ const paginatedList = computed(() => {
   return filteredList.value.slice(start, start + pageSize);
 });
 
-const currentPageSelectableItems = computed(() =>
-  paginatedList.value.filter((i) => i.statusServis === "Belum Selesai"),
-);
+const currentPageSelectableItems = computed(() => paginatedList.value.filter(isBulkSelectable));
 
 const isCurrentPageFullySelected = computed(() => {
   if (!currentPageSelectableItems.value.length) return false;
@@ -1224,7 +1268,11 @@ const isCurrentPageFullySelected = computed(() => {
 });
 
 const isFinishSelectedDisabled = computed(
-  () => loading.value || !hasLoaded.value || bulkUpdatingStatusServis.value || selectedServisCount.value === 0,
+  () => loading.value || !hasLoaded.value || bulkUpdatingStatusServis.value || selectedServisFinishCount.value === 0,
+);
+
+const isMarkTakenSelectedDisabled = computed(
+  () => loading.value || !hasLoaded.value || bulkUpdatingStatusServis.value || selectedServisPickupCount.value === 0,
 );
 
 const visiblePages = computed(() => {
@@ -1248,7 +1296,7 @@ function unlockSearchInput() {
 }
 
 function isItemSelectable(item) {
-  return item.statusServis === "Belum Selesai";
+  return isBulkSelectable(item);
 }
 
 function isItemSelected(id) {
@@ -1316,7 +1364,9 @@ async function loadData() {
 
 // ── Bulk Status Servis ───────────────────────────────────────────────────
 async function updateSelectedServisSelesai() {
-  const targetIds = selectedServisIds.value.filter((id) => selectableServisIdSet.value.has(id));
+  const targetIds = selectedServisIds.value.filter((id) =>
+    filteredList.value.some((item) => item.id === id && isFinishSelectable(item)),
+  );
   if (!targetIds.length) {
     return swal("Pilih data yang ingin diselesaikan terlebih dahulu", "warning");
   }
@@ -1341,6 +1391,43 @@ async function updateSelectedServisSelesai() {
     if (!isToday()) await loadData();
   } catch (e) {
     showError("Gagal update massal status servis", e.message);
+  } finally {
+    bulkUpdatingStatusServis.value = false;
+  }
+}
+
+async function updateSelectedServisSudahDiambil() {
+  if (!isSupervisor.value) {
+    return swal("Aksi ini hanya untuk supervisor", "warning");
+  }
+
+  const targetIds = selectedServisIds.value.filter((id) =>
+    filteredList.value.some((item) => item.id === id && isPickupSelectable(item)),
+  );
+  if (!targetIds.length) {
+    return swal("Pilih data yang sudah selesai dan belum diambil terlebih dahulu", "warning");
+  }
+
+  const result = await confirm({
+    title: "Tandai data terpilih sebagai sudah diambil?",
+    text:
+      `${targetIds.length} data yang dicentang akan diubah ke status pengambilan 'Sudah Diambil'. ` +
+      "Waktu pengambilan akan diisi otomatis.",
+    confirmText: "Ya, tandai sudah diambil",
+  });
+  if (!result.isConfirmed) return;
+
+  bulkUpdatingStatusServis.value = true;
+  try {
+    const updatedCount = await bulkMarkServisSudahDiambil(targetIds);
+    selectedServisIds.value = [];
+    invalidateCurrentRangeCache();
+    swal(`${updatedCount} data terpilih berhasil diubah ke status 'Sudah Diambil'`);
+
+    // For non-today date, fetch again because this view is not real-time.
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("Gagal update massal status pengambilan", e.message);
   } finally {
     bulkUpdatingStatusServis.value = false;
   }
@@ -1901,7 +1988,7 @@ watch([filterStartDate, filterEndDate], () => {
 });
 
 watch(filteredList, (list) => {
-  const allowed = new Set(list.filter((item) => item.statusServis === "Belum Selesai").map((item) => item.id));
+  const allowed = new Set(list.filter(isBulkSelectable).map((item) => item.id));
   selectedServisIds.value = selectedServisIds.value.filter((id) => allowed.has(id));
 });
 
@@ -1928,6 +2015,25 @@ onUnmounted(() => {
 .table th,
 .table td {
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+.servis-truncate-cell {
+  max-width: 1px;
+}
+
+.servis-truncate-value {
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.servis-jenis-badge {
+  display: inline-block;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   vertical-align: middle;
 }
 
