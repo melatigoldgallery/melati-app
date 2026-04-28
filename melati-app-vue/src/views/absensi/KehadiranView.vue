@@ -566,6 +566,52 @@ function getNotificationSpeechText(type, staffName = "", customText = "") {
   }
 }
 
+function mapErrorMessageToSpeech(message) {
+  const text = String(message || "")
+    .trim()
+    .toLowerCase();
+  if (!text) return "Terjadi kesalahan sistem";
+
+  if (text.includes("tidak sesuai shift")) {
+    return "Shift tidak sesuai, pilih shift yang benar";
+  }
+  if (text.includes("bukan untuk tanggal hari ini")) {
+    return "Kode bukan untuk hari ini";
+  }
+  if (text.includes("bukan untuk staf tersebut")) {
+    return "Kode bukan untuk staf ini";
+  }
+  if (text.includes("sudah digunakan oleh") || text.includes("kode sudah digunakan")) {
+    return "Kode sudah digunakan";
+  }
+  if (text.includes("kode verifikasi tidak ditemukan")) {
+    return "Kode verifikasi salah";
+  }
+  if (text.includes("kode verifikasi sudah dinonaktifkan")) {
+    return "Kode verifikasi sudah dinonaktifkan";
+  }
+  if (text.includes("masukkan kode verifikasi dari hrd")) {
+    return "Kode verifikasi belum diisi";
+  }
+  if (text.includes("id/barcode tidak terdaftar") || text.includes("barcode tidak terdaftar")) {
+    return "Barcode tidak terdaftar";
+  }
+  if (text.includes("verifikasi wajah dibatalkan atau gagal") || text.includes("verifikasi wajah gagal")) {
+    return "Verifikasi wajah gagal";
+  }
+  if (text.includes("belum absen masuk")) {
+    return "Belum absen masuk";
+  }
+  if (text.includes("sudah absen masuk")) {
+    return "Sudah absen masuk";
+  }
+  if (text.includes("sudah absen pulang")) {
+    return "Sudah absen pulang";
+  }
+
+  return "Terjadi kesalahan sistem";
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -1452,7 +1498,9 @@ async function submitBarcode({ source = "manual" } = {}) {
 
   // Validate late permission code when required
   if (scanType.value === "latepermission" && !latePermissionCode.value.trim()) {
-    showScanResult("error", "Input Tidak Lengkap", "Masukkan kode verifikasi dari HRD terlebih dahulu.");
+    const errorMessage = "Masukkan kode verifikasi dari HRD terlebih dahulu.";
+    showScanResult("error", "Input Tidak Lengkap", errorMessage);
+    playAttendanceNotification("error", "", mapErrorMessageToSpeech(errorMessage));
     return;
   }
 
@@ -1462,8 +1510,9 @@ async function submitBarcode({ source = "manual" } = {}) {
   try {
     const employee = await findEmployeeByCode(code);
     if (!employee) {
-      showScanResult("error", "Tidak Ditemukan", "ID/barcode tidak terdaftar dalam sistem.");
-      playAttendanceNotification("not-found");
+      const errorMessage = "ID/barcode tidak terdaftar dalam sistem.";
+      showScanResult("error", "Tidak Ditemukan", errorMessage);
+      playAttendanceNotification("error", "", mapErrorMessageToSpeech(errorMessage));
       return;
     }
 
@@ -1471,16 +1520,18 @@ async function submitBarcode({ source = "manual" } = {}) {
       const descriptorPrefetchPromise = getEmployeeFaceDescriptor(employee);
       const verified = await verifyFaceForEmployee(employee, descriptorPrefetchPromise);
       if (!verified) {
-        showScanResult("error", employee.name, "Verifikasi wajah dibatalkan atau gagal.");
-        playAttendanceNotification("error", "", "Verifikasi wajah gagal");
+        const errorMessage = "Verifikasi wajah dibatalkan atau gagal.";
+        showScanResult("error", employee.name, errorMessage);
+        playAttendanceNotification("error", "", mapErrorMessageToSpeech(errorMessage));
         return;
       }
     }
 
     await processAttendance(employee, { faceVerified: requiresFace ? true : false });
   } catch (e) {
-    showScanResult("error", "Error", e.message || "Terjadi kesalahan sistem.");
-    playAttendanceNotification("error");
+    const errorMessage = e?.message || "Terjadi kesalahan sistem.";
+    showScanResult("error", "Error", errorMessage);
+    playAttendanceNotification("error", "", mapErrorMessageToSpeech(errorMessage));
   } finally {
     processing.value = false;
     setTimeout(() => barcodeInputRef.value?.focus(), 100);
@@ -1561,8 +1612,9 @@ async function processAttendance(employee, options = {}) {
 
   if (type === "out") {
     if (!existing || !existing.timeIn) {
-      showScanResult("warning", employee.name, "Belum absen masuk. Silakan absen masuk dulu.");
-      playAttendanceNotification("error", "", `${employee.name} belum absen masuk`);
+      const errorMessage = "Belum absen masuk. Silakan absen masuk dulu.";
+      showScanResult("warning", employee.name, errorMessage);
+      playAttendanceNotification("error", "", mapErrorMessageToSpeech(errorMessage));
       return;
     }
     if (existing.timeOut) {
