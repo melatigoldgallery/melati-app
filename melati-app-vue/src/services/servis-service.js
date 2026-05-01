@@ -163,6 +163,13 @@ export async function saveServis(data) {
     updatedAt: Timestamp.now(),
     statusServis: "Belum Selesai",
     statusPengambilan: "Belum Diambil",
+    statusPenerimaanServis: "Belum Diterima",
+    penerimaServis: null,
+    waktuPenerimaan: null,
+    buktiPenerimaanUrl: null,
+    buktiPenerimaanPath: null,
+    buktiPenerimaanLiteUrl: null,
+    buktiPenerimaanLitePath: null,
     stafHandle: null,
     waktuPengambilan: null,
   });
@@ -221,6 +228,52 @@ export async function bulkMarkServisSudahDiambil(ids = []) {
       batch.update(doc(db, "servis", id), {
         statusPengambilan: "Sudah Diambil",
         waktuPengambilan,
+        updatedAt,
+      });
+    });
+
+    await batch.commit();
+    updatedCount += chunk.length;
+  }
+
+  return updatedCount;
+}
+
+export async function bulkMarkServisPenerimaan(ids = [], payload = {}) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (!uniqueIds.length) return 0;
+
+  const chunkSize = 450;
+  let updatedCount = 0;
+
+  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+    const chunk = uniqueIds.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    const updatedAt = Timestamp.now();
+
+    chunk.forEach((id) => {
+      const logRef = doc(collection(db, "servis", id, "penerimaanServis"));
+      batch.set(logRef, {
+        penerima: payload.penerimaServis || null,
+        waktu: payload.waktuPenerimaan || new Date().toISOString(),
+        catatan: payload.catatan || "",
+        buktiUrl: payload.buktiPenerimaanUrl || null,
+        buktiPath: payload.buktiPenerimaanPath || null,
+        buktiLiteUrl: payload.buktiPenerimaanLiteUrl || null,
+        buktiLitePath: payload.buktiPenerimaanLitePath || null,
+        createdBy: payload.createdBy || null,
+        createdAt: Timestamp.now(),
+      });
+
+      batch.update(doc(db, "servis", id), {
+        statusPenerimaanServis: "Sudah Diterima",
+        statusServis: "Sudah Selesai",
+        penerimaServis: payload.penerimaServis || null,
+        waktuPenerimaan: payload.waktuPenerimaan || new Date().toISOString(),
+        buktiPenerimaanUrl: payload.buktiPenerimaanUrl || null,
+        buktiPenerimaanPath: payload.buktiPenerimaanPath || null,
+        buktiPenerimaanLiteUrl: payload.buktiPenerimaanLiteUrl || null,
+        buktiPenerimaanLitePath: payload.buktiPenerimaanLitePath || null,
         updatedAt,
       });
     });
@@ -507,17 +560,33 @@ export async function uploadBuktiPengambilan(file, servisId) {
   return { url, path: storagePath, liteUrl, litePath };
 }
 
-// ── WhatsApp Helper ───────────────────────────────────────────────────────
+export async function uploadBuktiPenerimaanServis(file, servisId) {
+  const timestamp = Date.now();
+  const ext = file.type === "image/png" ? "png" : "jpg";
+  const fileName = `servis_penerimaan_${servisId}_${timestamp}.${ext}`;
+  const year = new Date().getFullYear();
+  const month = String(new Date().getMonth() + 1).padStart(2, "0");
+  const storagePath = `bukti-penerimaan-servis/${year}/${month}/${fileName}`;
+  const sRef = storageRef(storage, storagePath);
+  await uploadBytes(sRef, file, { contentType: file.type || "image/jpeg" });
+  const url = await getDownloadURL(sRef);
 
-export function buildWhatsAppUrl(servis) {
-  const phone = (servis.noHp || "").replace(/\D/g, "").replace(/^0/, "62");
-  if (!phone) return null;
-  const namaBarang = servis.namaBarang || servis.namaCustomer || "-";
-  const message =
-    `Halo Kak ${servis.namaCustomer}, Barang servis Kakak sudah selesai:\n` +
-    `(${namaBarang}) Sudah bisa diambil.\n` +
-    ` Silahkan datang ke Melati Gold Shop untuk mengambil barangnya ya kak. Terima kasih`;
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  let liteUrl;
+  let litePath;
+  try {
+    const liteBlob = await createLiteImageBlob(file);
+    if (liteBlob) {
+      const liteFileName = `servis_penerimaan_${servisId}_${timestamp}_lite.jpg`;
+      litePath = `bukti-penerimaan-servis-lite/${year}/${month}/${liteFileName}`;
+      const liteRef = storageRef(storage, litePath);
+      await uploadBytes(liteRef, liteBlob, { contentType: "image/jpeg" });
+      liteUrl = await getDownloadURL(liteRef);
+    }
+  } catch (e) {
+    console.warn("Upload foto penerimaan lite gagal, lanjut pakai foto asli", e);
+  }
+
+  return { url, path: storagePath, liteUrl, litePath };
 }
 
 // ── Status Helpers ────────────────────────────────────────────────────────
@@ -543,4 +612,8 @@ export function statusPembayaranBadge(value) {
     custom: "bg-warning text-dark",
   };
   return map[value] || "bg-secondary";
+}
+
+export function statusPenerimaanServisBadge(status) {
+  return status === "Sudah Diterima" ? "bg-success" : "bg-secondary";
 }

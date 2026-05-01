@@ -36,6 +36,15 @@ export const PAGE_ACCESS_SECTIONS = [
     ],
   },
   {
+    key: "order-online",
+    label: "Order Online",
+    pages: [
+      { key: "order-online.input", label: "Input Order", route: "/order-online/input" },
+      { key: "order-online.data", label: "Data Order", route: "/order-online/data" },
+      { key: "order-online.laporan", label: "Laporan Order", route: "/order-online/laporan" },
+    ],
+  },
+  {
     key: "aksesoris",
     label: "Aksesoris",
     pages: [
@@ -152,6 +161,9 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "servis.input-servis": "servis.input",
   "servis.data-servis": "servis.data",
   "servis.laporan-servis": "servis.laporan",
+  "order-online.input-order": "order-online.input",
+  "order-online.data-order": "order-online.data",
+  "order-online.laporan-order": "order-online.laporan",
   "promosi.setting-promosi": "promosi.setting",
   "admin.kelola-user": "admin.users",
   "admin.kode-akses": "admin.access-codes",

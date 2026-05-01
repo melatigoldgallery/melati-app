@@ -91,7 +91,7 @@
           :disabled="isFinishSelectedDisabled"
           @click="updateSelectedServisSelesai"
         >
-          <span v-if="bulkUpdatingStatusServis" class="spinner-border spinner-border-sm me-1"></span>
+          <span v-if="penerimaanSaving" class="spinner-border spinner-border-sm me-1"></span>
           <i v-else class="bi bi-check2-square me-1"></i>
           Selesaikan Terpilih ({{ selectedServisFinishCount }})
         </button>
@@ -124,6 +124,15 @@
         </div>
       </div>
       <div class="gap-2 d-flex flex-wrap">
+        <button
+          v-if="hasLoaded"
+          class="btn btn-info btn-sm"
+          @click="openContactTextModal"
+          title="Export teks kontak customer"
+        >
+          <i class="bi bi-clipboard me-1"></i>
+          Export Kontak
+        </button>
         <button v-if="hasLoaded" class="btn btn-danger btn-sm" @click="exportPDF" title="Export PDF sesuai filter">
           <i class="bi bi-file-earmark-pdf me-1"></i>
           Export PDF
@@ -132,6 +141,47 @@
           <i class="bi bi-tags me-1"></i>
           Print Label
         </button>
+      </div>
+    </div>
+
+    <!-- ── Contact Text Modal ── -->
+    <div class="modal fade" id="contactTextModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-clipboard me-1 text-primary"></i>
+              Export Text Kontak Customer
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="small text-muted mb-2">
+              Teks di bawah berisi daftar customer yang sedang difilter. Salin lalu kirim manual ke customer yang
+              sesuai.
+            </p>
+            <textarea
+              ref="contactTextRef"
+              v-model="contactExportText"
+              class="form-control contact-export-text"
+              rows="16"
+              readonly
+            ></textarea>
+          </div>
+          <div class="modal-footer py-2 d-flex justify-content-between flex-wrap gap-2">
+            <div class="small text-muted">{{ contactExportSummary }}</div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" @click="downloadContactText">
+                <i class="bi bi-download me-1"></i>
+                Download TXT
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" @click="copyContactText">
+                <i class="bi bi-clipboard-check me-1"></i>
+                Copy Text
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -181,6 +231,35 @@
               <span v-if="item.namaSales && getItemRincian(item) !== '-'">SALES :</span>
               <span v-if="item.namaSales">{{ item.namaSales }}</span>
             </div>
+            <div v-if="item.waktuDihubungiTerakhir" class="text-muted mb-1 mobile-sales-row">
+              Hubungi: {{ formatWaktu(item.waktuDihubungiTerakhir) }}
+            </div>
+            <div v-if="item.penerimaServis || item.waktuPenerimaan" class="text-muted mb-1 mobile-sales-row">
+              <span>Penerimaan:</span>
+              <span v-if="item.penerimaServis">{{ item.penerimaServis }}</span>
+              <span v-if="item.waktuPenerimaan">| {{ formatWaktu(item.waktuPenerimaan) }}</span>
+              <button
+                v-if="getBuktiPenerimaanUrl(item)"
+                class="btn btn-outline-warning btn-sm py-0 px-1 ms-1"
+                @click="openBuktiModalByUrl(getBuktiPenerimaanUrl(item), 'Bukti Penerimaan')"
+                title="Lihat bukti penerimaan"
+              >
+                <i class="bi bi-camera"></i>
+              </button>
+            </div>
+            <div v-if="item.stafHandle || item.waktuPengambilan" class="text-muted mb-1 mobile-sales-row">
+              <span>Pengambilan:</span>
+              <span v-if="item.stafHandle">{{ item.stafHandle }}</span>
+              <span v-if="item.waktuPengambilan">| {{ formatWaktu(item.waktuPengambilan) }}</span>
+              <button
+                v-if="getBuktiPengambilanUrl(item)"
+                class="btn btn-outline-info btn-sm py-0 px-1 ms-1"
+                @click="openBuktiModalByUrl(getBuktiPengambilanUrl(item), 'Bukti Pengambilan')"
+                title="Lihat bukti pengambilan"
+              >
+                <i class="bi bi-camera"></i>
+              </button>
+            </div>
             <!-- Row 4: badges + ongkos -->
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1 mobile-status-row">
               <div class="d-flex gap-1 flex-wrap">
@@ -208,20 +287,14 @@
                 <button
                   v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
                   class="btn btn-success btn-sm flex-fill"
-                  @click="sendWA(item)"
+                  :disabled="contactingServisId === item.id"
+                  @click="markCustomerContacted(item)"
                 >
-                  <i class="bi bi-whatsapp me-1"></i>
-                  WhatsApp
+                  <span v-if="contactingServisId === item.id" class="spinner-border spinner-border-sm me-1"></span>
+                  <i v-else class="bi bi-telephone-outbound me-1"></i>
+                  Sudah Dihubungi
                 </button>
               </div>
-              <button
-                v-if="item.buktiPengambilanUrl || item.buktiPengambilanLiteUrl"
-                class="btn btn-outline-info btn-sm w-100"
-                @click="openBuktiModal(item)"
-              >
-                <i class="bi bi-eye me-1"></i>
-                Lihat Bukti Pengambilan
-              </button>
             </div>
           </div>
         </div>
@@ -230,7 +303,7 @@
       <!-- Desktop table view -->
       <div class="d-none d-md-block card border-0 shadow-sm">
         <div class="table-responsive">
-          <table class="table table-hover table-sm table-bordered mb-0" style="font-size: 0.8rem">
+          <table class="table table-hover table-sm table-bordered mb-0 desktop-servis-table" style="font-size: 0.8rem">
             <thead class="table-light">
               <tr>
                 <th class="text-center" style="width: 42px">
@@ -246,8 +319,8 @@
                 <th style="width: 38px">No</th>
                 <th style="min-width: 130px">Tanggal/Jam</th>
                 <th style="min-width: 90px">Sales</th>
-                <th style="min-width: 110px">Customer</th>
-                <th style="min-width: 100px">No HP</th>
+                <th class="sticky-col-customer" style="min-width: 110px">Customer</th>
+                <th class="sticky-col-phone" style="min-width: 100px">No HP</th>
                 <th style="min-width: 110px">Nama Barang</th>
                 <th style="width: 72px; min-width: 72px">Berat</th>
                 <th style="width: 72px; min-width: 72px">Kadar</th>
@@ -256,8 +329,8 @@
                 <th style="min-width: 90px">Pembayaran</th>
                 <th class="text-end" style="min-width: 80px">Ongkos</th>
                 <th class="text-center" style="min-width: 100px">Status Servis</th>
-                <th style="min-width: 110px">Handle/Waktu</th>
-                <th class="text-center" style="width: 60px">Bukti</th>
+                <th style="min-width: 140px">Penerimaan Servis</th>
+                <th style="min-width: 110px">Pengambilan Servis</th>
                 <th class="text-center" style="min-width: 140px">Aksi</th>
               </tr>
             </thead>
@@ -282,8 +355,8 @@
                 <td class="text-muted align-middle">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
                 <td class="align-middle">{{ formatTanggalJam(item.tanggal, item.createdAt) }}</td>
                 <td class="align-middle">{{ item.namaSales || "-" }}</td>
-                <td class="align-middle fw-semibold">{{ item.namaCustomer }}</td>
-                <td class="align-middle">{{ item.noHp || "-" }}</td>
+                <td class="align-middle fw-semibold sticky-col-customer">{{ item.namaCustomer }}</td>
+                <td class="align-middle sticky-col-phone">{{ item.noHp || "-" }}</td>
                 <td
                   class="align-middle"
                   style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
@@ -340,23 +413,48 @@
                   </span>
                 </td>
                 <td class="align-middle small">
-                  <div v-if="item.stafHandle">{{ item.stafHandle }}</div>
-                  <div v-if="item.waktuPengambilan" class="text-muted">
-                    {{ formatWaktu(item.waktuPengambilan) }}
+                  <div
+                    v-if="item.penerimaServis || item.waktuPenerimaan || getBuktiPenerimaanUrl(item)"
+                    class="d-flex flex-column gap-1"
+                  >
+                    <div class="d-flex align-items-center justify-content-between">
+                      <span v-if="item.penerimaServis">{{ item.penerimaServis }}</span>
+                      <button
+                        v-if="getBuktiPenerimaanUrl(item)"
+                        class="btn btn-outline-warning btn-sm py-0 px-1"
+                        @click="openBuktiModalByUrl(getBuktiPenerimaanUrl(item), 'Bukti Penerimaan')"
+                        title="Lihat bukti penerimaan"
+                      >
+                        <i class="bi bi-camera"></i>
+                      </button>
+                    </div>
+                    <span v-if="item.waktuPenerimaan" class="text-muted">
+                      {{ formatWaktu(item.waktuPenerimaan) }}
+                    </span>
+                  </div>
+                  <span v-if="!item.penerimaServis && !item.waktuPenerimaan" class="text-muted">-</span>
+                </td>
+                <td class="align-middle small">
+                  <div
+                    v-if="item.stafHandle || item.waktuPengambilan || getBuktiPengambilanUrl(item)"
+                    class="d-flex flex-column gap-1"
+                  >
+                    <div class="d-flex align-items-center justify-content-between">
+                      <span v-if="item.stafHandle">{{ item.stafHandle }}</span>
+                      <button
+                        v-if="getBuktiPengambilanUrl(item)"
+                        class="btn btn-outline-info btn-sm py-0 px-1"
+                        @click="openBuktiModalByUrl(getBuktiPengambilanUrl(item), 'Bukti Pengambilan')"
+                        title="Lihat bukti pengambilan"
+                      >
+                        <i class="bi bi-camera"></i>
+                      </button>
+                    </div>
+                    <span v-if="item.waktuPengambilan" class="text-muted">
+                      {{ formatWaktu(item.waktuPengambilan) }}
+                    </span>
                   </div>
                   <span v-if="!item.stafHandle && !item.waktuPengambilan" class="text-muted">-</span>
-                </td>
-                <td class="text-center align-middle">
-                  <a
-                    v-if="item.buktiPengambilanUrl"
-                    :href="item.buktiPengambilanUrl"
-                    target="_blank"
-                    class="btn btn-outline-info btn-sm py-0 px-1"
-                    title="Lihat bukti"
-                  >
-                    <i class="bi bi-eye"></i>
-                  </a>
-                  <span v-else class="text-muted">-</span>
                 </td>
                 <td class="text-center align-middle">
                   <div class="btn-group btn-group-sm">
@@ -366,10 +464,17 @@
                     <button
                       v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
                       class="btn btn-success"
-                      @click="sendWA(item)"
-                      title="Kirim WhatsApp"
+                      :disabled="contactingServisId === item.id"
+                      @click="markCustomerContacted(item)"
+                      title="Tandai sudah dihubungi"
                     >
-                      <i class="bi bi-whatsapp"></i>
+                      <span
+                        v-if="contactingServisId === item.id"
+                        class="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      <i v-else class="bi bi-telephone-outbound"></i>
                     </button>
                     <button
                       class="btn btn-primary"
@@ -452,10 +557,12 @@
             </p>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Status Servis</label>
-              <select v-model="statusForm.statusServis" class="form-select form-select-sm">
-                <option value="Belum Selesai">Belum Selesai</option>
-                <option value="Sudah Selesai">Sudah Selesai</option>
-              </select>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge" :class="statusServisBadge(statusForm.statusServis)">
+                  {{ statusForm.statusServis || "-" }}
+                </span>
+                <small class="text-muted">Ubah status servis lewat "Selesaikan Terpilih" (butuh foto).</small>
+              </div>
             </div>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Status Pengambilan</label>
@@ -519,6 +626,107 @@
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
             <button class="btn btn-warning btn-sm" @click="saveStatus" :disabled="isStatusSaveDisabled">
               <span v-if="statusSaving" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-save me-1"></i>
+              Simpan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Revert Pengambilan Verify Modal ── -->
+    <div class="modal fade" id="revertPickupModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-md">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-shield-lock me-1 text-primary"></i>
+              Verifikasi Ubah Status Pengambilan
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="small text-muted mb-2">
+              Masukkan password untuk mengubah status dari
+              <strong>Sudah Diambil</strong>
+              ke
+              <strong>Belum Diambil</strong>
+              .
+            </p>
+            <input
+              v-model="revertPassword"
+              type="password"
+              name="supervisorRevertPassword"
+              autocomplete="new-password"
+              class="form-control form-control-sm"
+              placeholder="Password supervisor"
+              @keydown.enter="confirmRevertPickup"
+            />
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button class="btn btn-primary btn-sm" @click="confirmRevertPickup" :disabled="revertVerifying">
+              <span v-if="revertVerifying" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-unlock me-1"></i>
+              Verifikasi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Penerimaan Servis Modal ── -->
+    <div class="modal fade" id="penerimaanModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-clipboard-check me-1 text-warning"></i>
+              Penerimaan Servis
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Nama Penerima</label>
+              <input
+                v-model="penerimaanForm.penerima"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Nama staff"
+              />
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">
+                Bukti Penerimaan
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                ref="penerimaanInputRef"
+                type="file"
+                accept="image/*"
+                class="form-control form-control-sm"
+                @change="onPenerimaanPhotoChange"
+              />
+              <div v-if="!hasPenerimaanPhoto" class="small text-danger mt-1">Upload foto bukti sebelum menyimpan.</div>
+              <div v-if="penerimaanPhotoPreviewUrl" class="mt-2">
+                <img
+                  :src="penerimaanPhotoPreviewUrl"
+                  alt="Preview"
+                  class="img-fluid rounded border"
+                  style="max-height: 200px; object-fit: contain"
+                />
+                <button type="button" class="btn btn-outline-danger btn-sm mt-1 d-block" @click="clearPenerimaanPhoto">
+                  <i class="bi bi-x-circle me-1"></i>
+                  Hapus foto
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button class="btn btn-warning btn-sm" @click="savePenerimaanServis" :disabled="isPenerimaanSaveDisabled">
+              <span v-if="penerimaanSaving" class="spinner-border spinner-border-sm me-1"></span>
               <i v-else class="bi bi-save me-1"></i>
               Simpan
             </button>
@@ -889,7 +1097,7 @@
           <div class="modal-header py-2">
             <h6 class="modal-title fw-semibold">
               <i class="bi bi-image me-1"></i>
-              Bukti Pengambilan
+              {{ buktiViewTitle }}
             </h6>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
@@ -927,14 +1135,14 @@ import {
   fetchServisByRange,
   subscribeServisByRange,
   updateServisStatus,
-  bulkMarkServisSelesai,
   bulkMarkServisSudahDiambil,
+  bulkMarkServisPenerimaan,
   updateServisData,
   deleteServis,
   verifySupervisorPassword,
   printServisSlip,
   uploadBuktiPengambilan,
-  buildWhatsAppUrl,
+  uploadBuktiPenerimaanServis,
   getCachedServis,
   setCachedServis,
   invalidateCachedServis,
@@ -966,6 +1174,7 @@ const hasLoaded = ref(false);
 const bulkUpdatingStatusServis = ref(false);
 const selectedServisIds = ref([]);
 const isSupervisor = computed(() => authStore.userRole === "supervisor");
+const canReceiveServis = computed(() => ["kasir", "supervisor"].includes(authStore.userRole));
 
 // Pagination
 const currentPage = ref(1);
@@ -978,6 +1187,10 @@ const statusSaving = ref(false);
 const photoInputRef = ref(null);
 const photoFile = ref(null);
 const photoPreviewUrl = ref("");
+const revertPassword = ref("");
+const revertVerifying = ref(false);
+const allowRevertWithoutPassword = ref(false);
+const pendingReopenStatusModal = ref(false);
 const statusForm = ref({
   id: "",
   namaCustomer: "",
@@ -1004,6 +1217,26 @@ const isStatusSaveDisabled = computed(
     statusSaving.value ||
     (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value) ||
     isLunasRequiredButUnselected.value,
+);
+
+// Penerimaan servis modal
+const penerimaanSaving = ref(false);
+const penerimaanInputRef = ref(null);
+const penerimaanPhotoFile = ref(null);
+const penerimaanPhotoPreviewUrl = ref("");
+const penerimaanTargetIds = ref([]);
+const penerimaanForm = ref({
+  penerima: "",
+  catatan: "",
+});
+
+const hasPenerimaanPhoto = computed(() => Boolean(penerimaanPhotoFile.value));
+const isPenerimaanSaveDisabled = computed(
+  () =>
+    penerimaanSaving.value ||
+    !penerimaanForm.value.penerima?.trim() ||
+    !hasPenerimaanPhoto.value ||
+    !penerimaanTargetIds.value.length,
 );
 
 // Edit modal
@@ -1057,10 +1290,18 @@ const deleteSaving = ref(false);
 
 // Bukti viewer
 const buktiViewUrl = ref("");
+const buktiViewTitle = ref("Bukti Foto");
 const showPrintFailedModal = ref(false);
 const printFailedMessage = ref("Pastikan printing service sudah dijalankan di komputer ini.");
 const failedPrintItem = ref(null);
 const printingServisId = ref("");
+const contactingServisId = ref("");
+const contactTextRef = ref(null);
+const contactExportText = ref("");
+
+const contactExportSummary = computed(() => {
+  return `${filteredList.value.length} data | ${filteredList.value.filter((item) => item.noHp).length} nomor HP tersedia`;
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function getItems(item) {
@@ -1114,6 +1355,92 @@ function getItemOngkos(item) {
   const items = getItems(item);
   if (!items.length) return item.ongkos || 0;
   return items.reduce((sum, i) => sum + Number(i.ongkos || 0), 0);
+}
+
+function normalizePhoneForDisplay(phone) {
+  const cleaned = String(phone || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "-";
+}
+
+function getContactMessage(item) {
+  const namaCustomer = item?.namaCustomer || "Kak";
+  const namaBarang = getItemNama(item) || "-";
+  const isCustom = (item?.jenisInput || "servis") === "custom";
+  const jenisLabel = isCustom ? "CUSTOM" : getItemJenisServis(item) || "SERVIS";
+  const barangLabel = isCustom ? "Barang custom" : "Barang servis";
+
+  return (
+    `Halo Kak ${namaCustomer},\n` +
+    `${barangLabel} Kakak sudah selesai.\n` +
+    `(${namaBarang})\n` +
+    `Jenis: ${jenisLabel}\n` +
+    `Silahkan datang ke Melati Gold Shop untuk mengambil barangnya ya kak. Terima kasih`
+  );
+}
+
+function buildContactExportText() {
+  const items = filteredList.value;
+  if (!items.length) return "Tidak ada data servis untuk diekspor.";
+
+  const lines = [];
+  items.forEach((item, index) => {
+    lines.push(`Data ${index + 1}`);
+    lines.push(`Customer: ${item.namaCustomer || "-"}`);
+    lines.push(`No HP: ${normalizePhoneForDisplay(item.noHp)}`);
+    lines.push("Pesan:");
+    lines.push(getContactMessage(item));
+    if (item.waktuDihubungiTerakhir) {
+      lines.push(`Terakhir dihubungi: ${formatWaktu(item.waktuDihubungiTerakhir)}`);
+    }
+    if (index < items.length - 1) lines.push("");
+  });
+
+  return lines.join("\n");
+}
+
+function refreshContactExportText() {
+  contactExportText.value = buildContactExportText();
+}
+
+function openContactTextModal() {
+  refreshContactExportText();
+  Modal.getOrCreateInstance(document.getElementById("contactTextModal")).show();
+}
+
+async function copyContactText() {
+  const text = contactExportText.value || buildContactExportText();
+  if (!text.trim()) return swal("Tidak ada teks untuk disalin", "warning");
+
+  try {
+    await navigator.clipboard.writeText(text);
+    swal("Teks kontak berhasil disalin", "success");
+  } catch {
+    const textarea = contactTextRef.value;
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand("copy");
+      if (copied) return swal("Teks kontak berhasil disalin", "success");
+    }
+    swal("Gagal menyalin teks. Silakan salin manual dari kotak teks.", "warning");
+  }
+}
+
+function downloadContactText() {
+  const text = contactExportText.value || buildContactExportText();
+  if (!text.trim()) return swal("Tidak ada teks untuk diunduh", "warning");
+
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Teks_Kontak_${getDateRangeFileSuffix()}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function formatTanggal(val) {
@@ -1228,11 +1555,17 @@ const filteredList = computed(() => {
 });
 
 function isFinishSelectable(item) {
-  return item.statusServis === "Belum Selesai";
+  return canReceiveServis.value && item.statusServis === "Belum Selesai";
 }
 
 function isPickupSelectable(item) {
-  return isSupervisor.value && item.statusServis === "Sudah Selesai" && item.statusPengambilan === "Belum Diambil";
+  const penerimaanStatus = item.statusPenerimaanServis || "Belum Diterima";
+  return (
+    isSupervisor.value &&
+    item.statusServis === "Sudah Selesai" &&
+    item.statusPengambilan === "Belum Diambil" &&
+    penerimaanStatus === "Sudah Diterima"
+  );
 }
 
 function isBulkSelectable(item) {
@@ -1268,7 +1601,12 @@ const isCurrentPageFullySelected = computed(() => {
 });
 
 const isFinishSelectedDisabled = computed(
-  () => loading.value || !hasLoaded.value || bulkUpdatingStatusServis.value || selectedServisFinishCount.value === 0,
+  () =>
+    loading.value ||
+    !hasLoaded.value ||
+    bulkUpdatingStatusServis.value ||
+    selectedServisFinishCount.value === 0 ||
+    !canReceiveServis.value,
 );
 
 const isMarkTakenSelectedDisabled = computed(
@@ -1364,6 +1702,10 @@ async function loadData() {
 
 // ── Bulk Status Servis ───────────────────────────────────────────────────
 async function updateSelectedServisSelesai() {
+  if (!canReceiveServis.value) {
+    return swal("Aksi ini hanya untuk kasir atau supervisor", "warning");
+  }
+
   const targetIds = selectedServisIds.value.filter((id) =>
     filteredList.value.some((item) => item.id === id && isFinishSelectable(item)),
   );
@@ -1371,29 +1713,7 @@ async function updateSelectedServisSelesai() {
     return swal("Pilih data yang ingin diselesaikan terlebih dahulu", "warning");
   }
 
-  const result = await confirm({
-    title: "Selesaikan data terpilih?",
-    text:
-      `${targetIds.length} data yang dicentang akan diubah ke status servis 'Sudah Selesai'. ` +
-      "Status pengambilan tetap tidak diubah.",
-    confirmText: "Ya, selesaikan terpilih",
-  });
-  if (!result.isConfirmed) return;
-
-  bulkUpdatingStatusServis.value = true;
-  try {
-    const updatedCount = await bulkMarkServisSelesai(targetIds);
-    selectedServisIds.value = [];
-    invalidateCurrentRangeCache();
-    swal(`${updatedCount} data terpilih berhasil diubah ke status 'Sudah Selesai'`);
-
-    // For non-today date, fetch again because this view is not real-time.
-    if (!isToday()) await loadData();
-  } catch (e) {
-    showError("Gagal update massal status servis", e.message);
-  } finally {
-    bulkUpdatingStatusServis.value = false;
-  }
+  openPenerimaanModal(targetIds);
 }
 
 async function updateSelectedServisSudahDiambil() {
@@ -1529,11 +1849,111 @@ function clearPhoto() {
   if (photoInputRef.value) photoInputRef.value.value = "";
 }
 
+function getCurrentUserName() {
+  return authStore.userDisplayName || authStore.userName || authStore.userEmail || "";
+}
+
+function openPenerimaanModal(ids = []) {
+  if (!ids.length) return;
+  penerimaanTargetIds.value = ids;
+  penerimaanForm.value = {
+    penerima: getCurrentUserName(),
+    catatan: "",
+  };
+  penerimaanPhotoFile.value = null;
+  if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
+  penerimaanPhotoPreviewUrl.value = "";
+  if (penerimaanInputRef.value) penerimaanInputRef.value.value = "";
+  Modal.getOrCreateInstance(document.getElementById("penerimaanModal")).show();
+}
+
+async function onPenerimaanPhotoChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    swal("File harus berupa gambar", "warning");
+    e.target.value = "";
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    swal("Ukuran file maksimal 10MB", "warning");
+    e.target.value = "";
+    return;
+  }
+
+  try {
+    const compressedFile = await compressImageFile(file);
+    penerimaanPhotoFile.value = compressedFile;
+    if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
+    penerimaanPhotoPreviewUrl.value = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    swal("Gagal memproses gambar. Coba pilih ulang.", "warning");
+    e.target.value = "";
+  }
+}
+
+function clearPenerimaanPhoto() {
+  if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
+  penerimaanPhotoFile.value = null;
+  penerimaanPhotoPreviewUrl.value = "";
+  if (penerimaanInputRef.value) penerimaanInputRef.value.value = "";
+}
+
+async function savePenerimaanServis() {
+  if (!penerimaanTargetIds.value.length) return;
+  if (!penerimaanForm.value.penerima?.trim()) return swal("Nama penerima wajib diisi", "warning");
+  if (!penerimaanPhotoFile.value) return swal("Upload foto bukti terlebih dahulu", "warning");
+
+  penerimaanSaving.value = true;
+  try {
+    const targetId = penerimaanTargetIds.value[0];
+    const waktuPenerimaan = new Date().toISOString();
+    const { url, path, liteUrl, litePath } = await uploadBuktiPenerimaanServis(penerimaanPhotoFile.value, targetId);
+
+    const payload = {
+      penerimaServis: penerimaanForm.value.penerima.trim(),
+      waktuPenerimaan,
+      buktiPenerimaanUrl: url,
+      buktiPenerimaanPath: path,
+      buktiPenerimaanLiteUrl: liteUrl,
+      buktiPenerimaanLitePath: litePath,
+      catatan: penerimaanForm.value.catatan?.trim() || "",
+      createdBy: getCurrentUserName(),
+    };
+
+    const updatedCount = await bulkMarkServisPenerimaan(penerimaanTargetIds.value, payload);
+    selectedServisIds.value = [];
+    invalidateCurrentRangeCache();
+    Modal.getInstance(document.getElementById("penerimaanModal"))?.hide();
+    swal(`${updatedCount} data servis berhasil diterima`);
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("Gagal menyimpan penerimaan servis", e.message);
+  } finally {
+    penerimaanSaving.value = false;
+  }
+}
+
 async function saveStatus() {
   const targetItem = statusTargetItem.value;
 
+  const isRevertToNotTaken =
+    targetItem?.statusPengambilan === "Sudah Diambil" && statusForm.value.statusPengambilan === "Belum Diambil";
+  if (isRevertToNotTaken && !allowRevertWithoutPassword.value) {
+    revertPassword.value = "";
+    openRevertPickupModal();
+    return;
+  }
+
   if (targetItem?.statusServis === "Belum Selesai" && statusForm.value.statusServis === "Belum Selesai") {
     return swal("Data tidak bisa disimpan jika status belum selesai", "warning");
+  }
+
+  if (
+    statusForm.value.statusServis === "Sudah Selesai" &&
+    (targetItem?.statusPenerimaanServis || "Belum Diterima") !== "Sudah Diterima"
+  ) {
+    return swal("Penerimaan servis wajib sebelum status menjadi Sudah Selesai", "warning");
   }
 
   if (statusForm.value.statusPengambilan === "Sudah Diambil" && !hasPhotoEvidence.value) {
@@ -1596,7 +2016,43 @@ async function saveStatus() {
     showError("Gagal memperbarui status", e.message);
   } finally {
     statusSaving.value = false;
+    allowRevertWithoutPassword.value = false;
     statusTargetItem.value = null;
+  }
+}
+
+function openRevertPickupModal() {
+  const revertModalEl = document.getElementById("revertPickupModal");
+  const statusModalEl = document.getElementById("statusModal");
+  if (!revertModalEl) return;
+  if (!statusModalEl) {
+    Modal.getOrCreateInstance(revertModalEl).show();
+    return;
+  }
+
+  pendingReopenStatusModal.value = true;
+  const statusModal = Modal.getOrCreateInstance(statusModalEl);
+  const showRevertModal = () => {
+    Modal.getOrCreateInstance(revertModalEl).show();
+  };
+
+  statusModalEl.addEventListener("hidden.bs.modal", showRevertModal, { once: true });
+  statusModal.hide();
+}
+
+async function confirmRevertPickup() {
+  if (!revertPassword.value) return swal("Password wajib diisi", "warning");
+  revertVerifying.value = true;
+  try {
+    await verifySupervisorPassword(revertPassword.value);
+    pendingReopenStatusModal.value = false;
+    allowRevertWithoutPassword.value = true;
+    Modal.getInstance(document.getElementById("revertPickupModal"))?.hide();
+    await saveStatus();
+  } catch (e) {
+    showError("Verifikasi gagal", e.message);
+  } finally {
+    revertVerifying.value = false;
   }
 }
 
@@ -1695,19 +2151,58 @@ async function doDelete() {
 }
 
 // ── WA & Print ────────────────────────────────────────────────────────────
-function sendWA(item) {
-  const url = buildWhatsAppUrl(item);
-  if (url) window.open(url, "_blank");
-  else swal("Nomor HP tidak tersedia", "warning");
+async function markCustomerContacted(item) {
+  if (!item?.id) return;
+  if (!item.noHp) return swal("Nomor HP tidak tersedia", "warning");
+  if (contactingServisId.value) return;
+
+  const result = await confirm({
+    title: "Customer sudah dihubungi?",
+    text:
+      `Klik YA jika customer ${item.namaCustomer || "-"} sudah Anda hubungi secara manual. ` +
+      "Sistem akan menyimpan waktu kontak terakhir.",
+    confirmText: "Ya, sudah dihubungi",
+  });
+  if (!result.isConfirmed) return;
+
+  contactingServisId.value = item.id;
+  try {
+    await updateServisStatus(item.id, {
+      waktuDihubungiTerakhir: new Date().toISOString(),
+      metodeKontakTerakhir: "manual",
+      dihubungiOleh: authStore.userDisplayName || authStore.userName || authStore.userEmail || "staf",
+    });
+    invalidateCurrentRangeCache();
+    swal("Waktu kontak terakhir berhasil disimpan", "success");
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("Gagal menyimpan status kontak", e.message);
+  } finally {
+    contactingServisId.value = "";
+  }
 }
 
 function openBuktiModal(item) {
-  const url = item?.buktiPengambilanLiteUrl || item?.buktiPengambilanUrl || "";
+  const url = getBuktiPengambilanUrl(item);
   if (!url) {
     swal("Bukti pengambilan belum tersedia", "warning");
     return;
   }
+  openBuktiModalByUrl(url, "Bukti Pengambilan");
+}
+
+function getBuktiPengambilanUrl(item) {
+  return item?.buktiPengambilanLiteUrl || item?.buktiPengambilanUrl || "";
+}
+
+function getBuktiPenerimaanUrl(item) {
+  return item?.buktiPenerimaanLiteUrl || item?.buktiPenerimaanUrl || "";
+}
+
+function openBuktiModalByUrl(url, title = "Bukti Foto") {
+  if (!url) return;
   buktiViewUrl.value = url;
+  buktiViewTitle.value = title;
   Modal.getOrCreateInstance(document.getElementById("buktiModal")).show();
 }
 
@@ -1996,13 +2491,32 @@ onMounted(() => {
   // Hindari browser password manager mengisi field pencarian dengan username tersimpan.
   searchText.value = "";
   window.addEventListener("storage", handleStorageSync);
+
+  const revertModalEl = document.getElementById("revertPickupModal");
+  if (revertModalEl) {
+    revertModalEl.addEventListener("hidden.bs.modal", handleRevertModalHidden);
+  }
 });
 
 onUnmounted(() => {
   cleanupListener();
   if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
+  if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
   window.removeEventListener("storage", handleStorageSync);
+
+  const revertModalEl = document.getElementById("revertPickupModal");
+  if (revertModalEl) {
+    revertModalEl.removeEventListener("hidden.bs.modal", handleRevertModalHidden);
+  }
 });
+
+function handleRevertModalHidden() {
+  if (pendingReopenStatusModal.value && !allowRevertWithoutPassword.value) {
+    Modal.getOrCreateInstance(document.getElementById("statusModal")).show();
+  }
+  pendingReopenStatusModal.value = false;
+  revertPassword.value = "";
+}
 </script>
 
 <style scoped>
@@ -2016,6 +2530,57 @@ onUnmounted(() => {
 .table td {
   white-space: nowrap;
   vertical-align: middle;
+}
+
+.desktop-servis-table {
+  --sticky-customer-left: 0px;
+  --sticky-customer-width: 150px;
+  --sticky-phone-width: 120px;
+  --sticky-body-bg: #ffffff;
+  --sticky-head-bg: #f8f9fa;
+  --sticky-hover-bg: #f2f3f5;
+}
+
+.desktop-servis-table .sticky-col-customer,
+.desktop-servis-table .sticky-col-phone {
+  position: sticky;
+  background-color: var(--sticky-body-bg);
+  background-image: none;
+  background-clip: padding-box;
+}
+
+.desktop-servis-table .sticky-col-customer {
+  left: var(--sticky-customer-left);
+  min-width: var(--sticky-customer-width);
+  width: var(--sticky-customer-width);
+  z-index: 3;
+}
+
+.desktop-servis-table .sticky-col-phone {
+  left: calc(var(--sticky-customer-left) + var(--sticky-customer-width));
+  min-width: var(--sticky-phone-width);
+  width: var(--sticky-phone-width);
+  z-index: 4;
+  box-shadow: 2px 0 0 rgba(0, 0, 0, 0.06);
+}
+
+.desktop-servis-table thead .sticky-col-customer,
+.desktop-servis-table thead .sticky-col-phone {
+  background-color: var(--sticky-head-bg);
+  z-index: 6;
+}
+
+.desktop-servis-table tbody tr:hover .sticky-col-customer,
+.desktop-servis-table tbody tr:hover .sticky-col-phone {
+  background-color: var(--sticky-hover-bg);
+}
+
+.contact-export-text {
+  min-height: 360px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  background: #ffffff;
 }
 
 .servis-truncate-cell {

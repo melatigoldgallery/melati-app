@@ -54,6 +54,21 @@ export const menuStructure = [
     ],
   },
   {
+    label: "Order Online",
+    icon: "bi-bag-check",
+    roles: ALL,
+    children: [
+      { label: "Input Order", to: "/order-online/input", pageKey: "order-online.input", roles: ALL },
+      { label: "Data Order", to: "/order-online/data", pageKey: "order-online.data", roles: ALL },
+      {
+        label: "Laporan Order",
+        to: "/order-online/laporan",
+        pageKey: "order-online.laporan",
+        roles: ALL,
+      },
+    ],
+  },
+  {
     label: "Aksesoris",
     icon: "bi-gem",
     roles: ALL,

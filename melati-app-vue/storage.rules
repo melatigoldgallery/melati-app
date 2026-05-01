@@ -52,6 +52,18 @@ service firebase.storage {
       allow delete: if isAuthenticated();
     }
 
+    // Rules for order online proof uploads
+    // Path structure: order-online/proof/{orderNo}/{docId}/{timestamp}-{fileName}
+    match /order-online/proof/{orderNo}/{docId}/{fileName} {
+      allow read: if isAuthenticated();
+
+      allow write: if isAuthenticated()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+
+      allow delete: if isAuthenticated();
+    }
+
     // Rules for promotions folder (admin promosi uploads)
     // Path structure: promotions/{year}/{month}/{contentType}/{fileName}
     match /promotions/{year}/{month}/{contentType}/{fileName} {

@@ -24,6 +24,11 @@ const InputServisView = () => import("@/views/servis/InputServisView.vue");
 const DataServisView = () => import("@/views/servis/DataServisView.vue");
 const LaporanServisView = () => import("@/views/servis/LaporanServisView.vue");
 
+// Order Online
+const InputOrderView = () => import("@/views/order-online/InputOrderView.vue");
+const DataOrderView = () => import("@/views/order-online/DataOrderView.vue");
+const LaporanOrderView = () => import("@/views/order-online/LaporanOrderView.vue");
+
 // Aksesoris
 const PenjualanView = () => import("@/views/aksesoris/PenjualanView.vue");
 const DataPenjualanView = () => import("@/views/aksesoris/DataPenjualanView.vue");
@@ -113,6 +118,19 @@ const routes = [
     path: "/servis/laporan",
     component: LaporanServisView,
     meta: { requiresAuth: true, pageKey: "servis.laporan" },
+  },
+
+  // Order Online
+  {
+    path: "/order-online/input",
+    component: InputOrderView,
+    meta: { requiresAuth: true, pageKey: "order-online.input" },
+  },
+  { path: "/order-online/data", component: DataOrderView, meta: { requiresAuth: true, pageKey: "order-online.data" } },
+  {
+    path: "/order-online/laporan",
+    component: LaporanOrderView,
+    meta: { requiresAuth: true, pageKey: "order-online.laporan" },
   },
 
   // Aksesoris
