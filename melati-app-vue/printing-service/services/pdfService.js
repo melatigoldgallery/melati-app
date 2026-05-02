@@ -316,6 +316,247 @@ class PDFService {
   }
 
   /**
+   * Generate a QR code as PNG data URL using bwip-js
+   * @param {string} value
+   * @param {number} scale
+   * @returns {Promise<string>}
+   */
+  async generateQRDataUrl(value, scale = 4) {
+    if (!value) return "";
+    try {
+      const pngBuffer = await bwipjs.toBuffer({
+        bcid: "qrcode",
+        text: String(value),
+        scale: scale, // pixels per module
+        includetext: false,
+        paddingwidth: 0,
+        paddingheight: 0,
+      });
+
+      return `data:image/png;base64,${pngBuffer.toString("base64")}`;
+    } catch (error) {
+      logger.warn(`Failed to generate QR for value '${value}': ${error.message}`);
+      return "";
+    }
+  }
+
+  /**
+   * Generate PDF containing one or more QR label pages sized by centimeters
+   * @param {Object} data - { widthCm, heightCm, labels: [ { kode, nama, kadar, berat, qty } ] }
+   * @returns {Promise<string>} path to generated PDF
+   */
+  async generateLabelPDF(data) {
+    if (this.isProcessing) {
+      return new Promise((resolve, reject) => {
+        this.requestQueue.push({ data, resolve, reject });
+      });
+    }
+
+    this.isProcessing = true;
+    let page = null;
+    try {
+      await this.init();
+
+      const labelWidthMm = Number(data.labelWidthMm) || 24;
+      const labelHeightMm = Number(data.labelHeightMm) || 24;
+      const gapMm = Number(data.gapMm) || 35;
+      const pageWidthMm = labelWidthMm * 2 + gapMm;
+      const pageHeightMm = labelHeightMm;
+
+      // Build flattened list of rows: each requested label prints as 1 row with 2 identical labels
+      const rows = [];
+      (data.labels || []).forEach((l) => {
+        const qty = Number(l.qty) || 1;
+        for (let i = 0; i < qty; i++) {
+          rows.push({
+            left: l,
+            right: l,
+          });
+        }
+      });
+
+      // Prepare template data: each row contains 2 identical labels
+      const rowsData = [];
+      for (const row of rows) {
+        const left = row.left || {};
+        const right = row.right || left;
+        const leftQrDataUrl = await this.generateQRDataUrl(String(left.kode || ""), 6);
+        const rightQrDataUrl = await this.generateQRDataUrl(String(right.kode || left.kode || ""), 6);
+
+        rowsData.push({
+          left: {
+            kode: left.kode || "",
+            nama: left.nama || "",
+            kadar: left.kadar || "",
+            berat: left.berat || "",
+            qrDataUrl: leftQrDataUrl,
+          },
+          right: {
+            kode: right.kode || "",
+            nama: right.nama || "",
+            kadar: right.kadar || "",
+            berat: right.berat || "",
+            qrDataUrl: rightQrDataUrl,
+          },
+        });
+      }
+
+      // Load template
+      const template = await this.loadTemplate("label-qr");
+      // Build html by rendering each row and concatenating with page-break
+      const html = template({ rows: rowsData, labelWidthMm, labelHeightMm, gapMm, pageWidthMm, pageHeightMm });
+
+      page = await this.browser.newPage();
+
+      await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+
+      // Generate PDF - CSS @page sets size
+      const pdfBuffer = await page.pdf({
+        preferCSSPageSize: true,
+        landscape: true,
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      });
+
+      await page.close();
+      page = null;
+
+      const tempDir = path.join(__dirname, "../temp");
+      await fs.mkdir(tempDir, { recursive: true });
+      const filename = `qr_labels_${Date.now()}.pdf`;
+      const tempPath = path.join(tempDir, filename);
+      await fs.writeFile(tempPath, pdfBuffer);
+
+      logger.info(`✅ QR Label PDF generated: ${filename}`);
+      return tempPath;
+    } catch (error) {
+      logger.error("Label PDF generation error:", error);
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {}
+      }
+      throw error;
+    } finally {
+      this.isProcessing = false;
+      if (this.requestQueue.length > 0) {
+        const nextRequest = this.requestQueue.shift();
+        this.generateLabelPDF(nextRequest.data).then(nextRequest.resolve).catch(nextRequest.reject);
+      }
+    }
+  }
+
+  /**
+   * Generate QR label sheet as PNG image (for direct image printing)
+   * @param {Object} data - { labels, labelWidthMm, labelHeightMm, gapMm }
+   * @returns {Promise<string>} Path to generated PNG image
+   */
+  async generateLabelImage(data) {
+    if (this.isProcessing) {
+      return new Promise((resolve, reject) => {
+        this.requestQueue.push({ data, resolve, reject });
+      });
+    }
+
+    this.isProcessing = true;
+    let page = null;
+
+    try {
+      await this.init();
+      this.templateCache.clear();
+
+      const labelWidthMm = Number(data.labelWidthMm) || 24;
+      const labelHeightMm = Number(data.labelHeightMm) || 24;
+      const gapMm = Number(data.gapMm) || 50;
+      const pageWidthMm = labelWidthMm * 2 + gapMm;
+      const pageHeightMm = labelHeightMm;
+
+      const rows = [];
+      (data.labels || []).forEach((l) => {
+        const qty = Number(l.qty) || 1;
+        for (let i = 0; i < qty; i++) {
+          rows.push({ left: l, right: l });
+        }
+      });
+
+      const rowsData = [];
+      for (const row of rows) {
+        const left = row.left || {};
+        const right = row.right || left;
+        const leftQrDataUrl = await this.generateQRDataUrl(String(left.kode || ""), 6);
+        const rightQrDataUrl = await this.generateQRDataUrl(String(right.kode || left.kode || ""), 6);
+
+        rowsData.push({
+          left: {
+            kode: left.kode || "",
+            nama: left.nama || "",
+            kadar: left.kadar || "",
+            berat: left.berat || "",
+            qrDataUrl: leftQrDataUrl,
+          },
+          right: {
+            kode: right.kode || "",
+            nama: right.nama || "",
+            kadar: right.kadar || "",
+            berat: right.berat || "",
+            qrDataUrl: rightQrDataUrl,
+          },
+        });
+      }
+
+      const template = await this.loadTemplate("label-qr");
+      const html = template({ rows: rowsData, labelWidthMm, labelHeightMm, gapMm, pageWidthMm, pageHeightMm });
+
+      page = await this.browser.newPage();
+
+      // Gunakan 300 DPI untuk rendering yang akurat pada thermal printer
+      // 1 mm = 300/25.4 ≈ 11.81 pixels
+      const DPI = 300;
+      const mmToPixel = DPI / 25.4;
+      const cssWidthPx = Math.round(pageWidthMm * mmToPixel);
+      const cssHeightPx = Math.round(pageHeightMm * mmToPixel);
+
+      await page.setViewport({
+        width: cssWidthPx,
+        height: cssHeightPx,
+        deviceScaleFactor: 1.0,
+      });
+
+      await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+
+      const sheet = await page.$(".sheet");
+      if (!sheet) {
+        throw new Error("Sheet element not found for QR label rendering");
+      }
+
+      const pngBuffer = await sheet.screenshot({ type: "png" });
+
+      const tempDir = path.join(__dirname, "../temp");
+      await fs.mkdir(tempDir, { recursive: true });
+      const filename = `qr_labels_${Date.now()}.png`;
+      const tempPath = path.join(tempDir, filename);
+      await fs.writeFile(tempPath, pngBuffer);
+
+      logger.info(`✅ QR Label image generated: ${filename}`);
+      return tempPath;
+    } catch (error) {
+      logger.error("Label image generation error:", error);
+      throw error;
+    } finally {
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {}
+      }
+      this.isProcessing = false;
+      if (this.requestQueue.length > 0) {
+        const nextRequest = this.requestQueue.shift();
+        this.generateLabelImage(nextRequest.data).then(nextRequest.resolve).catch(nextRequest.reject);
+      }
+    }
+  }
+
+  /**
    * Cleanup browser and temp files
    */
   async cleanup() {

@@ -28,13 +28,28 @@ class PrinterService {
   }
 
   /**
+   * Read printer config fresh from disk (avoid stale require cache)
+   * @returns {Object}
+   */
+  readPrinterConfig() {
+    try {
+      const configPath = path.join(__dirname, "../config/printers.json");
+      const raw = fs.readFileSync(configPath, "utf8");
+      return JSON.parse(raw || "{}");
+    } catch (error) {
+      logger.error("Error reading printer config:", error);
+      return {};
+    }
+  }
+
+  /**
    * Get printer name for specific type
    * @param {string} type - 'receipt' or 'invoice'
    * @returns {string} Printer name
    */
   getPrinterForType(type) {
     try {
-      const config = require("../config/printers.json");
+      const config = this.readPrinterConfig();
       const printerName = config[type] || this.defaultPrinter;
 
       if (!printerName) {
@@ -280,6 +295,117 @@ try {
       const jobID = `PDF-${Date.now()}`;
       logger.info(`✅ PDF print job ${jobID} sent to ${printerName}`);
       resolve(jobID);
+    });
+  }
+
+  /**
+   * Print an image file using .NET PrintDocument with exact page sizing
+   * @param {string} printerName
+   * @param {string} imagePath
+   * @param {Object} options
+   * @returns {Promise<string>}
+   */
+  printImage(printerName, imagePath, options = {}) {
+    return new Promise((resolve, reject) => {
+      try {
+        logger.info(`Printing image to ${printerName}: ${imagePath}`);
+
+        const paperWidthMm = Number(options.paperWidthMm) || 83;
+        const paperHeightMm = Number(options.paperHeightMm) || 24;
+        const paperWidthHundredthsInch = Math.max(1, Math.round((paperWidthMm / 25.4) * 100));
+        const paperHeightHundredthsInch = Math.max(1, Math.round((paperHeightMm / 25.4) * 100));
+
+        const tempDir = path.join(__dirname, "../temp");
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const psScriptFile = path.join(tempDir, `print_img_${Date.now()}.ps1`);
+        const psScript = `
+$ErrorActionPreference = "Stop"
+
+try {
+    $printerName = "${printerName}"
+    $imagePath = "${imagePath.replace(/\\/g, "\\\\")}" 
+    $paperWidth = ${paperWidthHundredthsInch}
+    $paperHeight = ${paperHeightHundredthsInch}
+
+    $printer = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq $printerName }
+    if (-not $printer) {
+        Write-Host "ERROR: Printer $printerName not found"
+        exit 1
+    }
+
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $image = [System.Drawing.Image]::FromFile($imagePath)
+    $printDoc = New-Object System.Drawing.Printing.PrintDocument
+    $printDoc.PrinterSettings.PrinterName = $printerName
+    $printDoc.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Custom", $paperWidth, $paperHeight)
+    $printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
+    $printDoc.OriginAtMargins = $false
+    $printDoc.DefaultPageSettings.Landscape = $false
+
+    $printDoc.add_PrintPage({
+        param($sender, $ev)
+        try {
+            $ev.Graphics.PageUnit = [System.Drawing.GraphicsUnit]::Pixel
+            $ev.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+            $ev.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $ev.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+            $ev.Graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+
+            $rect = New-Object System.Drawing.Rectangle(0, 0, $ev.PageBounds.Width, $ev.PageBounds.Height)
+            $ev.Graphics.DrawImage($image, $rect)
+            $ev.HasMorePages = $false
+        } catch {
+            Write-Host "Print page error: $_"
+            $ev.HasMorePages = $false
+        }
+    })
+
+    $printDoc.Print()
+    $image.Dispose()
+    Write-Host "SUCCESS: Print job sent via image mode"
+} catch {
+    Write-Host "ERROR: $_"
+    exit 1
+}
+`;
+
+        fs.writeFileSync(psScriptFile, psScript, "utf8");
+
+        exec(
+          `powershell -ExecutionPolicy Bypass -File "${psScriptFile}"`,
+          { encoding: "utf8", maxBuffer: 1024 * 1024 },
+          (error, stdout, stderr) => {
+            logger.info(`PowerShell output: ${stdout}`);
+            if (stderr) logger.warn(`PowerShell stderr: ${stderr}`);
+
+            setTimeout(() => {
+              try {
+                if (fs.existsSync(psScriptFile)) fs.unlinkSync(psScriptFile);
+              } catch (e) {
+                logger.warn(`Cleanup warning: ${e.message}`);
+              }
+            }, 5000);
+
+            if (error && !stdout.includes("SUCCESS")) {
+              logger.error(`Image print error: ${stderr || error.message}`);
+              reject(new Error(stderr || error.message || "Image print failed"));
+              return;
+            }
+
+            const jobID = `IMG-${Date.now()}`;
+            logger.info(`✅ Image print job ${jobID} sent to ${printerName}`);
+            resolve(jobID);
+          },
+        );
+      } catch (error) {
+        logger.error("Print image error:", error);
+        reject(error);
+      }
     });
   }
 

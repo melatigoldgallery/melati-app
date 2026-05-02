@@ -551,6 +551,29 @@
         }
       ],
       "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "servis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statusServis",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusPengambilan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tanggal",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
     }
   ],
   "fieldOverrides": []

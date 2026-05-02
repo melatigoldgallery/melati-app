@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const path = require("path");
+const fs = require("fs");
 const logger = require("./utils/logger");
 const printController = require("./controllers/printController");
 const servisPrintController = require("./controllers/servisPrintController");
@@ -19,10 +20,10 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     const allowedOrigins = [
-      "https://melatigoldgallery.github.io", 
+      "https://melatigoldgallery.github.io",
       "http://localhost:8080",
       "http://127.0.0.1:8080",
-      "http://localhost:5500", 
+      "http://localhost:5500",
       "http://127.0.0.1:5500",
       "http://localhost:5501",
       "http://127.0.0.1:5501",
@@ -91,7 +92,8 @@ app.get("/api/health", (req, res) => {
 app.get("/api/printers", async (req, res) => {
   try {
     const printers = await printerService.listPrinters();
-    const config = require("./config/printers.json");
+    const configPath = path.join(__dirname, "config", "printers.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8") || "{}");
 
     res.json({
       success: true,
@@ -130,7 +132,7 @@ app.post("/api/printers/config", async (req, res) => {
     // Update config
     const fs = require("fs");
     const configPath = path.join(__dirname, "config", "printers.json");
-    const config = require("./config/printers.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8") || "{}");
     config[type] = printerName;
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -154,6 +156,9 @@ app.post("/api/print/nota-servis", servisPrintController.printNotaServis.bind(se
 
 // Print nota custom endpoint
 app.post("/api/print/nota-custom", servisPrintController.printNotaCustom.bind(servisPrintController));
+
+// Print QR labels for silver
+app.post("/api/print/qr-silver", printController.printQrSilver.bind(printController));
 
 // Get job status endpoint
 app.get("/api/job/:jobID", (req, res) => {

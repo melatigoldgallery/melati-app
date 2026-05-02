@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @page {
+        size: 8.5cm 2.6cm;
+        margin: 0;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 8.5cm;
+        height: 2.6cm;
+        overflow: hidden;
+      }
+      .sheet {
+        width: 8.5cm;
+        height: 2.6cm;
+        position: relative;
+        box-sizing: border-box;
+        overflow: hidden;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #fff;
+      }
+      .label {
+        width: 2.5cm;
+        height: 2.6cm;
+        position: relative;
+        box-sizing: border-box;
+        overflow: hidden;
+        background: #fff;
+      }
+      .label.left {
+        position: absolute;
+        left: 0cm;
+        top: 0;
+      }
+      .label.right {
+        position: absolute;
+        right: 2.3cm;
+        top: 0;
+      }
+      .label-inner {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        box-sizing: border-box;
+      }
+      .qr {
+        position: absolute;
+        top: 0.1cm;
+        left: 0.4cm;
+        width: 1.6cm;
+        height: 1.6cm;
+        object-fit: contain;
+      }
+      .kode {
+        position: absolute;
+        top: 0.5cm;
+        left: 1.3cm;
+        right: 0.02cm;
+        font-weight: 700;
+        font-size: 10px;
+        line-height: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+      }
+      .nama {
+        position: absolute;
+        top: 1.5cm;
+        left: 0.4cm;
+        right: 0.4cm;
+        font-weight: 700;
+        font-size: 15px;
+        line-height: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+      }
+      .berat {
+        position: absolute;
+        top: 1.7cm;
+        left: 0.4cm;
+        right: 0.4cm;
+        font-weight: 700;
+        font-size: 13px;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .kadar {
+        position: absolute;
+        right: 0.5cm;
+        bottom: 0.6cm;
+        font-weight: 700;
+        font-size: 8px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    {{#each rows}}
+    <div class="sheet">
+      <div class="label left">
+        <div class="label-inner">
+          <img class="qr" src="{{this.left.qrDataUrl}}" alt="QR" />
+          <div class="kode">{{this.left.kode}}</div>
+          <div class="nama">{{this.left.nama}}</div>
+          <div class="berat">{{this.left.berat}} gr</div>
+          {{#if this.left.kadar}}
+          <div class="kadar">{{this.left.kadar}}</div>
+          {{/if}}
+        </div>
+      </div>
+      <div class="label right">
+        <div class="label-inner">
+          <img class="qr" src="{{this.right.qrDataUrl}}" alt="QR" />
+          <div class="kode">{{this.right.kode}}</div>
+          <div class="nama">{{this.right.nama}}</div>
+          <div class="berat">{{this.right.berat}} gr</div>
+          {{#if this.right.kadar}}
+          <div class="kadar">{{this.right.kadar}}</div>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+    {{/each}}
+  </body>
+</html>

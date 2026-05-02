@@ -54,6 +54,16 @@
         </div>
       </div>
     </div>
+    <div class="d-flex justify-content-end mb-2">
+      <button
+        @click="openPrintQrModal"
+        :disabled="form.jenis !== 'silver' || isLoadingCodes"
+        class="btn btn-outline-success btn-sm"
+      >
+        <i class="bi bi-upc-scan me-1"></i>
+        Cetak QR Silver
+      </button>
+    </div>
 
     <!-- Card 2: Detail Barang -->
     <div class="card border-0 shadow-sm mb-3">
@@ -220,6 +230,72 @@
     </div>
 
     <!-- ── Modal: Kelola Kode ── -->
+    <!-- ── Modal: Cetak QR Silver ── -->
+    <div class="modal fade" id="modalPrintQrSilver" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">Cetak QR Silver</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Printer Label</label>
+                <select v-model="selectedPrinter" class="form-select form-select-sm" :disabled="isLoadingPrinters">
+                  <option value="">
+                    {{ isLoadingPrinters ? "Memuat printer..." : "Gunakan default printer label" }}
+                  </option>
+                  <option v-for="p in printerOptions" :key="p.name" :value="p.name">
+                    {{ p.name }}{{ p.isDefault ? " (Default)" : "" }}
+                  </option>
+                </select>
+              </div>
+              <div class="col-md-6 d-flex align-items-end">
+                <div class="small text-muted">Ukuran label: 2.4 cm x 2.4 cm</div>
+              </div>
+            </div>
+            <div v-if="isLoadingCodes" class="text-center py-3">
+              <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+            <div v-else>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Kode</th>
+                      <th>Nama</th>
+                      <th>Kadar</th>
+                      <th>Berat</th>
+                      <th style="width: 120px">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(r, i) in printRows" :key="r.kode + '-' + i">
+                      <td class="small fw-semibold">{{ r.kode }}</td>
+                      <td class="small">{{ r.nama }}</td>
+                      <td class="small">{{ r.kadar || "-" }}</td>
+                      <td class="small">{{ r.berat || "-" }}</td>
+                      <td>
+                        <input type="number" class="form-control form-control-sm" min="0" v-model.number="r.qty" />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+            <button @click="printQr" :disabled="isPrinting" class="btn btn-success btn-sm">
+              <span v-if="isPrinting" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-printer me-1"></i>
+              Print QR
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div
       class="modal fade"
       id="modalKelolaKode"
@@ -507,6 +583,94 @@ const form = ref({ tanggal: todayStringWITA(), jenis: "" });
 // ── Kode Catalog (dari kodeAksesoris/kategori/{jenis}) ───────────────────────
 const kodeCatalog = ref([]);
 const isLoadingCodes = ref(false);
+const printerOptions = ref([]);
+const isLoadingPrinters = ref(false);
+const selectedPrinter = ref("");
+const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3001";
+
+// ── Print QR Silver ─────────────────────────────────────────────────────────
+const printRows = ref([]);
+const isPrinting = ref(false);
+let printModal = null;
+
+async function loadPrinters() {
+  isLoadingPrinters.value = true;
+  try {
+    const res = await fetch(`${PRINT_BASE}/api/printers`);
+    const data = await res.json();
+    if (res.ok && data?.success) {
+      printerOptions.value = Array.isArray(data.printers) ? data.printers : [];
+      selectedPrinter.value =
+        data?.config?.label || data?.config?.default || printerOptions.value.find((p) => p.isDefault)?.name || "";
+    }
+  } catch (e) {
+    // keep default empty so service can use configured label printer
+    printerOptions.value = [];
+  } finally {
+    isLoadingPrinters.value = false;
+  }
+}
+
+function openPrintQrModal() {
+  if (form.value.jenis !== "silver") {
+    swal("Hanya untuk silver", "Pilih jenis 'silver' terlebih dahulu.", "warning");
+    return;
+  }
+  if (!printerOptions.value.length && !isLoadingPrinters.value) {
+    loadPrinters();
+  }
+  // Build rows from kodeCatalog
+  printRows.value = (kodeCatalog.value || []).map((k) => ({
+    kode: k.kode || k.text || "",
+    nama: k.nama || "",
+    kadar: k.kadar || "",
+    berat: k.berat || "",
+    qty: 0,
+  }));
+  if (!printModal) printModal = new Modal(document.getElementById("modalPrintQrSilver"));
+  printModal.show();
+}
+
+async function printQr() {
+  const toPrint = printRows.value
+    .filter((r) => r.qty && r.qty > 0)
+    .map((r) => ({ kode: r.kode, nama: r.nama, kadar: r.kadar, berat: r.berat, qty: r.qty }));
+  if (!toPrint.length) {
+    swal("Tidak ada label", "Masukkan qty > 0 pada minimal satu kode.", "warning");
+    return;
+  }
+
+  isPrinting.value = true;
+  try {
+    const payload = {
+      printer: selectedPrinter.value || undefined,
+      widthCm: 2.4,
+      heightCm: 2.4,
+      labels: toPrint,
+    };
+    const url = `${PRINT_BASE}/api/print/qr-silver`;
+    const controllerFetch = new AbortController();
+    const timeout = setTimeout(() => controllerFetch.abort(), 30000);
+    const respFetch = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controllerFetch.signal,
+    });
+    clearTimeout(timeout);
+    const resp = await respFetch.json().catch(() => null);
+    if (respFetch.ok && resp && resp.success) {
+      swal("Terkirim", `Job queued: ${resp.jobID}`, "success");
+      printModal.hide();
+    } else {
+      showError("Gagal print", (resp && resp.error) || `HTTP ${respFetch.status}`);
+    }
+  } catch (e) {
+    showError("Gagal print", e.message || e.toString());
+  } finally {
+    isPrinting.value = false;
+  }
+}
 
 async function loadKodeCatalog(jenis) {
   if (!jenis) {
@@ -873,6 +1037,7 @@ async function hapusKode() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  await loadPrinters();
   await loadHistory();
 });
 </script>

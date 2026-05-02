@@ -1174,7 +1174,7 @@ const hasLoaded = ref(false);
 const bulkUpdatingStatusServis = ref(false);
 const selectedServisIds = ref([]);
 const isSupervisor = computed(() => authStore.userRole === "supervisor");
-const canReceiveServis = computed(() => ["kasir", "supervisor"].includes(authStore.userRole));
+const canReceiveServis = computed(() => ["admin", "kasir", "supervisor"].includes(authStore.userRole));
 
 // Pagination
 const currentPage = ref(1);
@@ -1703,7 +1703,7 @@ async function loadData() {
 // ── Bulk Status Servis ───────────────────────────────────────────────────
 async function updateSelectedServisSelesai() {
   if (!canReceiveServis.value) {
-    return swal("Aksi ini hanya untuk kasir atau supervisor", "warning");
+    return swal("Aksi ini hanya untuk admin, kasir, atau supervisor", "warning");
   }
 
   const targetIds = selectedServisIds.value.filter((id) =>

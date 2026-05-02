@@ -51,6 +51,7 @@ export const menuStructure = [
       { label: "Input Servis", to: "/servis/input", pageKey: "servis.input", roles: ALL },
       { label: "Data Servis", to: "/servis/data", pageKey: "servis.data", roles: ALL },
       { label: "Laporan Servis", to: "/servis/laporan", pageKey: "servis.laporan", roles: ALL },
+      { label: "Manajemen Servis", to: "/servis/manajemen", pageKey: "servis.manajemen", roles: ALL },
     ],
   },
   {

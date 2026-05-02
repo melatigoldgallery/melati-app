@@ -23,6 +23,7 @@ const LaporanAntrianView = () => import("@/views/antrian/LaporanAntrianView.vue"
 const InputServisView = () => import("@/views/servis/InputServisView.vue");
 const DataServisView = () => import("@/views/servis/DataServisView.vue");
 const LaporanServisView = () => import("@/views/servis/LaporanServisView.vue");
+const ManajemenServisView = () => import("@/views/servis/ManajemenServisView.vue");
 
 // Order Online
 const InputOrderView = () => import("@/views/order-online/InputOrderView.vue");
@@ -118,6 +119,11 @@ const routes = [
     path: "/servis/laporan",
     component: LaporanServisView,
     meta: { requiresAuth: true, pageKey: "servis.laporan" },
+  },
+  {
+    path: "/servis/manajemen",
+    component: ManajemenServisView,
+    meta: { requiresAuth: true, pageKey: "servis.manajemen" },
   },
 
   // Order Online

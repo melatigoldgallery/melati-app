@@ -171,6 +171,64 @@ class PrintController {
       });
     }
   }
+
+  /**
+   * Print QR labels for silver (PDF per job) and enqueue
+   */
+  async printQrSilver(req, res) {
+    try {
+      const data = req.body;
+
+      if (!data || !Array.isArray(data.labels) || data.labels.length === 0) {
+        return res.status(400).json({ success: false, error: "No labels provided" });
+      }
+
+      logger.info(`QR-silver print request: ${data.labels.length} label(s)`);
+
+      // Always follow configured label printer for QR silver
+      const printerName = printerService.getPrinterForType("label");
+
+      const isAvailable = await printerService.isPrinterAvailable(printerName);
+      if (!isAvailable) {
+        return res.status(404).json({ success: false, error: `Printer not found: ${printerName}` });
+      }
+
+      // Generate PNG image for all requested labels (expanded by qty)
+      const imagePath = await pdfService.generateLabelImage(data);
+      logger.info(`Generated label image: ${imagePath}`);
+
+      // Enqueue print job
+      const jobID = printQueue.addJob(
+        printerName,
+        async () => {
+          const printJobID = await printerService.printImage(printerName, imagePath, {
+            paperWidthMm: 98,
+            paperHeightMm: 24,
+          });
+
+          // Schedule image cleanup
+          setTimeout(async () => {
+            try {
+              await fs.unlink(imagePath);
+              logger.info(`🧹 Cleaned up QR image: ${imagePath}`);
+            } catch (err) {
+              logger.error("Error cleaning up QR image:", err.message || err);
+            }
+          }, 10000);
+
+          return { printJobID, imagePath };
+        },
+        { type: "qr-silver", itemCount: data.labels.length },
+      );
+
+      const queueStatus = printQueue.getQueueStatus(printerName);
+
+      res.json({ success: true, jobID, printer: printerName, queueStatus, message: "QR labels queued for printing" });
+    } catch (error) {
+      logger.error("Print QR Silver error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 }
 
 module.exports = new PrintController();

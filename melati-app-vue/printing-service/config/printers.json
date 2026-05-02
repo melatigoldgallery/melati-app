@@ -1,5 +1,6 @@
 {
   "receipt": "Adobe PDF",
   "invoice": "Adobe PDF",
-  "default": "Adobe PDF"
+  "default": "SATO CG408",
+  "label": "SATO CG408"
 }

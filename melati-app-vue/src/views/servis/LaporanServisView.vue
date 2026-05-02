@@ -329,8 +329,8 @@ const items = ref([]);
 const filterStart = ref(currentMonthStart());
 const filterEnd = ref(currentMonthEnd());
 const statusServisFilter = ref("Sudah Selesai");
-const statusPengambilanFilter = ref("Sudah Diambil");
-const jenisFilter = ref("");
+const statusPengambilanFilter = ref("Belum Diambil");
+const jenisFilter = ref("servis");
 const exporting = ref(false);
 const exportProgressText = ref("");
 
