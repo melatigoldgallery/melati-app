@@ -22,10 +22,20 @@
           <i class="bi bi-boxes me-2 text-primary"></i>
           Data Aksesoris
         </span>
-        <button @click="openKelolaKode" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-pencil-square me-1"></i>
-          Edit Kode
-        </button>
+        <div class="d-flex gap-2 flex-wrap">
+          <button @click="openKelolaKode" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>
+            Edit Kode
+          </button>
+          <button
+            @click="openPrintQrModal"
+            :disabled="form.jenis !== 'silver' || isLoadingCodes"
+            class="btn btn-outline-success btn-sm"
+          >
+            <i class="bi bi-upc-scan me-1"></i>
+            Cetak QR Silver
+          </button>
+        </div>
       </div>
       <div class="card-body">
         <div class="row g-2">
@@ -53,16 +63,6 @@
           </div>
         </div>
       </div>
-    </div>
-    <div class="d-flex justify-content-end mb-2">
-      <button
-        @click="openPrintQrModal"
-        :disabled="form.jenis !== 'silver' || isLoadingCodes"
-        class="btn btn-outline-success btn-sm"
-      >
-        <i class="bi bi-upc-scan me-1"></i>
-        Cetak QR Silver
-      </button>
     </div>
 
     <!-- Card 2: Detail Barang -->

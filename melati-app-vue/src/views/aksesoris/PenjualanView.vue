@@ -88,7 +88,15 @@
           <i class="bi bi-list-ul me-2 text-success"></i>
           {{ detailTitle }}
         </span>
-        <button v-if="form.tipe !== 'manual'" @click="openCatalogModal" class="btn btn-primary btn-sm ms-auto">
+        <button
+          v-if="form.tipe === 'silver'"
+          @click="openSilverPriceModal"
+          class="btn btn-outline-secondary btn-sm ms-auto"
+        >
+          <i class="bi bi-gear me-1"></i>
+          Update Harga
+        </button>
+        <button v-else-if="form.tipe !== 'manual'" @click="openCatalogModal" class="btn btn-primary btn-sm ms-auto">
           <i class="bi bi-search me-1"></i>
           Pilih Kode
         </button>
@@ -122,8 +130,8 @@
               </tr>
               <tr v-for="(row, i) in aksesorisRows" :key="i">
                 <td class="text-center align-middle">{{ i + 1 }}</td>
-                <td class="align-middle">{{ row.kode }}</td>
-                <td class="align-middle">{{ row.nama }}</td>
+                <td class="align-middle small">{{ row.kode }}</td>
+                <td class="align-middle small">{{ row.nama }}</td>
                 <td>
                   <input
                     v-model.number="row.jumlah"
@@ -183,6 +191,7 @@
 
         <!-- Silver Table -->
         <div v-show="form.tipe === 'silver'" class="table-responsive">
+          <!-- inline input row will appear inside tbody -->
           <table class="table table-bordered table-sm mb-0">
             <thead class="table-primary">
               <tr>
@@ -198,15 +207,77 @@
               </tr>
             </thead>
             <tbody>
+              <!-- Inline input row for adding silver by kode -->
+              <tr class="table-light">
+                <td></td>
+                <td>
+                  <input
+                    v-model="silverInput.kode"
+                    @keydown.enter.prevent="commitSilverRowFromInput"
+                    type="text"
+                    class="form-control form-control-sm"
+                    placeholder="Kode (Enter untuk tambah)"
+                  />
+                </td>
+                <td>
+                  <input :value="silverInput.nama" type="text" class="form-control form-control-sm bg-light" readonly />
+                </td>
+                <td>
+                  <input
+                    v-model.number="silverInput.jumlah"
+                    type="number"
+                    min="1"
+                    class="form-control form-control-sm"
+                    style="width: 60px"
+                  />
+                </td>
+                <td>
+                  <input
+                    :value="silverInput.kadar"
+                    type="text"
+                    class="form-control form-control-sm bg-light"
+                    readonly
+                  />
+                </td>
+                <td>
+                  <input
+                    :value="silverInput.berat"
+                    type="text"
+                    class="form-control form-control-sm bg-light"
+                    readonly
+                  />
+                </td>
+                <td>
+                  <input
+                    :value="formatCurrency(silverInput.hargaPerGram)"
+                    type="text"
+                    class="form-control form-control-sm bg-light"
+                    readonly
+                  />
+                </td>
+                <td>
+                  <input
+                    v-model="silverInput.totalHargaStr"
+                    @blur="formatSilverInputTotal"
+                    type="text"
+                    class="form-control form-control-sm"
+                    placeholder="Masukkan harga"
+                  />
+                </td>
+                <td class="text-center align-middle">
+                  <button @click="commitSilverRowFromInput" class="btn btn-sm btn-primary">+</button>
+                </td>
+              </tr>
+
               <tr v-if="!silverRows.length">
                 <td colspan="9" class="text-center text-muted py-3">
-                  Belum ada barang. Klik "Pilih Kode" untuk menambahkan.
+                  Belum ada barang. Ketik kode di baris atas dan tekan Enter untuk menambahkan.
                 </td>
               </tr>
               <tr v-for="(row, i) in silverRows" :key="i">
                 <td class="text-center align-middle">{{ i + 1 }}</td>
-                <td class="align-middle">{{ row.kode }}</td>
-                <td class="align-middle">{{ row.nama }}</td>
+                <td class="align-middle small">{{ row.kode }}</td>
+                <td class="align-middle small">{{ row.nama }}</td>
                 <td>
                   <input
                     v-model.number="row.jumlah"
@@ -294,8 +365,8 @@
               </tr>
               <tr v-for="(row, i) in kotakRows" :key="i">
                 <td class="text-center align-middle">{{ i + 1 }}</td>
-                <td class="align-middle">{{ row.kode }}</td>
-                <td class="align-middle">{{ row.nama }}</td>
+                <td class="align-middle small">{{ row.kode }}</td>
+                <td class="align-middle small">{{ row.nama }}</td>
                 <td>
                   <input
                     v-model.number="row.jumlah"
@@ -610,6 +681,63 @@
       </template>
     </AppModal>
 
+    <!-- -- Silver Price Settings Modal -- -->
+    <AppModal v-model="showSilverPriceModal" title="Pengaturan Harga Silver" size="lg">
+      <template #default>
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input
+                v-model="silverPriceSearch"
+                type="text"
+                class="form-control"
+                placeholder="Cari kode atau nama..."
+              />
+            </div>
+          </div>
+          <div class="col-md-6 d-flex align-items-center text-muted small">
+            <i class="bi bi-info-circle me-2"></i>
+            Kode silver stok aktif otomatis ditampilkan.
+          </div>
+        </div>
+        <div class="table-responsive" style="max-height: 450px">
+          <table class="table table-sm table-hover">
+            <thead class="table-primary sticky-top">
+              <tr>
+                <th>Kode</th>
+                <th>Nama</th>
+                <th class="text-end">Harga Referensi</th>
+                <th style="width: 60px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!filteredSilverPriceList.length">
+                <td colspan="4" class="text-center text-muted py-3">Belum ada pengaturan harga</td>
+              </tr>
+              <tr v-for="(p, idx) in filteredSilverPriceList" :key="p.kode || idx">
+                <td>{{ p.kode }}</td>
+                <td>{{ p.nama || "-" }}</td>
+                <td>
+                  <input v-model.number="p.harga" type="number" class="form-control form-control-sm text-end" />
+                </td>
+                <td class="text-end">
+                  <button @click="removeSilverPriceByKode(p.kode)" class="btn btn-sm btn-danger">Hapus</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <template #footer>
+        <button @click="showSilverPriceModal = false" class="btn btn-secondary btn-sm">Tutup</button>
+        <button @click="saveSilverPrices" :disabled="isSavingSilverPrices" class="btn btn-primary btn-sm">
+          <span v-if="isSavingSilverPrices" class="spinner-border spinner-border-sm me-1"></span>
+          Simpan
+        </button>
+      </template>
+    </AppModal>
+
     <!-- -- Lock Modal (Manual kode lock picker) -- -->
     <AppModal v-model="showLockModal" title="Pilih Kode Lock" size="lg">
       <template #default>
@@ -639,7 +767,7 @@
                 <td colspan="3" class="text-center text-muted py-3">Tidak ada data</td>
               </tr>
               <tr v-for="item in filteredLockCatalog" :key="item.kode" @click="pickLock(item)" style="cursor: pointer">
-                <td class="align-middle">{{ item.kode }}</td>
+                <td class="align-middle small">{{ item.kode }}</td>
                 <td class="align-middle">{{ item.nama }}</td>
                 <td class="text-end align-middle">{{ item.stok ?? 0 }}</td>
               </tr>
@@ -695,8 +823,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from "vue";
-import { getDocs, query, collection, where, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
+import {
+  getDocs,
+  query,
+  collection,
+  where,
+  orderBy,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  setDoc,
+} from "firebase/firestore";
 import Swal from "sweetalert2";
 import { db } from "@/config/firebase";
 import { useAccessoriesStore } from "@/stores/accessories";
@@ -752,6 +891,17 @@ const manualInput = reactive({
   hargaPerGram: 0,
   totalHargaStr: "",
   keterangan: "",
+});
+
+// Silver inline input
+const silverInput = reactive({
+  kode: "",
+  nama: "",
+  jumlah: 1,
+  kadar: "",
+  berat: "",
+  hargaPerGram: 0,
+  totalHargaStr: "",
 });
 
 // --- Grand totals -------------------------------------------------------------
@@ -966,6 +1116,33 @@ async function handleJumlahBayarEnter() {
 const showCatalogModal = ref(false);
 const catalogSearch = ref("");
 
+// --- Silver price settings --------------------------------------------------
+const showSilverPriceModal = ref(false);
+const silverPriceList = ref([]); // [{ kode, nama, harga }]
+const silverPriceMap = computed(() => {
+  const m = {};
+  (silverPriceList.value || []).forEach((p) => {
+    if (p && p.kode) m[String(p.kode).toLowerCase()] = Number(p.harga) || 0;
+  });
+  return m;
+});
+const isSavingSilverPrices = ref(false);
+const silverPriceSearch = ref("");
+const silverStockedCatalog = computed(() => {
+  return store.activeSalesItems
+    .filter((i) => i.kategori === "silver" && (i.stok ?? 0) > 0)
+    .sort((a, b) => String(a.kode || "").localeCompare(String(b.kode || "")));
+});
+const filteredSilverPriceList = computed(() => {
+  const q = (silverPriceSearch.value || "").trim().toLowerCase();
+  if (!q) return silverPriceList.value;
+  return silverPriceList.value.filter((p) => {
+    const kode = String(p.kode || "").toLowerCase();
+    const nama = String(p.nama || "").toLowerCase();
+    return kode.includes(q) || nama.includes(q);
+  });
+});
+
 const catalogModalTitle = computed(() => {
   const map = { aksesoris: "Pilih Aksesoris", silver: "Pilih Silver", kotak: "Pilih Kotak" };
   return map[form.tipe] || "Pilih Barang";
@@ -990,6 +1167,280 @@ function openCatalogModal() {
   catalogSearch.value = "";
   showCatalogModal.value = true;
 }
+
+async function loadSilverPrices() {
+  try {
+    const d = doc(db, "settings", "silverPrice");
+    const snap = await getDoc(d);
+    if (!snap.exists()) {
+      return [];
+    }
+    const data = snap.data() || {};
+    return Array.isArray(data.prices) ? data.prices : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function buildMergedSilverPriceList(savedPrices) {
+  const merged = {};
+
+  silverStockedCatalog.value.forEach((item) => {
+    const key = String(item.kode || "")
+      .trim()
+      .toLowerCase();
+    if (!key) return;
+    merged[key] = {
+      kode: String(item.kode || "").trim(),
+      nama: item.nama || "",
+      harga: 0,
+    };
+  });
+
+  (savedPrices || []).forEach((row) => {
+    const key = String(row?.kode || "")
+      .trim()
+      .toLowerCase();
+    if (!key) return;
+    const matchedCatalog = store.activeSalesItems.find(
+      (i) => i.kategori === "silver" && String(i.kode || "").toLowerCase() === key,
+    );
+    const current = merged[key] || {
+      kode: String(row?.kode || "").trim(),
+      nama: matchedCatalog?.nama || "",
+      harga: 0,
+    };
+    current.harga = Number(row?.harga) || 0;
+    if (!current.nama && matchedCatalog?.nama) current.nama = matchedCatalog.nama;
+    merged[key] = current;
+  });
+
+  return Object.values(merged).sort((a, b) => String(a.kode || "").localeCompare(String(b.kode || "")));
+}
+
+function removeSilverPriceByKode(kode) {
+  const key = String(kode || "").toLowerCase();
+  silverPriceList.value = silverPriceList.value.filter((p) => String(p.kode || "").toLowerCase() !== key);
+}
+
+async function saveSilverPrices() {
+  isSavingSilverPrices.value = true;
+  try {
+    const d = doc(db, "settings", "silverPrice");
+    const cleanedMap = {};
+    (silverPriceList.value || []).forEach((p) => {
+      const key = String(p?.kode || "")
+        .trim()
+        .toLowerCase();
+      if (!key) return;
+      cleanedMap[key] = {
+        kode: String(p.kode || "").trim(),
+        harga: Number(p.harga) || 0,
+      };
+    });
+    const payload = Object.values(cleanedMap).sort((a, b) => String(a.kode || "").localeCompare(String(b.kode || "")));
+    await setDoc(d, { prices: payload, lastUpdated: serverTimestamp() }, { merge: true });
+    await store.loadSalesCatalog();
+    swal("Pengaturan harga tersimpan", "success");
+    showSilverPriceModal.value = false;
+  } catch (err) {
+    showError("Gagal menyimpan pengaturan harga", err.message);
+  } finally {
+    isSavingSilverPrices.value = false;
+  }
+}
+
+async function openSilverPriceModal() {
+  // Request verification code with retry logic
+  const verifyCode = await requestVerificationCode();
+  if (!verifyCode) return; // Verification failed or user cancelled
+
+  const saved = await loadSilverPrices();
+  silverPriceList.value = buildMergedSilverPriceList(saved);
+  silverPriceSearch.value = "";
+  showSilverPriceModal.value = true;
+}
+
+function formatSilverInputTotal() {
+  const val = parseNum(silverInput.totalHargaStr);
+  silverInput.totalHargaStr = formatCurrency(val);
+  silverInput.hargaPerGram =
+    (parseFloat(silverInput.berat) || 0) > 0 ? Math.round(val / parseFloat(silverInput.berat)) : 0;
+}
+
+function resetSilverInput() {
+  Object.assign(silverInput, {
+    kode: "",
+    nama: "",
+    jumlah: 1,
+    kadar: "",
+    berat: "",
+    hargaPerGram: 0,
+    totalHargaStr: "",
+  });
+}
+
+function fillSilverInputFromCatalog(found) {
+  silverInput.nama = found.nama || "";
+  silverInput.kadar = found.kadar || "";
+  silverInput.berat = found.berat ? String(found.berat) : "";
+  silverInput.hargaPerGram = 0;
+  // if there's a reference price set, prefill totalHargaStr
+  const ref = silverPriceMap.value[String(found.kode || "").toLowerCase()];
+  if (ref && ref > 0) {
+    silverInput.totalHargaStr = formatCurrency(ref * (silverInput.jumlah || 1));
+  }
+}
+
+function commitSilverRowFromInput() {
+  const kode = (silverInput.kode || "").trim();
+  if (!kode) {
+    swal("Kode wajib diisi", "warning");
+    return;
+  }
+  const found = store.activeSalesItems.find(
+    (i) => String(i.kode || "").toLowerCase() === kode.toLowerCase() && i.kategori === "silver",
+  );
+  if (!found) {
+    swal(`Kode ${kode} tidak ditemukan atau stok kosong`, "error");
+    return;
+  }
+
+  // prevent duplicate kode in current rows
+  if (silverRows.value.some((r) => String(r.kode || "").toLowerCase() === kode.toLowerCase())) {
+    swal("Kode sudah ditambahkan", "warning");
+    return;
+  }
+
+  const berat = parseFloat(found.berat) || 0;
+  const totalHarga = parseNum(silverInput.totalHargaStr);
+  if (totalHarga <= 0) {
+    swal("Total harga harus lebih dari 0", "warning");
+    return;
+  }
+
+  silverRows.value.push({
+    kode: found.kode,
+    nama: found.nama,
+    jumlah: silverInput.jumlah || 1,
+    kadar: found.kadar || silverInput.kadar || "",
+    berat: silverInput.berat || (found.berat ? String(found.berat) : ""),
+    _kadarFixed: !!found.kadar,
+    _beratFixed: !!found.berat,
+    _beratSatuan: found.berat || 0,
+    hargaPerGram: silverInput.hargaPerGram || 0,
+    totalHargaStr: formatCurrency(totalHarga),
+  });
+
+  resetSilverInput();
+}
+
+// Auto-fill silverInput fields when kode changes
+watch(
+  () => silverInput.kode,
+  (val) => {
+    const kode = (val || "").trim();
+    if (!kode) {
+      silverInput.nama = "";
+      silverInput.kadar = "";
+      silverInput.berat = "";
+      return;
+    }
+    const found = store.activeSalesItems.find(
+      (i) => String(i.kode || "").toLowerCase() === kode.toLowerCase() && i.kategori === "silver",
+    );
+    if (found) {
+      fillSilverInputFromCatalog(found);
+    } else {
+      silverInput.nama = "";
+      silverInput.kadar = "";
+      silverInput.berat = "";
+    }
+  },
+);
+
+// Helper: Request verification code with retry limit and clear error handling
+async function requestVerificationCode() {
+  const maxRetries = 3;
+  let attempts = 0;
+
+  while (attempts < maxRetries) {
+    const result = await Swal.fire({
+      title: "Masukkan Kode Verifikasi",
+      input: "password",
+      inputPlaceholder: "Kode verifikasi",
+      showCancelButton: true,
+      confirmButtonText: "Cek",
+      cancelButtonText: "Batal",
+      reverseButtons: true,
+      allowOutsideClick: false,
+      allowEscapeKey: true,
+      didOpen: () => {
+        const input = document.querySelector(".swal2-input");
+        if (input) input.focus();
+      },
+    });
+
+    if (!result.isConfirmed) {
+      return null; // User cancel
+    }
+
+    const code = result.value?.trim() || "";
+    if (!code) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Kode Kosong",
+        text: "Kode verifikasi harus diisi",
+        confirmButtonText: "OK",
+      });
+      attempts++;
+      continue;
+    }
+
+    try {
+      const isValid = await store.verifyEditAccess(code);
+      if (isValid) {
+        return code; // Success
+      } else {
+        attempts++;
+        if (attempts < maxRetries) {
+          await Swal.fire({
+            icon: "error",
+            title: "Kode Verifikasi Salah",
+            text: `Kesempatan tersisa: ${maxRetries - attempts}`,
+            confirmButtonText: "Coba Lagi",
+          });
+        } else {
+          await Swal.fire({
+            icon: "error",
+            title: "Verifikasi Gagal",
+            text: "Anda telah melampaui batas percobaan. Transaksi dibatalkan.",
+            confirmButtonText: "OK",
+          });
+          return null;
+        }
+      }
+    } catch (err) {
+      attempts++;
+      await Swal.fire({
+        icon: "error",
+        title: "Kesalahan Verifikasi",
+        text: err.message || "Gagal memeriksa kode verifikasi",
+        confirmButtonText: "Coba Lagi",
+      });
+    }
+  }
+
+  return null; // All retries exhausted
+}
+
+// --- Lifecycle Hooks -----------------------------------------------------------
+onMounted(async () => {
+  // Auto-load silver prices on component mount to ensure silverPriceMap is populated
+  // This ensures price validation works when user tries to save without opening the modal
+  const saved = await loadSilverPrices();
+  silverPriceList.value = buildMergedSilverPriceList(saved);
+});
 
 function getRowsByTipe(tipe) {
   if (tipe === "aksesoris") return aksesorisRows.value;
@@ -1195,6 +1646,41 @@ async function savePenjualan() {
           swal(`Baris ${i + 1}: Total harga harus diisi!`, "warning");
           return;
         }
+      }
+    }
+
+    // Price validation for silver against settings/silverPrice (exact match)
+    if (form.tipe === "silver") {
+      const mismatches = [];
+      for (let i = 0; i < silverRows.value.length; i++) {
+        const row = silverRows.value[i];
+        const kodeKey = String(row.kode || "").toLowerCase();
+        const refPrice = silverPriceMap.value[kodeKey];
+        if (refPrice && refPrice > 0) {
+          const expected = refPrice * (row.jumlah || 1);
+          const actual = parseNum(row.totalHargaStr);
+          if (actual !== expected) {
+            mismatches.push({ index: i, row, expected, actual });
+          }
+        }
+      }
+
+      if (mismatches.length > 0) {
+        const proceed = await Swal.fire({
+          icon: "warning",
+          title: `Harga tidak sesuai (${mismatches.length} baris)`,
+          text: "Beberapa baris memiliki harga yang tidak sesuai dengan pengaturan. Tetap proses?",
+          showCancelButton: true,
+          confirmButtonText: "Proses",
+          cancelButtonText: "Batal",
+          reverseButtons: true,
+        });
+
+        if (!proceed.isConfirmed) return;
+
+        // Request verification code with retry logic
+        const verifyCode = await requestVerificationCode();
+        if (!verifyCode) return; // Verification failed or user cancelled
       }
     }
 
