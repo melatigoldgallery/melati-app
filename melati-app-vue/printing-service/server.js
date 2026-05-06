@@ -161,6 +161,9 @@ app.post("/api/print/nota-custom", servisPrintController.printNotaCustom.bind(se
 // Print QR labels for silver
 app.post("/api/print/qr-silver", printController.printQrSilver.bind(printController));
 
+// Print QR labels using SBPL (native SATO format - faster & more efficient)
+app.post("/api/print/qr-sbpl", printController.printQrSbpl.bind(printController));
+
 // Get job status endpoint
 app.get("/api/job/:jobID", (req, res) => {
   try {

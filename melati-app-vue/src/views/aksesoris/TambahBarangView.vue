@@ -28,6 +28,7 @@
             Edit Kode
           </button>
           <button
+            v-if="!isL2Floor"
             @click="openPrintQrModal"
             :disabled="form.jenis !== 'silver' || isLoadingCodes"
             class="btn btn-outline-success btn-sm"
@@ -63,17 +64,6 @@
           </div>
         </div>
       </div>
-    </div>
-    <div class="d-flex justify-content-end mb-2">
-      <button
-        v-if="!isL2Floor"
-        @click="openPrintQrModal"
-        :disabled="form.jenis !== 'silver' || isLoadingCodes"
-        class="btn btn-outline-success btn-sm"
-      >
-        <i class="bi bi-upc-scan me-1"></i>
-        Cetak QR Silver
-      </button>
     </div>
 
     <!-- Card 2: Detail Barang -->
@@ -246,10 +236,18 @@
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header py-2">
-            <h6 class="modal-title fw-semibold">Cetak QR Silver</h6>
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-upc-scan me-2"></i>
+              Cetak QR Silver (SBPL Mode)
+            </h6>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
+            <div class="alert alert-info small mb-3" role="alert">
+              <i class="bi bi-lightning-charge me-2"></i>
+              <strong>Mode SBPL Aktif:</strong>
+              Lebih cepat (100-200ms) dan efisien - native SATO printer command
+            </div>
             <div class="row g-2 mb-3">
               <div class="col-md-6">
                 <label class="form-label small fw-semibold">Printer Label</label>
@@ -301,7 +299,7 @@
             <button @click="printQr" :disabled="isPrinting" class="btn btn-success btn-sm">
               <span v-if="isPrinting" class="spinner-border spinner-border-sm me-1"></span>
               <i v-else class="bi bi-printer me-1"></i>
-              Print QR
+              Cetak QR (SBPL)
             </button>
           </div>
         </div>
@@ -658,11 +656,10 @@ async function printQr() {
   try {
     const payload = {
       printer: selectedPrinter.value || undefined,
-      widthCm: 2.4,
-      heightCm: 2.4,
       labels: toPrint,
     };
-    const url = `${PRINT_BASE}/api/print/qr-silver`;
+    // Use SBPL endpoint (10-50x faster, native SATO format, minimal resource usage)
+    const url = `${PRINT_BASE}/api/print/qr-sbpl`;
     const controllerFetch = new AbortController();
     const timeout = setTimeout(() => controllerFetch.abort(), 30000);
     const respFetch = await fetch(url, {
@@ -674,7 +671,7 @@ async function printQr() {
     clearTimeout(timeout);
     const resp = await respFetch.json().catch(() => null);
     if (respFetch.ok && resp && resp.success) {
-      swal("Terkirim", `Job queued: ${resp.jobID}`, "success");
+      swal("Terkirim", `Job ${resp.jobID} - SBPL (${resp.performance?.estimatedSpeed || "cepat"})`, "success");
       printModal.hide();
     } else {
       showError("Gagal print", (resp && resp.error) || `HTTP ${respFetch.status}`);
