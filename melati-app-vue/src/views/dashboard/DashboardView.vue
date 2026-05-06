@@ -37,7 +37,7 @@
           <div class="row g-2">
             <div v-for="link in desktopQuickLinks" :key="link.to" class="col-6 col-md-3">
               <RouterLink :to="link.to" class="text-decoration-none d-block">
-                <div class="quick-btn" :style="{ background: link.color }">
+                <div class="quick-btn" :style="{ '--btn-bg': link.color }">
                   <i :class="['bi', link.icon]" aria-hidden="true"></i>
                   <span>{{ link.label }}</span>
                 </div>
@@ -270,44 +270,44 @@ const hrdSystems = [
 ];
 
 const quickLinks = [
-  { label: "Admin Antrian", to: "/antrian/admin", icon: "bi-people-fill", color: "#3b5bdb", pageKey: "antrian.admin" },
+  { label: "Admin Antrian", to: "/antrian/admin", icon: "bi-people-fill", color: "#2563eb", pageKey: "antrian.admin" },
   {
     label: "Absensi",
     to: "/absensi/kehadiran",
     icon: "bi-person-check-fill",
-    color: "#e67700",
+    color: "#f97316",
     pageKey: "absensi.kehadiran",
   },
-  { label: "Input Service", to: "/servis/input", icon: "bi-tools", color: "#2f9e44", pageKey: "servis.input" },
+  { label: "Input Service", to: "/servis/input", icon: "bi-tools", color: "#10b981", pageKey: "servis.input" },
   {
     label: "Input Penjualan",
     to: "/aksesoris/penjualan",
     icon: "bi-gem",
-    color: "#0c8599",
+    color: "#8b5cf6",
     pageKey: "aksesoris.penjualan",
   },
   {
     label: "Manajemen Stok",
     to: "/inventory/manajemen",
     icon: "bi-archive-fill",
-    color: "#6741d9",
+    color: "#ec4899",
     pageKey: "inventory.manajemen",
   },
   {
     label: "Laporan Penjualan",
     to: "/aksesoris/laporan-penjualan",
     icon: "bi-bar-chart-fill",
-    color: "#c8a96e",
+    color: "#f59e0b",
     pageKey: "aksesoris.laporan-penjualan",
   },
   {
     label: "Display Antrian",
     to: "/antrian/display",
     icon: "bi-display",
-    color: "#b74855",
+    color: "#ef4444",
     pageKey: "antrian.display",
   },
-  { label: "Data Servis", to: "/servis/data", icon: "bi-person-gear", color: "#495057", pageKey: "servis.data" },
+  { label: "Data Servis", to: "/servis/data", icon: "bi-person-gear", color: "#06b6d4", pageKey: "servis.data" },
 ];
 
 const l2AdminQuickLinks = [
@@ -315,7 +315,7 @@ const l2AdminQuickLinks = [
     label: "Order Online",
     to: "/order-online/data",
     icon: "bi-shop",
-    color: "#dc3545",
+    color: "#e11d48",
     pageKey: "order-online.data",
   },
 ];
@@ -325,28 +325,28 @@ const hrdQuickLinks = [
     label: "Kehadiran",
     to: "/absensi/kehadiran",
     icon: "bi-person-check-fill",
-    color: "#2b59c3",
+    color: "#3b82f6",
     pageKey: "absensi.kehadiran",
   },
   {
     label: "Pengajuan Izin",
     to: "/absensi/pengajuan-izin",
     icon: "bi-calendar-plus-fill",
-    color: "#2f9e44",
+    color: "#16a34a",
     pageKey: "absensi.pengajuan-izin",
   },
   {
     label: "Laporan Kehadiran",
     to: "/absensi/laporan-kehadiran",
     icon: "bi-clipboard-data-fill",
-    color: "#e67700",
+    color: "#ea580c",
     pageKey: "absensi.laporan-kehadiran",
   },
   {
     label: "Laporan Izin",
     to: "/absensi/laporan-izin",
     icon: "bi-journal-check",
-    color: "#5f3dc4",
+    color: "#d946ef",
     pageKey: "absensi.laporan-izin",
   },
 ];
@@ -563,9 +563,14 @@ const adminFeatures = [
 
 .quick-access-card {
   border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(245, 247, 250, 0.9));
+  border: 0;
+  box-shadow: 0 10px 30px rgba(18, 38, 63, 0.08);
+  overflow: hidden;
 }
 
 .quick-btn {
+  --btn-bg: #ffa940;
   border-radius: 12px;
   padding: 0.85rem;
   min-height: 70px;
@@ -573,27 +578,31 @@ const adminFeatures = [
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 0.3rem;
-  color: #fff;
+  gap: 0.35rem;
+  color: #272727;
   transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
+    transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1),
+    box-shadow 0.25s ease;
+  background: linear-gradient(135deg, var(--btn-bg) 0%, rgb(238, 238, 238) 100%);
+  box-shadow: 0 8px 22px rgba(14, 35, 60, 0.08);
+  border: none;
 }
 
 .quick-btn i {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
 }
 
 .quick-btn span {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   text-align: center;
-  font-weight: 600;
-  line-height: 1.25;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #272727;
 }
 
 .quick-btn:hover {
-  transform: translateY(-4px);
-  opacity: 0.92;
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 50px rgba(10, 30, 60, 0.12);
 }
 
 .role-badge {

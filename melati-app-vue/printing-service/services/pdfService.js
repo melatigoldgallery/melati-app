@@ -357,11 +357,13 @@ class PDFService {
     try {
       await this.init();
 
-      const labelWidthMm = Number(data.labelWidthMm) || 24;
+      const labelWidthMm = Number(data.labelWidthMm) || 23;
       const labelHeightMm = Number(data.labelHeightMm) || 24;
-      const gapMm = Number(data.gapMm) || 35;
-      const pageWidthMm = labelWidthMm * 2 + gapMm;
-      const pageHeightMm = labelHeightMm;
+      const pageWidthMm = Number(data.pageWidthMm) || 85;
+      const pageHeightMm = Number(data.pageHeightMm) || 28;
+      const pagePaddingX = Number(data.pagePaddingX) || 2;
+      const pagePaddingY = Number(data.pagePaddingY) || 2;
+      const gapMm = Number(data.gapMm) || pageWidthMm - 2 * pagePaddingX - 2 * labelWidthMm;
 
       // Build flattened list of rows: each requested label prints as 1 row with 2 identical labels
       const rows = [];
@@ -404,7 +406,16 @@ class PDFService {
       // Load template
       const template = await this.loadTemplate("label-qr");
       // Build html by rendering each row and concatenating with page-break
-      const html = template({ rows: rowsData, labelWidthMm, labelHeightMm, gapMm, pageWidthMm, pageHeightMm });
+      const html = template({
+        rows: rowsData,
+        labelWidthMm,
+        labelHeightMm,
+        gapMm,
+        pageWidthMm,
+        pageHeightMm,
+        pagePaddingX,
+        pagePaddingY,
+      });
 
       page = await this.browser.newPage();
 
@@ -465,11 +476,13 @@ class PDFService {
       await this.init();
       this.templateCache.clear();
 
-      const labelWidthMm = Number(data.labelWidthMm) || 24;
+      const labelWidthMm = Number(data.labelWidthMm) || 23;
       const labelHeightMm = Number(data.labelHeightMm) || 24;
-      const gapMm = Number(data.gapMm) || 50;
-      const pageWidthMm = labelWidthMm * 2 + gapMm;
-      const pageHeightMm = labelHeightMm;
+      const pageWidthMm = Number(data.pageWidthMm) || 85;
+      const pageHeightMm = Number(data.pageHeightMm) || 28;
+      const pagePaddingX = Number(data.pagePaddingX) || 2;
+      const pagePaddingY = Number(data.pagePaddingY) || 2;
+      const gapMm = Number(data.gapMm) || pageWidthMm - 2 * pagePaddingX - 2 * labelWidthMm;
 
       const rows = [];
       (data.labels || []).forEach((l) => {
@@ -505,7 +518,16 @@ class PDFService {
       }
 
       const template = await this.loadTemplate("label-qr");
-      const html = template({ rows: rowsData, labelWidthMm, labelHeightMm, gapMm, pageWidthMm, pageHeightMm });
+      const html = template({
+        rows: rowsData,
+        labelWidthMm,
+        labelHeightMm,
+        gapMm,
+        pageWidthMm,
+        pageHeightMm,
+        pagePaddingX,
+        pagePaddingY,
+      });
 
       page = await this.browser.newPage();
 

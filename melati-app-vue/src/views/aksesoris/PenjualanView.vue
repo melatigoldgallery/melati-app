@@ -213,7 +213,7 @@
                 <td>
                   <input
                     v-model="silverInput.kode"
-                    @keydown.enter.prevent="commitSilverRowFromInput"
+                    @keydown.enter.prevent="handleSilverKodeEnter"
                     type="text"
                     class="form-control form-control-sm"
                     placeholder="Kode (Enter untuk tambah)"
@@ -257,8 +257,11 @@
                 </td>
                 <td>
                   <input
+                    ref="silverTotalInput"
                     v-model="silverInput.totalHargaStr"
+                    @input="recalcSilverHargaPerGram"
                     @blur="formatSilverInputTotal"
+                    @keydown.enter.prevent="commitSilverRowFromInput"
                     type="text"
                     class="form-control form-control-sm"
                     placeholder="Masukkan harga"
@@ -824,7 +827,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
-import { getDocs, query, where, orderBy, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import { getDocs, getDoc, query, where, orderBy, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { floorCollection } from "@/services/floor-scope";
 import Swal from "sweetalert2";
 import { db } from "@/config/firebase";
@@ -897,6 +900,7 @@ const silverInput = reactive({
   hargaPerGram: 0,
   totalHargaStr: "",
 });
+const silverTotalInput = ref(null);
 
 // --- Grand totals -------------------------------------------------------------
 const grandTotalAksesoris = computed(() =>
@@ -1166,7 +1170,7 @@ function openCatalogModal() {
 
 async function loadSilverPrices() {
   try {
-    const d = doc(db, "settings", "silverPrice");
+    const d = doc(floorCollection(db, "settings", activeFloor.value), "silverPrice");
     const snap = await getDoc(d);
     if (!snap.exists()) {
       return [];
@@ -1222,7 +1226,7 @@ function removeSilverPriceByKode(kode) {
 async function saveSilverPrices() {
   isSavingSilverPrices.value = true;
   try {
-    const d = doc(db, "settings", "silverPrice");
+    const d = doc(floorCollection(db, "settings", activeFloor.value), "silverPrice");
     const cleanedMap = {};
     (silverPriceList.value || []).forEach((p) => {
       const key = String(p?.kode || "")
@@ -1281,10 +1285,35 @@ function fillSilverInputFromCatalog(found) {
   silverInput.kadar = found.kadar || "";
   silverInput.berat = found.berat ? String(found.berat) : "";
   silverInput.hargaPerGram = 0;
-  // if there's a reference price set, prefill totalHargaStr
+  // if there's a reference price set, prefill totalHargaStr and auto-calculate harga per gram
   const ref = silverPriceMap.value[String(found.kode || "").toLowerCase()];
   if (ref && ref > 0) {
-    silverInput.totalHargaStr = formatCurrency(ref * (silverInput.jumlah || 1));
+    silverInput.totalHargaStr = ref * (silverInput.jumlah || 1);
+    recalcSilverHargaPerGram();
+    silverInput.totalHargaStr = formatCurrency(silverInput.totalHargaStr);
+  }
+}
+
+function recalcSilverHargaPerGram() {
+  const berat = parseFloat(silverInput.berat) || 0;
+  const total = parseNum(silverInput.totalHargaStr);
+  silverInput.hargaPerGram = berat > 0 ? Math.round(total / berat) : 0;
+}
+
+async function handleSilverKodeEnter() {
+  const total = parseNum(silverInput.totalHargaStr);
+  if (total > 0) {
+    commitSilverRowFromInput();
+    return;
+  }
+  await nextTick();
+  if (silverTotalInput && silverTotalInput.value && typeof silverTotalInput.value.focus === "function") {
+    try {
+      silverTotalInput.value.focus();
+      if (typeof silverTotalInput.value.select === "function") silverTotalInput.value.select();
+    } catch (_) {
+      /* ignore focus errors */
+    }
   }
 }
 
@@ -1302,11 +1331,7 @@ function commitSilverRowFromInput() {
     return;
   }
 
-  // prevent duplicate kode in current rows
-  if (silverRows.value.some((r) => String(r.kode || "").toLowerCase() === kode.toLowerCase())) {
-    swal("Kode sudah ditambahkan", "warning");
-    return;
-  }
+  // allow same kode to be added multiple times (scanner use-case)
 
   const berat = parseFloat(found.berat) || 0;
   const totalHarga = parseNum(silverInput.totalHargaStr);
@@ -1331,7 +1356,7 @@ function commitSilverRowFromInput() {
   resetSilverInput();
 }
 
-// Auto-fill silverInput fields when kode changes
+// Auto-fill silverInput fields when kode changes and auto-calculate harga per gram
 watch(
   () => silverInput.kode,
   (val) => {
@@ -1340,6 +1365,7 @@ watch(
       silverInput.nama = "";
       silverInput.kadar = "";
       silverInput.berat = "";
+      silverInput.hargaPerGram = 0;
       return;
     }
     const found = store.activeSalesItems.find(
@@ -1351,6 +1377,7 @@ watch(
       silverInput.nama = "";
       silverInput.kadar = "";
       silverInput.berat = "";
+      silverInput.hargaPerGram = 0;
     }
   },
 );

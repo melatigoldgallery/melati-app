@@ -7,6 +7,22 @@ const logger = require("../utils/logger");
 const fs = require("fs").promises;
 
 class PrintController {
+  expandLabelsByQty(labels = []) {
+    const expanded = [];
+
+    for (const label of labels) {
+      const qty = Math.max(1, Number(label?.qty) || 1);
+      for (let index = 0; index < qty; index++) {
+        expanded.push({
+          ...label,
+          qty: 1,
+        });
+      }
+    }
+
+    return expanded;
+  }
+
   /**
    * Print thermal receipt (with queue)
    */
@@ -194,37 +210,68 @@ class PrintController {
         return res.status(404).json({ success: false, error: `Printer not found: ${printerName}` });
       }
 
-      // Generate PNG image for all requested labels (expanded by qty)
-      const imagePath = await pdfService.generateLabelImage(data);
-      logger.info(`Generated label image: ${imagePath}`);
+      // Ensure dimensions/defaults for SATO CG408 if not provided
+      data.labelWidthMm = Number(data.labelWidthMm) || 23;
+      data.labelHeightMm = Number(data.labelHeightMm) || 24;
+      data.pageWidthMm = Number(data.pageWidthMm) || 85;
+      data.pageHeightMm = Number(data.pageHeightMm) || 28;
+      data.pagePaddingX = Number(data.pagePaddingX) || 2;
+      data.pagePaddingY = Number(data.pagePaddingY) || 2;
+      if (!data.gapMm) data.gapMm = data.pageWidthMm - 2 * data.pagePaddingX - 2 * data.labelWidthMm;
 
-      // Enqueue print job
-      const jobID = printQueue.addJob(
-        printerName,
-        async () => {
-          const printJobID = await printerService.printImage(printerName, imagePath, {
-            paperWidthMm: 98,
-            paperHeightMm: 24,
-          });
+      const labelsToPrint = this.expandLabelsByQty(data.labels);
+      if (!labelsToPrint.length) {
+        return res.status(400).json({ success: false, error: "No printable labels after qty expansion" });
+      }
 
-          // Schedule image cleanup
-          setTimeout(async () => {
-            try {
-              await fs.unlink(imagePath);
-              logger.info(`🧹 Cleaned up QR image: ${imagePath}`);
-            } catch (err) {
-              logger.error("Error cleaning up QR image:", err.message || err);
-            }
-          }, 10000);
+      const labelWidthMm = Number(data?.labelWidthMm) || 23;
+      const labelHeightMm = Number(data?.labelHeightMm) || 24;
+      const gapMm = Number(data?.gapMm) || data.pageWidthMm - 2 * data.pagePaddingX - 2 * labelWidthMm;
+      const pageWidthMm = Number(data?.pageWidthMm) || data.pageWidthMm || labelWidthMm * 2 + gapMm;
 
-          return { printJobID, imagePath };
-        },
-        { type: "qr-silver", itemCount: data.labels.length },
-      );
+      const printJobIDs = [];
+      for (const label of labelsToPrint) {
+        const imagePath = await pdfService.generateLabelImage({
+          ...data,
+          labels: [{ ...label, qty: 1 }],
+        });
+        logger.info(`Generated label image: ${imagePath}`);
+
+        const jobID = printQueue.addJob(
+          printerName,
+          async () => {
+            const printJobID = await printerService.printImage(printerName, imagePath, {
+              paperWidthMm: pageWidthMm,
+              paperHeightMm: pageHeightMm || labelHeightMm,
+            });
+
+            setTimeout(async () => {
+              try {
+                await fs.unlink(imagePath);
+                logger.info(`🧹 Cleaned up QR image: ${imagePath}`);
+              } catch (err) {
+                logger.error("Error cleaning up QR image:", err.message || err);
+              }
+            }, 10000);
+
+            return { printJobID, imagePath };
+          },
+          { type: "qr-silver", itemCount: 1 },
+        );
+
+        printJobIDs.push(jobID);
+      }
 
       const queueStatus = printQueue.getQueueStatus(printerName);
 
-      res.json({ success: true, jobID, printer: printerName, queueStatus, message: "QR labels queued for printing" });
+      res.json({
+        success: true,
+        jobID: printJobIDs[0],
+        jobIDs: printJobIDs,
+        printer: printerName,
+        queueStatus,
+        message: "QR labels queued for printing",
+      });
     } catch (error) {
       logger.error("Print QR Silver error:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -264,63 +311,61 @@ class PrintController {
         });
       }
 
-      // Generate SBPL batch commands (native printer format)
-      const sbplCommand = sbplService.generateBatchQRLabels(data.labels);
+      // Ensure dimensions/defaults for SATO CG408 if not provided
+      data.labelWidthMm = Number(data.labelWidthMm) || 23;
+      data.labelHeightMm = Number(data.labelHeightMm) || 24;
+      data.pageWidthMm = Number(data.pageWidthMm) || 85;
+      data.pageHeightMm = Number(data.pageHeightMm) || 28;
+      data.pagePaddingX = Number(data.pagePaddingX) || 2;
+      data.pagePaddingY = Number(data.pagePaddingY) || 2;
+      if (!data.gapMm) data.gapMm = data.pageWidthMm - 2 * data.pagePaddingX - 2 * data.labelWidthMm;
 
-      // Validate SBPL command
-      if (!sbplService.isValidSBPLCommand(sbplCommand)) {
-        return res.status(400).json({
-          success: false,
-          error: "Invalid SBPL command generated",
+      const labelsToPrint = this.expandLabelsByQty(data.labels);
+      if (!labelsToPrint.length) {
+        return res.status(400).json({ success: false, error: "No printable labels after qty expansion" });
+      }
+      const printJobIDs = [];
+      const labelWidthMm = Number(data.labelWidthMm) || 23;
+      const labelHeightMm = Number(data.labelHeightMm) || 24;
+      const gapMm = Number(data.gapMm) || data.pageWidthMm - 2 * data.pagePaddingX - 2 * labelWidthMm;
+      const pageWidthMm = Number(data.pageWidthMm) || labelWidthMm * 2 + gapMm;
+
+      for (const label of labelsToPrint) {
+        const imagePath = await pdfService.generateLabelImage({
+          ...data,
+          labels: [{ ...label, qty: 1 }],
         });
+        logger.info(`Generated label image: ${imagePath}`);
+
+        const printJobID = await printerService.printImage(printerName, imagePath, {
+          paperWidthMm: pageWidthMm,
+          paperHeightMm: labelHeightMm,
+        });
+
+        printJobIDs.push(printJobID);
+
+        setTimeout(async () => {
+          try {
+            await fs.unlink(imagePath);
+            logger.info(`🧹 Cleaned up QR image: ${imagePath}`);
+          } catch (err) {
+            logger.error("Error cleaning up QR image:", err.message || err);
+          }
+        }, 10000);
       }
 
-      const cmdInfo = sbplService.getCommandInfo(sbplCommand);
-      logger.info(`📋 SBPL Command generated:`, cmdInfo);
-
-      // Add to print queue
-      const jobID = printQueue.addJob(
-        printerName,
-        async () => {
-          try {
-            logger.info(`⏳ Sending SBPL command to printer: ${printerName}`);
-            logger.info(`Command size: ${sbplCommand.length} bytes`);
-
-            // Send SBPL command directly to printer (raw)
-            const printJobID = await printerService.printRaw(printerName, sbplCommand);
-
-            logger.info(`✅ SBPL command sent successfully`);
-            return { printJobID, method: "SBPL", commandSize: sbplCommand.length };
-          } catch (error) {
-            logger.error("❌ Error sending SBPL command:", error.message);
-            throw new Error(`Failed to send SBPL command: ${error.message}`);
-          }
-        },
-        {
-          type: "qr-sbpl",
-          method: "SBPL",
-          labelCount: data.labels.length,
-          totalQty: data.labels.reduce((sum, l) => sum + (Number(l.qty) || 1), 0),
-          commandSize: sbplCommand.length,
-        },
-      );
-
-      const queueStatus = printQueue.getQueueStatus(printerName);
-
-      logger.info(`✅ SBPL job ${jobID} queued successfully`);
-      logger.info(`📊 Queue: ${queueStatus.queueLength} job(s), printer ${queueStatus.status}`);
+      logger.info(`✅ QR images sent successfully (${printJobIDs.length} job(s))`);
 
       res.json({
         success: true,
-        jobID,
+        jobID: printJobIDs[0],
+        jobIDs: printJobIDs,
         printer: printerName,
-        method: "SBPL",
-        queueStatus,
+        method: "IMAGE",
         performance: {
-          commandSize: sbplCommand.length,
-          estimatedSpeed: "100-200ms", // SBPL is much faster than image
+          estimatedSpeed: "image-mode",
         },
-        message: "QR labels queued for SBPL printing (fast native mode)",
+        message: "QR labels printed successfully",
       });
     } catch (error) {
       logger.error("❌ Print QR SBPL error:", error);

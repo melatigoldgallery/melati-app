@@ -70,25 +70,25 @@
 
     <template v-else>
       <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+        <div :class="isL2Floor ? 'col-6 col-md-4' : 'col-6 col-md-3'">
           <div class="card border-0 shadow-sm text-center py-3">
             <div class="h4 fw-bold text-primary mb-0">{{ filteredTransactions.length }}</div>
             <div class="small text-muted mt-1">Total Transaksi</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div :class="isL2Floor ? 'col-6 col-md-4' : 'col-6 col-md-3'">
           <div class="card border-0 shadow-sm text-center py-3">
             <div class="h5 fw-bold text-success mb-0">{{ formatCurrency(summaryTotals.harga) }}</div>
             <div class="small text-muted mt-1">Total Pendapatan</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div :class="isL2Floor ? 'col-6 col-md-4' : 'col-6 col-md-3'">
           <div class="card border-0 shadow-sm text-center py-3">
             <div class="h4 fw-bold text-warning mb-0">{{ summaryTotals.pcs }}</div>
             <div class="small text-muted mt-1">Total Item Terjual</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div v-if="!isL2Floor" class="col-6 col-md-3">
           <div class="card border-0 shadow-sm text-center py-3">
             <div class="h5 fw-bold text-info mb-0">{{ silverSummary.hargaLabel }} / {{ silverSummary.beratLabel }}</div>
             <div class="small text-muted mt-1">Total Penjualan Silver (Harga/Berat)</div>

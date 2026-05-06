@@ -276,6 +276,7 @@
                       <th>Nama</th>
                       <th>Kadar</th>
                       <th>Berat</th>
+                      <th class="text-center" style="width: 80px">Stok</th>
                       <th style="width: 120px">Qty</th>
                     </tr>
                   </thead>
@@ -285,6 +286,7 @@
                       <td class="small">{{ r.nama }}</td>
                       <td class="small">{{ r.kadar || "-" }}</td>
                       <td class="small">{{ r.berat || "-" }}</td>
+                      <td class="small text-center">{{ r.stok }}</td>
                       <td>
                         <input type="number" class="form-control form-control-sm" min="0" v-model.number="r.qty" />
                       </td>
@@ -577,7 +579,12 @@ import { floorCollection, floorDoc, floorSubCollection, floorSegmentsWithFloorId
 import { Modal } from "bootstrap";
 import { db } from "@/config/firebase";
 import { useAccessoriesStore } from "@/stores/accessories";
-import { addStock, fetchKodesByKategori, verifyDeleteTambahBarangPassword } from "@/services/stock-service";
+import {
+  addStock,
+  fetchKodesByKategori,
+  fetchKodeWithStockByKategori,
+  verifyDeleteTambahBarangPassword,
+} from "@/services/stock-service";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import { useAuthStore } from "@/stores/auth";
@@ -623,22 +630,38 @@ async function loadPrinters() {
   }
 }
 
-function openPrintQrModal() {
+async function openPrintQrModal() {
   if (form.value.jenis !== "silver") {
-    swal("Hanya untuk silver", "Pilih jenis 'silver' terlebih dahulu.", "warning");
+    swal("Pilih jenis 'silver' terlebih dahulu.", "warning");
     return;
   }
   if (!printerOptions.value.length && !isLoadingPrinters.value) {
     loadPrinters();
   }
-  // Build rows from kodeCatalog
-  printRows.value = (kodeCatalog.value || []).map((k) => ({
-    kode: k.kode || k.text || "",
-    nama: k.nama || "",
-    kadar: k.kadar || "",
-    berat: k.berat || "",
-    qty: 0,
-  }));
+
+  // Load silver codes with stok > 0 from active floor
+  isLoadingCodes.value = true;
+  try {
+    const silvercodes = await fetchKodeWithStockByKategori("silver", activeFloor.value);
+    printRows.value = silvercodes.map((k) => ({
+      kode: k.kode || k.text || "",
+      nama: k.nama || "",
+      kadar: k.kadar || "",
+      berat: k.berat || "",
+      stok: k.stok || 0,
+      qty: 0,
+    }));
+    if (!printRows.value.length) {
+      swal("Tidak ada silver dengan stok > 0", "info");
+      return;
+    }
+  } catch (e) {
+    showError("Gagal memuat kode silver", e.message);
+    return;
+  } finally {
+    isLoadingCodes.value = false;
+  }
+
   if (!printModal) printModal = new Modal(document.getElementById("modalPrintQrSilver"));
   printModal.show();
 }
@@ -646,9 +669,15 @@ function openPrintQrModal() {
 async function printQr() {
   const toPrint = printRows.value
     .filter((r) => r.qty && r.qty > 0)
-    .map((r) => ({ kode: r.kode, nama: r.nama, kadar: r.kadar, berat: r.berat, qty: r.qty }));
+    .map((r) => ({
+      kode: String(r.kode || ""),
+      nama: String(r.nama || ""),
+      kadar: String(r.kadar || ""),
+      berat: String(r.berat || ""),
+      qty: Number(r.qty) || 1,
+    }));
   if (!toPrint.length) {
-    swal("Tidak ada label", "Masukkan qty > 0 pada minimal satu kode.", "warning");
+    swal("Masukkan qty > 0 pada minimal satu kode.", "warning");
     return;
   }
 
@@ -671,7 +700,7 @@ async function printQr() {
     clearTimeout(timeout);
     const resp = await respFetch.json().catch(() => null);
     if (respFetch.ok && resp && resp.success) {
-      swal("Terkirim", `Job ${resp.jobID} - SBPL (${resp.performance?.estimatedSpeed || "cepat"})`, "success");
+      swal(`Job ${resp.jobID} - QR label (${resp.performance?.estimatedSpeed || "cepat"})`, "success");
       printModal.hide();
     } else {
       showError("Gagal print", (resp && resp.error) || `HTTP ${respFetch.status}`);
@@ -683,14 +712,14 @@ async function printQr() {
   }
 }
 
-async function loadKodeCatalog(jenis) {
+async function loadKodeCatalog(jenis, floorId = activeFloor.value) {
   if (!jenis) {
     kodeCatalog.value = [];
     return;
   }
   isLoadingCodes.value = true;
   try {
-    kodeCatalog.value = await fetchKodesByKategori(jenis);
+    kodeCatalog.value = await fetchKodesByKategori(jenis, floorId);
   } catch (e) {
     showError("Gagal memuat kode", e.message);
   } finally {
@@ -707,7 +736,7 @@ const totalJumlah = computed(() => inputRows.value.reduce((s, r) => s + (r.jumla
 
 function onJenisChange() {
   inputRows.value = [defaultRow()];
-  loadKodeCatalog(form.value.jenis);
+  loadKodeCatalog(form.value.jenis, activeFloor.value);
 }
 
 function onKodeChange(row) {
@@ -933,7 +962,7 @@ async function onKodeTabChange(tab) {
 async function loadKodeBarang(kategori) {
   isLoadingKode.value = true;
   try {
-    kodeList.value = await fetchKodesByKategori(kategori);
+    kodeList.value = await fetchKodesByKategori(kategori, activeFloor.value);
   } catch (e) {
     showError("Gagal memuat kode", e.message);
   } finally {

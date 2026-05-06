@@ -471,6 +471,31 @@ export async function fetchKodesByKategori(jenis, floorId = "") {
 }
 
 /**
+ * Fetch stok items by kategori with stok > 0 only.
+ * Source of truth is stokAksesoris collection (not master kode).
+ * Used for printing/display where we only want items actually in stock.
+ * @param {string} jenis - "kotak" | "aksesoris" | "silver"
+ * @param {string} floorId - optional floor ID
+ * @returns {Array} [{id, kode, nama, kadar, berat, stok, kategori, ...}]
+ */
+export async function fetchKodeWithStockByKategori(jenis, floorId = "") {
+  const resolvedFloor = normalizeFloorId(floorId || getActiveFloor());
+
+  // Query stokAksesoris (source of truth for stok) filtered by kategori
+  const stokSnap = await getDocs(
+    query(floorCollection(db, "stokAksesoris", resolvedFloor), where("kategori", "==", jenis)),
+  );
+
+  // Filter stok > 0 and map to result
+  const result = stokSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((item) => (item.stok || 0) > 0)
+    .sort((a, b) => (a.kode || "").localeCompare(b.kode || ""));
+
+  return result;
+}
+
+/**
  * Process return (decrement stock).
  * Writes log entries (jenis: "return") per item.
  * Supports both new-style (doc ID = kode) and legacy (auto-id + kode field) stokAksesoris docs.

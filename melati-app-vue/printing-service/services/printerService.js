@@ -350,13 +350,16 @@ try {
     $printDoc.add_PrintPage({
         param($sender, $ev)
         try {
-            $ev.Graphics.PageUnit = [System.Drawing.GraphicsUnit]::Pixel
             $ev.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
             $ev.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
             $ev.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
             $ev.Graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
 
-            $rect = New-Object System.Drawing.Rectangle(0, 0, $ev.PageBounds.Width, $ev.PageBounds.Height)
+            # Draw from (0,0) using actual image pixel dimensions to avoid printer hardware margins
+            # This ensures template positioning matches physical output exactly
+            $imgWidth = $image.Width
+            $imgHeight = $image.Height
+            $rect = New-Object System.Drawing.Rectangle(0, 0, $imgWidth, $imgHeight)
             $ev.Graphics.DrawImage($image, $rect)
             $ev.HasMorePages = $false
         } catch {
