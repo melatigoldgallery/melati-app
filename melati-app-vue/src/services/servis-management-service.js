@@ -17,12 +17,14 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
+import { calculateReconciliationStatus, getSafeQty } from "@/utils/floor-math";
 
 // Cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const managementCache = {
   data: null,
   timestamp: 0,
+  lastKey: "",
 };
 
 /**
@@ -45,13 +47,11 @@ export async function getServisManagementByUser(userId, tipe = null) {
 
   try {
     const results = {};
-    const userRef = doc(db, "servis_management", userId);
-
     // Get both servis and custom if tipe is null
     const tipeList = tipe ? [tipe] : ["servis", "custom"];
 
     for (const t of tipeList) {
-      const monthsRef = collection(userRef, t);
+      const monthsRef = collection(db, "servis_management", userId, t);
       const snapshot = await getDocs(monthsRef);
 
       results[t] = snapshot.docs.map((d) => ({
@@ -85,30 +85,19 @@ export async function getServisManagementByUser(userId, tipe = null) {
  * Update fisik barang quantity for a month
  * Implements: Update logic with history tracking
  */
-export async function updateFisikBarangQty(userId, tipe, bulan, newQty, notes, currentUser) {
+export async function updateFisikBarangQty(userId, tipe, bulan, newQty, notes, currentUser, options = {}) {
   try {
     const docRef = doc(db, "servis_management", userId, tipe, bulan);
 
     // Get current document
     const docSnap = await getDoc(docRef);
     const currentData = docSnap.data() || {};
-    const oldQty = currentData.fisikBarangQty || 0;
-    const sistemQty = currentData.sistemDataQty || 0;
+    const oldQty = getSafeQty(currentData.fisikBarangQty, 0);
+    const fallbackSistemQty = getSafeQty(options?.sistemQty, 0);
+    const sistemQty = getSafeQty(currentData.sistemDataQty, fallbackSistemQty);
 
     // Calculate new status and variance
-    let newStatus = "klop";
-    let newVariance = 0;
-
-    if (newQty === sistemQty) {
-      newStatus = "klop";
-      newVariance = 0;
-    } else if (newQty < sistemQty) {
-      newStatus = "kurang";
-      newVariance = newQty - sistemQty;
-    } else {
-      newStatus = "lebih";
-      newVariance = newQty - sistemQty;
-    }
+    const { status: newStatus, variance: newVariance } = calculateReconciliationStatus(newQty, sistemQty);
 
     // Create history entry
     const historyEntry = {
@@ -117,7 +106,7 @@ export async function updateFisikBarangQty(userId, tipe, bulan, newQty, notes, c
       fisikQtyAfter: newQty,
       status: newStatus,
       variance: newVariance,
-      updatedBy: currentUser,
+      updatedBy: currentUser || "",
       notes: notes || "",
     };
 
@@ -129,7 +118,7 @@ export async function updateFisikBarangQty(userId, tipe, bulan, newQty, notes, c
       sistemDataQty: sistemQty,
       status: newStatus,
       variance: newVariance,
-      lastUpdatedBy: currentUser,
+      lastUpdatedBy: currentUser || "",
       lastUpdatedAt: Timestamp.now(),
       updateNotes: notes,
       history: arrayUnion(historyEntry),
@@ -160,35 +149,43 @@ export async function initializeMonthRecord(userId, tipe, bulan, sistemQty) {
 
     if (!docSnap.exists()) {
       // Create new record
-      await setDoc(docRef, {
-        bulan,
-        tipe,
-        fisikBarangQty: 0,
-        sistemDataQty: sistemQty,
-        status: "pending",
-        variance: sistemQty,
-        lastUpdatedBy: "system",
-        lastUpdatedAt: Timestamp.now(),
-        updateNotes: "Auto-initialized",
-        history: [
-          {
-            timestamp: Timestamp.now(),
-            fisikQtyBefore: 0,
-            fisikQtyAfter: 0,
-            status: "pending",
-            variance: sistemQty,
-            updatedBy: "system",
-            notes: "Initial creation from servis data",
-          },
-        ],
-      });
+      await setDoc(
+        docRef,
+        {
+          bulan,
+          tipe,
+          fisikBarangQty: 0,
+          sistemDataQty: sistemQty,
+          status: "pending",
+          variance: sistemQty,
+          lastUpdatedBy: "system",
+          lastUpdatedAt: Timestamp.now(),
+          updateNotes: "Auto-initialized",
+          history: [
+            {
+              timestamp: Timestamp.now(),
+              fisikQtyBefore: 0,
+              fisikQtyAfter: 0,
+              status: "pending",
+              variance: sistemQty,
+              updatedBy: "system",
+              notes: "Initial creation from servis data",
+            },
+          ],
+        },
+        { merge: true },
+      );
     } else {
       // Update sistem count if it changed
       const currentData = docSnap.data();
       if (currentData.sistemDataQty !== sistemQty) {
+        const fisikQty = getSafeQty(currentData.fisikBarangQty, 0);
+        const { status, variance } = calculateReconciliationStatus(fisikQty, sistemQty);
+
         await updateDoc(docRef, {
           sistemDataQty: sistemQty,
-          variance: currentData.fisikBarangQty - sistemQty,
+          status,
+          variance,
           lastUpdatedAt: Timestamp.now(),
         });
       }

@@ -1,10 +1,16 @@
 ﻿<template>
   <div class="container-fluid py-3">
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-people me-2 text-warning"></i>
-        Kelola Pengguna
-      </h4>
+      <div>
+        <h4 class="fw-bold mb-0">
+          <i class="bi bi-people me-2 text-warning"></i>
+          Kelola Pengguna
+        </h4>
+        <div class="small text-muted mt-1">
+          Scope lantai aktif:
+          <span class="badge bg-light text-dark border ms-1">{{ activeFloorLabel }}</span>
+        </div>
+      </div>
       <button class="btn btn-warning btn-sm" @click="openAdd">
         <i class="bi bi-person-plus me-1"></i>
         Tambah User
@@ -128,10 +134,7 @@
                   <span class="text-danger">*</span>
                 </label>
                 <select v-model="form.role" class="form-select form-select-sm">
-                  <option value="admin">Admin</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="staff">Staff</option>
-                  <option value="hrd">HRD</option>
+                  <option v-for="role in availableRoles" :key="role" :value="role">{{ getRoleLabel(role) }}</option>
                 </select>
               </div>
               <div class="col-12">
@@ -207,11 +210,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { Modal } from "bootstrap";
 import { db } from "@/config/firebase";
-import { collection, getDocs, setDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, setDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
+import { floorCollection, floorDoc } from "@/services/floor-scope";
 import { useAlert } from "@/composables/useAlert";
+import { useAuthStore } from "@/stores/auth";
 import { hashSecret } from "@/utils/security";
 import {
   buildUserAccessMap,
@@ -219,8 +224,22 @@ import {
   normalizeAccessMap,
   normalizeUserRole,
 } from "@/config/access-control";
+import {
+  buildFloorUserDocId,
+  getAllowedRolesForFloor,
+  getFloorLabel,
+  isRoleAllowedForFloor,
+  normalizeFloorId,
+  normalizeUsername,
+  parseFloorFromUserDocId,
+} from "@/config/floor-config";
 
 const { toast, error: showError, confirm } = useAlert();
+const auth = useAuthStore();
+
+const activeFloor = computed(() => normalizeFloorId(auth.activeFloor, "L1"));
+const activeFloorLabel = computed(() => getFloorLabel(activeFloor.value));
+const availableRoles = computed(() => getAllowedRolesForFloor(activeFloor.value));
 
 const PERMISSION_GROUPS = {
   "inventory-barang": [
@@ -257,6 +276,12 @@ const PERMISSION_GROUPS = {
     { key: "input-servis", label: "Input Servis" },
     { key: "data-servis", label: "Data Servis" },
     { key: "laporan-servis", label: "Laporan Servis" },
+    { key: "manajemen-servis", label: "Manajemen Servis" },
+  ],
+  "order-online": [
+    { key: "input-order", label: "Input Order" },
+    { key: "data-order", label: "Data Order" },
+    { key: "manajemen-order", label: "Manajemen Order" },
   ],
   promosi: [{ key: "setting-promosi", label: "Setting Promosi" }],
   admin: [
@@ -266,6 +291,7 @@ const PERMISSION_GROUPS = {
     { key: "antrian-penutupan", label: "Setting Antrian" },
     { key: "tema-warna", label: "Tema Warna" },
     { key: "maintenance", label: "Maintenance" },
+    { key: "setting-manajemen-stok", label: "Setting Manajemen Stok" },
   ],
 };
 
@@ -297,6 +323,10 @@ const PERMISSION_TO_PAGE = {
   "servis.input-servis": "servis.input",
   "servis.data-servis": "servis.data",
   "servis.laporan-servis": "servis.laporan",
+  "servis.manajemen-servis": "servis.manajemen",
+  "order-online.input-order": "order-online.input",
+  "order-online.data-order": "order-online.data",
+  "order-online.manajemen-order": "order-online.manajemen",
   "promosi.setting-promosi": "promosi.setting",
   "admin.kelola-user": "admin.users",
   "admin.kode-akses": "admin.access-codes",
@@ -304,6 +334,7 @@ const PERMISSION_TO_PAGE = {
   "admin.antrian-penutupan": "admin.antrian-closing",
   "admin.tema-warna": "admin.theme-appearance",
   "admin.maintenance": "admin.maintenance",
+  "admin.setting-manajemen-stok": "admin.inventory-manajemen-stok",
 };
 
 function defaultPermissions() {
@@ -348,7 +379,7 @@ const form = ref({
   username: "",
   email: "",
   displayName: "",
-  role: "staff",
+  role: activeFloor.value === "L2" ? "admin" : "staff",
   password: "",
   confirmPassword: "",
   permissions: defaultPermissions(),
@@ -390,8 +421,12 @@ function isProtectedUser(user) {
   return normalizeUserRole(user?.role, "staff") === "supervisor";
 }
 
-function normalizeUsername(value) {
-  return String(value || "").trim();
+function getDefaultRoleForActiveFloor() {
+  return activeFloor.value === "L2" ? "admin" : "staff";
+}
+
+function getFloorUserDocId(username) {
+  return buildFloorUserDocId(activeFloor.value, username);
 }
 
 function findUserByUsername(username) {
@@ -408,15 +443,21 @@ function formatTs(ts) {
 async function loadUsers() {
   loading.value = true;
   try {
-    const snap = await getDocs(collection(db, "users"));
-    users.value = snap.docs.map((d) => {
-      const data = d.data() || {};
-      return {
-        id: d.id,
-        ...data,
-        role: normalizeUserRole(data.role, "staff"),
-      };
-    });
+    const snap = await getDocs(floorCollection(db, "users", activeFloor.value));
+    users.value = snap.docs
+      .map((d) => {
+        const data = d.data() || {};
+        const floorFromData = normalizeFloorId(data.floorId);
+        const floorFromDocId = parseFloorFromUserDocId(d.id);
+        const floorId = floorFromData || floorFromDocId || "L1";
+        return {
+          id: d.id,
+          ...data,
+          floorId,
+          role: normalizeUserRole(data.role, "staff"),
+        };
+      })
+      .filter((u) => u.floorId === activeFloor.value);
   } catch (e) {
     showError("Gagal memuat pengguna", e.message);
   } finally {
@@ -431,7 +472,7 @@ function openAdd() {
     username: "",
     email: "",
     displayName: "",
-    role: "staff",
+    role: getDefaultRoleForActiveFloor(),
     password: "",
     confirmPassword: "",
     permissions: defaultPermissions(),
@@ -449,7 +490,7 @@ function openEdit(u) {
     username: u.username,
     email: u.email || "",
     displayName: u.displayName || "",
-    role: userRole,
+    role: availableRoles.value.includes(userRole) ? userRole : getDefaultRoleForActiveFloor(),
     password: "",
     confirmPassword: "",
     permissions: permissionsFromPagesAccess(pagesAccess),
@@ -463,7 +504,11 @@ async function saveUser() {
   const { username, email, displayName, role, password, confirmPassword, permissions } = form.value;
   const normalizedUsername = normalizeUsername(username);
   const normalizedEmail = String(email || "").trim();
-  const normalizedRole = normalizeUserRole(role, "staff");
+  const normalizedRole = normalizeUserRole(role, getDefaultRoleForActiveFloor());
+  if (!isRoleAllowedForFloor(normalizedRole, activeFloor.value)) {
+    formError.value = `Role ${normalizedRole} tidak diizinkan untuk ${activeFloorLabel.value}.`;
+    return;
+  }
   if (!normalizedUsername || normalizedUsername.length < 3) {
     formError.value = "Username minimal 3 karakter.";
     return;
@@ -492,6 +537,8 @@ async function saveUser() {
 
     const data = {
       username: normalizedUsername,
+      usernameLower: normalizedUsername.toLowerCase(),
+      floorId: activeFloor.value,
       email: normalizedEmail || null,
       displayName,
       role: normalizedRole,
@@ -509,12 +556,15 @@ async function saveUser() {
       }
       data.createdAt = now;
       if (password) data.passwordHash = await hashSecret(password);
-      await setDoc(doc(db, "users", normalizedUsername), data);
+      await setDoc(floorDoc(db, "users", getFloorUserDocId(normalizedUsername), activeFloor.value), data);
     } else {
       const previousUsername = normalizeUsername(originalUsername.value || editTarget.value.username);
+      const previousDocId = String(editTarget.value.id || getFloorUserDocId(previousUsername));
+      const nextDocId = getFloorUserDocId(normalizedUsername);
       const isUsernameChanged = normalizedUsername.toLowerCase() !== previousUsername.toLowerCase();
+      const needsDocMigration = previousDocId !== nextDocId;
 
-      if (isUsernameChanged) {
+      if (isUsernameChanged || needsDocMigration) {
         const existingTarget = findUserByUsername(normalizedUsername);
         if (
           existingTarget &&
@@ -539,19 +589,25 @@ async function saveUser() {
           return;
         }
 
-        await setDoc(doc(db, "users", normalizedUsername), payload);
-        await deleteDoc(doc(db, "users", previousUsername));
+        await setDoc(floorDoc(db, "users", nextDocId, activeFloor.value), payload);
+        if (previousDocId !== nextDocId) {
+          await deleteDoc(floorDoc(db, "users", previousDocId, activeFloor.value));
+        }
       } else {
         if (password) data.passwordHash = await hashSecret(password);
-        await updateDoc(doc(db, "users", previousUsername), data);
+        await updateDoc(floorDoc(db, "users", previousDocId, activeFloor.value), data);
       }
     }
 
     // Sync role ke userRoles/{email} agar Firebase Auth login bisa membaca role
     if (normalizedEmail) {
       await setDoc(
-        doc(db, "userRoles", normalizedEmail),
-        { role: normalizedRole, username: normalizedUsername },
+        floorDoc(db, "userRoles", normalizedEmail, activeFloor.value),
+        {
+          role: normalizedRole,
+          username: normalizedUsername,
+          floorId: activeFloor.value,
+        },
         {
           merge: true,
         },
@@ -576,7 +632,7 @@ async function removeUser(u) {
   });
   if (!r.isConfirmed) return;
   try {
-    await deleteDoc(doc(db, "users", u.username));
+    await deleteDoc(floorDoc(db, "users", u.id, activeFloor.value));
     toast("User berhasil dihapus");
     await loadUsers();
   } catch (e) {
@@ -585,4 +641,7 @@ async function removeUser(u) {
 }
 
 onMounted(loadUsers);
+watch(activeFloor, () => {
+  loadUsers();
+});
 </script>

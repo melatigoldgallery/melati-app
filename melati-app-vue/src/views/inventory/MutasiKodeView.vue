@@ -13,7 +13,7 @@
         </ol>
       </nav>
     </div>
-    <div class="d-flex justify-content-end align-items-center mb-3">
+    <!-- <div class="d-flex justify-content-end align-items-center mb-3">
       <button
         type="button"
         class="btn btn-outline-secondary btn-sm"
@@ -23,7 +23,7 @@
         <i class="bi bi-arrow-clockwise me-1"></i>
         Refresh
       </button>
-    </div>
+    </div> -->
 
     <div class="card mb-3">
       <div class="card-header">
@@ -552,6 +552,8 @@ import Swal from "sweetalert2";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { Modal } from "bootstrap";
 import { useAlert } from "@/composables/useAlert";
+import { normalizeFloorId } from "@/config/floor-config";
+import { useAuthStore } from "@/stores/auth";
 import {
   clearAllCache,
   clearOldCache,
@@ -569,6 +571,7 @@ import {
 } from "@/services/mutasi-service";
 
 const { error: showError, success, toast } = useAlert();
+const auth = useAuthStore();
 
 const loading = ref(false);
 const processing = ref(false);
@@ -602,6 +605,7 @@ let validasiModal = null;
 const sourceText = computed(() =>
   currentDataSource.value === "penjualanAksesoris" ? "Transaksi Penjualan" : "Mutasi Kode",
 );
+const activeFloor = computed(() => normalizeFloorId(auth.activeFloor, "L1"));
 
 const filteredActive = computed(() => {
   const mutatedIds = new Set((kodeData.value.mutated || []).map((i) => i.id));
@@ -637,7 +641,7 @@ function switchTab(tab) {
 }
 
 function updateCacheBadge() {
-  const cacheInfo = getTodayCacheInfo();
+  const cacheInfo = getTodayCacheInfo(activeFloor.value);
   if (!cacheInfo) {
     cacheBadgeText.value = "";
     return;
@@ -656,7 +660,7 @@ async function loadData(forceRefresh = false) {
   selectedMutatedIds.value = new Set();
 
   try {
-    const result = await fetchKodeData({ forceRefresh });
+    const result = await fetchKodeData({ forceRefresh, floorId: activeFloor.value });
     kodeData.value = result.data;
     currentDataSource.value = result.source;
     updateCacheBadge();
@@ -677,6 +681,7 @@ function setupListener() {
   unsubscribeListener = setupRealtimeListener({
     source: currentDataSource.value,
     initialData: kodeData.value,
+    floorId: activeFloor.value,
     onUpdate: (newData) => {
       kodeData.value = newData;
       updateCacheBadge();
@@ -768,6 +773,7 @@ async function saveMutasi() {
       currentDataSource: currentDataSource.value,
       tanggalMutasi: tanggalMutasi.value,
       keteranganMutasi: keteranganMutasi.value.trim(),
+      floorId: activeFloor.value,
     });
 
     mutasiModal?.hide();
@@ -805,7 +811,7 @@ async function confirmRestoreSelected() {
 
   processing.value = true;
   try {
-    await restoreSelectedKodes(selectedItems);
+    await restoreSelectedKodes(selectedItems, activeFloor.value);
     selectedMutatedIds.value = new Set();
     await loadData(true);
     success(`${selectedItems.length} kode berhasil dikembalikan`);
@@ -850,13 +856,13 @@ async function submitValidasiDelete() {
   validasiError.value = "";
 
   try {
-    const valid = await verifyDeleteMutasiKodePassword(validasiPassword.value);
+    const valid = await verifyDeleteMutasiKodePassword(validasiPassword.value, activeFloor.value);
     if (!valid) {
       validasiError.value = "Kode akses tidak valid";
       return;
     }
 
-    await deleteSelectedKodes(pendingDeleteItems.value);
+    await deleteSelectedKodes(pendingDeleteItems.value, activeFloor.value);
     validasiModal?.hide();
     selectedMutatedIds.value = new Set();
     pendingDeleteItems.value = [];

@@ -1,12 +1,6 @@
 import { rtdb } from "@/config/firebase";
-import {
-  ref as dbRef,
-  onValue,
-  set,
-  get,
-  push,
-  remove,
-} from "firebase/database";
+import { ref as dbRef, onValue, set, get, push, remove } from "firebase/database";
+import { floorDataRef } from "./floor-scope";
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -26,11 +20,16 @@ export const LETTERS_MAP = {
   D: "Pembelian Emas",
 };
 
-const QUEUE_REF = "queue";
-const CUSTOMER_REF = "customerCount";
-
 function queueRef() {
-  return dbRef(rtdb, QUEUE_REF);
+  return floorDataRef(rtdb, "queue", "state");
+}
+
+function customerCountRef() {
+  return floorDataRef(rtdb, "queue", "customerCount");
+}
+
+function analyticsRef(year, month, day) {
+  return floorDataRef(rtdb, "queue", "analytics", String(year), String(month), String(day));
 }
 
 // ── State subscription ─────────────────────────────────────────────────────
@@ -140,9 +139,7 @@ export async function moveToMissed(state, queueNumber) {
   const newState = {
     ...state,
     delayedQueue: state.delayedQueue.filter((q) => q !== queueNumber),
-    missedQueue: state.missedQueue.includes(queueNumber)
-      ? state.missedQueue
-      : [...state.missedQueue, queueNumber],
+    missedQueue: state.missedQueue.includes(queueNumber) ? state.missedQueue : [...state.missedQueue, queueNumber],
   };
   await saveState(newState);
   return newState;
@@ -166,19 +163,19 @@ export async function resetQueue() {
 
 // ── Customer Count ─────────────────────────────────────────────────────────
 export async function incrementCustomer() {
-  const snap = await get(dbRef(rtdb, CUSTOMER_REF));
+  const snap = await get(customerCountRef());
   const current = snap.val() || 0;
-  await set(dbRef(rtdb, CUSTOMER_REF), current + 1);
+  await set(customerCountRef(), current + 1);
 }
 
 export async function decrementCustomer() {
-  const snap = await get(dbRef(rtdb, CUSTOMER_REF));
+  const snap = await get(customerCountRef());
   const current = snap.val() || 0;
-  await set(dbRef(rtdb, CUSTOMER_REF), Math.max(0, current - 1));
+  await set(customerCountRef(), Math.max(0, current - 1));
 }
 
 export function subscribeCustomerCount(callback) {
-  return onValue(dbRef(rtdb, CUSTOMER_REF), (snap) => callback(snap.val() || 0));
+  return onValue(customerCountRef(), (snap) => callback(snap.val() || 0));
 }
 
 // ── Analytics ─────────────────────────────────────────────────────────────
@@ -187,8 +184,7 @@ export async function writeAnalyticsEntry({ queueNumber, status = "served", wait
   const y = now.getFullYear();
   const m = now.getMonth() + 1;
   const d = now.getDate();
-  const analyticsRef = dbRef(rtdb, `analytics/${y}/${m}/${d}`);
-  await push(analyticsRef, {
+  await push(analyticsRef(y, m, d), {
     queueNumber,
     status,
     timestamp: now.toISOString(),
@@ -202,7 +198,7 @@ export async function writeAnalyticsEntry({ queueNumber, status = "served", wait
 }
 
 export async function fetchAnalyticsByMonth(year, month) {
-  const snap = await get(dbRef(rtdb, `analytics/${year}/${month}`));
+  const snap = await get(floorDataRef(rtdb, "queue", "analytics", String(year), String(month)));
   if (!snap.val()) return [];
   const entries = [];
   snap.forEach((daySnap) => {
@@ -214,7 +210,7 @@ export async function fetchAnalyticsByMonth(year, month) {
 }
 
 export async function resetAnalytics(year, month) {
-  await remove(dbRef(rtdb, `analytics/${year}/${month}`));
+  await remove(floorDataRef(rtdb, "queue", "analytics", String(year), String(month)));
 }
 
 // ── Connection status ──────────────────────────────────────────────────────

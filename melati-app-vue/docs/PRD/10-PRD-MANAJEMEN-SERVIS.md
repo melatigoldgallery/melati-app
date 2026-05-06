@@ -51,15 +51,10 @@ Contoh Kasus:
    - Custom (Belum Selesai), Custom (Sudah Selesai & Belum Diambil), Custom (Sudah Selesai & Sudah Diambil)
 
 2. **Section Input Fisik Barang:**
-   - Form sederhana: input jumlah pcs barang fisik yang ada di toko
-   - Grouped by **bulan** (auto-generated dari `bulan` field)
-   - Tipe: Servis atau Custom
-   - Field: Bulan, Tipe, Jumlah Pcs, Catatan (opsional)
-
-3. **Tab View untuk Reconciliation:**
-   - Tab 1: Servis (Sudah Selesai & Belum Diambil)
-   - Tab 2: Custom (Sudah Selesai & Belum Diambil)
-   - Tabel per tab dengan kolom: No, Bulan, Data Sistem, Fisik Barang, Aksi, Status, Riwayat
+   - Tipe dipilih dengan radio: **Servis** atau **Custom**
+   - Menampilkan tabel rekonsiliasi langsung di bawah radio (tanpa tab terpisah)
+   - Kolom tabel: **No, Bulan, Belum Selesai, Sudah Selesai & Belum Diambil, Fisik Barang, Aksi, Status, Terakhir Update**
+   - Tombol **Update** membuka modal dengan field: **Nama Staff** (default kosong), **Jumlah Pcs Fisik Baru**, **Catatan (opsional)**
 
 4. **Kolom Status:**
    - **Klop**: Data sistem = Fisik barang (jumlah sama)
@@ -224,35 +219,40 @@ Catatan:
 
 #### FR-2: Input Fisik Barang
 
-- **Input Method:** Form sederhana dengan field: Bulan, Tipe, Jumlah Pcs, Catatan
-- **Month Selection:** Auto-detect current month, bisa custom pilih bulan lain
-- **Type Selection:** Servis atau Custom
-- **Save Destination:** `servis_management/{userId}/{tipe}/{bulan}` (upsert, hanya satu record per tipe per bulan)
+- **Input Method:** Radio tipe (`servis` / `custom`) + tabel rekonsiliasi per bulan
+- **Table Columns:** Bulan, Belum Selesai, Sudah Selesai & Belum Diambil, Fisik Barang, Aksi, Status, Terakhir Update
+- **Row Source:** Union dari bulan pada data sistem (`servis` collection) dan data fisik (`servis_management`)
+- **Save Destination:** `servis_management/{userId}/{tipe}/{bulan}` (upsert, satu record per tipe per bulan)
 - **Validation:**
   - Jumlah Pcs >= 0
+  - Nama Staff wajib diisi saat update modal
   - Catatan optional
-- **Duplicate Handling:** Jika sudah ada record untuk bulan+tipe yang sama, update (replace) nilai sebelumnya
+- **Duplicate Handling:** Jika sudah ada record untuk bulan+tipe yang sama, update nilai sebelumnya
 
-#### FR-3: Reconciliation Tab - Servis (Belum Diambil)
+#### FR-3: Rekonsiliasi Per Bulan (Servis / Custom)
 
 - **Data Source:**
-  - **Sistem:** Count dari `servis` collection dengan `statusServis="Sudah Selesai"` AND `statusPengambilan="Belum Diambil"`, group by bulan
-  - **Fisik:** Query `servis_management` collection dengan `tipe="servis"`, ambil `fisikBarangQty` per bulan
+  - **Belum Selesai:** Count dari `servis` collection dengan `statusServis="Belum Selesai"`, group by bulan
+  - **Sudah Selesai & Belum Diambil:** Count dari `servis` collection dengan `statusServis="Sudah Selesai"` AND `statusPengambilan="Belum Diambil"`, group by bulan
+  - **Fisik:** Query `servis_management` collection sesuai `tipe`, ambil `fisikBarangQty` per bulan
 - **Calculation:**
+  - Basis pembanding status = kolom **Sudah Selesai & Belum Diambil** vs **Fisik Barang**
   - `Status = "Klop"` jika `fisikQty == sistemQty`
-  - `Status = "Kurang"` jika `fisikQty < sistemQty` (ada diskrepansi, barang kurang di toko)
-  - `Status = "Lebih"` jika `fisikQty > sistemQty` (ada diskrepansi, barang lebih di toko)
+  - `Status = "Kurang"` jika `sistemQty > fisikQty`
+  - `Status = "Lebih"` jika `sistemQty < fisikQty`
   - `Variance = fisikQty - sistemQty`
 
-#### FR-4: Reconciliation Tab - Custom (Belum Diambil)
+#### FR-4: Filter Tipe
 
-- Same as FR-3 but for `jenisInput="custom"`
+- Gunakan logic FR-3 untuk `jenisInput != "custom"` saat tipe `servis`
+- Gunakan logic FR-3 untuk `jenisInput = "custom"` saat tipe `custom`
 
 #### FR-5: Action - Update Fisik Barang
 
 - **Modal Form:**
   - Show current fisikBarangQty dan sistemDataQty
   - Status indicator (Klop / Kurang / Lebih)
+  - Input `Nama Staff` (default kosong)
   - Input field untuk update fisikBarangQty (angka pcs baru)
   - Textbox untuk catatan reconciliation
 - **Save Logic:**

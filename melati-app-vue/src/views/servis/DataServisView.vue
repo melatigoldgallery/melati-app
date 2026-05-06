@@ -63,7 +63,7 @@
               type="search"
               name="servisSearch"
               class="form-control form-control-sm"
-              placeholder="Customer / barang..."
+              placeholder="Customer / barang / kontak..."
               autocomplete="off"
               autocapitalize="off"
               autocorrect="off"
@@ -105,13 +105,23 @@
           <i v-else class="bi bi-box-arrow-in-down me-1"></i>
           Sudah Diambil ({{ selectedServisPickupCount }})
         </button>
+        <button
+          v-if="hasLoaded && canReturnOwner"
+          class="btn btn-outline-dark btn-sm fw-semibold flex-fill flex-md-grow-0"
+          :disabled="isReturnOwnerSelectedDisabled"
+          @click="updateSelectedServisReturnOwner"
+        >
+          <span v-if="returnOwnerSaving" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-arrow-return-left me-1"></i>
+          Return ke Owner ({{ selectedServisPickupCount }})
+        </button>
         <div class="" v-if="hasLoaded">
           <input
             v-model="searchText"
             type="search"
             name="servisSearch"
             class="form-control form-control-sm"
-            placeholder="Customer / barang..."
+            placeholder="Customer / barang / kontak..."
             autocomplete="off"
             autocapitalize="off"
             autocorrect="off"
@@ -140,6 +150,19 @@
         <button v-if="hasLoaded" class="btn btn-success btn-sm" @click="printAllLabels" title="Print semua label">
           <i class="bi bi-tags me-1"></i>
           Print Label
+        </button>
+      </div>
+    </div>
+    <div v-if="hasLoaded && canReceiveServis" class="d-md-none card border-0 shadow-sm mb-3">
+      <div class="card-body py-2">
+        <button
+          class="btn btn-outline-success btn-sm fw-semibold w-100"
+          :disabled="isFinishSelectedDisabled"
+          @click="updateSelectedServisSelesai"
+        >
+          <span v-if="penerimaanSaving" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-check2-square me-1"></i>
+          Selesaikan Terpilih ({{ selectedServisFinishCount }})
         </button>
       </div>
     </div>
@@ -215,6 +238,18 @@
             <!-- Row 1: customer + tanggal -->
             <div class="d-flex justify-content-between align-items-start mb-1 mobile-top-row">
               <div class="d-flex align-items-start">
+                <input
+                  type="checkbox"
+                  class="form-check-input mobile-select-checkbox me-2"
+                  :checked="isFinishSelectable(item) && isItemSelected(item.id)"
+                  :disabled="!isFinishSelectable(item)"
+                  :title="
+                    isFinishSelectable(item)
+                      ? 'Pilih untuk aksi Selesaikan Terpilih'
+                      : 'Hanya data belum selesai yang bisa dipilih'
+                  "
+                  @change="toggleItemSelection(item.id, $event.target.checked)"
+                />
                 <span class="fw-bold text-dark mobile-customer">{{ item.namaCustomer }}</span>
               </div>
               <span class="text-muted mobile-date">{{ formatTanggalJam(item.tanggal, item.createdAt) }}</span>
@@ -222,8 +257,8 @@
             <!-- Row 2: nama barang + jenis -->
             <div class="d-flex align-items-center gap-1 mb-1 mobile-item-row">
               <span class="text-truncate flex-grow-1 mobile-item-name">{{ getItemNama(item) }}</span>
-              <span class="badge text-muted flex-shrink-0 mobile-item-kind">
-                {{ item.jenisInput === "custom" ? "CUSTOM" : getItemJenisServis(item) }}
+              <span v-if="item.jenisInput !== 'custom'" class="badge text-muted flex-shrink-0 mobile-item-kind">
+                {{ getItemJenisServis(item) }}
               </span>
             </div>
             <!-- Row 3: sales + rincian -->
@@ -250,6 +285,7 @@
             <div v-if="item.stafHandle || item.waktuPengambilan" class="text-muted mb-1 mobile-sales-row">
               <span>Pengambilan:</span>
               <span v-if="item.stafHandle">{{ item.stafHandle }}</span>
+              <span v-if="isReturnOwnerItem(item)" class="badge bg-warning text-dark ms-1">Return Owner</span>
               <span v-if="item.waktuPengambilan">| {{ formatWaktu(item.waktuPengambilan) }}</span>
               <button
                 v-if="getBuktiPengambilanUrl(item)"
@@ -260,8 +296,8 @@
                 <i class="bi bi-camera"></i>
               </button>
             </div>
-            <!-- Row 4: badges + ongkos -->
-            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1 mobile-status-row">
+            <!-- Row 4: badges -->
+            <div class="d-flex align-items-center mb-2 flex-wrap gap-1 mobile-status-row">
               <div class="d-flex gap-1 flex-wrap">
                 <span class="badge mobile-status-badge" :class="statusServisBadge(item.statusServis)">
                   {{ item.statusServis }}
@@ -269,13 +305,14 @@
                 <span class="badge mobile-status-badge" :class="statusPengambilanBadge(item.statusPengambilan)">
                   {{ item.statusPengambilan }}
                 </span>
-                <span class="badge mobile-status-badge" :class="statusPembayaranBadge(getItemStatusPembayaran(item))">
+                <span
+                  v-if="item.jenisInput !== 'custom'"
+                  class="badge mobile-status-badge"
+                  :class="statusPembayaranBadge(getItemStatusPembayaran(item))"
+                >
                   {{ statusPembayaranLabel(getItemStatusPembayaran(item)) }}
                 </span>
               </div>
-              <span class="fw-bold text-dark mobile-price">
-                Rp {{ Number(getItemOngkos(item)).toLocaleString("id-ID") }}
-              </span>
             </div>
             <!-- Row 5: actions -->
             <div class="d-grid gap-2 mobile-action-grid">
@@ -324,9 +361,10 @@
                 <th style="min-width: 110px">Nama Barang</th>
                 <th style="width: 72px; min-width: 72px">Berat</th>
                 <th style="width: 72px; min-width: 72px">Kadar</th>
-                <th style="width: 120px; min-width: 120px">Jenis Servis</th>
+                <th class="text-center" style="width: 120px; min-width: 120px">Jenis</th>
                 <th style="min-width: 200px">Rincian</th>
                 <th style="min-width: 90px">Pembayaran</th>
+                <th v-if="filterJenis === 'custom'" class="text-end" style="min-width: 90px">DP</th>
                 <th class="text-end" style="min-width: 80px">Ongkos</th>
                 <th class="text-center" style="min-width: 100px">Status Servis</th>
                 <th style="min-width: 140px">Penerimaan Servis</th>
@@ -336,7 +374,7 @@
             </thead>
             <tbody>
               <tr v-if="filteredList.length === 0">
-                <td colspan="17" class="text-center text-muted py-5">
+                <td :colspan="filterJenis === 'custom' ? 18 : 17" class="text-center text-muted py-5">
                   <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
                   Tidak ada data servis.
                 </td>
@@ -374,7 +412,7 @@
                     {{ getItemKarat(item) }}
                   </span>
                 </td>
-                <td class="align-middle servis-truncate-cell">
+                <td class="align-middle servis-truncate-cell text-center">
                   <span
                     class="badge bg-light text-dark border text-truncate servis-jenis-badge"
                     :title="item.jenisInput === 'custom' ? 'CUSTOM' : getItemJenisServis(item)"
@@ -399,6 +437,9 @@
                   <span class="badge" :class="statusPembayaranBadge(getItemStatusPembayaran(item))">
                     {{ statusPembayaranLabel(getItemStatusPembayaran(item)) }}
                   </span>
+                </td>
+                <td v-if="filterJenis === 'custom'" class="text-end align-middle fw-semibold">
+                  Rp {{ Number(getItemDP(item)).toLocaleString("id-ID") }}
                 </td>
                 <td class="text-end align-middle fw-semibold">
                   Rp {{ Number(getItemOngkos(item)).toLocaleString("id-ID") }}
@@ -440,7 +481,10 @@
                     class="d-flex flex-column gap-1"
                   >
                     <div class="d-flex align-items-center justify-content-between">
-                      <span v-if="item.stafHandle">{{ item.stafHandle }}</span>
+                      <div class="d-flex align-items-center gap-1">
+                        <span v-if="item.stafHandle">{{ item.stafHandle }}</span>
+                        <span v-if="isReturnOwnerItem(item)" class="badge bg-warning text-dark">Return Owner</span>
+                      </div>
                       <button
                         v-if="getBuktiPengambilanUrl(item)"
                         class="btn btn-outline-info btn-sm py-0 px-1"
@@ -557,11 +601,29 @@
             </p>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Status Servis</label>
-              <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center gap-2 mb-2">
                 <span class="badge" :class="statusServisBadge(statusForm.statusServis)">
                   {{ statusForm.statusServis || "-" }}
                 </span>
-                <small class="text-muted">Ubah status servis lewat "Selesaikan Terpilih" (butuh foto).</small>
+                <small class="text-muted">
+                  {{
+                    statusForm.statusServis === statusForm.initialStatusServis
+                      ? "Status saat ini"
+                      : "Status setelah simpan"
+                  }}
+                </small>
+              </div>
+              <div class="form-check">
+                <input
+                  id="statusServisToggle"
+                  v-model="statusForm.toggleStatusServis"
+                  class="form-check-input"
+                  type="checkbox"
+                  @change="onStatusServisToggleChange"
+                />
+                <label class="form-check-label small" for="statusServisToggle">
+                  {{ statusServisToggleLabel }}
+                </label>
               </div>
             </div>
             <div class="mb-2">
@@ -659,7 +721,7 @@
               name="supervisorRevertPassword"
               autocomplete="new-password"
               class="form-control form-control-sm"
-              placeholder="Password supervisor"
+              placeholder="Masukkan password"
               @keydown.enter="confirmRevertPickup"
             />
           </div>
@@ -667,6 +729,51 @@
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
             <button class="btn btn-primary btn-sm" @click="confirmRevertPickup" :disabled="revertVerifying">
               <span v-if="revertVerifying" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-unlock me-1"></i>
+              Verifikasi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Revert Status Servis Verify Modal ── -->
+    <div class="modal fade" id="revertStatusServisModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-md">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-shield-lock me-1 text-primary"></i>
+              Verifikasi Ubah Status Servis
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="small text-muted mb-2">
+              Masukkan password untuk mengubah status servis dari
+              <strong>Sudah Selesai</strong>
+              ke
+              <strong>Belum Selesai</strong>
+              .
+            </p>
+            <input
+              v-model="revertStatusServisPassword"
+              type="password"
+              name="supervisorRevertStatusServisPassword"
+              autocomplete="new-password"
+              class="form-control form-control-sm"
+              placeholder="Masukkan password"
+              @keydown.enter="confirmRevertStatusServis"
+            />
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button
+              class="btn btn-primary btn-sm"
+              @click="confirmRevertStatusServis"
+              :disabled="revertStatusServisVerifying"
+            >
+              <span v-if="revertStatusServisVerifying" class="spinner-border spinner-border-sm me-1"></span>
               <i v-else class="bi bi-unlock me-1"></i>
               Verifikasi
             </button>
@@ -735,6 +842,73 @@
       </div>
     </div>
 
+    <!-- ── Return Owner Modal ── -->
+    <div class="modal fade" id="returnOwnerModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-semibold">
+              <i class="bi bi-arrow-return-left me-1 text-dark"></i>
+              Return ke Owner
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="small text-muted mb-2">
+              Data terpilih:
+              <strong>{{ returnOwnerTargetIds.length }}</strong>
+              item
+            </p>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Nama Sales</label>
+              <input
+                v-model="returnOwnerForm.salesName"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Nama sales"
+              />
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">
+                Bukti Return
+                <span class="text-danger">*</span>
+              </label>
+              <input
+                ref="returnOwnerInputRef"
+                type="file"
+                accept="image/*"
+                class="form-control form-control-sm"
+                @change="onReturnOwnerPhotoChange"
+              />
+              <div v-if="!hasReturnOwnerPhoto" class="small text-danger mt-1">
+                Upload foto bukti return sebelum menyimpan.
+              </div>
+              <div v-if="returnOwnerPhotoPreviewUrl" class="mt-2">
+                <img
+                  :src="returnOwnerPhotoPreviewUrl"
+                  alt="Preview"
+                  class="img-fluid rounded border"
+                  style="max-height: 200px; object-fit: contain"
+                />
+                <button type="button" class="btn btn-outline-danger btn-sm mt-1 d-block" @click="clearReturnOwnerPhoto">
+                  <i class="bi bi-x-circle me-1"></i>
+                  Hapus foto
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+            <button class="btn btn-dark btn-sm" @click="saveReturnOwner" :disabled="isReturnOwnerSaveDisabled">
+              <span v-if="returnOwnerSaving" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="bi bi-save me-1"></i>
+              Simpan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Edit Verify Modal (md) ── -->
     <div class="modal fade" id="editVerifyModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-md">
@@ -754,7 +928,7 @@
               name="supervisorVerifyPassword"
               autocomplete="new-password"
               class="form-control form-control-sm"
-              placeholder="Password supervisor"
+              placeholder="Masukkan password"
               @keydown.enter="unlockEdit"
             />
           </div>
@@ -1075,7 +1249,7 @@
               name="supervisorDeletePassword"
               autocomplete="new-password"
               class="form-control form-control-sm"
-              placeholder="Password supervisor"
+              placeholder="Masukkan password"
             />
           </div>
           <div class="modal-footer py-2">
@@ -1173,8 +1347,14 @@ const searchReadonly = ref(true);
 const hasLoaded = ref(false);
 const bulkUpdatingStatusServis = ref(false);
 const selectedServisIds = ref([]);
-const isSupervisor = computed(() => authStore.userRole === "supervisor");
-const canReceiveServis = computed(() => ["admin", "kasir", "supervisor"].includes(authStore.userRole));
+const normalizedUserRole = computed(() =>
+  String(authStore.userRole || "")
+    .trim()
+    .toLowerCase(),
+);
+const isSupervisor = computed(() => normalizedUserRole.value === "supervisor");
+const canReturnOwner = computed(() => ["admin", "supervisor"].includes(normalizedUserRole.value));
+const canReceiveServis = computed(() => ["admin", "kasir", "supervisor"].includes(normalizedUserRole.value));
 
 // Pagination
 const currentPage = ref(1);
@@ -1191,10 +1371,16 @@ const revertPassword = ref("");
 const revertVerifying = ref(false);
 const allowRevertWithoutPassword = ref(false);
 const pendingReopenStatusModal = ref(false);
+const revertStatusServisPassword = ref("");
+const revertStatusServisVerifying = ref(false);
+const allowRevertStatusServisWithoutPassword = ref(false);
+const pendingReopenStatusServisModal = ref(false);
 const statusForm = ref({
   id: "",
   namaCustomer: "",
   namaBarang: "",
+  initialStatusServis: "",
+  toggleStatusServis: false,
   statusServis: "",
   statusPengambilan: "",
   stafHandle: "",
@@ -1219,6 +1405,13 @@ const isStatusSaveDisabled = computed(
     isLunasRequiredButUnselected.value,
 );
 
+const statusServisToggleLabel = computed(() => {
+  if (statusForm.value.initialStatusServis === "Sudah Selesai") {
+    return "Ubah status menjadi Belum Selesai";
+  }
+  return "Ubah status menjadi Sudah Selesai";
+});
+
 // Penerimaan servis modal
 const penerimaanSaving = ref(false);
 const penerimaanInputRef = ref(null);
@@ -1237,6 +1430,24 @@ const isPenerimaanSaveDisabled = computed(
     !penerimaanForm.value.penerima?.trim() ||
     !hasPenerimaanPhoto.value ||
     !penerimaanTargetIds.value.length,
+);
+
+// Return owner modal
+const returnOwnerSaving = ref(false);
+const returnOwnerInputRef = ref(null);
+const returnOwnerPhotoFile = ref(null);
+const returnOwnerPhotoPreviewUrl = ref("");
+const returnOwnerTargetIds = ref([]);
+const returnOwnerForm = ref({
+  salesName: "",
+});
+const hasReturnOwnerPhoto = computed(() => Boolean(returnOwnerPhotoFile.value));
+const isReturnOwnerSaveDisabled = computed(
+  () =>
+    returnOwnerSaving.value ||
+    !returnOwnerForm.value.salesName?.trim() ||
+    !hasReturnOwnerPhoto.value ||
+    !returnOwnerTargetIds.value.length,
 );
 
 // Edit modal
@@ -1355,6 +1566,16 @@ function getItemOngkos(item) {
   const items = getItems(item);
   if (!items.length) return item.ongkos || 0;
   return items.reduce((sum, i) => sum + Number(i.ongkos || 0), 0);
+}
+
+function getItemDP(item) {
+  const isCustom = (item?.jenisInput || "servis") === "custom";
+  if (!isCustom) return 0;
+  if (item.totalDP != null) return Number(item.totalDP || 0);
+
+  const items = getItems(item);
+  if (!items.length) return Number(item.dp || 0);
+  return items.reduce((sum, i) => sum + Number(i.totalDP || i.dp || 0), 0);
 }
 
 function normalizePhoneForDisplay(phone) {
@@ -1544,12 +1765,22 @@ const filteredList = computed(() => {
   if (filterPengambilan.value) list = list.filter((i) => i.statusPengambilan === filterPengambilan.value);
   if (searchText.value.trim()) {
     const q = searchText.value.toLowerCase();
-    list = list.filter(
-      (i) =>
+    const qDigits = q.replace(/\D/g, "");
+    list = list.filter((i) => {
+      const phoneRaw = String(i.noHp || "");
+      const phone = phoneRaw.toLowerCase();
+      const phoneDigits = phoneRaw.replace(/\D/g, "");
+
+      const textMatch =
         (i.namaCustomer || "").toLowerCase().includes(q) ||
         (i.namaBarang || "").toLowerCase().includes(q) ||
-        (i.namaSales || "").toLowerCase().includes(q),
-    );
+        (i.namaSales || "").toLowerCase().includes(q) ||
+        phone.includes(q);
+      if (textMatch) return true;
+
+      if (!qDigits) return false;
+      return phoneDigits.includes(qDigits);
+    });
   }
   return list;
 });
@@ -1559,13 +1790,7 @@ function isFinishSelectable(item) {
 }
 
 function isPickupSelectable(item) {
-  const penerimaanStatus = item.statusPenerimaanServis || "Belum Diterima";
-  return (
-    isSupervisor.value &&
-    item.statusServis === "Sudah Selesai" &&
-    item.statusPengambilan === "Belum Diambil" &&
-    penerimaanStatus === "Sudah Diterima"
-  );
+  return canReturnOwner.value && item.statusServis === "Sudah Selesai" && item.statusPengambilan === "Belum Diambil";
 }
 
 function isBulkSelectable(item) {
@@ -1610,7 +1835,21 @@ const isFinishSelectedDisabled = computed(
 );
 
 const isMarkTakenSelectedDisabled = computed(
-  () => loading.value || !hasLoaded.value || bulkUpdatingStatusServis.value || selectedServisPickupCount.value === 0,
+  () =>
+    loading.value ||
+    !hasLoaded.value ||
+    bulkUpdatingStatusServis.value ||
+    returnOwnerSaving.value ||
+    selectedServisPickupCount.value === 0,
+);
+
+const isReturnOwnerSelectedDisabled = computed(
+  () =>
+    loading.value ||
+    !hasLoaded.value ||
+    bulkUpdatingStatusServis.value ||
+    returnOwnerSaving.value ||
+    selectedServisPickupCount.value === 0,
 );
 
 const visiblePages = computed(() => {
@@ -1635,6 +1874,10 @@ function unlockSearchInput() {
 
 function isItemSelectable(item) {
   return isBulkSelectable(item);
+}
+
+function isReturnOwnerItem(item) {
+  return item?.metodePengambilan === "return_owner";
 }
 
 function isItemSelected(id) {
@@ -1739,7 +1982,15 @@ async function updateSelectedServisSudahDiambil() {
 
   bulkUpdatingStatusServis.value = true;
   try {
-    const updatedCount = await bulkMarkServisSudahDiambil(targetIds);
+    const updatedCount = await bulkMarkServisSudahDiambil(targetIds, {
+      metodePengambilan: null,
+      returnOwnerBy: null,
+      returnOwnerAt: null,
+      returnOwnerProofUrl: null,
+      returnOwnerProofPath: null,
+      returnOwnerProofLiteUrl: null,
+      returnOwnerProofLitePath: null,
+    });
     selectedServisIds.value = [];
     invalidateCurrentRangeCache();
     swal(`${updatedCount} data terpilih berhasil diubah ke status 'Sudah Diambil'`);
@@ -1753,10 +2004,27 @@ async function updateSelectedServisSudahDiambil() {
   }
 }
 
+async function updateSelectedServisReturnOwner() {
+  if (!canReturnOwner.value) {
+    return swal("Aksi ini hanya untuk admin atau supervisor", "warning");
+  }
+
+  const targetIds = selectedServisIds.value.filter((id) =>
+    filteredList.value.some((item) => item.id === id && isPickupSelectable(item)),
+  );
+  if (!targetIds.length) {
+    return swal("Pilih data yang sudah selesai dan belum diambil terlebih dahulu", "warning");
+  }
+
+  openReturnOwnerModal(targetIds);
+}
+
 // ── Status Modal ──────────────────────────────────────────────────────────
 function openStatusModal(item) {
   const hasBelumLunas = hasBelumLunasPembayaran(item);
   statusTargetItem.value = item;
+  allowRevertWithoutPassword.value = false;
+  allowRevertStatusServisWithoutPassword.value = false;
   photoFile.value = null;
   if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   photoPreviewUrl.value = "";
@@ -1765,6 +2033,8 @@ function openStatusModal(item) {
     id: item.id,
     namaCustomer: item.namaCustomer,
     namaBarang: getItemNama(item),
+    initialStatusServis: item.statusServis,
+    toggleStatusServis: false,
     statusServis: item.statusServis,
     statusPengambilan: item.statusPengambilan,
     stafHandle: item.stafHandle || "",
@@ -1773,6 +2043,18 @@ function openStatusModal(item) {
     statusPembayaranUpdate: hasBelumLunas ? "belum_lunas" : "",
   };
   new Modal(document.getElementById("statusModal")).show();
+}
+
+function onStatusServisToggleChange() {
+  const initialStatus = statusForm.value.initialStatusServis || "Belum Selesai";
+  const shouldToggle = Boolean(statusForm.value.toggleStatusServis);
+
+  if (!shouldToggle) {
+    statusForm.value.statusServis = initialStatus;
+    return;
+  }
+
+  statusForm.value.statusServis = initialStatus === "Sudah Selesai" ? "Belum Selesai" : "Sudah Selesai";
 }
 
 async function compressImageFile(file, options = {}) {
@@ -1934,14 +2216,108 @@ async function savePenerimaanServis() {
   }
 }
 
+function openReturnOwnerModal(ids = []) {
+  if (!ids.length) return;
+  returnOwnerTargetIds.value = ids;
+  returnOwnerForm.value = {
+    salesName: getCurrentUserName(),
+  };
+  returnOwnerPhotoFile.value = null;
+  if (returnOwnerPhotoPreviewUrl.value) URL.revokeObjectURL(returnOwnerPhotoPreviewUrl.value);
+  returnOwnerPhotoPreviewUrl.value = "";
+  if (returnOwnerInputRef.value) returnOwnerInputRef.value.value = "";
+  Modal.getOrCreateInstance(document.getElementById("returnOwnerModal")).show();
+}
+
+async function onReturnOwnerPhotoChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    swal("File harus berupa gambar", "warning");
+    e.target.value = "";
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    swal("Ukuran file maksimal 10MB", "warning");
+    e.target.value = "";
+    return;
+  }
+
+  try {
+    const compressedFile = await compressImageFile(file);
+    returnOwnerPhotoFile.value = compressedFile;
+    if (returnOwnerPhotoPreviewUrl.value) URL.revokeObjectURL(returnOwnerPhotoPreviewUrl.value);
+    returnOwnerPhotoPreviewUrl.value = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    swal("Gagal memproses gambar. Coba pilih ulang.", "warning");
+    e.target.value = "";
+  }
+}
+
+function clearReturnOwnerPhoto() {
+  if (returnOwnerPhotoPreviewUrl.value) URL.revokeObjectURL(returnOwnerPhotoPreviewUrl.value);
+  returnOwnerPhotoFile.value = null;
+  returnOwnerPhotoPreviewUrl.value = "";
+  if (returnOwnerInputRef.value) returnOwnerInputRef.value.value = "";
+}
+
+async function saveReturnOwner() {
+  if (!returnOwnerTargetIds.value.length) return;
+  if (!returnOwnerForm.value.salesName?.trim()) return swal("Nama sales wajib diisi", "warning");
+  if (!returnOwnerPhotoFile.value) return swal("Upload foto bukti return terlebih dahulu", "warning");
+
+  returnOwnerSaving.value = true;
+  try {
+    const targetId = returnOwnerTargetIds.value[0];
+    const waktuPengambilan = new Date().toISOString();
+    const { url, path, liteUrl, litePath } = await uploadBuktiPengambilan(returnOwnerPhotoFile.value, targetId);
+
+    const payload = {
+      stafHandle: returnOwnerForm.value.salesName.trim(),
+      waktuPengambilan,
+      buktiPengambilanUrl: url,
+      buktiPengambilanPath: path,
+      buktiPengambilanLiteUrl: liteUrl || null,
+      buktiPengambilanLitePath: litePath || null,
+      metodePengambilan: "return_owner",
+      returnOwnerBy: returnOwnerForm.value.salesName.trim(),
+      returnOwnerAt: waktuPengambilan,
+      returnOwnerProofUrl: url,
+      returnOwnerProofPath: path,
+      returnOwnerProofLiteUrl: liteUrl || null,
+      returnOwnerProofLitePath: litePath || null,
+    };
+
+    const updatedCount = await bulkMarkServisSudahDiambil(returnOwnerTargetIds.value, payload);
+    selectedServisIds.value = [];
+    invalidateCurrentRangeCache();
+    Modal.getInstance(document.getElementById("returnOwnerModal"))?.hide();
+    swal(`${updatedCount} data berhasil direturn ke owner`);
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("Gagal menyimpan return owner", e.message);
+  } finally {
+    returnOwnerSaving.value = false;
+  }
+}
+
 async function saveStatus() {
   const targetItem = statusTargetItem.value;
 
   const isRevertToNotTaken =
     targetItem?.statusPengambilan === "Sudah Diambil" && statusForm.value.statusPengambilan === "Belum Diambil";
+  const isVerifiedRevertToNotTaken = isRevertToNotTaken && allowRevertWithoutPassword.value;
   if (isRevertToNotTaken && !allowRevertWithoutPassword.value) {
     revertPassword.value = "";
     openRevertPickupModal();
+    return;
+  }
+
+  const isRevertServisToBelumSelesai =
+    targetItem?.statusServis === "Sudah Selesai" && statusForm.value.statusServis === "Belum Selesai";
+  if (isRevertServisToBelumSelesai && !allowRevertStatusServisWithoutPassword.value) {
+    revertStatusServisPassword.value = "";
+    openRevertStatusServisModal();
     return;
   }
 
@@ -1950,6 +2326,7 @@ async function saveStatus() {
   }
 
   if (
+    !isVerifiedRevertToNotTaken &&
     statusForm.value.statusServis === "Sudah Selesai" &&
     (targetItem?.statusPenerimaanServis || "Belum Diterima") !== "Sudah Diterima"
   ) {
@@ -2006,6 +2383,13 @@ async function saveStatus() {
     } else {
       updates.stafHandle = null;
       updates.waktuPengambilan = null;
+      updates.metodePengambilan = null;
+      updates.returnOwnerBy = null;
+      updates.returnOwnerAt = null;
+      updates.returnOwnerProofUrl = null;
+      updates.returnOwnerProofPath = null;
+      updates.returnOwnerProofLiteUrl = null;
+      updates.returnOwnerProofLitePath = null;
     }
     await updateServisStatus(statusForm.value.id, updates);
     invalidateCurrentRangeCache();
@@ -2017,6 +2401,7 @@ async function saveStatus() {
   } finally {
     statusSaving.value = false;
     allowRevertWithoutPassword.value = false;
+    allowRevertStatusServisWithoutPassword.value = false;
     statusTargetItem.value = null;
   }
 }
@@ -2040,6 +2425,25 @@ function openRevertPickupModal() {
   statusModal.hide();
 }
 
+function openRevertStatusServisModal() {
+  const revertModalEl = document.getElementById("revertStatusServisModal");
+  const statusModalEl = document.getElementById("statusModal");
+  if (!revertModalEl) return;
+  if (!statusModalEl) {
+    Modal.getOrCreateInstance(revertModalEl).show();
+    return;
+  }
+
+  pendingReopenStatusServisModal.value = true;
+  const statusModal = Modal.getOrCreateInstance(statusModalEl);
+  const showRevertModal = () => {
+    Modal.getOrCreateInstance(revertModalEl).show();
+  };
+
+  statusModalEl.addEventListener("hidden.bs.modal", showRevertModal, { once: true });
+  statusModal.hide();
+}
+
 async function confirmRevertPickup() {
   if (!revertPassword.value) return swal("Password wajib diisi", "warning");
   revertVerifying.value = true;
@@ -2053,6 +2457,22 @@ async function confirmRevertPickup() {
     showError("Verifikasi gagal", e.message);
   } finally {
     revertVerifying.value = false;
+  }
+}
+
+async function confirmRevertStatusServis() {
+  if (!revertStatusServisPassword.value) return swal("Password wajib diisi", "warning");
+  revertStatusServisVerifying.value = true;
+  try {
+    await verifySupervisorPassword(revertStatusServisPassword.value);
+    pendingReopenStatusServisModal.value = false;
+    allowRevertStatusServisWithoutPassword.value = true;
+    Modal.getInstance(document.getElementById("revertStatusServisModal"))?.hide();
+    await saveStatus();
+  } catch (e) {
+    showError("Verifikasi gagal", e.message);
+  } finally {
+    revertStatusServisVerifying.value = false;
   }
 }
 
@@ -2496,17 +2916,28 @@ onMounted(() => {
   if (revertModalEl) {
     revertModalEl.addEventListener("hidden.bs.modal", handleRevertModalHidden);
   }
+
+  const revertStatusServisModalEl = document.getElementById("revertStatusServisModal");
+  if (revertStatusServisModalEl) {
+    revertStatusServisModalEl.addEventListener("hidden.bs.modal", handleRevertStatusServisModalHidden);
+  }
 });
 
 onUnmounted(() => {
   cleanupListener();
   if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
+  if (returnOwnerPhotoPreviewUrl.value) URL.revokeObjectURL(returnOwnerPhotoPreviewUrl.value);
   window.removeEventListener("storage", handleStorageSync);
 
   const revertModalEl = document.getElementById("revertPickupModal");
   if (revertModalEl) {
     revertModalEl.removeEventListener("hidden.bs.modal", handleRevertModalHidden);
+  }
+
+  const revertStatusServisModalEl = document.getElementById("revertStatusServisModal");
+  if (revertStatusServisModalEl) {
+    revertStatusServisModalEl.removeEventListener("hidden.bs.modal", handleRevertStatusServisModalHidden);
   }
 });
 
@@ -2516,6 +2947,14 @@ function handleRevertModalHidden() {
   }
   pendingReopenStatusModal.value = false;
   revertPassword.value = "";
+}
+
+function handleRevertStatusServisModalHidden() {
+  if (pendingReopenStatusServisModal.value && !allowRevertStatusServisWithoutPassword.value) {
+    Modal.getOrCreateInstance(document.getElementById("statusModal")).show();
+  }
+  pendingReopenStatusServisModal.value = false;
+  revertStatusServisPassword.value = "";
 }
 </script>
 
@@ -2655,11 +3094,6 @@ function handleRevertModalHidden() {
   font-size: 0.68rem;
 }
 
-.mobile-price {
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-
 .mobile-action-grid .btn {
   font-size: 0.77rem;
   font-weight: 600;
@@ -2680,10 +3114,6 @@ function handleRevertModalHidden() {
 
   .mobile-status-badge {
     font-size: 0.64rem;
-  }
-
-  .mobile-price {
-    font-size: 0.78rem;
   }
 
   .mobile-action-grid .btn {

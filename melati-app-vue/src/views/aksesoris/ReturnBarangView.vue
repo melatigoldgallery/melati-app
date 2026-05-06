@@ -51,7 +51,7 @@
               <option value="">-- Pilih Jenis --</option>
               <option value="kotak">Kotak</option>
               <option value="aksesoris">Aksesoris</option>
-              <option value="silver">Silver</option>
+              <option v-if="!isL2Floor" value="silver">Silver</option>
             </select>
           </div>
           <div class="col-md-3 d-flex align-items-end">
@@ -279,11 +279,15 @@ import {
   verifyDeleteReturnPassword,
 } from "@/services/stock-service";
 import { fetchSalesList } from "@/services/sales-service";
+import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import AppModal from "@/components/common/AppModal.vue";
 
 const store = useAccessoriesStore();
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
+const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
 const { swal, error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 

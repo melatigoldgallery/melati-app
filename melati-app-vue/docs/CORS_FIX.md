@@ -2,7 +2,7 @@
 
 ## ❌ Problem
 
-Chrome memblok akses dari `https://melatigoldgallery.github.io` ke `http://localhost:3001` dengan error:
+Chrome memblok akses dari `https://melatigold.web.app` ke `http://localhost:3001` dengan error:
 
 ```
 Access to fetch at 'http://localhost:3001/api/health' has been blocked by CORS policy:
@@ -87,7 +87,7 @@ Expected: `{"status":"ok", ...}`
 
 ### 2. Check dari Browser
 
-1. Buka aplikasi: `https://melatigoldgallery.github.io/melati-app/...`
+1. Buka aplikasi: `https://melatigold.web.app/...`
 2. Open DevTools (F12) → Console tab
 3. Look for:
    - ✅ `"✅ Print service online"`

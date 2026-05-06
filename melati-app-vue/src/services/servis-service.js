@@ -4,24 +4,24 @@
  * Also reads: settings/passwords
  */
 import {
-  collection,
   doc,
   getDoc,
   getDocs,
-  addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   writeBatch,
   query,
   where,
   orderBy,
-  limit,
   onSnapshot,
+  collection,
   Timestamp,
 } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/config/firebase";
+import { db, storage, auth } from "@/config/firebase";
 import { verifyStoredSecret } from "@/utils/security";
+import { floorDoc } from "@/services/floor-scope";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -114,8 +114,8 @@ function _buildMonthQuery(year, month) {
 // ── Fetch (one-shot, for past months + laporan) ───────────────────────────
 
 export async function fetchServisByMonth(year, month) {
-  const snap = await getDocs(_buildMonthQuery(year, month));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const docs = await getDocs(_buildMonthQuery(year, month)).then((s) => s.docs);
+  return docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function fetchServisByRange(startDate, endDate) {
@@ -124,7 +124,6 @@ export async function fetchServisByRange(startDate, endDate) {
     where("tanggal", ">=", startDate),
     where("tanggal", "<=", endDate + "T23:59:59.999Z"),
     orderBy("tanggal", "asc"),
-    limit(500),
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -156,31 +155,48 @@ export function subscribeServisByRange(startDate, endDate, callback) {
  * Save new servis. Returns the new document ID.
  * @param {Object} data - All fields EXCEPT createdAt/updatedAt/statusServis/statusPengambilan
  */
-export async function saveServis(data) {
-  const ref = await addDoc(collection(db, "servis"), {
-    ...data,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-    statusServis: "Belum Selesai",
-    statusPengambilan: "Belum Diambil",
-    statusPenerimaanServis: "Belum Diterima",
-    penerimaServis: null,
-    waktuPenerimaan: null,
-    buktiPenerimaanUrl: null,
-    buktiPenerimaanPath: null,
-    buktiPenerimaanLiteUrl: null,
-    buktiPenerimaanLitePath: null,
-    stafHandle: null,
-    waktuPengambilan: null,
-  });
+function notifyServisDataChanged() {
+  try {
+    localStorage.setItem("servisDataChanged", JSON.stringify({ ts: Date.now() }));
+  } catch {
+    // Ignore storage access issues in non-browser or restricted environments.
+  }
+}
+
+export async function saveServis(data, floorId = "") {
+  const ref = doc(collection(db, "servis"));
+  await setDoc(
+    ref,
+    {
+      ...data,
+      floorId: floorId || "",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      statusServis: "Belum Selesai",
+      statusPengambilan: "Belum Diambil",
+      statusPenerimaanServis: "Belum Diterima",
+      penerimaServis: null,
+      waktuPenerimaan: null,
+      buktiPenerimaanUrl: null,
+      buktiPenerimaanPath: null,
+      buktiPenerimaanLiteUrl: null,
+      buktiPenerimaanLitePath: null,
+      stafHandle: null,
+      waktuPengambilan: null,
+    },
+    { merge: true },
+  );
+  notifyServisDataChanged();
   return ref.id;
 }
 
 export async function updateServisStatus(id, updates) {
-  await updateDoc(doc(db, "servis", id), {
+  const docRef = doc(db, "servis", id);
+  await updateDoc(docRef, {
     ...updates,
     updatedAt: Timestamp.now(),
   });
+  notifyServisDataChanged();
 }
 
 export async function bulkMarkServisSelesai(ids = []) {
@@ -207,35 +223,48 @@ export async function bulkMarkServisSelesai(ids = []) {
     updatedCount += chunk.length;
   }
 
+  notifyServisDataChanged();
   return updatedCount;
 }
 
-export async function bulkMarkServisSudahDiambil(ids = []) {
+export async function bulkMarkServisSudahDiambil(ids = [], payload = {}) {
   const uniqueIds = [...new Set(ids.filter(Boolean))];
   if (!uniqueIds.length) return 0;
 
   // Firestore batched writes are limited to 500 operations per commit.
   const chunkSize = 450;
   let updatedCount = 0;
+  const normalizedPayload = {};
+
+  if (payload && typeof payload === "object") {
+    Object.entries(payload).forEach(([key, value]) => {
+      if (key === "updatedAt") return;
+      if (value === undefined) return;
+      normalizedPayload[key] = value;
+    });
+  }
 
   for (let i = 0; i < uniqueIds.length; i += chunkSize) {
     const chunk = uniqueIds.slice(i, i + chunkSize);
     const batch = writeBatch(db);
     const updatedAt = Timestamp.now();
-    const waktuPengambilan = new Date().toISOString();
+    const waktuPengambilan = normalizedPayload.waktuPengambilan || new Date().toISOString();
+    const updates = {
+      ...normalizedPayload,
+      statusPengambilan: "Sudah Diambil",
+      waktuPengambilan,
+      updatedAt,
+    };
 
     chunk.forEach((id) => {
-      batch.update(doc(db, "servis", id), {
-        statusPengambilan: "Sudah Diambil",
-        waktuPengambilan,
-        updatedAt,
-      });
+      batch.update(doc(db, "servis", id), updates);
     });
 
     await batch.commit();
     updatedCount += chunk.length;
   }
 
+  notifyServisDataChanged();
   return updatedCount;
 }
 
@@ -282,24 +311,29 @@ export async function bulkMarkServisPenerimaan(ids = [], payload = {}) {
     updatedCount += chunk.length;
   }
 
+  notifyServisDataChanged();
   return updatedCount;
 }
 
 export async function updateServisData(id, data) {
-  await updateDoc(doc(db, "servis", id), {
+  const docRef = doc(db, "servis", id);
+  await updateDoc(docRef, {
     ...data,
     updatedAt: Timestamp.now(),
   });
+  notifyServisDataChanged();
 }
 
 export async function deleteServis(id) {
-  await deleteDoc(doc(db, "servis", id));
+  const docRef = doc(db, "servis", id);
+  await deleteDoc(docRef);
+  notifyServisDataChanged();
 }
 
 // ── Password Verification ─────────────────────────────────────────────────
 
-export async function verifySupervisorPassword(inputPassword) {
-  const snap = await getDoc(doc(db, "settings", "passwords"));
+export async function verifySupervisorPassword(inputPassword, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "passwords", floorId));
   if (!snap.exists()) throw new Error("Pengaturan password tidak ditemukan");
   const data = snap.data();
   // Field "deleteServis" is the primary password for servis edit/delete operations
@@ -539,7 +573,11 @@ export async function uploadBuktiPengambilan(file, servisId) {
   const month = String(new Date().getMonth() + 1).padStart(2, "0");
   const storagePath = `bukti-pengambilan/${year}/${month}/${fileName}`;
   const sRef = storageRef(storage, storagePath);
-  await uploadBytes(sRef, file, { contentType: file.type || "image/jpeg" });
+  const uploaderUid = auth.currentUser?.uid || "";
+  await uploadBytes(sRef, file, {
+    contentType: file.type || "image/jpeg",
+    customMetadata: { uploadedBy: uploaderUid },
+  });
   const url = await getDownloadURL(sRef);
 
   let liteUrl;
@@ -550,7 +588,10 @@ export async function uploadBuktiPengambilan(file, servisId) {
       const liteFileName = `servis_${servisId}_${timestamp}_lite.jpg`;
       litePath = `bukti-pengambilan-lite/${year}/${month}/${liteFileName}`;
       const liteRef = storageRef(storage, litePath);
-      await uploadBytes(liteRef, liteBlob, { contentType: "image/jpeg" });
+      await uploadBytes(liteRef, liteBlob, {
+        contentType: "image/jpeg",
+        customMetadata: { uploadedBy: uploaderUid },
+      });
       liteUrl = await getDownloadURL(liteRef);
     }
   } catch (e) {
@@ -568,7 +609,11 @@ export async function uploadBuktiPenerimaanServis(file, servisId) {
   const month = String(new Date().getMonth() + 1).padStart(2, "0");
   const storagePath = `bukti-penerimaan-servis/${year}/${month}/${fileName}`;
   const sRef = storageRef(storage, storagePath);
-  await uploadBytes(sRef, file, { contentType: file.type || "image/jpeg" });
+  const uploaderUid = auth.currentUser?.uid || "";
+  await uploadBytes(sRef, file, {
+    contentType: file.type || "image/jpeg",
+    customMetadata: { uploadedBy: uploaderUid },
+  });
   const url = await getDownloadURL(sRef);
 
   let liteUrl;
@@ -579,7 +624,10 @@ export async function uploadBuktiPenerimaanServis(file, servisId) {
       const liteFileName = `servis_penerimaan_${servisId}_${timestamp}_lite.jpg`;
       litePath = `bukti-penerimaan-servis-lite/${year}/${month}/${liteFileName}`;
       const liteRef = storageRef(storage, litePath);
-      await uploadBytes(liteRef, liteBlob, { contentType: "image/jpeg" });
+      await uploadBytes(liteRef, liteBlob, {
+        contentType: "image/jpeg",
+        customMetadata: { uploadedBy: uploaderUid },
+      });
       liteUrl = await getDownloadURL(liteRef);
     }
   } catch (e) {

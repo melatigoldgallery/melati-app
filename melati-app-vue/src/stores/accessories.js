@@ -1,7 +1,9 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { db } from "@/config/firebase";
-import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from "firebase/firestore";
+import { query, where, orderBy, limit, onSnapshot, Timestamp } from "firebase/firestore";
+import { useAuthStore } from "@/stores/auth";
+import { floorCollection } from "@/services/floor-scope";
 import {
   fetchCatalog,
   fetchCurrentStockMap,
@@ -16,6 +18,8 @@ import {
 } from "@/services/stock-service";
 
 export const useAccessoriesStore = defineStore("accessories", () => {
+  const authStore = useAuthStore();
+
   // ─── State ───────────────────────────────────────────────────────────────
   const catalog = ref([]); // stokAksesoris master (cache-first)
   const salesCatalog = ref([]); // stokAksesoris for sales transaction (computed stock)
@@ -114,7 +118,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     // Query by timestamp range — same as old dataPenjualan.js setupDateListener.
     // Single-field orderBy on the same field used in where() → no composite index needed.
     const q = query(
-      collection(db, "penjualanAksesoris"),
+      floorCollection(db, "penjualanAksesoris"),
       where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
       where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
       orderBy("timestamp", "desc"),
@@ -213,7 +217,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
    * @returns {boolean}
    */
   async function verifySupervisor(password) {
-    return verifySupervisorPassword(password);
+    return verifySupervisorPassword(password, authStore.activeFloor || "");
   }
 
   /**

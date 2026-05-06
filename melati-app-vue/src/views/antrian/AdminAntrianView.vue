@@ -482,6 +482,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { Modal } from "bootstrap";
 import Swal from "sweetalert2";
+import { useAuthStore } from "@/stores/auth";
 import {
   subscribeQueue,
   subscribeConnection,
@@ -513,13 +514,15 @@ import {
 } from "@/services/antrian-closing-service";
 
 const state = ref({ currentLetter: 0, currentNumber: 1, delayedQueue: [], skipList: [], missedQueue: [] });
+const auth = useAuthStore();
+const activeFloor = computed(() => auth.activeFloor || "L1");
 const connected = ref(false);
 const busy = ref(false);
 const audioActiveBtn = ref("");
 const lastAutoRunSlot = ref(null);
 const closingSettings = ref({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
-const AUTO_RUN_STORAGE_KEY = "closing_auto_run_slot";
+const AUTO_RUN_STORAGE_KEY = computed(() => `closing_auto_run_slot_${activeFloor.value}`);
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const POLL_MS = 60 * 1000;
 const WINDOW_MS = 5 * 60 * 1000;
@@ -632,11 +635,11 @@ async function triggerAutoForSlot(targetHour, targetMinute, repeatCount = 1) {
   if (lastAutoRunSlot.value === slotKey) return;
 
   try {
-    if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
+    if (localStorage.getItem(AUTO_RUN_STORAGE_KEY.value) === slotKey) {
       lastAutoRunSlot.value = slotKey;
       return;
     }
-    localStorage.setItem(AUTO_RUN_STORAGE_KEY, slotKey);
+    localStorage.setItem(AUTO_RUN_STORAGE_KEY.value, slotKey);
   } catch (_) {
     // Ignore localStorage errors (private mode/restrictions)
   }

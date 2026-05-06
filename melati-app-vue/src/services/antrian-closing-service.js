@@ -1,5 +1,6 @@
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
+import { floorDoc } from "@/services/floor-scope";
 
 export const DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS = Object.freeze({
   enabled: true,
@@ -14,7 +15,9 @@ export const DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS = Object.freeze({
   updatedBy: "System",
 });
 
-const SETTINGS_DOC_REF = doc(db, "settings", "antrianClosingAnnouncement");
+function getClosingSettingsDoc(floorId = "") {
+  return floorDoc(db, "settings", "antrianClosingAnnouncement", floorId);
+}
 
 function isValidTimeFormat(value) {
   if (typeof value !== "string") return false;
@@ -64,13 +67,14 @@ export function normalizeClosingAnnouncementSettings(raw = {}) {
   };
 }
 
-export async function ensureClosingAnnouncementSettings() {
-  const snap = await getDoc(SETTINGS_DOC_REF);
+export async function ensureClosingAnnouncementSettings(floorId = "") {
+  const docRef = getClosingSettingsDoc(floorId);
+  const snap = await getDoc(docRef);
   if (snap.exists()) return;
 
   const now = new Date().toISOString();
   await setDoc(
-    SETTINGS_DOC_REF,
+    docRef,
     {
       ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS,
       lastUpdated: now,
@@ -80,15 +84,15 @@ export async function ensureClosingAnnouncementSettings() {
   );
 }
 
-export async function fetchClosingAnnouncementSettings() {
-  const snap = await getDoc(SETTINGS_DOC_REF);
+export async function fetchClosingAnnouncementSettings(floorId = "") {
+  const snap = await getDoc(getClosingSettingsDoc(floorId));
   return normalizeClosingAnnouncementSettings(snap.exists() ? snap.data() : DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS);
 }
 
-export async function saveClosingAnnouncementSettings(payload, updatedBy = "System") {
+export async function saveClosingAnnouncementSettings(payload, updatedBy = "System", floorId = "") {
   const normalized = normalizeClosingAnnouncementSettings(payload);
   await setDoc(
-    SETTINGS_DOC_REF,
+    getClosingSettingsDoc(floorId),
     {
       ...normalized,
       lastUpdated: new Date().toISOString(),
@@ -98,8 +102,8 @@ export async function saveClosingAnnouncementSettings(payload, updatedBy = "Syst
   );
 }
 
-export function subscribeClosingAnnouncementSettings(callback) {
-  return onSnapshot(SETTINGS_DOC_REF, (snap) => {
+export function subscribeClosingAnnouncementSettings(callback, floorId = "") {
+  return onSnapshot(getClosingSettingsDoc(floorId), (snap) => {
     const data = snap.exists() ? snap.data() : DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS;
     callback(normalizeClosingAnnouncementSettings(data));
   });

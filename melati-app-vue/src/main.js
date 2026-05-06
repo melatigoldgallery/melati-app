@@ -6,34 +6,6 @@ import "bootstrap";
 import App from "./App.vue";
 import router from "./router";
 import "./assets/css/main.css";
-import {
-  applyThemeAppearanceToDocument,
-  ensureThemeAppearanceSettings,
-  fetchThemeAppearanceSettings,
-  subscribeThemeAppearanceSettings,
-} from "@/services/theme-settings-service";
-
-async function initThemeAppearance() {
-  try {
-    const settings = await fetchThemeAppearanceSettings();
-    applyThemeAppearanceToDocument(settings);
-  } catch (error) {
-    console.warn("Theme appearance settings not loaded, using default CSS variables.", error);
-  }
-
-  subscribeThemeAppearanceSettings(
-    (settings) => {
-      applyThemeAppearanceToDocument(settings);
-    },
-    (error) => {
-      console.warn("Theme appearance live update failed.", error);
-    },
-  );
-
-  ensureThemeAppearanceSettings().catch((error) => {
-    console.warn("Theme appearance defaults cannot be ensured.", error);
-  });
-}
 
 async function bootstrap() {
   const pinia = createPinia();
@@ -42,9 +14,8 @@ async function bootstrap() {
   app.use(pinia);
   app.use(router);
 
-  initThemeAppearance();
-
   // Tunggu resolusi navigasi awal agar layout tidak sempat menampilkan sidebar sebelum guard redirect.
+  // Theme loading dipindahkan ke DefaultLayout.vue (setelah user login + floor dipilih)
   await router.isReady();
   app.mount("#app");
 }

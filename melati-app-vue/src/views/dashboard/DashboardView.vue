@@ -166,6 +166,10 @@ const normalizedRole = computed(() => {
   return normalizeUserRole(auth.userRole, "staff");
 });
 
+const isL2Admin = computed(() => {
+  return auth.activeFloor === "L2" && (auth.userRole === "admin" || auth.userRole === "admin_custom");
+});
+
 const systems = [
   {
     label: "Sistem Antrian",
@@ -206,6 +210,19 @@ const systems = [
     gradStart: "#0dcaf0",
     gradEnd: "#0d6efd",
     pageKey: "aksesoris.penjualan",
+  },
+];
+
+const l2AdminSystems = [
+  {
+    label: "Pesanan Online",
+    desc: "Kelola pesanan dan order dari customer online",
+    to: "/order-online/data",
+    icon: "bi-shop",
+    iconColor: "linear-gradient(135deg,#dc3545 0%,#fd7e14 100%)",
+    gradStart: "#dc3545",
+    gradEnd: "#fd7e14",
+    pageKey: "order-online.data",
   },
 ];
 
@@ -287,10 +304,20 @@ const quickLinks = [
     label: "Display Antrian",
     to: "/antrian/display",
     icon: "bi-display",
-    color: "#e03131",
+    color: "#b74855",
     pageKey: "antrian.display",
   },
   { label: "Data Servis", to: "/servis/data", icon: "bi-person-gear", color: "#495057", pageKey: "servis.data" },
+];
+
+const l2AdminQuickLinks = [
+  {
+    label: "Order Online",
+    to: "/order-online/data",
+    icon: "bi-shop",
+    color: "#dc3545",
+    pageKey: "order-online.data",
+  },
 ];
 
 const hrdQuickLinks = [
@@ -326,12 +353,26 @@ const hrdQuickLinks = [
 
 const desktopSystems = computed(() => {
   const source = normalizedRole.value === "hrd" ? hrdSystems : systems;
-  return source.filter((item) => canOpen(item.pageKey));
+  let filtered = source.filter((item) => canOpen(item.pageKey));
+
+  // Tambahkan L2 admin systems jika kondisi terpenuhi
+  if (isL2Admin.value) {
+    filtered = filtered.concat(l2AdminSystems.filter((item) => canOpen(item.pageKey)));
+  }
+
+  return filtered;
 });
 
 const desktopQuickLinks = computed(() => {
   const source = normalizedRole.value === "hrd" ? hrdQuickLinks : quickLinks;
-  return source.filter((item) => canOpen(item.pageKey));
+  let filtered = source.filter((item) => canOpen(item.pageKey));
+
+  // Tambahkan L2 admin quick links jika kondisi terpenuhi
+  if (isL2Admin.value) {
+    filtered = filtered.concat(l2AdminQuickLinks.filter((item) => canOpen(item.pageKey)));
+  }
+
+  return filtered;
 });
 
 const mobileDashboardVariant = computed(() => {

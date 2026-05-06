@@ -28,31 +28,36 @@
     </div>
 
     <template v-else>
-      <div class="row g-2 mb-3">
-        <div v-for="cat in SUMMARY_CARD_ORDER" :key="cat" class="col-6 col-md-4 col-lg-4" @click="activeTab = cat">
-          <div class="summary-card" :class="cardClass(cat)">
-            <div class="summary-title">{{ cat }}</div>
-            <div :class="['summary-value', summaryValueClass(cat)]">{{ summary[cat]?.fisik ?? 0 }}</div>
-            <small class="summary-status">{{ summary[cat]?.status.label ?? "-" }}</small>
+      <div class="summary-grid mb-3" :style="summaryGridStyle">
+        <div
+          v-for="card in summaryCards"
+          :key="card.id"
+          class="summary-grid-item"
+          @click="activeTab = card.id"
+        >
+          <div class="summary-card" :style="cardStyle(card.id)">
+            <div class="summary-title">{{ card.label }}</div>
+            <div :class="['summary-value', summaryValueClass(card.id)]">{{ summary[card.id]?.fisik ?? 0 }}</div>
+            <small class="summary-status">{{ summary[card.id]?.status.label ?? "-" }}</small>
           </div>
         </div>
       </div>
 
-      <ul class="nav nav-tabs compact justify-content-center overflow-auto mb-0">
-        <li v-for="tab in TABS" :key="tab" class="nav-item">
+      <ul v-if="hasTabs" class="nav nav-tabs compact justify-content-center overflow-auto mb-0">
+        <li v-for="tab in tabs" :key="tab.id" class="nav-item">
           <button
             class="nav-link text-nowrap small text-dark fw-bold"
-            :class="{ active: activeTab === tab }"
-            @click="activeTab = tab"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id"
           >
-            {{ tab }}
+            {{ tab.label }}
           </button>
         </li>
       </ul>
 
-      <div class="card border-0 shadow-sm rounded-0 rounded-bottom">
+      <div v-if="hasTabs" class="card border-0 shadow-sm rounded-0 rounded-bottom">
         <div class="card-body p-0">
-          <div v-if="activeTab !== 'STOK KOMPUTER'" class="table-responsive">
+          <div v-if="!isComputerTab" class="table-responsive">
             <table class="table table-hover mb-0">
               <thead class="table-light">
                 <tr>
@@ -66,7 +71,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(sub, idx) in SUB_CATEGORIES" :key="sub.key">
+                <tr v-for="(sub, idx) in tableRows" :key="sub.key">
                   <td class="fw-semibold">{{ idx + 1 }}</td>
                   <td class="fw-semibold">{{ sub.label }}</td>
                   <td v-if="showRincianColumn" class="text-center">
@@ -124,20 +129,20 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(cat, idx) in MAIN_CATEGORIES" :key="cat">
+                <tr v-for="(card, idx) in nonComputerCards" :key="card.id">
                   <td class="fw-semibold">{{ idx + 1 }}</td>
-                  <td class="fw-semibold">{{ cat }}</td>
+                  <td class="fw-semibold">{{ card.label }}</td>
                   <td class="text-center">
-                    <span class="badge bg-primary fs-6 px-2">{{ getQty(cat, "stok-komputer") }}</span>
+                    <span class="badge bg-primary fs-6 px-2">{{ getQty(card.id, "stok-komputer") }}</span>
                   </td>
                   <td class="text-center">
-                    <button class="btn btn-primary btn-sm" @click="openKomputerModal(cat)">
+                    <button class="btn btn-primary btn-sm" @click="openKomputerModal(card.id)">
                       <i class="bi bi-pencil me-1"></i>
                       Update
                     </button>
                   </td>
                   <td class="text-center text-muted small">
-                    {{ formatDate(getItem("stok-komputer", cat)?.lastUpdated) }}
+                    {{ formatDate(getItem("stok-komputer", card.id)?.lastUpdated) }}
                   </td>
                 </tr>
               </tbody>
@@ -145,6 +150,7 @@
           </div>
         </div>
       </div>
+      <div v-else class="alert alert-warning mb-0">Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.</div>
     </template>
 
     <div class="modal fade" id="simpleUpdateModal" tabindex="-1" aria-hidden="true">
@@ -479,16 +485,13 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { Modal } from "bootstrap";
 import { useAlert } from "@/composables/useAlert";
+import { useAuthStore } from "@/stores/auth";
 import {
   COLOR_LABELS,
   COLOR_TYPES,
-  HALA_CATS,
   HALA_LABELS,
   HALA_TYPES,
   KETERANGAN_OPTS,
-  MAIN_CATEGORIES,
-  SUB_CATEGORIES,
-  TYPED_CATS,
   calcFisikTotal,
   fetchAllStockData,
   fetchDailyReport,
@@ -500,32 +503,29 @@ import {
   updateKomputerStock,
   updateStockItem,
 } from "@/services/inventory-service";
+import {
+  ensureInventorySettings,
+  fetchInventorySettings,
+  normalizeInventorySettings,
+  subscribeInventorySettings,
+} from "@/services/inventory-setting-service";
 
 const { toast, error: showError } = useAlert();
+const auth = useAuthStore();
 
 const loading = ref(false);
 const saving = ref(false);
 const stockData = ref({});
 const staffOptions = ref([]);
-const activeTab = ref(MAIN_CATEGORIES[0]);
-const TABS = [...MAIN_CATEGORIES, "STOK KOMPUTER"];
-const SUMMARY_CARD_ORDER = [
-  "KALUNG",
-  "LIONTIN",
-  "ANTING",
-  "CINCIN",
-  "GELANG",
-  "GIWANG",
-  "HALA & SDW",
-  "BERLIAN",
-  "KENDARI & EMAS BALI",
-];
+const displaySettings = ref(normalizeInventorySettings());
+const activeTab = ref("");
 
 const CACHE_KEY = "melati-stock-cache-v2";
 const CACHE_TTL = 5 * 60 * 1000;
 const modalMap = new Map();
 
 let unsubRealtime = null;
+let unsubSettings = null;
 let snapshotTimer = null;
 
 const simpleForm = ref({
@@ -572,12 +572,29 @@ const historyList = ref([]);
 const detailInfo = ref({ mainCat: "", subLabel: "" });
 const detailData = ref({});
 
-const showRincianColumn = computed(() => TYPED_CATS.includes(activeTab.value) || HALA_CATS.includes(activeTab.value));
+const enabledCards = computed(() => displaySettings.value.cards.filter((card) => card.enabled));
+const nonComputerCards = computed(() => enabledCards.value.filter((card) => card.type !== "computer"));
+const summaryCards = computed(() => nonComputerCards.value.filter((card) => card.showInSummary !== false));
+const tabs = computed(() => enabledCards.value);
+const hasTabs = computed(() => tabs.value.length > 0);
+const tableRows = computed(() => displaySettings.value.tableRows.filter((row) => row.enabled));
+const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
+const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
+const summaryGridStyle = computed(() => {
+  const grid = displaySettings.value.summaryGrid || {};
+  return {
+    "--summary-md-cols": String(grid.md || 2),
+    "--summary-lg-cols": String(grid.lg || 3),
+    "--summary-xl-cols": String(grid.xl || 3),
+    "--summary-gap": `${grid.gap || 12}px`,
+  };
+});
 
 const summary = computed(() => {
   const out = {};
-  MAIN_CATEGORIES.forEach((cat) => {
-    const fisik = calcFisikTotal(stockData.value, cat);
+  nonComputerCards.value.forEach((card) => {
+    const cat = card.id;
+    const fisik = calcFisikTotal(stockData.value, cat, tableRows.value);
     const komputer = toInt(stockData.value["stok-komputer"]?.[cat]?.quantity);
     out[cat] = {
       fisik,
@@ -592,19 +609,29 @@ function toInt(value) {
   return parseInt(value, 10) || 0;
 }
 
-function cardClass(cat) {
-  const map = {
-    KALUNG: "card-kalung",
-    LIONTIN: "card-liontin",
-    ANTING: "card-anting",
-    CINCIN: "card-cincin",
-    GELANG: "card-gelang",
-    "HALA & SDW": "card-hala",
-    GIWANG: "card-giwang",
-    "KENDARI & EMAS BALI": "card-kendari",
-    BERLIAN: "card-berlian",
+function getCardById(id) {
+  return displaySettings.value.cards.find((card) => card.id === id) || null;
+}
+
+function getCardType(id) {
+  return getCardById(id)?.type || "simple";
+}
+
+function isColorType(id) {
+  return getCardType(id) === "color";
+}
+
+function isHalaType(id) {
+  return getCardType(id) === "hala";
+}
+
+function cardStyle(cardId) {
+  const card = getCardById(cardId);
+  const start = card?.colorStart || "#eef7ff";
+  const end = card?.colorEnd || "#8cc8ff";
+  return {
+    background: `linear-gradient(135deg, ${start} 0%, ${end} 100%)`,
   };
-  return map[cat] || "";
 }
 
 function summaryValueClass(cat) {
@@ -646,8 +673,8 @@ function formatDate(value) {
 }
 
 function getTypeLabel(mainCat, key) {
-  if (TYPED_CATS.includes(mainCat)) return COLOR_LABELS[key] || key;
-  if (HALA_CATS.includes(mainCat)) return HALA_LABELS[key] || key;
+  if (isColorType(mainCat)) return COLOR_LABELS[key] || key;
+  if (isHalaType(mainCat)) return HALA_LABELS[key] || key;
   return key;
 }
 
@@ -721,7 +748,7 @@ async function loadData({ force = false } = {}) {
       }
     }
 
-    stockData.value = await fetchAllStockData();
+    stockData.value = await fetchAllStockData(auth.activeFloor);
     writeCache(stockData.value);
   } catch (e) {
     showError("Gagal memuat data stok", e.message);
@@ -732,10 +759,49 @@ async function loadData({ force = false } = {}) {
 
 async function loadStaffOptions() {
   try {
-    staffOptions.value = await fetchStaffOptions();
+    staffOptions.value = await fetchStaffOptions({ floorId: auth.activeFloor });
   } catch {
     staffOptions.value = [];
   }
+}
+
+function ensureActiveTab() {
+  const tabIds = tabs.value.map((card) => card.id);
+  if (!tabIds.length) {
+    activeTab.value = "";
+    return;
+  }
+  if (!tabIds.includes(activeTab.value)) {
+    activeTab.value = tabIds[0];
+  }
+}
+
+function applyDisplaySettings(payload = {}) {
+  displaySettings.value = normalizeInventorySettings(payload);
+  ensureActiveTab();
+}
+
+async function loadDisplaySettings() {
+  try {
+    await ensureInventorySettings(auth.activeFloor);
+    const settings = await fetchInventorySettings(auth.activeFloor);
+    applyDisplaySettings(settings);
+  } catch (e) {
+    showError("Gagal memuat setting manajemen stok", e.message);
+  }
+}
+
+function setupDisplaySettingsRealtime() {
+  if (unsubSettings) unsubSettings();
+  unsubSettings = subscribeInventorySettings(
+    (data) => {
+      applyDisplaySettings(data);
+    },
+    () => {
+      // ignore listener runtime errors
+    },
+    auth.activeFloor,
+  );
 }
 
 async function refreshData() {
@@ -744,7 +810,7 @@ async function refreshData() {
 }
 
 function openUpdateModal(mainCat, sub) {
-  if (TYPED_CATS.includes(mainCat)) {
+  if (isColorType(mainCat)) {
     const item = getItem(sub.key, mainCat) || {};
     const details = {};
     COLOR_TYPES.forEach((k) => {
@@ -763,7 +829,7 @@ function openUpdateModal(mainCat, sub) {
     return;
   }
 
-  if (HALA_CATS.includes(mainCat)) {
+  if (isHalaType(mainCat)) {
     const item = getItem(sub.key, mainCat) || {};
     const details = {};
     HALA_TYPES.forEach((k) => {
@@ -795,7 +861,7 @@ function openUpdateModal(mainCat, sub) {
 
 function openKomputerModal(mainCat) {
   const item = getItem("stok-komputer", mainCat) || { quantity: 0, details: {} };
-  if (TYPED_CATS.includes(mainCat)) {
+  if (isColorType(mainCat)) {
     const details = {};
     COLOR_TYPES.forEach((k) => {
       details[k] = toInt(item.details?.[k]);
@@ -850,6 +916,7 @@ async function submitSimpleUpdate() {
       newDetails: null,
       petugas: simpleForm.value.petugas.trim(),
       keterangan: simpleForm.value.keterangan,
+      floorId: auth.activeFloor,
     });
     await loadData({ force: true });
     closeModal("simpleUpdateModal");
@@ -877,6 +944,7 @@ async function submitTypedUpdate() {
       newDetails: { ...typedForm.value.details },
       petugas: typedForm.value.petugas.trim(),
       keterangan: typedForm.value.keterangan,
+      floorId: auth.activeFloor,
     });
     await loadData({ force: true });
     closeModal("typedUpdateModal");
@@ -904,6 +972,7 @@ async function submitHalaUpdate() {
       newDetails: { ...halaForm.value.details },
       petugas: halaForm.value.petugas.trim(),
       keterangan: halaForm.value.keterangan,
+      floorId: auth.activeFloor,
     });
     await loadData({ force: true });
     closeModal("halaUpdateModal");
@@ -922,6 +991,7 @@ async function submitKomputerUpdate() {
       mainCat: komputerForm.value.mainCat,
       newQuantity: toInt(komputerForm.value.quantity),
       newDetails: null,
+      floorId: auth.activeFloor,
     });
     await loadData({ force: true });
     closeModal("komputerUpdateModal");
@@ -940,6 +1010,7 @@ async function submitKomputerColorUpdate() {
       mainCat: komputerColorForm.value.mainCat,
       newQuantity: null,
       newDetails: { ...komputerColorForm.value.details },
+      floorId: auth.activeFloor,
     });
     await loadData({ force: true });
     closeModal("komputerColorModal");
@@ -953,10 +1024,13 @@ async function submitKomputerColorUpdate() {
 
 function setupRealtimeListener() {
   if (unsubRealtime) unsubRealtime();
-  unsubRealtime = subscribeStocksRealtime((incoming) => {
-    stockData.value = mergeStockByLatest(stockData.value, incoming);
-    writeCache(stockData.value);
-  });
+  unsubRealtime = subscribeStocksRealtime(
+    (incoming) => {
+      stockData.value = mergeStockByLatest(stockData.value, incoming);
+      writeCache(stockData.value);
+    },
+    auth.activeFloor,
+  );
 }
 
 function handleStorageSync(event) {
@@ -993,7 +1067,7 @@ function scheduleNextDailySnapshot() {
   const delay = target.getTime() - now.getTime();
   snapshotTimer = setTimeout(async () => {
     try {
-      await saveDailyReport(formatDateKey(getNowWita()), stockData.value);
+      await saveDailyReport(formatDateKey(getNowWita()), stockData.value, auth.activeFloor);
     } catch {
       // ignore snapshot runtime errors
     } finally {
@@ -1007,18 +1081,18 @@ async function initDailySnapshots() {
     const now = getNowWita();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const yesterdayKey = formatDateKey(yesterday);
-    const yReport = await fetchDailyReport(yesterdayKey);
+    const yReport = await fetchDailyReport(yesterdayKey, auth.activeFloor);
     if (yReport.source === "none") {
-      await saveDailyReport(yesterdayKey, stockData.value);
+      await saveDailyReport(yesterdayKey, stockData.value, auth.activeFloor);
     }
 
     const todayKey = formatDateKey(now);
     const today005 = new Date(now);
     today005.setHours(0, 5, 0, 0);
     if (now >= today005) {
-      const tReport = await fetchDailyReport(todayKey);
+      const tReport = await fetchDailyReport(todayKey, auth.activeFloor);
       if (tReport.source === "none") {
-        await saveDailyReport(todayKey, stockData.value);
+        await saveDailyReport(todayKey, stockData.value, auth.activeFloor);
       }
     }
   } catch {
@@ -1029,15 +1103,18 @@ async function initDailySnapshots() {
 }
 
 onMounted(async () => {
+  await loadDisplaySettings();
   await loadData();
   await loadStaffOptions();
   setupRealtimeListener();
+  setupDisplaySettingsRealtime();
   window.addEventListener("storage", handleStorageSync);
   await initDailySnapshots();
 });
 
 onUnmounted(() => {
   if (unsubRealtime) unsubRealtime();
+  if (unsubSettings) unsubSettings();
   if (snapshotTimer) clearTimeout(snapshotTimer);
   window.removeEventListener("storage", handleStorageSync);
 });
@@ -1046,6 +1123,30 @@ onUnmounted(() => {
 <style scoped>
 .stock-page {
   --tab-bg: linear-gradient(135deg, #c4dbf7 0%, #dbe9fc 100%);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--summary-gap, 12px);
+}
+
+@media (min-width: 768px) {
+  .summary-grid {
+    grid-template-columns: repeat(var(--summary-md-cols, 2), minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 992px) {
+  .summary-grid {
+    grid-template-columns: repeat(var(--summary-lg-cols, 3), minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .summary-grid {
+    grid-template-columns: repeat(var(--summary-xl-cols, 3), minmax(0, 1fr));
+  }
 }
 
 .summary-card {
@@ -1074,24 +1175,6 @@ onUnmounted(() => {
 .summary-status {
   text-transform: uppercase;
   font-weight: 600;
-}
-
-.card-kalung,
-.card-cincin,
-.card-hala {
-  background: linear-gradient(135deg, #eef7ff 0%, #8cc8ff 100%);
-}
-
-.card-liontin,
-.card-gelang,
-.card-berlian {
-  background: linear-gradient(135deg, #f1f8e9 0%, #b7ea72 100%);
-}
-
-.card-anting,
-.card-giwang,
-.card-kendari {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffd06d 100%);
 }
 
 .nav-tabs.compact {

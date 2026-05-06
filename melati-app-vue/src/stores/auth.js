@@ -1,9 +1,24 @@
 import { defineStore } from "pinia";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
 import { auth, db, functions } from "@/config/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { floorCollection, floorDoc } from "@/services/floor-scope";
 import { httpsCallable } from "firebase/functions";
-import { buildUserAccessMap, getDefaultPageAccess, normalizeUserRole } from "@/config/access-control";
+import {
+  buildUserAccessMap,
+  createDefaultAccessMap,
+  getDefaultPageAccess,
+  normalizeUserRole,
+} from "@/config/access-control";
+import {
+  buildFloorUserDocId,
+  clearActiveFloor,
+  getActiveFloor,
+  normalizeFloorId,
+  parseFloorFromUserDocId,
+  setActiveFloor,
+} from "@/config/floor-config";
+import { resetThemeAppearanceToDefault } from "@/services/theme-settings-service";
 
 function normalizeRoleForCompare(role) {
   const raw = String(role || "")
@@ -24,12 +39,22 @@ function mapUsernameLoginError(err) {
   }
 
   if (code === "functions/permission-denied") {
+    if (message.toLowerCase().includes("lantai")) {
+      const mapped = new Error("Akun tidak terdaftar untuk lantai yang dipilih.");
+      mapped.code = "auth/floor-user-mismatch";
+      return mapped;
+    }
     const mapped = new Error("Password salah.");
     mapped.code = "auth/wrong-password";
     return mapped;
   }
 
   if (code === "functions/failed-precondition") {
+    if (message.toLowerCase().includes("tidak diizinkan")) {
+      const mapped = new Error("Role akun tidak diizinkan untuk lantai yang dipilih.");
+      mapped.code = "auth/floor-role-not-allowed";
+      return mapped;
+    }
     if (message.toLowerCase().includes("akun tidak aktif")) {
       const mapped = new Error("Akun tidak aktif.");
       mapped.code = "auth/user-disabled";
@@ -62,10 +87,20 @@ function mapUsernameLoginError(err) {
   return err;
 }
 
+function createNoAccessMap(role = "staff") {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  const map = createDefaultAccessMap(normalizedRole);
+  Object.keys(map).forEach((key) => {
+    map[key] = false;
+  });
+  return map;
+}
+
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     user: null, // Firebase Auth user object
     userRole: null, // 'admin' | 'supervisor' | 'staff' | 'hrd' | 'admin_custom'
+    activeFloor: getActiveFloor(),
     accessPages: {}, // pageKey -> boolean
     initialized: false, // true setelah onAuthStateChanged pertama kali resolve
   }),
@@ -94,7 +129,9 @@ export const useAuthStore = defineStore("auth", {
 
       try {
         if (firebaseUser.email) {
-          const snap = await getDoc(doc(db, "userRoles", firebaseUser.email));
+          const snap = await getDoc(
+            floorDoc(db, "userRoles", firebaseUser.email, this.activeFloor || getActiveFloor()),
+          );
           if (snap.exists()) return normalizeUserRole(snap.data().role, "staff");
         }
       } catch (_) {
@@ -115,7 +152,9 @@ export const useAuthStore = defineStore("auth", {
 
       try {
         if (firebaseUser.email) {
-          const roleSnap = await getDoc(doc(db, "userRoles", firebaseUser.email));
+          const roleSnap = await getDoc(
+            floorDoc(db, "userRoles", firebaseUser.email, this.activeFloor || getActiveFloor()),
+          );
           if (roleSnap.exists()) {
             const data = roleSnap.data() || {};
             if (data.username) return String(data.username);
@@ -128,30 +167,154 @@ export const useAuthStore = defineStore("auth", {
       return "";
     },
 
-    async loadAccessProfile(firebaseUser, fallbackUsername = "") {
+    setFloorSelection(floorId) {
+      this.activeFloor = setActiveFloor(floorId);
+      return this.activeFloor;
+    },
+
+    resolveUserDocCandidates(username, floorId) {
+      const normalizedUsername = String(username || "").trim();
+      const normalizedUsernameLower = normalizedUsername.toLowerCase();
+      const normalizedFloor = normalizeFloorId(floorId);
+      if (!normalizedUsername) return [];
+
+      const candidates = [];
+      if (normalizedFloor) candidates.push(buildFloorUserDocId(normalizedFloor, normalizedUsername));
+      if (normalizedFloor) candidates.push(`${normalizedFloor}_${normalizedUsernameLower}`);
+      candidates.push(normalizedUsername);
+
+      if (normalizedUsername !== normalizedUsernameLower) {
+        if (normalizedFloor) candidates.push(`${normalizedFloor}_${normalizedUsername}`);
+        candidates.push(normalizedUsernameLower);
+      }
+
+      return [...new Set(candidates)];
+    },
+
+    async findUserProfileByDocIds(candidateIds) {
+      for (const userDocId of candidateIds) {
+        try {
+          const snap = await getDoc(floorDoc(db, "users", userDocId, this.activeFloor || getActiveFloor()));
+          if (snap.exists()) {
+            return { id: snap.id, data: snap.data() || {} };
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      return null;
+    },
+
+    async findUserProfileByEmail(email, floorId) {
+      const normalizedEmail = String(email || "")
+        .trim()
+        .toLowerCase();
+      const normalizedFloor = normalizeFloorId(floorId);
+      if (!normalizedEmail || !normalizedFloor) return null;
+
+      try {
+        const snap = await getDocs(floorCollection(db, "users", normalizedFloor));
+        const match = snap.docs.find((d) => {
+          const data = d.data() || {};
+          const userEmail = String(data.email || "")
+            .trim()
+            .toLowerCase();
+          if (!userEmail || userEmail !== normalizedEmail) return false;
+
+          const floorFromData = normalizeFloorId(data.floorId);
+          const floorFromDoc = parseFloorFromUserDocId(d.id);
+          const effectiveFloor = floorFromData || floorFromDoc || "L1";
+          return effectiveFloor === normalizedFloor;
+        });
+
+        if (match) {
+          return { id: match.id, data: match.data() || {} };
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      return null;
+    },
+
+    async findLegacyUserProfileByDocIds(candidateIds) {
+      for (const userDocId of candidateIds) {
+        try {
+          const snap = await getDoc(doc(db, "users", userDocId));
+          if (snap.exists()) {
+            return { id: snap.id, data: snap.data() || {} };
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      return null;
+    },
+
+    async findLegacyUserProfileByEmail(email) {
+      const normalizedEmail = String(email || "")
+        .trim()
+        .toLowerCase();
+      if (!normalizedEmail) return null;
+
+      try {
+        const snap = await getDocs(collection(db, "users"));
+        const match = snap.docs.find((d) => {
+          const data = d.data() || {};
+          const userEmail = String(data.email || "")
+            .trim()
+            .toLowerCase();
+          return userEmail && userEmail === normalizedEmail;
+        });
+
+        if (match) {
+          return { id: match.id, data: match.data() || {} };
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      return null;
+    },
+
+    async loadAccessProfile(firebaseUser, fallbackUsername = "", floorId = "") {
+      const selectedFloor = normalizeFloorId(floorId || this.activeFloor || getActiveFloor());
+      if (selectedFloor) {
+        this.activeFloor = setActiveFloor(selectedFloor);
+      }
+
       const username = await this.resolveUsername(firebaseUser, fallbackUsername || this.user?.username || "");
       if (this.user) this.user.username = username || this.user.username || "";
 
-      if (!username) {
-        this.accessPages = buildUserAccessMap(null, this.userRole || "staff");
-        return;
+      const candidateIds = this.resolveUserDocCandidates(username, selectedFloor);
+      let userProfile = await this.findUserProfileByDocIds(candidateIds);
+
+      if (!userProfile && firebaseUser?.email) {
+        userProfile = await this.findUserProfileByEmail(firebaseUser.email, selectedFloor);
       }
 
-      try {
-        const snap = await getDoc(doc(db, "users", username));
-        if (snap.exists()) {
-          const userData = snap.data() || {};
-          this.accessPages = buildUserAccessMap(userData, this.userRole || userData.role || "staff");
-          if (this.user && !this.user.displayName) {
-            this.user.displayName = userData.displayName || username;
-          }
-          return;
+      if (!userProfile && selectedFloor === "L1") {
+        userProfile = await this.findLegacyUserProfileByDocIds(candidateIds);
+
+        if (!userProfile && firebaseUser?.email) {
+          userProfile = await this.findLegacyUserProfileByEmail(firebaseUser.email);
         }
-      } catch (_) {
-        /* ignore */
       }
 
-      this.accessPages = buildUserAccessMap(null, this.userRole || "staff");
+      if (userProfile) {
+        const userData = userProfile.data || {};
+        if (this.user) {
+          this.user.username = userData.username || username || this.user.username || "";
+          this.user.displayName = userData.displayName || this.user.displayName || this.user.username || "";
+        }
+
+        this.userRole = normalizeUserRole(userData.role, this.userRole || "staff");
+        this.accessPages = buildUserAccessMap(userData, this.userRole || "staff");
+        return { found: true, userData, userDocId: userProfile.id };
+      }
+
+      this.accessPages = createNoAccessMap(this.userRole || "staff");
+      return { found: false };
     },
 
     // ── Dipanggil sekali saat app mount (main.js) ───────────────────────────
@@ -181,7 +344,10 @@ export const useAuthStore = defineStore("auth", {
                   displayName: sessionUser.displayName || sessionUser.username || firebaseUser.displayName,
                 };
                 this.userRole = normalizeUserRole(sessionUser.role, "staff");
-                await this.loadAccessProfile(firebaseUser, sessionUser.username || "");
+                const floor = normalizeFloorId(sessionUser.floorId || this.activeFloor || getActiveFloor());
+                this.activeFloor = floor || this.activeFloor;
+                if (this.activeFloor) setActiveFloor(this.activeFloor);
+                await this.loadAccessProfile(firebaseUser, sessionUser.username || "", this.activeFloor);
               } else {
                 const token = await firebaseUser.getIdTokenResult();
                 this.user = {
@@ -191,7 +357,10 @@ export const useAuthStore = defineStore("auth", {
                   displayName: firebaseUser.displayName,
                 };
                 this.userRole = await this.fetchRole(firebaseUser);
-                await this.loadAccessProfile(firebaseUser, this.user.username || "");
+                const floor = normalizeFloorId(token?.claims?.floorId || this.activeFloor || getActiveFloor());
+                this.activeFloor = floor || this.activeFloor;
+                if (this.activeFloor) setActiveFloor(this.activeFloor);
+                await this.loadAccessProfile(firebaseUser, this.user.username || "", this.activeFloor);
               }
             } else {
               // Fallback: cek sessionStorage (kompatibilitas sistem lama)
@@ -201,6 +370,8 @@ export const useAuthStore = defineStore("auth", {
                   role: normalizeUserRole(sessionUser.role, "staff"),
                 };
                 this.userRole = normalizeUserRole(sessionUser.role, "staff");
+                this.activeFloor = normalizeFloorId(sessionUser.floorId || this.activeFloor || getActiveFloor()) || "";
+                if (this.activeFloor) setActiveFloor(this.activeFloor);
                 const sessionAccessProfile = {
                   pagesAccess: sessionUser.pagesAccess,
                   permissions: sessionUser.permissions,
@@ -209,6 +380,7 @@ export const useAuthStore = defineStore("auth", {
               } else {
                 this.user = null;
                 this.userRole = null;
+                this.activeFloor = getActiveFloor();
                 this.accessPages = {};
               }
             }
@@ -226,9 +398,16 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async loginWithUsername(username, password) {
+      const selectedFloor = normalizeFloorId(this.activeFloor || getActiveFloor());
+      if (!selectedFloor) {
+        const err = new Error("Silakan pilih lantai terlebih dahulu.");
+        err.code = "auth/floor-required";
+        throw err;
+      }
+
       try {
         const callable = httpsCallable(functions, "loginWithUsername");
-        const result = await callable({ username, password });
+        const result = await callable({ username, password, floorId: selectedFloor });
         const payload = result?.data || {};
 
         if (!payload.customToken) {
@@ -246,8 +425,18 @@ export const useAuthStore = defineStore("auth", {
           username: payload.username || username,
           displayName: payload.displayName || payload.username || username,
         };
+        this.activeFloor = setActiveFloor(payload.floorId || selectedFloor);
         this.userRole = normalizeUserRole(payload.role, "staff");
-        await this.loadAccessProfile(firebaseUser, this.user.username || username);
+        const accessProfile = await this.loadAccessProfile(
+          firebaseUser,
+          this.user.username || username,
+          this.activeFloor,
+        );
+        if (!accessProfile?.found) {
+          const mismatchErr = new Error("Akun tidak terdaftar untuk lantai yang dipilih.");
+          mismatchErr.code = "auth/floor-user-mismatch";
+          throw mismatchErr;
+        }
 
         sessionStorage.setItem(
           "currentUser",
@@ -257,6 +446,7 @@ export const useAuthStore = defineStore("auth", {
             username: this.user.username,
             displayName: this.user.displayName,
             role: this.userRole,
+            floorId: this.activeFloor,
             pagesAccess: this.accessPages,
             authMode: "legacy",
           }),
@@ -267,7 +457,15 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ── Login ────────────────────────────────────────────────────────────────
-    async login(identifier, password) {
+    async login(identifier, password, floorId = "") {
+      const selectedFloor = normalizeFloorId(floorId || this.activeFloor || getActiveFloor());
+      if (!selectedFloor) {
+        const err = new Error("Silakan pilih lantai terlebih dahulu.");
+        err.code = "auth/floor-required";
+        throw err;
+      }
+      this.activeFloor = setActiveFloor(selectedFloor);
+
       const normalized = String(identifier || "").trim();
 
       if (!normalized) {
@@ -290,7 +488,14 @@ export const useAuthStore = defineStore("auth", {
         displayName: firebaseUser.displayName,
       };
       this.userRole = await this.fetchRole(firebaseUser);
-      await this.loadAccessProfile(firebaseUser, this.user.username || "");
+      const accessProfile = await this.loadAccessProfile(firebaseUser, this.user.username || "", this.activeFloor);
+      if (!accessProfile?.found) {
+        await signOut(auth);
+        sessionStorage.removeItem("currentUser");
+        const err = new Error("Akun tidak terdaftar untuk lantai yang dipilih.");
+        err.code = "auth/floor-user-mismatch";
+        throw err;
+      }
       // Simpan ke sessionStorage untuk kompatibilitas modul lama
       sessionStorage.setItem(
         "currentUser",
@@ -300,6 +505,7 @@ export const useAuthStore = defineStore("auth", {
           username: this.user.username,
           displayName: this.user.displayName,
           role: this.userRole,
+          floorId: this.activeFloor,
           pagesAccess: this.accessPages,
           authMode: "firebase",
         }),
@@ -310,8 +516,12 @@ export const useAuthStore = defineStore("auth", {
     async logout() {
       await signOut(auth);
       sessionStorage.removeItem("currentUser");
+      clearActiveFloor();
+      // Reset theme CSS variables to default when logging out
+      resetThemeAppearanceToDefault();
       this.user = null;
       this.userRole = null;
+      this.activeFloor = "";
       this.accessPages = {};
     },
 

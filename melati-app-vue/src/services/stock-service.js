@@ -19,6 +19,8 @@ import {
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { verifyStoredSecret } from "@/utils/security";
+import { floorCollection, floorDoc } from "./floor-scope";
+import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
 
 /**
  * Process sale atomically:
@@ -30,7 +32,7 @@ import { verifyStoredSecret } from "@/utils/security";
  * @param {Object} transactionData - Header fields (tanggal, sales, metodePembayaran, etc.)
  * @returns {string} The new sale document ID
  */
-export async function processSale(cartItems, transactionData) {
+export async function processSale(cartItems, transactionData, floorId = "") {
   const stockLines = [];
 
   cartItems.forEach((item) => {
@@ -43,21 +45,11 @@ export async function processSale(cartItems, transactionData) {
         item,
       });
     }
-    if (item.tipe === "manual" && item.kodeLock && item.kodeLock !== "-") {
-      stockLines.push({
-        source: "lock",
-        kode: item.kodeLock,
-        qty: item.qty ?? 1,
-        kategori: "aksesoris",
-        item,
-      });
-    }
   });
 
   const d = new Date();
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const stockRows = await fetchStockReport(todayStr, todayStr);
-
+  const stockRows = await fetchStockReport(todayStr, todayStr, floorId);
   const rowsByKode = new Map();
   stockRows.forEach((row) => {
     const key = row.kode;
@@ -109,7 +101,7 @@ export async function processSale(cartItems, transactionData) {
   let saleId = null;
 
   await runTransaction(db, async (txn) => {
-    const saleRef = doc(collection(db, "penjualanAksesoris"));
+    const saleRef = doc(floorCollection(db, "penjualanAksesoris", floorId));
     saleId = saleRef.id;
     txn.set(saleRef, {
       ...transactionData,
@@ -127,7 +119,7 @@ export async function processSale(cartItems, transactionData) {
       const qty = Number(line.qty || 0);
       const before = runningStock.get(line.stockKey) ?? 0;
       const after = before - qty;
-      const logRef = doc(collection(db, "stokAksesorisTransaksi"));
+      const logRef = doc(floorCollection(db, "stokAksesorisTransaksi", floorId));
 
       if (line.source === "lock") {
         txn.set(logRef, {
@@ -172,9 +164,9 @@ export async function processSale(cartItems, transactionData) {
  * @param {string} saleId
  * @param {Object} saleData - Existing sale document data (items array required)
  */
-export async function deleteSale(saleId, saleData) {
+export async function deleteSale(saleId, saleData, floorId = "") {
   const txLogSnap = await getDocs(
-    query(collection(db, "stokAksesorisTransaksi"), where("kodeTransaksi", "==", saleId), limit(1000)),
+    query(floorCollection(db, "stokAksesorisTransaksi", floorId), where("kodeTransaksi", "==", saleId), limit(1000)),
   );
 
   const refsToDelete = new Map();
@@ -209,7 +201,7 @@ export async function deleteSale(saleId, saleData) {
 
       const daySnap = await getDocs(
         query(
-          collection(db, "stokAksesorisTransaksi"),
+          floorCollection(db, "stokAksesorisTransaksi", floorId),
           where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
           where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
           orderBy("timestamp", "desc"),
@@ -298,8 +290,8 @@ export async function deleteSale(saleId, saleData) {
     // So delete the original stock logs tied to this sale, do not create reverse logs.
     refsToDelete.forEach((ref) => txn.delete(ref));
 
-    // ── Delete sale document ──────────────────────────────────────────────
-    txn.delete(doc(db, "penjualanAksesoris", saleId));
+    // ── Delete sale document (also remove legacy copy) ─────────────────────
+    txn.delete(floorDoc(db, "penjualanAksesoris", saleId, floorId));
   });
 }
 
@@ -307,9 +299,10 @@ export async function deleteSale(saleId, saleData) {
  * Fetch all active catalog items (stokAksesoris where isActive==true).
  * @returns {Array}
  */
-export async function fetchCatalog() {
-  const snap = await getDocs(collection(db, "stokAksesoris"));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+export async function fetchCatalog(floorId = "") {
+  const resolvedFloor = normalizeFloorId(floorId || getActiveFloor());
+  const docs = await getDocs(floorCollection(db, "stokAksesoris", resolvedFloor)).then((s) => s.docs);
+  return docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 /**
@@ -317,9 +310,10 @@ export async function fetchCatalog() {
  * @param {string} kode
  * @returns {Object|null}
  */
-export async function fetchStockItem(kode) {
-  const snap = await getDoc(doc(db, "stokAksesoris", kode));
-  if (!snap.exists()) return null;
+export async function fetchStockItem(kode, floorId = "") {
+  const resolvedFloor = normalizeFloorId(floorId || getActiveFloor());
+  const snap = await getDoc(floorDoc(db, "stokAksesoris", kode, resolvedFloor));
+  if (!snap || !snap.exists()) return null;
   return { id: snap.id, ...snap.data() };
 }
 
@@ -331,7 +325,7 @@ export async function fetchStockItem(kode) {
  * @param {Object|null} lastDoc - Firestore cursor
  * @returns {{ docs: Array, lastDoc: Object|null, hasMore: boolean }}
  */
-export async function fetchTransactions(startDate, endDate, pageLimit = 200, lastDoc = null) {
+export async function fetchTransactions(startDate, endDate, pageLimit = 200, lastDoc = null, floorId = "") {
   const { startAfter } = await import("firebase/firestore");
 
   // Use timestamp range — same index as old dataPenjualan.js.
@@ -347,7 +341,7 @@ export async function fetchTransactions(startDate, endDate, pageLimit = 200, las
   ];
   if (lastDoc) constraints.push(startAfter(lastDoc));
 
-  const snap = await getDocs(query(collection(db, "penjualanAksesoris"), ...constraints));
+  const snap = await getDocs(query(floorCollection(db, "penjualanAksesoris", floorId), ...constraints));
   const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   return {
     docs,
@@ -361,13 +355,13 @@ export async function fetchTransactions(startDate, endDate, pageLimit = 200, las
  * @param {string} inputPassword - Plain text input from user
  * @returns {boolean}
  */
-export async function verifySupervisorPassword(inputPassword) {
-  const snap = await getDoc(doc(db, "settings", "passwords"));
+export async function verifySupervisorPassword(inputPassword, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "passwords", floorId));
   if (!snap.exists()) return false;
   const data = snap.data();
-  const stored = data.supervisorPassword ?? data.deleteDataPenjualan;
-  if (!stored) return false;
-  return verifyStoredSecret(inputPassword, stored, { allowLegacyBase64: true });
+  const candidates = [data.supervisorPassword, data.deleteDataPenjualan, data.editDataPenjualan].filter(Boolean);
+  if (!candidates.length) return false;
+  return candidates.some((stored) => verifyStoredSecret(inputPassword, stored, { allowLegacyBase64: true }));
 }
 
 /**
@@ -376,8 +370,8 @@ export async function verifySupervisorPassword(inputPassword) {
  * @param {string} inputPassword
  * @returns {boolean}
  */
-export async function verifyDeleteReturnPassword(inputPassword) {
-  const snap = await getDoc(doc(db, "settings", "passwords"));
+export async function verifyDeleteReturnPassword(inputPassword, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "passwords", floorId));
   if (!snap.exists()) return verifyStoredSecret(inputPassword, "smlt116");
   const data = snap.data() || {};
   const stored =
@@ -391,8 +385,8 @@ export async function verifyDeleteReturnPassword(inputPassword) {
  * @param {string} inputPassword
  * @returns {boolean}
  */
-export async function verifyDeleteTambahBarangPassword(inputPassword) {
-  const snap = await getDoc(doc(db, "settings", "passwords"));
+export async function verifyDeleteTambahBarangPassword(inputPassword, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "passwords", floorId));
   if (!snap.exists()) return verifyStoredSecret(inputPassword, "smlt116");
   const data = snap.data() || {};
   const stored =
@@ -416,19 +410,19 @@ export async function verifyDeleteTambahBarangPassword(inputPassword) {
  * @param {Array}  items - [{ kode, nama, jumlah, kategori }]
  * @param {Object} data  - { tanggal: "YYYY-MM-DD", kasir: string }
  */
-export async function addStock(items, data) {
+export async function addStock(items, data, floorId = "") {
   // Pre-resolve document refs outside the transaction so we can run queries.
   // 1. Check direct ref (new-style: doc ID = kode)
   // 2. Fallback: query by kode field (legacy: auto-generated doc ID)
   // 3. Not found → throw — never create a doc here
   const resolvedRefs = await Promise.all(
     items.map(async (item) => {
-      const directRef = doc(db, "stokAksesoris", item.kode);
+      const directRef = floorDoc(db, "stokAksesoris", item.kode, floorId);
       const directSnap = await getDoc(directRef);
       if (directSnap.exists()) return directRef;
 
       const legacySnap = await getDocs(
-        query(collection(db, "stokAksesoris"), where("kode", "==", item.kode), limit(1)),
+        query(floorCollection(db, "stokAksesoris", floorId), where("kode", "==", item.kode), limit(1)),
       );
       if (!legacySnap.empty) return legacySnap.docs[0].ref;
 
@@ -449,7 +443,7 @@ export async function addStock(items, data) {
 
       txn.update(resolvedRefs[idx], { stok: increment(item.jumlah), updatedAt: serverTimestamp() });
 
-      const logRef = doc(collection(db, "stokAksesorisTransaksi"));
+      const logRef = doc(floorCollection(db, "stokAksesorisTransaksi", floorId));
       txn.set(logRef, {
         kode: item.kode,
         nama: item.nama,
@@ -469,8 +463,8 @@ export async function addStock(items, data) {
  * @param {string} jenis - "kotak" | "aksesoris" | "silver"
  * @returns {Array} [{kode, nama, kadar, berat, ...}]
  */
-export async function fetchKodesByKategori(jenis) {
-  const snap = await getDocs(collection(db, "kodeAksesoris", "kategori", jenis));
+export async function fetchKodesByKategori(jenis, floorId = "") {
+  const snap = await getDocs(collection(floorDoc(db, "kodeAksesoris", "kategori", floorId), jenis));
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (a.text || a.kode || "").localeCompare(b.text || b.kode || ""));
@@ -483,15 +477,15 @@ export async function fetchKodesByKategori(jenis) {
  * @param {Array}  items - [{ kode, nama, jumlah, kategori, keterangan }]
  * @param {Object} data  - { tanggal: "YYYY-MM-DD", kasir: string, jenis: "kotak"|"aksesoris"|"silver" }
  */
-export async function processReturn(items, data) {
+export async function processReturn(items, data, floorId = "") {
   const resolvedRefs = await Promise.all(
     items.map(async (item) => {
-      const directRef = doc(db, "stokAksesoris", item.kode);
+      const directRef = floorDoc(db, "stokAksesoris", item.kode, floorId);
       const directSnap = await getDoc(directRef);
       if (directSnap.exists()) return directRef;
 
       const legacySnap = await getDocs(
-        query(collection(db, "stokAksesoris"), where("kode", "==", item.kode), limit(1)),
+        query(floorCollection(db, "stokAksesoris", floorId), where("kode", "==", item.kode), limit(1)),
       );
       if (!legacySnap.empty) return legacySnap.docs[0].ref;
 
@@ -507,7 +501,7 @@ export async function processReturn(items, data) {
       if (!snap.exists()) throw new Error(`Barang "${item.kode}" tidak ditemukan di katalog`);
       txn.update(resolvedRefs[idx], { stok: increment(-item.jumlah), updatedAt: serverTimestamp() });
 
-      const logRef = doc(collection(db, "stokAksesorisTransaksi"));
+      const logRef = doc(floorCollection(db, "stokAksesorisTransaksi", floorId));
       txn.set(logRef, {
         kode: item.kode,
         nama: item.nama,
@@ -529,15 +523,17 @@ export async function processReturn(items, data) {
  * @param {string} txId  - stokAksesorisTransaksi document ID
  * @param {{kode:string, jumlah:number}} data - fields from the return record
  */
-export async function deleteReturn(txId, data) {
+export async function deleteReturn(txId, data, floorId = "") {
   // Resolve stock ref before transaction — support legacy docs
-  const directRef = doc(db, "stokAksesoris", data.kode);
+  const directRef = floorDoc(db, "stokAksesoris", data.kode, floorId);
   const directSnap = await getDoc(directRef);
   let stockRef;
   if (directSnap.exists()) {
     stockRef = directRef;
   } else {
-    const legacySnap = await getDocs(query(collection(db, "stokAksesoris"), where("kode", "==", data.kode), limit(1)));
+    const legacySnap = await getDocs(
+      query(floorCollection(db, "stokAksesoris", floorId), where("kode", "==", data.kode), limit(1)),
+    );
     if (!legacySnap.empty) {
       stockRef = legacySnap.docs[0].ref;
     } else {
@@ -546,7 +542,7 @@ export async function deleteReturn(txId, data) {
   }
 
   await runTransaction(db, async (txn) => {
-    const txRef = doc(db, "stokAksesorisTransaksi", txId);
+    const txRef = floorDoc(db, "stokAksesorisTransaksi", txId, floorId);
     const txSnap = await txn.get(txRef);
     if (!txSnap.exists()) throw new Error("Data return tidak ditemukan");
     txn.update(stockRef, { stok: increment(Math.abs(data.jumlah)), updatedAt: serverTimestamp() });
@@ -565,7 +561,7 @@ export async function deleteReturn(txId, data) {
  * @param {string|null} jenisFilter  Optional: single jenis value (e.g., "tambah", "return")
  * @returns {Array}
  */
-export async function fetchTransactionHistory(startDate, endDate, jenisFilter = null) {
+export async function fetchTransactionHistory(startDate, endDate, jenisFilter = null, floorId = "") {
   // Expand query bounds to capture legacy ISO strings:
   // Lower: 1 day before (old system stored WITA midnight as UTC prev-day 16:00)
   // Upper: append "\uf8ff" to catch ISO strings beyond plain date string
@@ -575,7 +571,7 @@ export async function fetchTransactionHistory(startDate, endDate, jenisFilter = 
 
   const snap = await getDocs(
     query(
-      collection(db, "stokAksesorisTransaksi"),
+      floorCollection(db, "stokAksesorisTransaksi", floorId),
       where("tanggal", ">=", queryStart),
       where("tanggal", "<=", endDate + "\uf8ff"),
       orderBy("tanggal", "desc"),
@@ -612,14 +608,14 @@ export async function fetchTransactionHistory(startDate, endDate, jenisFilter = 
  * @param {string} saleId
  * @param {Object} updates - Allowed: metodePembayaran, keterangan, customerName, customerPhone
  */
-export async function updateSale(saleId, updates) {
+export async function updateSale(saleId, updates, floorId = "") {
   const { updateDoc } = await import("firebase/firestore");
   const allowedFields = ["metodePembayaran", "keterangan", "customerName", "customerPhone", "statusPembayaran"];
   const safeUpdates = {};
   allowedFields.forEach((f) => {
     if (updates[f] !== undefined) safeUpdates[f] = updates[f];
   });
-  await updateDoc(doc(db, "penjualanAksesoris", saleId), {
+  await updateDoc(floorDoc(db, "penjualanAksesoris", saleId, floorId), {
     ...safeUpdates,
     updatedAt: serverTimestamp(),
   });
@@ -631,9 +627,9 @@ export async function updateSale(saleId, updates) {
  * @param {string} saleId
  * @param {Object} updates - Any penjualanAksesoris fields (items, salesName, totalHarga, etc.)
  */
-export async function updateSaleFull(saleId, updates) {
+export async function updateSaleFull(saleId, updates, floorId = "") {
   const { updateDoc } = await import("firebase/firestore");
-  await updateDoc(doc(db, "penjualanAksesoris", saleId), {
+  await updateDoc(floorDoc(db, "penjualanAksesoris", saleId, floorId), {
     ...updates,
     updatedAt: serverTimestamp(),
   });
@@ -644,8 +640,8 @@ export async function updateSaleFull(saleId, updates) {
  * @param {string} inputPassword
  * @returns {boolean}
  */
-export async function verifyEditPassword(inputPassword) {
-  const snap = await getDoc(doc(db, "settings", "passwords"));
+export async function verifyEditPassword(inputPassword, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "passwords", floorId));
   if (!snap.exists()) return verifyStoredSecret(inputPassword, "admin123");
   const stored = snap.data().editDataPenjualan ?? "admin123";
   return verifyStoredSecret(inputPassword, stored, { allowLegacyBase64: true });
@@ -659,7 +655,7 @@ export async function verifyEditPassword(inputPassword) {
  * @param {string} endDate   YYYY-MM-DD
  * @returns {Array}
  */
-export async function fetchStockReport(startDate, endDate) {
+export async function fetchStockReport(startDate, endDate, floorId = "") {
   // ── Timestamp bounds ──────────────────────────────────────────────────────
   const startTs = Timestamp.fromDate(
     (() => {
@@ -695,11 +691,11 @@ export async function fetchStockReport(startDate, endDate) {
 
   // ── Fetch catalog, snapshot, and period transactions in parallel ──────────
   const [catalogSnap, snapshotSnap, txSnap] = await Promise.all([
-    getDocs(collection(db, "stokAksesoris")),
-    getDocs(query(collection(db, "dailyStockSnapshot"), where("date", "==", snapshotDateKey))),
+    getDocs(floorCollection(db, "stokAksesoris", floorId)),
+    getDocs(query(floorCollection(db, "dailyStockSnapshot", floorId), where("date", "==", snapshotDateKey))),
     getDocs(
       query(
-        collection(db, "stokAksesorisTransaksi"),
+        floorCollection(db, "stokAksesorisTransaksi", floorId),
         where("timestamp", ">=", startTs),
         where("timestamp", "<=", endTs),
         orderBy("timestamp", "asc"),
@@ -759,7 +755,7 @@ export async function fetchStockReport(startDate, endDate) {
   if (!stokAwalMap) {
     const txAfterSnap = await getDocs(
       query(
-        collection(db, "stokAksesorisTransaksi"),
+        floorCollection(db, "stokAksesorisTransaksi", floorId),
         where("timestamp", ">=", afterTs),
         orderBy("timestamp", "asc"),
         limit(5000),
@@ -810,10 +806,10 @@ export async function fetchStockReport(startDate, endDate) {
  * Uses the same snapshot + delta logic as fetchStockReport.
  * @returns {Map<string, number>}
  */
-export async function fetchCurrentStockMap() {
+export async function fetchCurrentStockMap(floorId = "") {
   const d = new Date();
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const items = await fetchStockReport(todayStr, todayStr);
+  const items = await fetchStockReport(todayStr, todayStr, floorId);
   return new Map(items.map((i) => [i.kode, i.stokAkhir]));
 }
 
@@ -822,8 +818,8 @@ export async function fetchCurrentStockMap() {
  * Keeps UI stock aligned with snapshot+today-delta calculation used in old page.
  * @returns {Array}
  */
-export async function fetchSalesCatalogWithComputedStock() {
-  const [items, stockMap] = await Promise.all([fetchCatalog(), fetchCurrentStockMap()]);
+export async function fetchSalesCatalogWithComputedStock(floorId = "") {
+  const [items, stockMap] = await Promise.all([fetchCatalog(floorId), fetchCurrentStockMap(floorId)]);
   return items.map((item) => ({
     ...item,
     stok: stockMap.get(item.kode) ?? item.stok ?? 0,
