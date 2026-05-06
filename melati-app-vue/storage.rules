@@ -16,6 +16,29 @@ service firebase.storage {
       return hasRole('admin') || hasRole('hrd') || hasRole('supervisor');
     }
 
+    // Floor-scoped storage paths (multi-floor rollout)
+    // Servis uploads now use global paths (data is global)
+
+    match /floors/{floorId}/order-online/proof/{orderNo}/{docId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if isAuthenticated();
+    }
+
+    match /floors/{floorId}/promotions/{year}/{month}/{contentType}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && request.resource.size < 50 * 1024 * 1024
+                   && (
+                     request.resource.contentType.matches('image/.*')
+                     || request.resource.contentType.matches('video/.*')
+                     || request.resource.contentType == 'application/octet-stream'
+                   );
+      allow delete: if isAuthenticated();
+    }
+
     // Medical Certificate Rules (Phase 1 - Cloudinary → Firebase Migration)
     // Path structure: medical-certificates/{year}/{month}/{employeeId}_{timestamp}_{uuid}.{ext}
     match /medical-certificates/{year}/{month}/{fileName} {
@@ -49,6 +72,39 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*'); // Images only
 
       // Allow authenticated users to delete
+      allow delete: if isAuthenticated();
+    }
+
+    // Rules for bukti-pengambilan-lite folder (compressed service pickup photos)
+    match /bukti-pengambilan-lite/{year}/{month}/{fileName} {
+      allow read: if isAuthenticated();
+
+      allow write: if isAuthenticated()
+                   && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                   && request.resource.contentType.matches('image/.*'); // Images only
+
+      allow delete: if isAuthenticated();
+    }
+
+    // Rules for bukti-penerimaan-servis folder (service receiving photos)
+    match /bukti-penerimaan-servis/{year}/{month}/{fileName} {
+      allow read: if isAuthenticated();
+
+      allow write: if isAuthenticated()
+                   && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                   && request.resource.contentType.matches('image/.*'); // Images only
+
+      allow delete: if isAuthenticated();
+    }
+
+    // Rules for bukti-penerimaan-servis-lite folder (compressed service receiving photos)
+    match /bukti-penerimaan-servis-lite/{year}/{month}/{fileName} {
+      allow read: if isAuthenticated();
+
+      allow write: if isAuthenticated()
+                   && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                   && request.resource.contentType.matches('image/.*'); // Images only
+
       allow delete: if isAuthenticated();
     }
 
@@ -89,3 +145,5 @@ service firebase.storage {
     }
   }
 }
+
+

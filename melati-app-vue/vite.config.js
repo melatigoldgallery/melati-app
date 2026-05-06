@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from "node:url";
 export default defineConfig({
   plugins: [vue(), basicSsl()],
   server: {
-    https: true, // Enables HTTPS on localhost — required for reliable camera (getUserMedia) access.
+    https: process.env.VITE_DEV_HTTPS !== "false", // Default HTTPS; set VITE_DEV_HTTPS=false for browser tool access.
     // Chrome blocks camera on a per-origin basis. Switching from http://localhost:5173
     // to https://localhost:5173 creates a fresh origin and prompts for permission correctly.
   },

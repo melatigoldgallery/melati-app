@@ -30,7 +30,7 @@
             <option value="all">Semua Jenis</option>
             <option value="aksesoris">Aksesoris</option>
             <option value="kotak">Kotak</option>
-            <option value="silver">Silver</option>
+            <option v-if="!isL2Floor" value="silver">Silver</option>
             <option value="manual">Manual</option>
           </select>
           <select v-model="filterSales" class="form-select form-select-sm" style="width: 150px">
@@ -241,12 +241,17 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { collection, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
+import { floorCollection } from "@/services/floor-scope";
+import { useAuthStore } from "@/stores/auth";
 import { db } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { useAccessoriesStore } from "@/stores/accessories";
 
 const store = useAccessoriesStore();
 const { swal } = useAlert();
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
+const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
 
 const today = new Date();
 const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -730,7 +735,7 @@ function statusClass(status) {
 }
 
 function getCacheKey() {
-  return `salesData_${filterStart.value}_to_${filterEnd.value}`;
+  return `salesData_${activeFloor.value}_${filterStart.value}_to_${filterEnd.value}`;
 }
 
 function isTodayIncluded() {
@@ -825,7 +830,7 @@ function setupRealtimeListener() {
   const endOfDay = new Date(`${todayISO}T23:59:59.999`);
 
   const q = query(
-    collection(db, "penjualanAksesoris"),
+    floorCollection(db, "penjualanAksesoris", activeFloor.value),
     where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
     where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
     orderBy("timestamp", "desc"),

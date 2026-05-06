@@ -28,7 +28,7 @@ const ManajemenServisView = () => import("@/views/servis/ManajemenServisView.vue
 // Order Online
 const InputOrderView = () => import("@/views/order-online/InputOrderView.vue");
 const DataOrderView = () => import("@/views/order-online/DataOrderView.vue");
-const LaporanOrderView = () => import("@/views/order-online/LaporanOrderView.vue");
+const ManajemenOrderView = () => import("@/views/order-online/ManajemenOrderView.vue");
 
 // Aksesoris
 const PenjualanView = () => import("@/views/aksesoris/PenjualanView.vue");
@@ -57,6 +57,7 @@ const JamAbsensiView = () => import("@/views/pengaturan/JamAbsensiView.vue");
 const AntrianClosingSettingView = () => import("@/views/pengaturan/AntrianSettingView.vue");
 const TemaWarnaView = () => import("@/views/pengaturan/TemaWarnaView.vue");
 const MaintenanceView = () => import("@/views/pengaturan/MaintenanceView.vue");
+const PengaturanManajemenStokView = () => import("@/views/pengaturan/PengaturanManajemenStokView.vue");
 
 // ─── Route definitions ────────────────────────────────────────────────────────
 const routes = [
@@ -134,9 +135,9 @@ const routes = [
   },
   { path: "/order-online/data", component: DataOrderView, meta: { requiresAuth: true, pageKey: "order-online.data" } },
   {
-    path: "/order-online/laporan",
-    component: LaporanOrderView,
-    meta: { requiresAuth: true, pageKey: "order-online.laporan" },
+    path: "/order-online/manajemen",
+    component: ManajemenOrderView,
+    meta: { requiresAuth: true, pageKey: "order-online.manajemen" },
   },
 
   // Aksesoris
@@ -237,6 +238,11 @@ const routes = [
     component: MaintenanceView,
     meta: { requiresAuth: true, pageKey: "admin.maintenance" },
   },
+  {
+    path: "/pengaturan/manajemen-stok",
+    component: PengaturanManajemenStokView,
+    meta: { requiresAuth: true, pageKey: "admin.inventory-manajemen-stok" },
+  },
 
   // Backward-compatible redirects
   { path: "/admin/users", redirect: "/pengaturan/users" },
@@ -245,6 +251,7 @@ const routes = [
   { path: "/admin/antrian-penutupan", redirect: "/pengaturan/antrian-penutupan" },
   { path: "/admin/tema-warna", redirect: "/pengaturan/tema-warna" },
   { path: "/maintenance", redirect: "/pengaturan/maintenance" },
+  { path: "/order-online/laporan", redirect: "/order-online/manajemen" },
   { path: "/absensi/supervisor", redirect: "/absensi/status-pengajuan" },
   { path: "/absensi/tambah-pengguna", redirect: "/absensi/tambah-staff" },
 
@@ -271,6 +278,11 @@ router.beforeEach(async (to) => {
 
   // Needs auth but not logged in
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { path: "/login", query: { redirect: to.fullPath } };
+  }
+
+  // Floor selection guard for authenticated pages.
+  if (to.meta.requiresAuth && !auth.activeFloor) {
     return { path: "/login", query: { redirect: to.fullPath } };
   }
 

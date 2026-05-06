@@ -2,16 +2,25 @@
 
 ## 1. Ringkasan
 
-Dokumen ini mendefinisikan rencana final penambahan fitur agar 1 aplikasi Vue yang sama dapat dipakai untuk operasional lantai 1 dan lantai 2, dengan kemampuan fitur yang berbeda per lantai.
+Dokumen ini mendefinisikan rencana final penambahan fitur agar 1 aplikasi Vue yang sama dapat dipakai untuk operasional lantai 1 dan lantai 2, dengan fitur yang sama di kedua lantai namun scope data dan user akses dipisahkan per lantai.
 
 Tujuan utama:
 
 - Menghilangkan maintenance 2 codebase terpisah.
 - Menjaga isolasi data per lantai secara aman di semua layer.
-- Mengoptimalkan operasional dengan capability berbasis lantai.
+- Mengoptimalkan operasional dengan scope data berbasis lantai.
 
-Status: Draft v1.1  
-Tanggal: 2026-04-15
+Status: **FINAL v1.2 - Sebagian Implementasi Selesai**
+Tanggal: 2026-05-04
+
+**Status Implementasi (per 04-Mei-2026):**
+
+- ✅ Fase 1 Foundation: Claims, floor context, capability guard, rules draft
+- ✅ Login 2-step: Floor selector + form login
+- ✅ Auth validation: User profile floor-aware, reject mismatch
+- ✅ Cloud Function: loginWithUsername menerima floorId, enforce role per-floor
+- 🔄 Fase 2-3: Service migration (aksesoris, antrian, inventory, promosi, pengaturan, servis, absensi)
+- 📋 Fase 4: Hard cutover & cleanup legacy
 
 ---
 
@@ -25,19 +34,25 @@ Tanggal: 2026-04-15
 ### 2.2 Capability per Lantai
 
 - Lantai 1 (L1): Firestore, Realtime Database, Storage, Cloud Functions.
-- Lantai 2 (L2): Firestore, Realtime Database, Cloud Functions.
-- L2 tidak menggunakan Storage.
+- Lantai 2 (L2): Firestore, Realtime Database, Storage, Cloud Functions.
 
 ### 2.3 Scope Menu per Lantai
 
-- L1: semua menu sesuai role.
-- L2: hanya menu `aksesoris`, `antrian`, `inventory`, `promosi`, `pengaturan`.
-- L2 tidak perlu modul `absensi` dan `servis`.
+- L1: semua menu sesuai role akses menu bisa diatur dari role supervisor
+- L2: semua menu sesuai role akses menu bisa diatur dari role supervisor
 
 ### 2.4 Data Sensitif
 
 - Data sensitif wajib floor-scoped.
-- Tiap lantai memiliki supervisor sendiri (otorisasi sensitif tidak boleh berbagi kode/role global).
+- Supervisor L2 memiliki full page access seperti supervisor L1 untuk mengatur hak akses menu pada user lantai tersebut.
+- Akun default operasional per lantai:
+  - Supervisor L2 menggunakan username/password supervisor yang sudah ada.
+  - Admin L2 menggunakan `username: admin` dan `password: adminyoung`.
+
+### 2.5 Matriks Role per Lantai
+
+- L1: `supervisor`, `admin`, `staff`, `hrd`
+- L2: `supervisor`, `admin`
 
 ---
 
@@ -85,7 +100,7 @@ Masalah utama:
 - Auth user dengan floor authorization dan role per lantai.
 - Isolasi data Firestore per lantai.
 - Isolasi node RTDB per lantai.
-- Isolasi Storage per lantai dengan pembatasan L2 no-storage.
+- Isolasi Storage per lantai
 - Penyesuaian Cloud Functions agar floor-aware dan capability-aware.
 - Penyesuaian query frontend agar wajib scoped ke floor aktif.
 - Floor-scoped sensitive configuration.
@@ -126,24 +141,24 @@ Prinsip desain:
 
 ## 8. Capability Matrix
 
-| Area            | L1  | L2    |
-| --------------- | --- | ----- |
-| Menu Aksesoris  | Ya  | Ya    |
-| Menu Antrian    | Ya  | Ya    |
-| Menu Inventory  | Ya  | Ya    |
-| Menu Promosi    | Ya  | Ya    |
-| Menu Pengaturan | Ya  | Ya    |
-| Menu Absensi    | Ya  | Tidak |
-| Menu Servis     | Ya  | Tidak |
-| Firestore       | Ya  | Ya    |
-| RTDB            | Ya  | Ya    |
-| Cloud Functions | Ya  | Ya    |
-| Storage         | Ya  | Tidak |
+| Area            | L1  | L2  |
+| --------------- | --- | --- |
+| Menu Aksesoris  | Ya  | Ya  |
+| Menu Antrian    | Ya  | Ya  |
+| Menu Inventory  | Ya  | Ya  |
+| Menu Promosi    | Ya  | Ya  |
+| Menu Pengaturan | Ya  | Ya  |
+| Menu Absensi    | Ya  | Ya  |
+| Menu Servis     | Ya  | Ya  |
+| Firestore       | Ya  | Ya  |
+| RTDB            | Ya  | Ya  |
+| Cloud Functions | Ya  | Ya  |
+| Storage         | Ya  | Ya  |
 
 Aturan penting:
 
-- L2 tidak boleh membaca/menulis file ke Storage.
-- Modul yang bergantung ke Storage harus otomatis nonaktif untuk L2.
+- Seluruh modul dan fitur tersedia di L1 dan L2.
+- Semua data operasional, data sensitif, cache, dan query wajib dibatasi ke `floorId` aktif.
 
 ---
 
@@ -151,29 +166,57 @@ Aturan penting:
 
 ### FR-01 Login dan Floor Context
 
-- Setelah login, sistem memuat floor yang diizinkan dan role per lantai.
-- User single-floor langsung terkunci ke floor tersebut.
-- Tidak ada role operasional lintas floor pada fase ini.
+**Flow Pengguna:**
+
+1. Login page dibuka → tampilkan selector `Lt 1` / `Lt 2`.
+2. User pilih lantai → store `activeFloor` di session.
+3. Form login tampil → user input username/password.
+4. Backend validasi:
+   - User profil harus cocok dengan `floorId` terpilih.
+   - Role user harus valid untuk lantai tersebut (L2 hanya supervisor/admin).
+   - Reject jika mismatch dengan error `auth/floor-user-mismatch`.
+5. Login berhasil → generate custom claims (`allowedFloors`, `floorRoles`).
+6. User diarahkan ke dashboard dengan data scoped ke `activeFloor`.
+
+**Validasi Floor-Aware:**
+
+- Auth store memvalidasi: `userProfile.floorId === selectedFloor`.
+- Tidak boleh ada user lintas floor pada fase ini.
+- Session `activeFloor` persist sampai logout.
 
 ### FR-02 Floor-Scoped Feature Access
 
-- Menu dan aksi tampil berdasarkan capability lantai.
-- User L2 tidak dapat mengakses absensi/servis.
+- Menu dan aksi tampil berdasarkan role + hak akses user pada floor aktif.
+- Supervisor L1 dan L2 memiliki full akses menu untuk mengatur hak akses user pada floor masing-masing.
 
 ### FR-03 Isolasi Data per Lantai
 
 - Semua read/write operasional wajib scoped ke `floorId` aktif.
 - Tidak boleh query global tanpa floor scope.
 
-### FR-04 Storage Restriction for L2
+### FR-04 Storage Scope
 
-- Semua fitur upload/download/delete file ditolak untuk L2.
+- Semua fitur upload/download/delete file tetap tersedia di L1 dan L2.
+- Path Storage wajib scoped ke `floors/{floorId}/...`.
 - Enforcement dilakukan di UI, service guard, function, dan Storage Rules.
 
 ### FR-05 Cloud Functions Aware Floor and Capability
 
-- Callable/trigger yang menyentuh data scoped memvalidasi `floorId` terhadap claims.
-- Function menolak request jika floor tidak sah atau capability tidak diizinkan.
+**Kontrak Wajib untuk Semua Callable/HTTP Operasional:**
+
+- Terima `floorId` di payload request.
+- Validasi `floorId` tidak kosong → return `invalid-argument` jika kosong.
+- Validasi `floorId` termasuk `allowedFloors` claim → return `permission-denied` jika tidak.
+- Validasi role dari `floorRoles[floorId]` untuk aksi sensitif.
+- Validasi capability per floor sesuai matriks role + hak akses menu.
+- Return `permission-denied` jika floor/role/capability tidak valid.
+- Log operasional menyertakan: `floorId`, `uid`, `action`, `status`.
+
+**Pattern Trigger/Scheduler:**
+
+- Trigger Firestore gunakan wildcard: `floors/{floorId}/stokAksesorisTransaksi/{txId}`.
+- Scheduler harian iterasi daftar floor aktif, proses per floor.
+- Hasil job disimpan per floor agar mudah audit & rollback.
 
 ### FR-06 Floor-Scoped Sensitive Data
 
@@ -205,12 +248,21 @@ Claims yang disarankan:
 - `floorRoles`: map role per floor, contoh `{ "L1": "supervisor", "L2": "staf" }`.
 - `capabilities`: map capability per floor bila diperlukan fine-grained control.
 
-Contoh:
+**Contoh Claims:**
 
-- User supervisor L1: `allowedFloors=["L1"]`, `floorRoles={"L1":"supervisor"}`.
-- User supervisor L2: `allowedFloors=["L2"]`, `floorRoles={"L2":"supervisor"}`.
-- User admin L1: `allowedFloors=["L1"]`, `floorRoles={"L1":"admin"}`.
-- User admin L2: `allowedFloors=["L2"]`, `floorRoles={"L2":"admin"}`.
+- **Supervisor L1:** `allowedFloors=["L1"]`, `floorRoles={"L1":"supervisor"}`, `userFloor="L1"`.
+- **Supervisor L2:** `allowedFloors=["L2"]`, `floorRoles={"L2":"supervisor"}`, `userFloor="L2"`.
+- **Admin L1:** `allowedFloors=["L1"]`, `floorRoles={"L1":"admin"}`, `userFloor="L1"`.
+- **Admin L2:** `allowedFloors=["L2"]`, `floorRoles={"L2":"admin"}`, `userFloor="L2"`.
+- **Staff L1:** `allowedFloors=["L1"]`, `floorRoles={"L1":"staff"}`, `userFloor="L1"`.
+- **HRD L1:** `allowedFloors=["L1"]`, `floorRoles={"L1":"hrd"}`, `userFloor="L1"`.
+
+**Ketentuan:**
+
+- Setiap user hanya boleh memiliki 1 floor (tidak lintas floor).
+- `userFloor` mengindikasikan lantai primary user, wajib ada di profile Firestore.
+- Claim `floorRoles` hanya mengandung 1 entry per user.
+- Role L2 dibatasi: `supervisor`, `admin` saja (tidak ada staff/hrd di L2).
 
 Ketentuan fase ini:
 
@@ -240,15 +292,15 @@ Struktur final (canonical):
 - `floors/{floorId}/maintenanceLogs/{docId}`
 - `floors/{floorId}/systemLocks/{docId}`
 
-Khusus L1 saja:
+Berlaku untuk L1 dan L2:
 
-- `floors/L1/servis/{docId}`
-- `floors/L1/absensi/attendance/{docId}`
-- `floors/L1/absensi/leaveRequests/{docId}`
-- `floors/L1/absensi/manualOvertime/{docId}`
-- `floors/L1/absensi/latePermissionCodes/{code}`
-- `floors/L1/absensi/employees/{docId}`
-- `floors/L1/absensi/employeeFaces/{employeeId}`
+- `floors/{floorId}/servis/{docId}`
+- `floors/{floorId}/absensi/attendance/{docId}`
+- `floors/{floorId}/absensi/leaveRequests/{docId}`
+- `floors/{floorId}/absensi/manualOvertime/{docId}`
+- `floors/{floorId}/absensi/latePermissionCodes/{code}`
+- `floors/{floorId}/absensi/employees/{docId}`
+- `floors/{floorId}/absensi/employeeFaces/{employeeId}`
 
 Data sensitif per lantai:
 
@@ -293,7 +345,7 @@ Path berbasis lantai:
 
 Kebijakan:
 
-- L2: no-storage access (read/write/delete ditolak).
+- Semua file operasional wajib disimpan ke path floor-scoped sesuai lantai aktif.
 
 ---
 
@@ -313,7 +365,6 @@ Kebijakan:
 ### 13.3 Storage Rules
 
 - `floors/{floorId}/...` validasi `allowedFloors`.
-- Tambah guard eksplisit: jika `floorId == "L2"`, deny akses storage.
 - Validasi `size/contentType` per folder.
 
 Catatan:
@@ -334,7 +385,7 @@ Catatan:
 - Semua service/query wajib menerima floor scope.
 - Menu dan route guard mengikuti capability matrix.
 - Cache/session/localStorage key wajib menambahkan suffix `floorId`.
-- Semua upload flow wajib guard `canUseStorage()`.
+- Semua upload flow wajib menulis ke path storage dengan prefix `floors/{floorId}/`.
 
 ---
 
@@ -358,7 +409,7 @@ Kontrak implementasi Functions (wajib):
 - Jika `floorId` kosong atau tidak valid, return `invalid-argument`.
 - Jika `floorId` tidak termasuk `allowedFloors`, return `permission-denied`.
 - Validasi role dari `floorRoles[floorId]` untuk aksi sensitif.
-- Validasi capability per floor (termasuk no-storage untuk L2).
+- Validasi capability per floor sesuai matriks role dan hak akses menu.
 - Semua log operasional function menyertakan `floorId`, `uid`, `action`, `status`.
 
 Pattern trigger/scheduler:
@@ -371,7 +422,17 @@ Pattern trigger/scheduler:
 
 ## 16. Rencana Migrasi dan Cutover
 
-Matriks mapping awal (global -> floor-scoped):
+### Status Migrasi (per 04-Mei-2026)
+
+| Fase       | Status         | Keterangan                                                                          |
+| ---------- | -------------- | ----------------------------------------------------------------------------------- |
+| **Fase 0** | ✅ Selesai     | Inventarisasi mapping, matriks role, claims model                                   |
+| **Fase 1** | ✅ Selesai     | Claims + floor context + auth validation + rules draft + Cloud Function floor-aware |
+| **Fase 2** | 🔄 In Progress | Migrasi modul L2: aksesoris, antrian, inventory, promosi, pengaturan                |
+| **Fase 3** | 📋 Planned     | Migrasi modul L1: servis, absensi; hardening functions/rules; testing               |
+| **Fase 4** | 📋 Planned     | Hard cutover + cleanup legacy                                                       |
+
+### Matriks mapping awal (global -> floor-scoped):
 
 - `penjualanAksesoris` -> `floors/{floorId}/penjualanAksesoris`
 - `mutasiKode` -> `floors/{floorId}/mutasiKode`
@@ -382,13 +443,13 @@ Matriks mapping awal (global -> floor-scoped):
 - `daily_stock_logs` -> `floors/{floorId}/dailyStockLogs`
 - `daily_stock_reports` -> `floors/{floorId}/dailyStockReports`
 - `dailyStockSnapshot` -> `floors/{floorId}/dailyStockSnapshot`
-- `servis` -> `floors/L1/servis`
-- `attendance` -> `floors/L1/absensi/attendance`
-- `leaveRequests` -> `floors/L1/absensi/leaveRequests`
-- `manualOvertime` -> `floors/L1/absensi/manualOvertime`
-- `latePermissionCodes` -> `floors/L1/absensi/latePermissionCodes`
-- `employees` -> `floors/L1/absensi/employees`
-- `employeeFaces` -> `floors/L1/absensi/employeeFaces`
+- `servis` -> `floors/{floorId}/servis`
+- `attendance` -> `floors/{floorId}/absensi/attendance`
+- `leaveRequests` -> `floors/{floorId}/absensi/leaveRequests`
+- `manualOvertime` -> `floors/{floorId}/absensi/manualOvertime`
+- `latePermissionCodes` -> `floors/{floorId}/absensi/latePermissionCodes`
+- `employees` -> `floors/{floorId}/absensi/employees`
+- `employeeFaces` -> `floors/{floorId}/absensi/employeeFaces`
 
 Matriks mapping RTDB:
 
@@ -396,47 +457,50 @@ Matriks mapping RTDB:
 - `customerCount` -> `floorData/{floorId}/queue/customerCount`
 - `analytics/{yyyy}/{mm}` -> `floorData/{floorId}/queue/analytics/{yyyy}/{mm}/{dd}`
 
-### Fase 0 - Inventarisasi dan Mapping
+### Fase 0 - Inventarisasi dan Mapping ✅
 
-- Buat matriks semua collection/node/path lama ke target floor-scoped.
-- Tetapkan modul L1-only dan L2-enabled.
+- ✅ Buat matriks semua collection/node/path lama ke target floor-scoped.
+- ✅ Tetapkan modul L1-only dan L2-enabled.
 
-### Fase 1 - Foundation
+### Fase 1 - Foundation ✅
 
-- Implement claims (`allowedFloors`, `floorRoles`).
-- Implement floor context manager dan capability guard.
-- Draft rules baru + emulator tests.
-- Tambahkan helper path terpusat agar tidak ada string path hardcoded di service.
+- ✅ Implement claims (`allowedFloors`, `floorRoles`, `userFloor`).
+- ✅ Implement floor context manager dan capability guard.
+- ✅ Draft rules baru + emulator tests.
+- ✅ Tambahkan helper path terpusat agar tidak ada string path hardcoded di service.
+- ✅ Login 2-step: floor selector + form login di LoginView.vue.
+- ✅ Auth validation: user profile harus cocok floor, reject mismatch.
+- ✅ Cloud Function loginWithUsername: menerima floorId, enforce role per-floor.
 
-### Fase 2 - Migrasi Read/Write Vue
+### Fase 2 - Migrasi Read/Write Vue 🔄 In Progress
 
-- Pindahkan query/write modul yang dipakai L2 dulu: aksesoris, antrian, inventory, promosi, pengaturan.
-- Lanjut modul L1-only: servis, absensi.
-- Terapkan dual-read sementara (fallback old path) hanya selama masa transisi pendek.
+- 🔄 Pindahkan query/write modul yang dipakai L2 dulu: aksesoris, antrian, inventory, promosi, pengaturan.
+- 📋 Lanjut modul L1-only: servis, absensi.
+- 📋 Terapkan floor-scoped helper agar refactor ringkas, tidak duplikasi.
+- 📋 Dual-read fallback hanya jika diperlukan data kritikal tertentu, bukan default.
 
-### Fase 3 - Hard Cutover Vue-Only
+### Fase 3 - Hard Cutover Vue-Only 📋 Planned
 
-- Aktifkan strict rules floor-scoped.
-- Bekukan perubahan di kode legacy.
-- Verifikasi parity dan UAT.
-- Matikan fallback old path setelah parity terkonfirmasi.
+- 📋 Aktifkan strict rules floor-scoped.
+- 📋 Bekukan perubahan di kode legacy.
+- 📋 Verifikasi parity dan UAT.
+- 📋 Matikan fallback old path setelah parity terkonfirmasi.
 
-### Fase 4 - Cleanup Legacy
+### Fase 4 - Cleanup Legacy 📋 Planned
 
-- Hapus kode lama/legacy bertahap per modul setelah backup/tag release.
-- Hapus path lama yang sudah tidak dipakai.
+- 📋 Hapus kode lama/legacy bertahap per modul setelah backup/tag release.
+- 📋 Hapus path lama yang sudah tidak dipakai.
 
-Catatan:
-
-- Dual write hanya dipakai jika diperlukan untuk data kritikal tertentu, bukan default.
-
-Checklist best practice cutover:
+### Checklist Best Practice Cutover (Wajib)
 
 - Semua query Firestore di codebase mengandung `floorId` di path.
 - Semua key cache/localStorage/session menyertakan suffix `floorId`.
 - Semua function operasional menolak request tanpa `floorId`.
 - Semua rules emulator test mencakup kasus negatif lintas floor.
-- Semua flow Storage memiliki guard eksplisit untuk L2.
+- Validasi role per-floor untuk aksi sensitif (edit/hapus data sensitif).
+- Log unauthorized akses per modul dan per floor untuk audit.
+- Semua flow Storage memiliki guard eksplisit dan path scoped per floor.
+- Session `activeFloor` persist dan validated di setiap navigation.
 
 ---
 
@@ -452,8 +516,8 @@ Checklist best practice cutover:
 
 - User L1 tidak bisa akses data L2.
 - User L2 tidak bisa akses data L1.
-- User L2 tidak bisa akses menu absensi/servis.
 - Admin L1 hanya bisa akses scope L1, admin L2 hanya bisa akses scope L2.
+- User L2 hanya dapat menggunakan role `supervisor` dan `admin`.
 
 ### 17.3 Security Test
 
@@ -474,7 +538,6 @@ Checklist best practice cutover:
 
 - 100% modul operasional scoped by `floorId`.
 - 0 insiden akses lintas lantai tanpa hak.
-- 0 akses Storage sukses dari user L2.
 - 100% data sensitif menggunakan konfigurasi per lantai.
 - 1 codebase Vue aktif untuk L1+L2.
 
@@ -491,8 +554,8 @@ Checklist best practice cutover:
 3. Risiko: data sensitif masih global  
    Mitigasi: migrasi ke floor-scoped settings lebih dulu sebelum strict mode.
 
-4. Risiko: user L2 tetap melihat fitur non-scope  
-   Mitigasi: route guard + menu guard + backend deny.
+4. Risiko: user melihat data lantai yang bukan scope login  
+   Mitigasi: floor selector wajib sebelum login + route guard + floor-scoped query + backend deny.
 
 5. Risiko: penghapusan legacy terlalu cepat  
    Mitigasi: backup, tag release, checklist parity, rollback window.
@@ -523,13 +586,23 @@ Checklist best practice cutover:
 ## 22. Keputusan Final PRD
 
 - Tetap 1 aplikasi Vue dan 1 Firebase project.
-- Enforce `floorId` dan capability per lantai di seluruh layer.
-- L2 dibatasi ke menu: aksesoris, antrian, inventory, promosi, pengaturan.
-- L2 tidak menggunakan Storage.
-- Tidak ada role operasional lintas floor.
-- Data sensitif wajib floor-scoped dengan supervisor per lantai.
-- Semua data operasional bersifat floor-scoped.
-- Audit trail detail tidak diwajibkan pada fase ini.
-- Legacy code dihapus bertahap setelah cutover aman.
+- Enforce `floorId` dan capability per lantai di seluruh layer (UI, services, functions, rules).
+- L1 dan L2 memiliki fitur/menu yang sama, pembedaan hanya pada scope data dan role access.
+- Pembedaan akses dilakukan melalui role + hak akses user per lantai.
+- L2 hanya menggunakan role `supervisor` dan `admin` (tidak ada staff/hrd).
+- Tidak ada role operasional lintas floor pada fase ini.
+- Data sensitif wajib floor-scoped dengan supervisor independen per lantai.
+- Semua data operasional bersifat floor-scoped dengan path prefix `floors/{floorId}/...`.
+- Login wajib 2-step: pilih lantai dulu sebelum form login.
+- Auth validation floor-aware: reject login jika user profil tidak cocok dengan lantai terpilih.
+- Cloud Function operasional wajib menerima `floorId` dan validasi terhadap claims.
+- Audit trail detail tidak diwajibkan pada fase ini, namun metadata minimum (`floorId`, `createdAt`, `updatedAt`) tetap disarankan.
+- Legacy code dihapus bertahap setelah cutover aman dan parity terkonfirmasi.
 
-Dokumen ini menjadi acuan implementasi teknis lintas modul untuk fase multi-floor.
+---
+
+## 23. Progress Tracking
+
+**Diperbarui:** 2026-05-04
+
+Dokumen ini merupakan acuan implementasi teknis lintas modul untuk fase multi-floor. Progress tracking dilakukan per sprint dan per fase sesuai jadwal di Section 20.

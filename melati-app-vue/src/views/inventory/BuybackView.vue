@@ -197,11 +197,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { Modal } from "bootstrap";
 import { db } from "@/config/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useAlert } from "@/composables/useAlert";
+import { floorDoc } from "@/services/floor-scope";
+import { useAuthStore } from "@/stores/auth";
 
 const { error: showError } = useAlert();
 
@@ -221,6 +223,9 @@ const settingsError = ref("");
 const persentaseMap = ref({ K1: 97, K2: 92, K3: 85, K4: 70 });
 const editPersentase = ref({ K1: 97, K2: 92, K3: 85, K4: 70 });
 const results = ref([]);
+
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
 
 function defaultRow() {
   return { kadar: "18K", namaBarang: "", kondisiBarang: "1", hargaBeli: 0, hargaHariIni: 0 };
@@ -282,12 +287,16 @@ function unlockSettings() {
 async function saveSettingsBuyback() {
   savingBuyback.value = true;
   try {
-    await setDoc(doc(db, "setting_buyback", "default"), {
-      K1: editPersentase.value.K1,
-      K2: editPersentase.value.K2,
-      K3: editPersentase.value.K3,
-      K4: editPersentase.value.K4,
-    });
+    await setDoc(
+      floorDoc(db, "setting_buyback", "default", activeFloor.value),
+      {
+        K1: editPersentase.value.K1,
+        K2: editPersentase.value.K2,
+        K3: editPersentase.value.K3,
+        K4: editPersentase.value.K4,
+      },
+      { merge: true },
+    );
     Object.assign(persentaseMap.value, editPersentase.value);
     Modal.getInstance(document.getElementById("settingsModal"))?.hide();
   } catch (e) {
@@ -299,7 +308,7 @@ async function saveSettingsBuyback() {
 
 onMounted(async () => {
   try {
-    const snap = await getDoc(doc(db, "setting_buyback", "default"));
+    const snap = await getDoc(floorDoc(db, "setting_buyback", "default", activeFloor.value));
     if (snap.exists()) Object.assign(persentaseMap.value, snap.data());
   } catch {
     /* use defaults */

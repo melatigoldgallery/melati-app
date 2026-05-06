@@ -29,8 +29,10 @@
               </td>
               <td class="small text-muted">{{ def.description }}</td>
               <td class="small text-muted">
-                <span v-if="meta.lastUpdated">{{ formatTs(meta.lastUpdated) }}</span>
-                <span v-if="meta.updatedBy" class="ms-1 text-muted fst-italic">oleh: {{ meta.updatedBy }}</span>
+                <span v-if="getCodeMeta(def.key).lastUpdated">{{ formatTs(getCodeMeta(def.key).lastUpdated) }}</span>
+                <span v-if="getCodeMeta(def.key).updatedBy" class="ms-1 text-muted fst-italic">
+                  oleh: {{ getCodeMeta(def.key).updatedBy }}
+                </span>
               </td>
               <td class="text-center">
                 <button class="btn btn-sm btn-outline-warning" @click="openEdit(def)">
@@ -111,10 +113,11 @@
 import { ref, onMounted, nextTick } from "vue";
 import { Modal } from "bootstrap";
 import { db } from "@/config/firebase";
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, Timestamp, setDoc, updateDoc } from "firebase/firestore";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { hashSecret, isSha256Hex, verifyStoredSecret } from "@/utils/security";
+import { floorDoc } from "@/services/floor-scope";
 
 const { toast, error: showError } = useAlert();
 const auth = useAuthStore();
@@ -190,11 +193,26 @@ const loading = ref(true);
 const saving = ref(false);
 const showNew = ref(false);
 const codes = ref({});
-const meta = ref({ lastUpdated: null, updatedBy: "" });
+const codeMeta = ref({});
 const editDef = ref(null);
 const editForm = ref({ old: "", new: "", confirm: "" });
 const editError = ref("");
 const oldRef = ref(null);
+
+function buildMetaKey(key) {
+  return `${key}__meta`;
+}
+
+function getCodeMeta(key) {
+  return codeMeta.value[buildMetaKey(key)] || { lastUpdated: null, updatedBy: "" };
+}
+
+function setCodeMeta(key, value) {
+  codeMeta.value[buildMetaKey(key)] = {
+    lastUpdated: value?.lastUpdated || null,
+    updatedBy: value?.updatedBy || "",
+  };
+}
 
 function formatTs(ts) {
   if (!ts) return "";
@@ -232,22 +250,41 @@ async function getDefaultCodes() {
 async function loadCodes() {
   loading.value = true;
   try {
-    const docRef = doc(db, "settings", "passwords");
+    const docRef = floorDoc(db, "settings", "passwords");
     const snap = await getDoc(docRef);
     if (!snap.exists()) {
       const defaults = await getDefaultCodes();
       const now = Timestamp.now();
-      await setDoc(docRef, {
-        ...defaults,
-        lastUpdated: now,
-        updatedBy: auth.user?.email || "system",
+      const createdBy = auth.user?.email || "system";
+      const perCodeMeta = {};
+      Object.keys(defaults).forEach((key) => {
+        perCodeMeta[`${key}UpdatedAt`] = now;
+        perCodeMeta[`${key}UpdatedBy`] = createdBy;
       });
+      await setDoc(
+        docRef,
+        {
+          ...defaults,
+          ...perCodeMeta,
+          lastUpdated: now,
+          updatedBy: createdBy,
+        },
+        { merge: true },
+      );
       codes.value = defaults;
-      meta.value = { lastUpdated: now, updatedBy: auth.user?.email || "system" };
+      DEFINITIONS.forEach(({ key }) => {
+        setCodeMeta(key, { lastUpdated: now, updatedBy: createdBy });
+      });
     } else {
       const data = snap.data();
       codes.value = data;
-      meta.value = { lastUpdated: data.lastUpdated, updatedBy: data.updatedBy };
+      const fallbackMeta = { lastUpdated: data.lastUpdated || null, updatedBy: data.updatedBy || "" };
+      DEFINITIONS.forEach(({ key }) => {
+        setCodeMeta(key, {
+          lastUpdated: data[`${key}UpdatedAt`] || fallbackMeta.lastUpdated,
+          updatedBy: data[`${key}UpdatedBy`] || fallbackMeta.updatedBy,
+        });
+      });
 
       const migrationUpdates = {};
       const defaultCodes = await getDefaultCodes();
@@ -272,10 +309,6 @@ async function loadCodes() {
           updatedBy: auth.user?.email || data.updatedBy || "system-migration",
         });
         codes.value = { ...codes.value, ...migrationUpdates };
-        meta.value = {
-          lastUpdated: now,
-          updatedBy: auth.user?.email || data.updatedBy || "system-migration",
-        };
       }
     }
   } catch (e) {
@@ -326,16 +359,19 @@ async function saveCode() {
 
   saving.value = true;
   try {
-    const docRef = doc(db, "settings", "passwords");
+    const docRef = floorDoc(db, "settings", "passwords");
     const hashedCode = await hashSecret(newCode);
     const now = Timestamp.now();
+    const updatedBy = auth.user?.email || "";
     await updateDoc(docRef, {
       [editDef.value.key]: hashedCode,
+      [`${editDef.value.key}UpdatedAt`]: now,
+      [`${editDef.value.key}UpdatedBy`]: updatedBy,
       lastUpdated: now,
-      updatedBy: auth.user?.email || "",
+      updatedBy,
     });
     codes.value[editDef.value.key] = hashedCode;
-    meta.value = { lastUpdated: now, updatedBy: auth.user?.email };
+    setCodeMeta(editDef.value.key, { lastUpdated: now, updatedBy });
     Modal.getInstance(document.getElementById("editCodeModal"))?.hide();
     toast(`Kode ${editDef.value.label} berhasil diubah`);
   } catch (e) {

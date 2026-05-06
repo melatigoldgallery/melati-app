@@ -11,6 +11,8 @@ const db = admin.firestore();
 const WITA_OFFSET = "+08:00";
 const WITA_MS = 8 * 60 * 60 * 1000;
 const LOCK_TTL_MS = 10 * 60 * 1000;
+const ENABLE_GLOBAL_SNAPSHOT_COMPAT = true;
+const SNAPSHOT_FLOORS = ["L1", "L2"];
 
 function sha256Hex(value) {
   return createHash("sha256").update(String(value)).digest("hex");
@@ -37,6 +39,19 @@ function buildLegacyUid(username) {
   return `legacy_${safe || "user"}`;
 }
 
+function buildFloorUserDocId(floorId, username) {
+  const safeFloor =
+    String(floorId || "")
+      .trim()
+      .toUpperCase() === "L2"
+      ? "L2"
+      : "L1";
+  const safeUsername = String(username || "")
+    .trim()
+    .toLowerCase();
+  return `${safeFloor}__${safeUsername}`;
+}
+
 function normalizeUserRole(role, fallback = "staff") {
   const raw = String(role || "")
     .trim()
@@ -49,6 +64,18 @@ function normalizeUserRole(role, fallback = "staff") {
   if (raw === "hr") return "hrd";
   if (["admin", "supervisor", "staff", "hrd", "admin_custom"].includes(raw)) return raw;
   return normalizedFallback;
+}
+
+function isRoleAllowedForFloor(role, floorId) {
+  const normalizedRole = normalizeUserRole(role, "staff");
+  if (
+    String(floorId || "")
+      .trim()
+      .toUpperCase() === "L2"
+  ) {
+    return ["supervisor", "admin"].includes(normalizedRole);
+  }
+  return ["supervisor", "admin", "staff", "hrd"].includes(normalizedRole);
 }
 
 function normalizeMaintenanceCollectionKey(value) {
@@ -417,21 +444,108 @@ export const loginWithUsername = onCall(
   async (request) => {
     const username = String(request.data?.username || "").trim();
     const password = String(request.data?.password || "");
+    const floorIdRaw = String(request.data?.floorId || "")
+      .trim()
+      .toUpperCase();
+    const floorId = ["L1", "L2"].includes(floorIdRaw) ? floorIdRaw : "L1";
 
     if (!username || !password) {
       throw new HttpsError("invalid-argument", "Username dan password wajib diisi.");
     }
 
-    let userSnap = await db.collection("users").doc(username).get();
-    if (!userSnap.exists && username !== username.toLowerCase()) {
-      userSnap = await db.collection("users").doc(username.toLowerCase()).get();
+    const usernameLower = username.toLowerCase();
+    const candidateDocIds = [buildFloorUserDocId(floorId, username), `${floorId}_${usernameLower}`, username];
+    if (username !== usernameLower) {
+      candidateDocIds.push(`${floorId}_${username}`);
+      candidateDocIds.push(usernameLower);
+    }
+    const usernameCandidates = [...new Set([username, usernameLower])];
+
+    const floorUsersRef = db.collection("floors").doc(floorId).collection("users");
+
+    let userSnap = null;
+    let userSource = "floor";
+    for (const userDocId of [...new Set(candidateDocIds)]) {
+      // eslint-disable-next-line no-await-in-loop
+      const candidate = await floorUsersRef.doc(userDocId).get();
+      if (candidate.exists) {
+        userSnap = candidate;
+        break;
+      }
     }
 
-    if (!userSnap.exists) {
+    if (!userSnap?.exists) {
+      for (const candidateUsername of usernameCandidates) {
+        // eslint-disable-next-line no-await-in-loop
+        const querySnap = await floorUsersRef.where("username", "==", candidateUsername).limit(1).get();
+        if (!querySnap.empty) {
+          userSnap = querySnap.docs[0];
+          break;
+        }
+      }
+    }
+
+    if (!userSnap?.exists) {
+      const querySnap = await floorUsersRef.where("usernameLower", "==", usernameLower).limit(1).get();
+      if (!querySnap.empty) {
+        userSnap = querySnap.docs[0];
+      }
+    }
+
+    // Backward-compat for legacy users collection (pre-floor deployment).
+    // Kept for L1 so akun lama tetap bisa login tanpa mengganggu isolasi L2.
+    if (!userSnap?.exists && floorId === "L1") {
+      const legacyUsersRef = db.collection("users");
+
+      for (const userDocId of [...new Set(candidateDocIds)]) {
+        // eslint-disable-next-line no-await-in-loop
+        const candidate = await legacyUsersRef.doc(userDocId).get();
+        if (candidate.exists) {
+          userSnap = candidate;
+          userSource = "legacy-global";
+          break;
+        }
+      }
+
+      if (!userSnap?.exists) {
+        for (const candidateUsername of usernameCandidates) {
+          // eslint-disable-next-line no-await-in-loop
+          const queryByUsername = await legacyUsersRef.where("username", "==", candidateUsername).limit(1).get();
+          if (!queryByUsername.empty) {
+            userSnap = queryByUsername.docs[0];
+            userSource = "legacy-global";
+            break;
+          }
+        }
+      }
+
+      if (!userSnap?.exists) {
+        const queryByUsernameLower = await legacyUsersRef.where("usernameLower", "==", usernameLower).limit(1).get();
+        if (!queryByUsernameLower.empty) {
+          userSnap = queryByUsernameLower.docs[0];
+          userSource = "legacy-global";
+        }
+      }
+    }
+
+    if (!userSnap?.exists) {
       throw new HttpsError("not-found", "Username tidak ditemukan.");
     }
 
     const userData = userSnap.data() || {};
+    const userFloorIdRaw = String(userData.floorId || "")
+      .trim()
+      .toUpperCase();
+    const userFloorId = ["L1", "L2"].includes(userFloorIdRaw)
+      ? userFloorIdRaw
+      : userSource === "legacy-global"
+        ? "L1"
+        : floorId;
+
+    if (userFloorId !== floorId) {
+      throw new HttpsError("permission-denied", "Akun tidak terdaftar untuk lantai yang dipilih.");
+    }
+
     const status = String(userData.status || "active").toLowerCase();
     if (status !== "active") {
       throw new HttpsError("failed-precondition", "Akun tidak aktif.");
@@ -443,20 +557,28 @@ export const loginWithUsername = onCall(
 
     const usernameValue = String(userData.username || userSnap.id);
     const role = normalizeUserRole(userData.role, "staff");
+    if (!isRoleAllowedForFloor(role, floorId)) {
+      throw new HttpsError("failed-precondition", `Role ${role} tidak diizinkan untuk ${floorId}.`);
+    }
     const displayName = String(userData.displayName || usernameValue);
     const email = userData.email ? String(userData.email) : null;
     const uid = userData.uid ? String(userData.uid) : buildLegacyUid(usernameValue);
 
     let customToken;
     try {
+      const floorRoles = { [floorId]: role };
       customToken = await admin.auth().createCustomToken(uid, {
         role,
         username: usernameValue,
+        floorId,
+        allowedFloors: [floorId],
+        floorRoles,
         authMode: "legacy",
       });
     } catch (error) {
       logger.error("Failed creating custom token", {
         username: usernameValue,
+        floorId,
         code: error?.errorInfo?.code || error?.code || "unknown",
         message: error?.message,
       });
@@ -471,12 +593,13 @@ export const loginWithUsername = onCall(
       throw new HttpsError("internal", "Gagal membuat custom token.");
     }
 
-    logger.info("Username login success", { username: usernameValue, role });
+    logger.info("Username login success", { username: usernameValue, role, floorId });
 
     return {
       customToken,
       username: usernameValue,
       role,
+      floorId,
       displayName,
       email,
     };
@@ -553,10 +676,96 @@ async function aggregateTransactionsUntil(endDate) {
   return map;
 }
 
-async function buildSnapshotStockData({ yesterdayYmd }) {
+function resolveSnapshotScope(scope = "global", floorId = "") {
+  const normalizedScope =
+    String(scope || "global")
+      .trim()
+      .toLowerCase() === "floor"
+      ? "floor"
+      : "global";
+  const normalizedFloor = String(floorId || "")
+    .trim()
+    .toUpperCase();
+
+  if (normalizedScope === "floor") {
+    if (!["L1", "L2"].includes(normalizedFloor)) {
+      throw new Error("INVALID_FLOOR_SCOPE");
+    }
+
+    const floorDoc = db.collection("floors").doc(normalizedFloor);
+    return {
+      scope: "floor",
+      floorId: normalizedFloor,
+      scopeKey: `floor_${normalizedFloor}`,
+      catalogRef: floorDoc.collection("stokAksesoris"),
+      txRef: floorDoc.collection("stokAksesorisTransaksi"),
+      snapshotRef: floorDoc.collection("dailyStockSnapshot"),
+      dailyReportsRef: floorDoc.collection("dailyStockReports"),
+      lockRef: floorDoc.collection("systemLocks"),
+    };
+  }
+
+  return {
+    scope: "global",
+    floorId: null,
+    scopeKey: "global",
+    catalogRef: db.collection("stokAksesoris"),
+    txRef: db.collection("stokAksesorisTransaksi"),
+    snapshotRef: db.collection("dailyStockSnapshot"),
+    dailyReportsRef: db.collection("dailyStockReports"),
+    lockRef: db.collection("systemLocks"),
+  };
+}
+
+function getSnapshotScopes() {
+  const scopes = SNAPSHOT_FLOORS.map((floorId) => ({ scope: "floor", floorId }));
+  if (ENABLE_GLOBAL_SNAPSHOT_COMPAT) scopes.unshift({ scope: "global", floorId: "" });
+  return scopes;
+}
+
+async function aggregateTransactionsUntilByScope(endDate, scopeConfig) {
+  const endTs = admin.firestore.Timestamp.fromDate(endDate);
+  const snap = await scopeConfig.txRef.where("timestamp", "<=", endTs).get();
+
+  const map = new Map();
+  for (const docSnap of snap.docs) {
+    const tx = docSnap.data();
+    const kode = tx.kode;
+    if (!kode) continue;
+
+    if (!map.has(kode)) {
+      map.set(kode, 0);
+    }
+
+    const jumlah = Number(tx.jumlah || 0);
+
+    switch (tx.jenis) {
+      case "tambah":
+      case "stockAddition":
+      case "initialStock":
+        map.set(kode, map.get(kode) + jumlah);
+        break;
+      case "laku":
+      case "free":
+      case "gantiLock":
+      case "return":
+        map.set(kode, map.get(kode) - jumlah);
+        break;
+      case "adjustment":
+        map.set(kode, tx.stokSesudah || map.get(kode));
+        break;
+      default:
+        break;
+    }
+  }
+
+  return map;
+}
+
+async function buildSnapshotStockDataByScope({ yesterdayYmd, scopeConfig }) {
   const endOfYesterday = toDateFromYmd(yesterdayYmd, "23:59:59");
-  const catalogSnap = await db.collection("stokAksesoris").get();
-  const stockByKode = await aggregateTransactionsUntil(endOfYesterday);
+  const catalogSnap = await scopeConfig.catalogRef.get();
+  const stockByKode = await aggregateTransactionsUntilByScope(endOfYesterday, scopeConfig);
 
   const stockData = [];
   const catalogKodes = new Set();
@@ -589,6 +798,7 @@ async function buildSnapshotStockData({ yesterdayYmd }) {
   }
 
   logger.info("Snapshot stockData built", {
+    scopeKey: scopeConfig.scopeKey,
     yesterdayYmd,
     totalItems: stockData.length,
     txCodesCount: stockByKode.size,
@@ -597,21 +807,70 @@ async function buildSnapshotStockData({ yesterdayYmd }) {
   return stockData;
 }
 
-async function ensureSnapshotForYesterday(triggerSource) {
+function computeDailyStockReportsFromStockData(stockData = [], snapshotDateYmd = "") {
+  const mainCategories = [
+    "KALUNG",
+    "LIONTIN",
+    "ANTING",
+    "CINCIN",
+    "HALA & SDW",
+    "GELANG",
+    "GIWANG",
+    "KENDARI & EMAS BALI",
+    "BERLIAN",
+  ];
+
+  const items = {};
+  const breakdown = {};
+
+  for (const cat of mainCategories) {
+    items[cat] = { total: 0, komputer: 0, status: "Belum ada data" };
+    breakdown[cat] = {};
+  }
+
+  for (const item of stockData) {
+    const cat = String(item?.kategori || "")
+      .trim()
+      .toUpperCase();
+    if (!cat || !items[cat]) continue;
+    items[cat].total += Math.max(0, Number(item?.stokAkhir || 0));
+  }
+
+  for (const cat of mainCategories) {
+    items[cat].status = items[cat].total === 0 ? "Belum ada data" : "Klop";
+  }
+
+  return {
+    date: snapshotDateYmd,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    items,
+    breakdown,
+    createdBy: "cloud-function",
+    version: "1.0",
+  };
+}
+
+async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global", floorId = "") {
+  const scopeConfig = resolveSnapshotScope(scope, floorId);
   const todayYmd = formatYmd(toWitaParts(new Date()));
   const yesterdayYmd = shiftYmd(todayYmd, -1);
   const dateKey = formatDmy(toWitaParts(toDateFromYmd(yesterdayYmd, "00:00:00")));
   const snapshotId = yesterdayYmd;
-  const lockId = `snapshot_lock_${snapshotId}`;
+  const lockId = `snapshot_lock_${scopeConfig.scopeKey}_${snapshotId}`;
 
-  const lockRef = db.collection("systemLocks").doc(lockId);
-  const snapshotRef = db.collection("dailyStockSnapshot").doc(snapshotId);
+  const lockRef = scopeConfig.lockRef.doc(lockId);
+  const snapshotRef = scopeConfig.snapshotRef.doc(snapshotId);
 
   let hasLock = false;
 
-  const existingByDateSnap = await db.collection("dailyStockSnapshot").where("date", "==", dateKey).limit(1).get();
+  const existingByDateSnap = await scopeConfig.snapshotRef.where("date", "==", dateKey).limit(1).get();
   if (!existingByDateSnap.empty) {
-    logger.info("Snapshot already exists by date field", { dateKey, triggerSource });
+    logger.info("Snapshot already exists by date field", {
+      scopeKey: scopeConfig.scopeKey,
+      floorId: scopeConfig.floorId,
+      dateKey,
+      triggerSource,
+    });
     return { success: true, created: false, reason: "exists-by-date", snapshotId };
   }
 
@@ -638,12 +897,14 @@ async function ensureSnapshotForYesterday(triggerSource) {
         status: "processing",
         triggerSource,
         snapshotId,
+        scopeKey: scopeConfig.scopeKey,
+        floorId: scopeConfig.floorId,
       });
     });
 
     hasLock = true;
 
-    const stockData = await buildSnapshotStockData({ yesterdayYmd });
+    const stockData = await buildSnapshotStockDataByScope({ yesterdayYmd, scopeConfig });
 
     await snapshotRef.set({
       date: dateKey,
@@ -654,9 +915,26 @@ async function ensureSnapshotForYesterday(triggerSource) {
       createdBy: "cloud-function",
       version: "3.0",
       triggerSource,
+      scopeKey: scopeConfig.scopeKey,
+      floorId: scopeConfig.floorId,
     });
 
+    const dailyReportsRef = scopeConfig.dailyReportsRef.doc(yesterdayYmd);
+    const dailyReportSnap = await dailyReportsRef.get();
+    if (!dailyReportSnap.exists) {
+      await dailyReportsRef.set({
+        ...computeDailyStockReportsFromStockData(stockData, yesterdayYmd),
+        snapshotDateKey: dateKey,
+        source: "snapshot-bridge",
+        triggerSource,
+        scopeKey: scopeConfig.scopeKey,
+        floorId: scopeConfig.floorId,
+      });
+    }
+
     logger.info("Daily snapshot created", {
+      scopeKey: scopeConfig.scopeKey,
+      floorId: scopeConfig.floorId,
       snapshotId,
       dateKey,
       triggerSource,
@@ -666,15 +944,27 @@ async function ensureSnapshotForYesterday(triggerSource) {
     return { success: true, created: true, snapshotId, dateKey };
   } catch (error) {
     if (error.message === "SNAPSHOT_ALREADY_EXISTS") {
-      logger.info("Snapshot already exists", { snapshotId, triggerSource });
+      logger.info("Snapshot already exists", {
+        scopeKey: scopeConfig.scopeKey,
+        floorId: scopeConfig.floorId,
+        snapshotId,
+        triggerSource,
+      });
       return { success: true, created: false, reason: "exists", snapshotId };
     }
     if (error.message === "LOCKED") {
-      logger.info("Snapshot creation locked by another process", { snapshotId, triggerSource });
+      logger.info("Snapshot creation locked by another process", {
+        scopeKey: scopeConfig.scopeKey,
+        floorId: scopeConfig.floorId,
+        snapshotId,
+        triggerSource,
+      });
       return { success: true, created: false, reason: "locked", snapshotId };
     }
 
     logger.error("Failed to ensure daily snapshot", {
+      scopeKey: scopeConfig.scopeKey,
+      floorId: scopeConfig.floorId,
       triggerSource,
       error: error.message,
       stack: error.stack,
@@ -694,6 +984,29 @@ async function ensureSnapshotForYesterday(triggerSource) {
   }
 }
 
+async function ensureSnapshotsForAllScopes(triggerSource) {
+  const scopes = getSnapshotScopes();
+  const results = [];
+
+  for (const scopeItem of scopes) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await ensureSnapshotForYesterdayByScope(triggerSource, scopeItem.scope, scopeItem.floorId);
+      results.push({ ...scopeItem, result });
+    } catch (error) {
+      logger.error("Failed snapshot for scope", {
+        scope: scopeItem.scope,
+        floorId: scopeItem.floorId || null,
+        triggerSource,
+        error: error.message,
+      });
+      results.push({ ...scopeItem, error: error.message });
+    }
+  }
+
+  return results;
+}
+
 export const scheduledCreateDailySnapshot = onSchedule(
   {
     schedule: "5 0 * * *",
@@ -702,7 +1015,7 @@ export const scheduledCreateDailySnapshot = onSchedule(
     memory: "256MiB",
   },
   async () => {
-    await ensureSnapshotForYesterday("scheduler");
+    await ensureSnapshotsForAllScopes("scheduler");
   },
 );
 
@@ -716,11 +1029,11 @@ export const periodicEnsureYesterdaySnapshot = onSchedule(
     memory: "256MiB",
   },
   async () => {
-    await ensureSnapshotForYesterday("periodic-scheduler");
+    await ensureSnapshotsForAllScopes("periodic-scheduler");
   },
 );
 
-export const ensureYesterdaySnapshotOnFirstTx = onDocumentWritten(
+export const ensureYesterdaySnapshotOnFirstTxGlobal = onDocumentWritten(
   {
     document: "stokAksesorisTransaksi/{txId}",
     region: "asia-southeast2",
@@ -728,6 +1041,415 @@ export const ensureYesterdaySnapshotOnFirstTx = onDocumentWritten(
     retry: false,
   },
   async () => {
-    await ensureSnapshotForYesterday("firestore-write-fallback");
+    await ensureSnapshotForYesterdayByScope("firestore-write-fallback-global", "global", "");
+  },
+);
+
+export const ensureYesterdaySnapshotOnFirstTxFloor = onDocumentWritten(
+  {
+    document: "floors/{floorId}/stokAksesorisTransaksi/{txId}",
+    region: "asia-southeast2",
+    memory: "256MiB",
+    retry: false,
+  },
+  async (event) => {
+    const floorId = String(event.params?.floorId || "")
+      .trim()
+      .toUpperCase();
+    if (!["L1", "L2"].includes(floorId)) return;
+    await ensureSnapshotForYesterdayByScope("firestore-write-fallback-floor", "floor", floorId);
+  },
+);
+
+export const scheduledCreateDailyStockReports = onSchedule(
+  {
+    schedule: "10 0 * * *",
+    timeZone: "Asia/Makassar",
+    region: "asia-southeast2",
+    memory: "256MiB",
+  },
+  async () => {
+    await ensureSnapshotsForAllScopes("scheduler-daily-reports");
+  },
+);
+
+export const backfillSnapshots = onCall(
+  {
+    region: "asia-southeast2",
+    memory: "512MiB",
+    timeoutSeconds: 540,
+  },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["admin", "supervisor"].includes(role)) {
+      throw new HttpsError("permission-denied", "Anda harus admin/supervisor untuk menjalankan backfill snapshots.");
+    }
+
+    const scopeRaw = String(request.data?.scope || "floor")
+      .trim()
+      .toLowerCase();
+    const scope = scopeRaw === "global" ? "global" : "floor";
+    const floorId = String(request.data?.floorId || "")
+      .trim()
+      .toUpperCase();
+    const startYmd = String(request.data?.startYmd || "").trim();
+    const endYmd = String(request.data?.endYmd || "").trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startYmd) || !/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
+      throw new HttpsError("invalid-argument", "Format tanggal harus YYYY-MM-DD.");
+    }
+
+    const startDate = toDateFromYmd(startYmd, "00:00:00");
+    const endDate = toDateFromYmd(endYmd, "00:00:00");
+    if (startDate > endDate) throw new HttpsError("invalid-argument", "startYmd harus <= endYmd.");
+
+    const today = formatYmd(toWitaParts(new Date()));
+    if (endYmd >= today) throw new HttpsError("failed-precondition", "Range harus sebelum hari berjalan.");
+
+    const results = [];
+
+    let current = startYmd;
+    while (true) {
+      try {
+        const scopeConfig = resolveSnapshotScope(scope, floorId);
+        const snapshotId = current;
+        const lockId = `snapshot_lock_${scopeConfig.scopeKey}_${snapshotId}`;
+        const lockRef = scopeConfig.lockRef.doc(lockId);
+        const snapshotRef = scopeConfig.snapshotRef.doc(snapshotId);
+
+        // Acquire lightweight lock and ensure snapshot not already present
+        await db.runTransaction(async (tx) => {
+          const snapshotSnap = await tx.get(snapshotRef);
+          if (snapshotSnap.exists) throw new Error("SNAPSHOT_ALREADY_EXISTS");
+
+          const lockSnap = await tx.get(lockRef);
+          if (lockSnap.exists) {
+            const lockData = lockSnap.data() || {};
+            const lockTsMillis =
+              lockData.createdAt && typeof lockData.createdAt.toMillis === "function"
+                ? lockData.createdAt.toMillis()
+                : 0;
+            const lockAge = Date.now() - lockTsMillis;
+            if (lockAge < LOCK_TTL_MS) throw new Error("LOCKED");
+          }
+
+          tx.set(lockRef, {
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: "processing",
+            triggerSource: "backfill",
+            snapshotId,
+            scopeKey: scopeConfig.scopeKey,
+            floorId: scopeConfig.floorId,
+          });
+        });
+
+        const stockData = await buildSnapshotStockDataByScope({ yesterdayYmd: current, scopeConfig });
+
+        await snapshotRef.set({
+          date: formatDmy(toWitaParts(toDateFromYmd(current, "00:00:00"))),
+          dateYmd: current,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          totalItems: stockData.length,
+          stockData,
+          createdBy: "cloud-function-backfill",
+          version: "3.0",
+          triggerSource: "backfill",
+          scopeKey: scopeConfig.scopeKey,
+          floorId: scopeConfig.floorId,
+        });
+
+        const dailyReportsRef = scopeConfig.dailyReportsRef.doc(current);
+        const dailyReportSnap = await dailyReportsRef.get();
+        if (!dailyReportSnap.exists) {
+          await dailyReportsRef.set({
+            ...computeDailyStockReportsFromStockData(stockData, current),
+            snapshotDateKey: formatDmy(toWitaParts(toDateFromYmd(current, "00:00:00"))),
+            source: "snapshot-backfill",
+            triggerSource: "backfill",
+            scopeKey: scopeConfig.scopeKey,
+            floorId: scopeConfig.floorId,
+          });
+        }
+
+        // delete lock
+        try {
+          await lockRef.delete();
+        } catch (e) {
+          logger.warn("Failed to delete backfill lock", { lockId, error: e.message });
+        }
+
+        results.push({ date: current, created: true });
+      } catch (error) {
+        if (error.message === "SNAPSHOT_ALREADY_EXISTS") {
+          results.push({ date: current, created: false, reason: "exists" });
+        } else if (error.message === "LOCKED") {
+          results.push({ date: current, created: false, reason: "locked" });
+        } else {
+          logger.error("Backfill snapshot error", { date: current, error: error.message });
+          results.push({ date: current, error: error.message });
+        }
+      }
+
+      if (current === endYmd) break;
+      current = shiftYmd(current, 1);
+    }
+
+    return { ok: true, scope, floorId: floorId || null, startYmd, endYmd, results };
+  },
+);
+
+// ========== MIGRATION: Legacy → Floors/L1 ==========
+// Bulk migrate legacy collections to floors/{floorId} paths
+// Strategy B: Copy to floors/L1, keep legacy as backup
+
+const MIGRATION_CONFIG = {
+  manualOvertime: { sourceCollections: ["manualOvertime"] },
+  mutasiKode: { sourceCollections: ["mutasiKode"] },
+  orderBarang: { sourceCollections: ["orderBarang"] },
+  order_online: { sourceCollections: ["order_online"] },
+  order_online_management: { sourceCollections: ["order_online_management"] },
+  penjualanAksesoris: { sourceCollections: ["penjualanAksesoris"] },
+  restokBarang: { sourceCollections: ["restokBarang"] },
+  salesStaff: { sourceCollections: ["salesStaff"] },
+  settings: { sourceCollections: ["settings"] },
+  stocks: { sourceCollections: ["stocks"] },
+  stokAksesoris: { sourceCollections: ["stokAksesoris"] },
+  stokAksesorisTransaksi: { sourceCollections: ["stokAksesorisTransaksi", "stokSksesorisTransaksi"] },
+  systemLocks: { sourceCollections: ["systemLocks"], runtimeSensitive: true },
+  users: { sourceCollections: ["users"] },
+  attendance: { sourceCollections: ["attendance"] },
+  dailyStockSnapshot: { sourceCollections: ["dailyStockSnapshot"] },
+  daily_stock_reports: { sourceCollections: ["daily_stock_reports"] },
+  employeeFaces: { sourceCollections: ["employeeFaces"] },
+  employees: { sourceCollections: ["employees"] },
+  kodeAksesoris: { sourceCollections: ["kodeAksesoris"] },
+  latePermissionCodes: { sourceCollections: ["latePermissionCodes"] },
+  leaveRequests: { sourceCollections: ["leaveRequests", "leaveRequest"] },
+  maintenanceLogs: { sourceCollections: ["maintenanceLogs"] },
+};
+
+function getMigrationConfig(collectionName) {
+  return MIGRATION_CONFIG[collectionName] || { sourceCollections: [collectionName] };
+}
+
+async function copyDocumentTree({ sourceDocRef, targetDocRef, batchWriter, stats }) {
+  const sourceSnap = await sourceDocRef.get();
+  if (!sourceSnap.exists) {
+    stats.skippedDocs += 1;
+    return;
+  }
+
+  batchWriter.set(targetDocRef, sourceSnap.data());
+  stats.writtenDocs += 1;
+
+  const subcollections = await sourceDocRef.listCollections();
+  for (const sourceSubcollectionRef of subcollections) {
+    // eslint-disable-next-line no-await-in-loop
+    const subDocs = await sourceSubcollectionRef.get();
+    for (const subDoc of subDocs.docs) {
+      const targetSubDocRef = db.doc(`${targetDocRef.path}/${sourceSubcollectionRef.id}/${subDoc.id}`);
+      // eslint-disable-next-line no-await-in-loop
+      await copyDocumentTree({
+        sourceDocRef: subDoc.ref,
+        targetDocRef: targetSubDocRef,
+        batchWriter,
+        stats,
+      });
+    }
+  }
+}
+
+async function migrateCollection(collectionName, floorId, batchSize = 500) {
+  const config = getMigrationConfig(collectionName);
+  const sourceCollections = [...new Set(config.sourceCollections || [collectionName])];
+  const batchWriter = db.bulkWriter();
+
+  let migratedCount = 0;
+  let totalDocs = 0;
+  let errorCount = 0;
+  const errors = [];
+  const stats = {
+    writtenDocs: 0,
+    skippedDocs: 0,
+  };
+
+  try {
+    for (const sourceCollectionName of sourceCollections) {
+      const sourceColRef = db.collection(sourceCollectionName);
+      // eslint-disable-next-line no-await-in-loop
+      const sourceDocs = await sourceColRef.get();
+      totalDocs += sourceDocs.size;
+
+      if (sourceDocs.size === 0) {
+        logger.info("Migration: collection empty", { collectionName, sourceCollectionName });
+        continue;
+      }
+
+      let processedCount = 0;
+      for (const sourceDoc of sourceDocs.docs) {
+        try {
+          const targetDocRef = db.doc(`floors/${floorId}/${collectionName}/${sourceDoc.id}`);
+          // eslint-disable-next-line no-await-in-loop
+          await copyDocumentTree({
+            sourceDocRef: sourceDoc.ref,
+            targetDocRef,
+            batchWriter,
+            stats,
+          });
+
+          migratedCount += 1;
+          processedCount += 1;
+
+          if (processedCount % batchSize === 0) {
+            // eslint-disable-next-line no-await-in-loop
+            await batchWriter.flush();
+            logger.info("Migration batch checkpoint", {
+              collectionName,
+              sourceCollectionName,
+              processed: processedCount,
+              total: sourceDocs.size,
+            });
+          }
+        } catch (docError) {
+          errorCount += 1;
+          const errorMsg = `doc ${sourceCollectionName}/${sourceDoc.id}: ${docError.message}`;
+          errors.push(errorMsg);
+          logger.warn("Migration document error", {
+            collectionName,
+            sourceCollectionName,
+            docId: sourceDoc.id,
+            error: docError.message,
+          });
+        }
+      }
+    }
+
+    await batchWriter.flush();
+
+    logger.info("Migration collection completed", {
+      collectionName,
+      sourceCollections,
+      migratedCount,
+      totalDocs,
+      writtenDocs: stats.writtenDocs,
+      errorCount,
+    });
+  } catch (collectionError) {
+    errorCount += 1;
+    const errorMsg = `collection migration failed: ${collectionError.message}`;
+    errors.push(errorMsg);
+    logger.error("Migration collection error", { collectionName, error: collectionError.message });
+  }
+
+  return {
+    collectionName,
+    sourceCollections,
+    totalDocs,
+    migratedCount,
+    writtenDocs: stats.writtenDocs,
+    skippedDocs: stats.skippedDocs,
+    errorCount,
+    errors,
+  };
+}
+
+export const migrateToFloorScoped = onCall(
+  {
+    region: "asia-southeast2",
+    memory: "512MiB",
+    timeoutSeconds: 540,
+  },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["admin", "supervisor"].includes(role)) {
+      throw new HttpsError("permission-denied", "Anda harus admin/supervisor untuk menjalankan migration.");
+    }
+
+    const floorId = String(request.data?.floorId || "L1")
+      .trim()
+      .toUpperCase();
+    if (!["L1", "L2"].includes(floorId)) {
+      throw new HttpsError("invalid-argument", "floorId harus L1 atau L2.");
+    }
+
+    const requestedCollections = Array.isArray(request.data?.collections) ? request.data.collections : [];
+    const collectionsToMigrate = requestedCollections.length
+      ? requestedCollections.filter((name) => MIGRATION_CONFIG[name])
+      : Object.keys(MIGRATION_CONFIG);
+
+    if (collectionsToMigrate.length === 0) {
+      throw new HttpsError("invalid-argument", "Tidak ada koleksi valid untuk di-migrate.");
+    }
+
+    logger.info("Migration starting", {
+      callerRole: role,
+      floorId,
+      collections: collectionsToMigrate,
+    });
+
+    // Create migration status doc for tracking
+    const statusDocId = `migration_${Date.now()}`;
+    const statusRef = db.collection("migration_status").doc(statusDocId);
+
+    await statusRef.set({
+      status: "in-progress",
+      floorId,
+      collections: collectionsToMigrate,
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      initiatedBy: request.auth?.uid || "unknown",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const results = [];
+    let totalDocsMigrated = 0;
+    let totalErrors = 0;
+
+    try {
+      for (const collectionName of collectionsToMigrate) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await migrateCollection(collectionName, floorId, 500);
+        results.push(result);
+        totalDocsMigrated += result.migratedCount;
+        totalErrors += result.errorCount;
+
+        // Update status after each collection
+        // eslint-disable-next-line no-await-in-loop
+        await statusRef.update({
+          [`collectionProgress.${collectionName}`]: result,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Mark migration as completed
+      await statusRef.update({
+        status: "completed",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        totalDocsMigrated,
+        totalErrors,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      logger.info("Migration completed", { statusDocId, totalDocsMigrated, totalErrors, floorId });
+
+      return {
+        success: totalErrors === 0,
+        statusDocId,
+        floorId,
+        collections: collectionsToMigrate,
+        totalDocsMigrated,
+        totalErrors,
+        results,
+      };
+    } catch (migrationError) {
+      await statusRef.update({
+        status: "failed",
+        error: migrationError.message,
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      logger.error("Migration failed", { statusDocId, error: migrationError.message });
+      throw new HttpsError("internal", `Migration gagal: ${migrationError.message}`);
+    }
   },
 );

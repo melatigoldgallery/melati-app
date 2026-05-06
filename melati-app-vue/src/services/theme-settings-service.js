@@ -1,5 +1,7 @@
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
+import { floorDoc } from "@/services/floor-scope";
+import { getActiveFloor } from "@/config/floor-config";
 
 export const DEFAULT_THEME_APPEARANCE_SETTINGS = Object.freeze({
   sidebarStart: "#667eea",
@@ -15,7 +17,15 @@ export const DEFAULT_THEME_APPEARANCE_SETTINGS = Object.freeze({
   updatedBy: "System",
 });
 
-const THEME_SETTINGS_DOC_REF = doc(db, "settings", "themeAppearance");
+function getThemeSettingsDoc(floorId = "") {
+  // Always use floor-scoped path - no fallback to global
+  // This ensures L1 and L2 have completely isolated theme settings
+  const activeFloor = floorId || getActiveFloor();
+  if (!activeFloor) {
+    throw new Error("Floor tidak dipilih. Tidak dapat membaca pengaturan tema.");
+  }
+  return floorDoc(db, "settings", "themeAppearance", activeFloor);
+}
 
 function normalizeHexColor(value, fallback) {
   const hex = String(value || "").trim();
@@ -67,43 +77,41 @@ export function applyThemeAppearanceToDocument(rawSettings = {}, rootElement = d
   });
 }
 
-export async function ensureThemeAppearanceSettings() {
-  const snap = await getDoc(THEME_SETTINGS_DOC_REF);
+export async function ensureThemeAppearanceSettings(floorId = "") {
+  const docRef = getThemeSettingsDoc(floorId);
+  const snap = await getDoc(docRef);
   if (snap.exists()) return;
 
-  await setDoc(
-    THEME_SETTINGS_DOC_REF,
-    {
-      ...DEFAULT_THEME_APPEARANCE_SETTINGS,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: auth.currentUser?.email || "System (Initial)",
-    },
-    { merge: true },
-  );
+  // Only write to floor-scoped path - no global write
+  await setDoc(docRef, {
+    ...DEFAULT_THEME_APPEARANCE_SETTINGS,
+    lastUpdated: new Date().toISOString(),
+    updatedBy: auth.currentUser?.email || "System (Initial)",
+  });
 }
 
-export async function fetchThemeAppearanceSettings() {
-  const snap = await getDoc(THEME_SETTINGS_DOC_REF);
+export async function fetchThemeAppearanceSettings(floorId = "") {
+  // Always read from floor-scoped path only - no fallback to global
+  const snap = await getDoc(getThemeSettingsDoc(floorId));
   const source = snap.exists() ? snap.data() : DEFAULT_THEME_APPEARANCE_SETTINGS;
   return normalizeThemeAppearanceSettings(source);
 }
 
-export async function saveThemeAppearanceSettings(payload, updatedBy = "System") {
+export async function saveThemeAppearanceSettings(payload, updatedBy = "System", floorId = "") {
   const normalized = normalizeThemeAppearanceSettings(payload);
-  await setDoc(
-    THEME_SETTINGS_DOC_REF,
-    {
-      ...normalized,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: updatedBy || auth.currentUser?.email || "System",
-    },
-    { merge: true },
-  );
+  // Only write to floor-scoped path - no global write
+  // This ensures L1 and L2 themes are completely isolated
+  await setDoc(getThemeSettingsDoc(floorId), {
+    ...normalized,
+    lastUpdated: new Date().toISOString(),
+    updatedBy: updatedBy || auth.currentUser?.email || "System",
+  });
 }
 
-export function subscribeThemeAppearanceSettings(onData, onError) {
+export function subscribeThemeAppearanceSettings(onData, onError, floorId = "") {
+  // Subscribe to floor-scoped theme settings only
   return onSnapshot(
-    THEME_SETTINGS_DOC_REF,
+    getThemeSettingsDoc(floorId),
     (snap) => {
       const source = snap.exists() ? snap.data() : DEFAULT_THEME_APPEARANCE_SETTINGS;
       onData(normalizeThemeAppearanceSettings(source));
@@ -112,4 +120,25 @@ export function subscribeThemeAppearanceSettings(onData, onError) {
       if (typeof onError === "function") onError(error);
     },
   );
+}
+
+export function resetThemeAppearanceToDefault(rootElement = document.documentElement) {
+  // Reset all theme CSS variables to default (used on logout)
+  if (!rootElement || !rootElement.style || typeof rootElement.style.setProperty !== "function") return;
+
+  const cssVariables = [
+    "--theme-sidebar-start",
+    "--theme-sidebar-mid",
+    "--theme-sidebar-end",
+    "--theme-tampilkan-start",
+    "--theme-tampilkan-end",
+    "--theme-antrian-card-header-start",
+    "--theme-antrian-card-header-end",
+    "--theme-surface-accent-start",
+    "--theme-surface-accent-end",
+  ];
+
+  cssVariables.forEach((key) => {
+    rootElement.style.removeProperty(key);
+  });
 }

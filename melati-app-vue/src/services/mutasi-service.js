@@ -1,20 +1,22 @@
 import * as XLSX from "xlsx";
 import {
   Timestamp,
-  addDoc,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
   onSnapshot,
   orderBy,
   query,
+  setDoc,
   serverTimestamp,
+  deleteDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
+import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
+import { floorCollection, floorDoc } from "./floor-scope";
 import { verifyStoredSecret } from "@/utils/security";
 
 const CACHE_KEY = "kodeDataCache";
@@ -35,9 +37,54 @@ export const JENIS_BARANG = {
   V: "HALA & SDW",
 };
 
+// Coba deteksi prefix jenis barang dari nama produk jika kode tidak memiliki prefix yang valid
+function detectPrefixFromNama(nama) {
+  const text = String(nama || "").toLowerCase();
+  if (!text) return null;
+
+  // Periksa apakah nama mengandung salah satu label jenis barang
+  for (const [key, label] of Object.entries(JENIS_BARANG)) {
+    if (!label) continue;
+    const token = String(label).toLowerCase();
+    if (token && text.includes(token)) return key;
+  }
+
+  // Coba beberapa kata kunci pendek (mis. 'kalung', 'liontin', 'cincin') untuk akurasi
+  const keywords = {
+    C: ["cincin"],
+    K: ["kalung"],
+    L: ["liontin"],
+    A: ["anting"],
+    G: ["gelang"],
+    S: ["giwang"],
+    Z: ["hala", "sdw"],
+    V: ["hala", "sdw"],
+  };
+
+  for (const [key, keys] of Object.entries(keywords)) {
+    for (const k of keys) {
+      if (text.includes(k)) return key;
+    }
+  }
+
+  return null;
+}
+
 const kodeDataCache = new Map();
 const kodeDataCacheMeta = new Map();
 let saveToStorageTimeout = null;
+
+function resolveCacheFloorId(floorId = "") {
+  const normalizedInput = normalizeFloorId(floorId);
+  if (normalizedInput) return normalizedInput;
+
+  const activeFloor = getActiveFloor({ fallback: "L1" });
+  return normalizeFloorId(activeFloor, "L1");
+}
+
+function buildCacheKey(dateString = getLocalDateString(), floorId = "") {
+  return `${CACHE_KEY}_${dateString}_${resolveCacheFloorId(floorId)}`;
+}
 
 function cloneData(data) {
   return {
@@ -241,8 +288,8 @@ export function clearAllCache() {
   keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
-export function getTodayCacheInfo() {
-  const key = `${CACHE_KEY}_${getLocalDateString()}`;
+export function getTodayCacheInfo(floorId = "") {
+  const key = buildCacheKey(getLocalDateString(), floorId);
   if (!kodeDataCacheMeta.has(key)) return null;
 
   return {
@@ -263,8 +310,15 @@ function processPenjualanData(docs) {
       if (!kodeRaw || kodeRaw === "-" || !kodeRaw.trim()) return;
 
       const kode = kodeRaw.trim();
-      const prefix = kode.charAt(0).toUpperCase();
-      if (!(prefix in JENIS_BARANG)) return;
+      let prefix = kode.charAt(0).toUpperCase();
+      const detectedFromName = detectPrefixFromNama(item.nama);
+
+      if (!(prefix in JENIS_BARANG)) {
+        if (detectedFromName) prefix = detectedFromName;
+        else prefix = "LAIN"; // tetap masukkan data, beri label Lainnya
+      }
+
+      const jenisNama = JENIS_BARANG[prefix] || (detectedFromName ? JENIS_BARANG[detectedFromName] : "Lainnya");
 
       processedData.active.push({
         id: `${data.id}_${index}`,
@@ -275,7 +329,7 @@ function processPenjualanData(docs) {
         tanggalInput: data.tanggal || formatTimestamp(data.timestamp),
         keterangan: item.keterangan || "",
         jenisPrefix: prefix,
-        jenisNama: JENIS_BARANG[prefix],
+        jenisNama,
         penjualanId: data.id,
         isMutated: false,
         tanggalMutasi: null,
@@ -305,8 +359,16 @@ function processMutasiKodeData(docs) {
     const explicitPrefix = String(data.jenisPrefix || "")
       .trim()
       .toUpperCase();
-    const resolvedPrefix = explicitPrefix || kodePrefix || "LAIN";
-    const resolvedJenisNama = data.jenisNama || JENIS_BARANG[resolvedPrefix] || "Lainnya";
+
+    let resolvedPrefix = explicitPrefix;
+    const detectedFromName = detectPrefixFromNama(data.namaBarang);
+    if (!resolvedPrefix) {
+      if (kodePrefix && kodePrefix in JENIS_BARANG) resolvedPrefix = kodePrefix;
+      else resolvedPrefix = detectedFromName || "LAIN";
+    }
+
+    const resolvedJenisNama =
+      data.jenisNama || JENIS_BARANG[resolvedPrefix] || (detectedFromName ? JENIS_BARANG[detectedFromName] : "Lainnya");
 
     const kodeItem = {
       id: data.id,
@@ -340,9 +402,9 @@ function processMutasiKodeData(docs) {
   return processedData;
 }
 
-async function loadFromPenjualanAksesoris() {
+async function loadFromPenjualanAksesoris(floorId = "") {
   const penjualanQuery = query(
-    collection(db, "penjualanAksesoris"),
+    floorCollection(db, "penjualanAksesoris", floorId),
     where("jenisPenjualan", "==", "manual"),
     orderBy("timestamp", "desc"),
   );
@@ -360,8 +422,8 @@ async function loadFromPenjualanAksesoris() {
   };
 }
 
-async function loadFromMutasiKode() {
-  const mutasiQuery = query(collection(db, "mutasiKode"), orderBy("timestamp", "desc"));
+async function loadFromMutasiKode(floorId = "") {
+  const mutasiQuery = query(floorCollection(db, "mutasiKode", floorId), orderBy("timestamp", "desc"));
   const querySnapshot = await getDocs(mutasiQuery);
 
   if (querySnapshot.empty) {
@@ -418,9 +480,9 @@ export function filterKodeData(data, jenisFilter, searchText) {
   });
 }
 
-export async function fetchKodeData({ forceRefresh = false } = {}) {
+export async function fetchKodeData({ forceRefresh = false, floorId = "" } = {}) {
   const today = getLocalDateString();
-  const cacheKey = `${CACHE_KEY}_${today}`;
+  const cacheKey = buildCacheKey(today, floorId);
 
   if (!forceRefresh && isCacheValid(cacheKey)) {
     const cached = getFromCache(cacheKey);
@@ -436,9 +498,9 @@ export async function fetchKodeData({ forceRefresh = false } = {}) {
   }
 
   try {
-    let loaded = await loadFromMutasiKode();
+    let loaded = await loadFromMutasiKode(floorId);
     if (!loaded || (loaded.data.active.length === 0 && loaded.data.mutated.length === 0)) {
-      const fallback = await loadFromPenjualanAksesoris();
+      const fallback = await loadFromPenjualanAksesoris(floorId);
       if (fallback) loaded = fallback;
     }
 
@@ -479,8 +541,14 @@ function handlePenjualanChanges(baseData, changes) {
         if (!item?.kodeText || item.kodeText === "-") return;
 
         const itemId = `${docData.id}_${index}`;
-        const prefix = item.kodeText.charAt(0).toUpperCase();
-        if (!(prefix in JENIS_BARANG)) return;
+        let prefix = item.kodeText.charAt(0).toUpperCase();
+        const detectedFromName = detectPrefixFromNama(item.nama);
+        if (!(prefix in JENIS_BARANG)) {
+          if (detectedFromName) prefix = detectedFromName;
+          else prefix = "LAIN";
+        }
+
+        const jenisNama = JENIS_BARANG[prefix] || (detectedFromName ? JENIS_BARANG[detectedFromName] : "Lainnya");
 
         const kodeItem = {
           id: itemId,
@@ -491,7 +559,7 @@ function handlePenjualanChanges(baseData, changes) {
           tanggalInput: docData.tanggal || formatTimestamp(docData.timestamp),
           keterangan: item.keterangan || "",
           jenisPrefix: prefix,
-          jenisNama: JENIS_BARANG[prefix],
+          jenisNama,
           penjualanId: docData.id,
           isMutated: false,
           tanggalMutasi: null,
@@ -521,7 +589,17 @@ function handleMutasiKodeChanges(baseData, changes) {
   changes.forEach((change) => {
     const docData = { id: change.doc.id, ...change.doc.data() };
     const prefix = docData.kode?.charAt(0).toUpperCase();
-    if (!prefix || !(prefix in JENIS_BARANG)) return;
+    // Jika prefix tidak valid, coba deteksi dari jenisPrefix eksplisit atau nama barang
+    let resolvedPrefix = String(docData.jenisPrefix || "")
+      .trim()
+      .toUpperCase();
+    if (!resolvedPrefix) {
+      const kodePrefix = prefix || "";
+      if (kodePrefix && kodePrefix in JENIS_BARANG) resolvedPrefix = kodePrefix;
+      else resolvedPrefix = detectPrefixFromNama(docData.namaBarang) || "LAIN";
+    }
+
+    const resolvedJenisNama = docData.jenisNama || JENIS_BARANG[resolvedPrefix] || "Lainnya";
 
     const kodeItem = {
       id: docData.id,
@@ -531,8 +609,8 @@ function handleMutasiKodeChanges(baseData, changes) {
       berat: docData.berat || 0,
       tanggalInput: docData.tanggalInput || formatTimestamp(docData.timestamp || docData.createdAt),
       keterangan: docData.keterangan || "",
-      jenisPrefix: prefix,
-      jenisNama: JENIS_BARANG[prefix],
+      jenisPrefix: resolvedPrefix,
+      jenisNama: resolvedJenisNama,
       penjualanId: docData.penjualanId || docData.id,
       isMutated: docData.isMutated || false,
       tanggalMutasi: docData.tanggalMutasi || null,
@@ -568,10 +646,10 @@ function handleMutasiKodeChanges(baseData, changes) {
   });
 }
 
-export function setupRealtimeListener({ source, initialData, onUpdate, onError }) {
+export function setupRealtimeListener({ source, initialData, onUpdate, onError, floorId = "" }) {
   const currentData = cloneData(initialData || { active: [], mutated: [] });
 
-  const todayCacheKey = `${CACHE_KEY}_${getLocalDateString()}`;
+  const todayCacheKey = buildCacheKey(getLocalDateString(), floorId);
   const runUpdate = () => {
     sortKodeData(currentData);
     saveToCache(currentData, source, todayCacheKey);
@@ -580,7 +658,7 @@ export function setupRealtimeListener({ source, initialData, onUpdate, onError }
 
   if (source === "penjualanAksesoris") {
     const penjualanQuery = query(
-      collection(db, "penjualanAksesoris"),
+      floorCollection(db, "penjualanAksesoris", floorId),
       where("jenisPenjualan", "==", "manual"),
       orderBy("timestamp", "desc"),
     );
@@ -603,7 +681,7 @@ export function setupRealtimeListener({ source, initialData, onUpdate, onError }
     );
   }
 
-  const mutasiQuery = query(collection(db, "mutasiKode"), orderBy("timestamp", "desc"));
+  const mutasiQuery = query(floorCollection(db, "mutasiKode", floorId), orderBy("timestamp", "desc"));
   return onSnapshot(
     mutasiQuery,
     (snapshot) => {
@@ -622,7 +700,13 @@ export function setupRealtimeListener({ source, initialData, onUpdate, onError }
   );
 }
 
-export async function mutateSelectedKodes({ selectedItems, currentDataSource, tanggalMutasi, keteranganMutasi }) {
+export async function mutateSelectedKodes({
+  selectedItems,
+  currentDataSource,
+  tanggalMutasi,
+  keteranganMutasi,
+  floorId = "",
+}) {
   const currentTimestamp = Timestamp.now();
 
   const updatePromises = selectedItems.map(async (item) => {
@@ -642,7 +726,8 @@ export async function mutateSelectedKodes({ selectedItems, currentDataSource, ta
     };
 
     if (currentDataSource === "mutasiKode") {
-      await updateDoc(doc(db, "mutasiKode", item.id), updateData);
+      const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
+      await updateDoc(floorRef, updateData);
       return;
     }
 
@@ -662,38 +747,38 @@ export async function mutateSelectedKodes({ selectedItems, currentDataSource, ta
       ...updateData,
     };
 
-    await addDoc(collection(db, "mutasiKode"), newMutasiData);
+    const floorRef = doc(floorCollection(db, "mutasiKode", floorId));
+    await setDoc(floorRef, newMutasiData, { merge: true });
   });
 
   await Promise.all(updatePromises);
 }
 
-export async function restoreSelectedKodes(selectedItems) {
+export async function restoreSelectedKodes(selectedItems, floorId = "") {
   const currentTimestamp = Timestamp.now();
   const formattedDate = getCurrentDateDDMMYYYY();
 
-  for (const item of selectedItems) {
-    const restoreHistory = {
-      tanggal: formattedDate,
-      status: "Dikembalikan",
-      keterangan: "Kode dikembalikan ke status aktif",
-      timestamp: currentTimestamp,
-    };
+  await Promise.all(
+    selectedItems.map((item) => {
+      const restoreHistory = {
+        tanggal: formattedDate,
+        status: "Dikembalikan",
+        keterangan: "Kode dikembalikan ke status aktif",
+        timestamp: currentTimestamp,
+      };
 
-    await updateDoc(doc(db, "mutasiKode", item.id), {
-      isMutated: false,
-      mutasiHistory: [restoreHistory, ...(item.mutasiHistory || [])],
-      lastUpdated: serverTimestamp(),
-    });
-  }
+      const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
+      return updateDoc(floorRef, {
+        isMutated: false,
+        mutasiHistory: [restoreHistory, ...(item.mutasiHistory || [])],
+        lastUpdated: serverTimestamp(),
+      });
+    }),
+  );
 }
 
-export async function deleteSelectedKodes(selectedItems) {
-  await Promise.all(selectedItems.map((item) => deleteDoc(doc(db, "mutasiKode", item.id))));
-}
-
-export async function verifyDeleteMutasiKodePassword(inputPassword) {
-  const snap = await getDoc(doc(db, "settings", "passwords"));
+export async function verifyDeleteMutasiKodePassword(inputPassword, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "passwords", floorId));
   if (!snap.exists()) return verifyStoredSecret(inputPassword, "smlt116");
 
   const data = snap.data() || {};
@@ -701,6 +786,14 @@ export async function verifyDeleteMutasiKodePassword(inputPassword) {
   return verifyStoredSecret(inputPassword, stored, { allowLegacyBase64: true });
 }
 
+export async function deleteSelectedKodes(selectedItems, floorId = "") {
+  await Promise.all(
+    selectedItems.map((item) => {
+      const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
+      return deleteDoc(floorRef);
+    }),
+  );
+}
 export function exportToExcel(data, filename, sheetName, currentDataSource) {
   const exportData = (data || []).map((item) => ({
     Kode: item.kode,

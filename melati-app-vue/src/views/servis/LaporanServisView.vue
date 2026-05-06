@@ -57,6 +57,14 @@
               <option value="custom">Custom</option>
             </select>
           </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Metode Pengambilan</label>
+            <select v-model="returnOwnerFilter" class="form-select form-select-sm">
+              <option value="">Semua</option>
+              <option value="return_owner">Return Owner</option>
+              <option value="non_return_owner">Non Return Owner</option>
+            </select>
+          </div>
           <div class="col-md-auto">
             <button class="btn btn-tampilkan btn-sm" @click="loadData" :disabled="loading">
               <i class="bi bi-search me-1"></i>
@@ -331,6 +339,7 @@ const filterEnd = ref(currentMonthEnd());
 const statusServisFilter = ref("Sudah Selesai");
 const statusPengambilanFilter = ref("Belum Diambil");
 const jenisFilter = ref("servis");
+const returnOwnerFilter = ref("");
 const exporting = ref(false);
 const exportProgressText = ref("");
 
@@ -346,7 +355,14 @@ const filteredItems = computed(() =>
       ? i.statusPengambilan === statusPengambilanFilter.value
       : true;
     const matchesJenis = jenisFilter.value ? (i.jenisInput || "servis") === jenisFilter.value : true;
-    return matchesStatusServis && matchesStatusPengambilan && matchesJenis;
+    const isReturnOwner = i.metodePengambilan === "return_owner";
+    const matchesReturnOwner =
+      returnOwnerFilter.value === "return_owner"
+        ? isReturnOwner
+        : returnOwnerFilter.value === "non_return_owner"
+          ? !isReturnOwner
+          : true;
+    return matchesStatusServis && matchesStatusPengambilan && matchesJenis && matchesReturnOwner;
   }),
 );
 
@@ -402,7 +418,7 @@ const byPengambilan = computed(() => {
   return map;
 });
 
-watch([statusServisFilter, statusPengambilanFilter, jenisFilter], () => {
+watch([statusServisFilter, statusPengambilanFilter, jenisFilter, returnOwnerFilter], () => {
   page.value = 1;
 });
 

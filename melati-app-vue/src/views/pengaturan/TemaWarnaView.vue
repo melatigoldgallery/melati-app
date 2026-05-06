@@ -180,6 +180,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import Swal from "sweetalert2";
 import { useAuthStore } from "@/stores/auth";
+import { getActiveFloor } from "@/config/floor-config";
 import {
   DEFAULT_THEME_APPEARANCE_SETTINGS,
   applyThemeAppearanceToDocument,
@@ -190,6 +191,7 @@ import {
 } from "@/services/theme-settings-service";
 
 const auth = useAuthStore();
+const activeFloor = ref("");
 
 const loading = ref(true);
 const saving = ref(false);
@@ -251,8 +253,9 @@ function applyPreview() {
 async function loadSettings() {
   loading.value = true;
   try {
-    await ensureThemeAppearanceSettings();
-    const data = await fetchThemeAppearanceSettings();
+    const floorId = activeFloor.value || getActiveFloor();
+    await ensureThemeAppearanceSettings(floorId);
+    const data = await fetchThemeAppearanceSettings(floorId);
     applySettings(data);
     applyThemeAppearanceToDocument(data);
   } catch (error) {
@@ -270,13 +273,18 @@ async function loadSettings() {
 async function saveSettings() {
   try {
     saving.value = true;
+    const floorId = activeFloor.value || getActiveFloor();
     const payload = getPayload();
-    await saveThemeAppearanceSettings(payload, auth.user?.email || auth.user?.username || auth.userRole || "System");
+    await saveThemeAppearanceSettings(
+      payload,
+      auth.user?.email || auth.user?.username || auth.userRole || "System",
+      floorId,
+    );
     applyThemeAppearanceToDocument(payload);
     await Swal.fire({
       icon: "success",
       title: "Berhasil",
-      text: "Pengaturan tema warna berhasil disimpan.",
+      text: "Pengaturan tema warna berhasil disimpan untuk lantai ini.",
       timer: 1500,
       showConfirmButton: false,
     });
@@ -297,7 +305,7 @@ async function resetToDefault() {
   const result = await Swal.fire({
     icon: "question",
     title: "Reset ke Default?",
-    text: "Semua warna akan dikembalikan ke tema bawaan.",
+    text: "Semua warna akan dikembalikan ke tema bawaan untuk lantai ini.",
     showCancelButton: true,
     confirmButtonText: "Ya, Reset",
     cancelButtonText: "Batal",
@@ -305,15 +313,20 @@ async function resetToDefault() {
 
   if (!result.isConfirmed) return;
 
+  const floorId = activeFloor.value || getActiveFloor();
   const payload = { ...DEFAULT_THEME_APPEARANCE_SETTINGS };
   applySettings(payload);
   applyThemeAppearanceToDocument(payload);
-  await saveThemeAppearanceSettings(payload, auth.user?.email || auth.user?.username || auth.userRole || "System");
+  await saveThemeAppearanceSettings(
+    payload,
+    auth.user?.email || auth.user?.username || auth.userRole || "System",
+    floorId,
+  );
 
   await Swal.fire({
     icon: "success",
     title: "Tema Direset",
-    text: "Tema warna kembali ke nilai default.",
+    text: "Tema warna kembali ke nilai default untuk lantai ini.",
     timer: 1400,
     showConfirmButton: false,
   });
@@ -321,7 +334,10 @@ async function resetToDefault() {
   await loadSettings();
 }
 
-onMounted(loadSettings);
+onMounted(() => {
+  activeFloor.value = getActiveFloor();
+  loadSettings();
+});
 </script>
 
 <style scoped>

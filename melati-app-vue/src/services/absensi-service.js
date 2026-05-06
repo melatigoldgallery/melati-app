@@ -22,28 +22,27 @@ import {
 import { db, storage, auth } from "@/config/firebase";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { hashSecret, isSha256Hex, verifyStoredSecret } from "@/utils/security";
+import { floorCollection, floorDoc } from "@/services/floor-scope";
 
 // ── Employee CRUD ─────────────────────────────────────────────────────────
 
-export async function fetchEmployees() {
-  const snap = await getDocs(collection(db, "employees"));
+export async function fetchEmployees(floorId = "") {
+  const snap = await getDocs(floorCollection(db, "employees", floorId));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export async function saveEmployee(data) {
-  const ref = await addDoc(collection(db, "employees"), {
-    ...data,
-    createdAt: Timestamp.now(),
-  });
+export async function saveEmployee(data, floorId = "") {
+  const ref = doc(floorCollection(db, "employees", floorId));
+  await setDoc(ref, { ...data, createdAt: Timestamp.now() }, { merge: true });
   return ref.id;
 }
 
-export async function updateEmployee(id, data) {
-  await updateDoc(doc(db, "employees", id), data);
+export async function updateEmployee(id, data, floorId = "") {
+  await updateDoc(floorDoc(db, "employees", id, floorId), data);
 }
 
-export async function deleteEmployee(id) {
-  await deleteDoc(doc(db, "employees", id));
+export async function deleteEmployee(id, floorId = "") {
+  await deleteDoc(floorDoc(db, "employees", id, floorId));
 }
 
 // ── Password Verification (settings/passwords) ───────────────────────────
@@ -76,8 +75,8 @@ async function verifySecretWithCandidates(inputSecret, candidates = []) {
   return false;
 }
 
-async function ensureKehadiranAccessCodes() {
-  const docRef = doc(db, "settings", "passwords");
+async function ensureKehadiranAccessCodes(floorId = "") {
+  const docRef = floorDoc(db, "settings", "passwords", floorId);
   const snap = await getDoc(docRef);
 
   if (!snap.exists()) {
@@ -132,8 +131,8 @@ async function ensureKehadiranAccessCodes() {
   return data;
 }
 
-export async function verifyEditLaporanKehadiranPassword(inputPassword) {
-  const data = await ensureKehadiranAccessCodes();
+export async function verifyEditLaporanKehadiranPassword(inputPassword, floorId = "") {
+  const data = await ensureKehadiranAccessCodes(floorId);
   return verifySecretWithCandidates(inputPassword, [
     data.editLaporanKehadiran,
     data.editDataPenjualan,
@@ -142,8 +141,8 @@ export async function verifyEditLaporanKehadiranPassword(inputPassword) {
   ]);
 }
 
-export async function verifyDeleteLaporanKehadiranPassword(inputPassword) {
-  const data = await ensureKehadiranAccessCodes();
+export async function verifyDeleteLaporanKehadiranPassword(inputPassword, floorId = "") {
+  const data = await ensureKehadiranAccessCodes(floorId);
   return verifySecretWithCandidates(inputPassword, [
     data.deleteLaporanKehadiran,
     data.deleteDataPenjualan,
@@ -153,9 +152,9 @@ export async function verifyDeleteLaporanKehadiranPassword(inputPassword) {
 }
 
 /** Look up an employee by barcode or employeeId string (case-insensitive). */
-export async function findEmployeeByCode(code) {
+export async function findEmployeeByCode(code, floorId = "") {
   const upper = code.trim().toUpperCase();
-  const snap = await getDocs(collection(db, "employees"));
+  const snap = await getDocs(floorCollection(db, "employees", floorId));
   for (const d of snap.docs) {
     const e = d.data();
     if ((e.barcode || "").toUpperCase() === upper || (e.employeeId || "").toUpperCase() === upper) {
@@ -167,12 +166,16 @@ export async function findEmployeeByCode(code) {
 
 // ── Face Descriptors ──────────────────────────────────────────────────────
 
-export async function saveFaceDescriptor(employeeId, descriptorArray) {
-  await setDoc(doc(db, "employeeFaces", employeeId), {
-    employeeId,
-    faceDescriptor: Array.from(descriptorArray),
-    updatedAt: Timestamp.now(),
-  });
+export async function saveFaceDescriptor(employeeId, descriptorArray, floorId = "") {
+  await setDoc(
+    floorDoc(db, "employeeFaces", employeeId, floorId),
+    {
+      employeeId,
+      faceDescriptor: Array.from(descriptorArray),
+      updatedAt: Timestamp.now(),
+    },
+    { merge: true },
+  );
 }
 
 function toFloat32Descriptor(data) {
@@ -236,7 +239,7 @@ function toFloat32Descriptor(data) {
   );
 }
 
-export async function getFaceDescriptor(employeeId, options = {}) {
+export async function getFaceDescriptor(employeeId, options = {}, floorId = "") {
   const candidates = new Set();
   const addCandidate = (v) => {
     if (!v || typeof v !== "string") return;
@@ -253,7 +256,7 @@ export async function getFaceDescriptor(employeeId, options = {}) {
   const candidateIds = [...candidates];
 
   // 1) Fast path: try by possible document IDs
-  const directSnaps = await Promise.all(candidateIds.map((id) => getDoc(doc(db, "employeeFaces", id))));
+  const directSnaps = await Promise.all(candidateIds.map((id) => getDoc(floorDoc(db, "employeeFaces", id, floorId))));
   for (let i = 0; i < candidateIds.length; i += 1) {
     const snap = directSnaps[i];
     if (!snap.exists()) continue;
@@ -264,7 +267,7 @@ export async function getFaceDescriptor(employeeId, options = {}) {
   // 2) Fallback: scan by embedded employeeId field for legacy records
   const fallbackSnaps = await Promise.all(
     candidateIds.map((id) => {
-      const q = query(collection(db, "employeeFaces"), where("employeeId", "==", id), limit(1));
+      const q = query(floorCollection(db, "employeeFaces", floorId), where("employeeId", "==", id), limit(1));
       return getDocs(q);
     }),
   );
@@ -281,8 +284,8 @@ export async function getFaceDescriptor(employeeId, options = {}) {
 /** Fetch all face descriptors as a map { employeeId → Float32Array }.
  * Keys are indexed by: doc ID, doc ID uppercase, embedded employeeId field, and its uppercase.
  */
-export async function fetchAllFaceDescriptors() {
-  const snap = await getDocs(collection(db, "employeeFaces"));
+export async function fetchAllFaceDescriptors(floorId = "") {
+  const snap = await getDocs(floorCollection(db, "employeeFaces", floorId));
   const map = {};
   snap.docs.forEach((d) => {
     try {
@@ -307,15 +310,15 @@ export async function fetchAllFaceDescriptors() {
   return map;
 }
 
-export async function deleteFaceDescriptor(employeeId) {
-  await deleteDoc(doc(db, "employeeFaces", employeeId));
+export async function deleteFaceDescriptor(employeeId, floorId = "") {
+  await deleteDoc(floorDoc(db, "employeeFaces", employeeId, floorId));
 }
 
 // ── Attendance ────────────────────────────────────────────────────────────
 
 /** Get today's attendance as an onSnapshot — returns unsubscribe fn. */
-export function subscribeTodayAttendance(today, callback) {
-  const q = query(collection(db, "attendance"), where("date", "==", today), orderBy("timeIn", "desc"));
+export function subscribeTodayAttendance(today, callback, floorId = "") {
+  const q = query(floorCollection(db, "attendance", floorId), where("date", "==", today), orderBy("timeIn", "desc"));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });
@@ -335,35 +338,41 @@ export async function recordCheckIn({
   lateMinutes,
   faceVerified,
   faceVerificationRequired,
+  floorId = "",
 }) {
-  const ref = await addDoc(collection(db, "attendance"), {
-    employeeId,
-    name,
-    type: type || "staff",
-    shift: shift || "morning",
-    date,
-    timeIn: Timestamp.now(),
-    timeOut: null,
-    status: status || "Tepat Waktu",
-    lateMinutes: lateMinutes || 0,
-    faceVerified: faceVerified || false,
-    faceVerificationRequired: !!faceVerificationRequired,
-  });
+  const ref = doc(floorCollection(db, "attendance", floorId));
+  await setDoc(
+    ref,
+    {
+      employeeId,
+      name,
+      type: type || "staff",
+      shift: shift || "morning",
+      date,
+      timeIn: Timestamp.now(),
+      timeOut: null,
+      status: status || "Tepat Waktu",
+      lateMinutes: lateMinutes || 0,
+      faceVerified: faceVerified || false,
+      faceVerificationRequired: !!faceVerificationRequired,
+    },
+    { merge: true },
+  );
   return ref.id;
 }
 
 /** Record check-out on existing attendance doc. */
-export async function recordCheckOut(docId, data = {}) {
-  await updateDoc(doc(db, "attendance", docId), {
+export async function recordCheckOut(docId, data = {}, floorId = "") {
+  await updateDoc(floorDoc(db, "attendance", docId, floorId), {
     timeOut: Timestamp.now(),
     ...data,
   });
 }
 
 /** Fetch attendance by date range for reports. */
-export async function fetchAttendanceByRange(startDate, endDate, shiftFilter, statusFilter) {
+export async function fetchAttendanceByRange(startDate, endDate, shiftFilter, statusFilter, floorId = "") {
   const q = query(
-    collection(db, "attendance"),
+    floorCollection(db, "attendance", floorId),
     where("date", ">=", startDate),
     where("date", "<=", endDate),
     orderBy("date", "desc"),
@@ -464,50 +473,53 @@ function normalizeAttendanceSettings(raw = {}) {
   };
 }
 
-export async function fetchAttendanceSettings() {
-  const snap = await getDoc(doc(db, "settings", "attendanceThresholds"));
+export async function fetchAttendanceSettings(floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "attendanceThresholds", floorId));
   return normalizeAttendanceSettings(snap.exists() ? snap.data() : DEFAULT_ATTENDANCE_SETTINGS);
 }
 
-export async function saveAttendanceSettings(data) {
-  await setDoc(doc(db, "settings", "attendanceThresholds"), normalizeAttendanceSettings(data), { merge: true });
+export async function saveAttendanceSettings(data, floorId = "") {
+  await setDoc(floorDoc(db, "settings", "attendanceThresholds", floorId), normalizeAttendanceSettings(data), {
+    merge: true,
+  });
 }
 
 /** Ensure attendance settings document exists; creates defaults when missing. */
-export async function ensureAttendanceSettings() {
-  const settingsRef = doc(db, "settings", "attendanceThresholds");
+export async function ensureAttendanceSettings(floorId = "") {
+  const settingsRef = floorDoc(db, "settings", "attendanceThresholds", floorId);
   const snap = await getDoc(settingsRef);
   if (!snap.exists()) {
-    await setDoc(settingsRef, {
-      ...DEFAULT_ATTENDANCE_SETTINGS,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: "System (Initial)",
-    });
+    await setDoc(
+      settingsRef,
+      {
+        ...DEFAULT_ATTENDANCE_SETTINGS,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: "System (Initial)",
+      },
+      { merge: true },
+    );
   }
 }
 
 /** Subscribe to attendance settings in real-time. Returns unsubscribe fn. */
-export function subscribeAttendanceSettings(callback) {
-  return onSnapshot(doc(db, "settings", "attendanceThresholds"), (snap) => {
+export function subscribeAttendanceSettings(callback, floorId = "") {
+  return onSnapshot(floorDoc(db, "settings", "attendanceThresholds", floorId), (snap) => {
     callback(normalizeAttendanceSettings(snap.exists() ? snap.data() : DEFAULT_ATTENDANCE_SETTINGS));
   });
 }
 
 // ── Leave Requests ────────────────────────────────────────────────────────
 
-export async function submitLeaveRequest(data) {
-  const ref = await addDoc(collection(db, "leaveRequests"), {
-    ...data,
-    status: "Menunggu Persetujuan",
-    submitDate: Timestamp.now(),
-  });
+export async function submitLeaveRequest(data, floorId = "") {
+  const ref = doc(floorCollection(db, "leaveRequests", floorId));
+  await setDoc(ref, { ...data, status: "Menunggu Persetujuan", submitDate: Timestamp.now() }, { merge: true });
   return ref.id;
 }
 
 /** Subscribe to pending leave requests (for supervisor page). */
-export function subscribePendingLeaves(callback) {
+export function subscribePendingLeaves(callback, floorId = "") {
   const q = query(
-    collection(db, "leaveRequests"),
+    floorCollection(db, "leaveRequests", floorId),
     where("status", "==", "Menunggu Persetujuan"),
     orderBy("submitDate", "desc"),
   );
@@ -517,7 +529,7 @@ export function subscribePendingLeaves(callback) {
 }
 
 /** Approve or reject a leave request. */
-export async function updateLeaveStatus(id, status, approvedBy, options = {}) {
+export async function updateLeaveStatus(id, status, approvedBy, options = {}, floorId = "") {
   const payload = {
     status,
     approvedBy: approvedBy || "",
@@ -530,17 +542,17 @@ export async function updateLeaveStatus(id, status, approvedBy, options = {}) {
     payload.rejectedAt = Timestamp.now();
   }
 
-  await updateDoc(doc(db, "leaveRequests", id), payload);
+  await updateDoc(floorDoc(db, "leaveRequests", id, floorId), payload);
 }
 
-export async function deleteLeaveRequest(id) {
-  await deleteDoc(doc(db, "leaveRequests", id));
+export async function deleteLeaveRequest(id, floorId = "") {
+  await deleteDoc(floorDoc(db, "leaveRequests", id, floorId));
 }
 
 /** Fetch leave requests by month range. */
-export async function fetchLeavesByRange(startDate, endDate) {
+export async function fetchLeavesByRange(startDate, endDate, floorId = "") {
   const q = query(
-    collection(db, "leaveRequests"),
+    floorCollection(db, "leaveRequests", floorId),
     where("leaveStartDate", ">=", startDate),
     where("leaveStartDate", "<=", endDate),
     orderBy("leaveStartDate", "desc"),
@@ -550,9 +562,9 @@ export async function fetchLeavesByRange(startDate, endDate) {
 }
 
 /** Fetch last 20 leave requests for a specific employee. */
-export async function fetchLeavesByEmployee(employeeId) {
+export async function fetchLeavesByEmployee(employeeId, floorId = "") {
   const q = query(
-    collection(db, "leaveRequests"),
+    floorCollection(db, "leaveRequests", floorId),
     where("employeeId", "==", employeeId),
     orderBy("submitDate", "desc"),
     limit(20),
@@ -660,7 +672,7 @@ export function detectShift(now = new Date()) {
  * - If docIdOrPayload is a string docId, updates existing attendance doc.
  * - If docIdOrPayload is an object payload, creates new attendance doc.
  */
-export async function recordLatePermission(docIdOrPayload, verificationCode) {
+export async function recordLatePermission(docIdOrPayload, verificationCode, floorId = "") {
   const payload = {
     latePermission: true,
     latePermissionCode: verificationCode || "",
@@ -669,24 +681,29 @@ export async function recordLatePermission(docIdOrPayload, verificationCode) {
   };
 
   if (typeof docIdOrPayload === "string" && docIdOrPayload.trim()) {
-    await updateDoc(doc(db, "attendance", docIdOrPayload), payload);
+    await updateDoc(floorDoc(db, "attendance", docIdOrPayload, floorId), payload);
     return docIdOrPayload;
   }
 
   const data = docIdOrPayload || {};
-  const ref = await addDoc(collection(db, "attendance"), {
-    employeeId: data.employeeId || "",
-    name: data.name || "",
-    type: data.type || "staff",
-    shift: data.shift || "morning",
-    date: data.date || "",
-    timeIn: Timestamp.now(),
-    timeOut: null,
-    lateMinutes: 0,
-    faceVerified: false,
-    faceVerificationRequired: false,
-    ...payload,
-  });
+  const ref = doc(floorCollection(db, "attendance", floorId));
+  await setDoc(
+    ref,
+    {
+      employeeId: data.employeeId || "",
+      name: data.name || "",
+      type: data.type || "staff",
+      shift: data.shift || "morning",
+      date: data.date || "",
+      timeIn: Timestamp.now(),
+      timeOut: null,
+      lateMinutes: 0,
+      faceVerified: false,
+      faceVerificationRequired: false,
+      ...payload,
+    },
+    { merge: true },
+  );
   return ref.id;
 }
 
@@ -702,7 +719,7 @@ function generateLatePermissionCode(length = 8) {
 }
 
 /** Create random one-time late-permission verification code (no expiry). */
-export async function createLatePermissionCode(payload = {}) {
+export async function createLatePermissionCode(payload = {}, floorId = "") {
   const date = String(payload.date || "").trim();
   if (!date) throw new Error("Tanggal kode verifikasi wajib diisi.");
   const employeeId = String(payload.employeeId || "").trim();
@@ -712,26 +729,30 @@ export async function createLatePermissionCode(payload = {}) {
   while (attempt < 8) {
     attempt += 1;
     const code = generateLatePermissionCode(8);
-    const ref = doc(db, "latePermissionCodes", code);
+    const ref = floorDoc(db, "latePermissionCodes", code, floorId);
     const exists = await getDoc(ref);
     if (exists.exists()) continue;
 
-    await setDoc(ref, {
-      code,
-      date,
-      shift: payload.shift || "morning",
-      employeeId,
-      employeeName: String(payload.employeeName || "").trim(),
-      note: String(payload.note || "").trim(),
-      used: false,
-      usedAt: null,
-      usedByEmployeeId: "",
-      usedByName: "",
-      usedByAttendanceId: "",
-      createdAt: Timestamp.now(),
-      createdBy: String(payload.createdBy || "").trim(),
-      revoked: false,
-    });
+    await setDoc(
+      ref,
+      {
+        code,
+        date,
+        shift: payload.shift || "morning",
+        employeeId,
+        employeeName: String(payload.employeeName || "").trim(),
+        note: String(payload.note || "").trim(),
+        used: false,
+        usedAt: null,
+        usedByEmployeeId: "",
+        usedByName: "",
+        usedByAttendanceId: "",
+        createdAt: Timestamp.now(),
+        createdBy: String(payload.createdBy || "").trim(),
+        revoked: false,
+      },
+      { merge: true },
+    );
 
     return code;
   }
@@ -740,8 +761,8 @@ export async function createLatePermissionCode(payload = {}) {
 }
 
 /** Subscribe verification codes by date (sorted client-side by newest first). */
-export function subscribeLatePermissionCodesByDate(date, callback) {
-  const q = query(collection(db, "latePermissionCodes"), where("date", "==", date));
+export function subscribeLatePermissionCodesByDate(date, callback, floorId = "") {
+  const q = query(floorCollection(db, "latePermissionCodes", floorId), where("date", "==", date));
   return onSnapshot(q, (snap) => {
     const rows = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
@@ -755,9 +776,9 @@ export function subscribeLatePermissionCodesByDate(date, callback) {
 }
 
 /** Subscribe verification codes by date range (sorted client-side by newest first). */
-export function subscribeLatePermissionCodesByDateRange(startDate, endDate, callback) {
+export function subscribeLatePermissionCodesByDateRange(startDate, endDate, callback, floorId = "") {
   const q = query(
-    collection(db, "latePermissionCodes"),
+    floorCollection(db, "latePermissionCodes", floorId),
     where("date", ">=", startDate),
     where("date", "<=", endDate),
     orderBy("date", "desc"),
@@ -778,21 +799,24 @@ export function subscribeLatePermissionCodesByDateRange(startDate, endDate, call
 }
 
 /** Delete a late-permission verification code by document ID/code. */
-export async function deleteLatePermissionCode(id) {
-  await deleteDoc(doc(db, "latePermissionCodes", id));
+export async function deleteLatePermissionCode(id, floorId = "") {
+  await deleteDoc(floorDoc(db, "latePermissionCodes", id, floorId));
 }
 
 /**
  * Validate and consume one verification code.
  * No expiry, but strictly one-time and stores who used it.
  */
-export async function consumeLatePermissionCode({ code, date, shift, employeeId, employeeName, attendanceId = "" }) {
+export async function consumeLatePermissionCode(
+  { code, date, shift, employeeId, employeeName, attendanceId = "" },
+  floorId = "",
+) {
   const normalizedCode = String(code || "")
     .trim()
     .toUpperCase();
   if (!normalizedCode) throw new Error("Kode verifikasi wajib diisi.");
 
-  const ref = doc(db, "latePermissionCodes", normalizedCode);
+  const ref = floorDoc(db, "latePermissionCodes", normalizedCode, floorId);
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -835,7 +859,7 @@ export async function consumeLatePermissionCode({ code, date, shift, employeeId,
     let usedAt = Timestamp.now();
     const normalizedAttendanceId = String(attendanceId || "").trim();
     if (normalizedAttendanceId) {
-      const attendanceRef = doc(db, "attendance", normalizedAttendanceId);
+      const attendanceRef = floorDoc(db, "attendance", normalizedAttendanceId, floorId);
       const attendanceSnap = await tx.get(attendanceRef);
       if (attendanceSnap.exists()) {
         const attendanceData = attendanceSnap.data() || {};
@@ -860,8 +884,8 @@ export async function consumeLatePermissionCode({ code, date, shift, employeeId,
 /** Subscribe to today's approved leave requests (izin libur). Returns unsubscribe fn.
  *  Uses single equality filter (no composite index needed), date range filtered client-side.
  */
-export function subscribeTodayLeaves(today, callback) {
-  const q = query(collection(db, "leaveRequests"), where("status", "==", "Disetujui"));
+export function subscribeTodayLeaves(today, callback, floorId = "") {
+  const q = query(floorCollection(db, "leaveRequests", floorId), where("status", "==", "Disetujui"));
   return onSnapshot(q, (snap) => {
     const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     callback(all.filter((r) => (r.leaveStartDate || "") <= today && (r.leaveEndDate || "") >= today));
@@ -869,9 +893,9 @@ export function subscribeTodayLeaves(today, callback) {
 }
 
 /** Subscribe to today's time-based replacements (ganti jam + lembur) with low-read query. */
-export function subscribeTodayJamReplacements(today, callback) {
+export function subscribeTodayJamReplacements(today, callback, floorId = "") {
   const q = query(
-    collection(db, "leaveRequests"),
+    floorCollection(db, "leaveRequests", floorId),
     where("replacementType", "in", ["jam", "lembur"]),
     where("replacementDetails.date", "==", today),
   );
@@ -885,30 +909,39 @@ export function subscribeTodayJamReplacements(today, callback) {
 }
 
 /** Add manual overtime entry from supervisor page. */
-export async function addManualOvertimeEntry(data) {
-  const ref = await addDoc(collection(db, "manualOvertime"), {
-    date: data.date,
-    name: data.name,
-    reason: data.reason || "Internal Shifting",
-    employeeId: data.employeeId || "",
-    createdBy: data.createdBy || "",
-    createdAt: Timestamp.now(),
-  });
+export async function addManualOvertimeEntry(data, floorId = "") {
+  const ref = doc(floorCollection(db, "manualOvertime", floorId));
+  await setDoc(
+    ref,
+    {
+      date: data.date,
+      name: data.name,
+      reason: data.reason || "Internal Shifting",
+      employeeId: data.employeeId || "",
+      createdBy: data.createdBy || "",
+      createdAt: Timestamp.now(),
+    },
+    { merge: true },
+  );
   return ref.id;
 }
 
 /** Subscribe manual overtime entries by date (low-read equality filter). */
-export function subscribeManualOvertimeByDate(date, callback) {
-  const q = query(collection(db, "manualOvertime"), where("date", "==", date), orderBy("createdAt", "desc"));
+export function subscribeManualOvertimeByDate(date, callback, floorId = "") {
+  const q = query(
+    floorCollection(db, "manualOvertime", floorId),
+    where("date", "==", date),
+    orderBy("createdAt", "desc"),
+  );
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });
 }
 
 /** Subscribe manual overtime entries within a date range for headcount history. */
-export function subscribeManualOvertimeByDateRange(startDate, endDate, callback) {
+export function subscribeManualOvertimeByDateRange(startDate, endDate, callback, floorId = "") {
   const q = query(
-    collection(db, "manualOvertime"),
+    floorCollection(db, "manualOvertime", floorId),
     where("date", ">=", startDate),
     where("date", "<=", endDate),
     orderBy("date", "desc"),
@@ -921,49 +954,53 @@ export function subscribeManualOvertimeByDateRange(startDate, endDate, callback)
 }
 
 /** Delete a single manual overtime entry by document ID. */
-export async function deleteManualOvertimeEntry(id) {
-  await deleteDoc(doc(db, "manualOvertime", id));
+export async function deleteManualOvertimeEntry(id, floorId = "") {
+  await deleteDoc(floorDoc(db, "manualOvertime", id, floorId));
 }
 
 /** Update an attendance record by doc ID. */
-export async function updateAttendanceRecord(id, data) {
-  await updateDoc(doc(db, "attendance", id), {
+export async function updateAttendanceRecord(id, data, floorId = "") {
+  await updateDoc(floorDoc(db, "attendance", id, floorId), {
     ...data,
     updatedAt: Timestamp.now(),
   });
 }
 
 /** Delete a single attendance record by ID. */
-export async function deleteAttendanceRecord(id) {
-  await deleteDoc(doc(db, "attendance", id));
+export async function deleteAttendanceRecord(id, floorId = "") {
+  await deleteDoc(floorDoc(db, "attendance", id, floorId));
 }
 
 /** Delete all leaveRequests for a given month/year. Returns deleted count. */
-export async function deleteLeavesByMonth(month, year) {
+export async function deleteLeavesByMonth(month, year, floorId = "") {
   const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = `${year}-${String(month).padStart(2, "0")}-${new Date(year, month, 0).getDate()}`;
   const q = query(
-    collection(db, "leaveRequests"),
+    floorCollection(db, "leaveRequests", floorId),
     where("leaveStartDate", ">=", firstDay),
     where("leaveStartDate", "<=", lastDay),
   );
   const snap = await getDocs(q);
-  await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, "leaveRequests", d.id))));
+  await Promise.all(snap.docs.map((d) => deleteDoc(floorDoc(db, "leaveRequests", d.id, floorId))));
   return snap.docs.length;
 }
 
 /** Delete all attendance records within a date range. Returns deleted count. */
-export async function deleteAttendanceByDateRange(startDate, endDate) {
-  const q = query(collection(db, "attendance"), where("date", ">=", startDate), where("date", "<=", endDate));
+export async function deleteAttendanceByDateRange(startDate, endDate, floorId = "") {
+  const q = query(
+    floorCollection(db, "attendance", floorId),
+    where("date", ">=", startDate),
+    where("date", "<=", endDate),
+  );
   const snap = await getDocs(q);
-  const deletes = snap.docs.map((d) => deleteDoc(doc(db, "attendance", d.id)));
+  const deletes = snap.docs.map((d) => deleteDoc(floorDoc(db, "attendance", d.id, floorId)));
   await Promise.all(deletes);
   return snap.docs.length;
 }
 
 /** Fetch all leave requests ordered by newest first. */
-export async function fetchAllLeaves() {
-  const q = query(collection(db, "leaveRequests"), orderBy("submitDate", "desc"));
+export async function fetchAllLeaves(floorId = "") {
+  const q = query(floorCollection(db, "leaveRequests", floorId), orderBy("submitDate", "desc"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => {
     const data = d.data();
@@ -977,8 +1014,8 @@ export async function fetchAllLeaves() {
 }
 
 /** Fetch a single leave request by its doc ID. */
-export async function fetchLeaveById(id) {
-  const snap = await getDoc(doc(db, "leaveRequests", id));
+export async function fetchLeaveById(id, floorId = "") {
+  const snap = await getDoc(floorDoc(db, "leaveRequests", id, floorId));
   if (!snap.exists()) throw new Error("Leave request not found");
   return { id: snap.id, ...snap.data() };
 }
@@ -987,8 +1024,8 @@ export async function fetchLeaveById(id) {
  * Update replacementStatus (and replacementStatusArray for multi-day) on a leave request.
  * Logic mirrors leave-service.js updateReplacementStatus().
  */
-export async function updateLeaveReplacementStatus(id, status, dayIndex = null) {
-  const leaveRef = doc(db, "leaveRequests", id);
+export async function updateLeaveReplacementStatus(id, status, dayIndex = null, floorId = "") {
+  const leaveRef = floorDoc(db, "leaveRequests", id, floorId);
   const snap = await getDoc(leaveRef);
   if (!snap.exists()) throw new Error("Leave request not found");
 

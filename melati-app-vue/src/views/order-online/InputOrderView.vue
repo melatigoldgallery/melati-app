@@ -64,7 +64,13 @@
                 Kontak
                 <span class="text-danger">*</span>
               </label>
-              <input v-model="form.kontak" type="text" class="form-control form-control-sm" placeholder="08xxx" required />
+              <input
+                v-model="form.kontak"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="08xxx"
+                required
+              />
             </div>
           </div>
         </div>
@@ -98,22 +104,50 @@
               <tbody>
                 <tr v-for="(row, index) in detailRows" :key="index">
                   <td>
-                    <input v-model.number="row.jml" type="number" min="1" class="form-control form-control-sm text-center" />
+                    <input
+                      v-model.number="row.jml"
+                      type="number"
+                      min="1"
+                      class="form-control form-control-sm text-center"
+                    />
                   </td>
                   <td>
-                    <input v-model="row.namaBarang" type="text" class="form-control form-control-sm" placeholder="Nama barang" />
+                    <input
+                      v-model="row.namaBarang"
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="Nama barang"
+                    />
                   </td>
                   <td>
-                    <input v-model="row.berat" type="number" step="0.01" min="0" class="form-control form-control-sm" placeholder="0.00" />
+                    <input
+                      v-model="row.berat"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="form-control form-control-sm"
+                      placeholder="0.00"
+                    />
                   </td>
                   <td>
                     <input v-model="row.karat" type="text" class="form-control form-control-sm" placeholder="22K" />
                   </td>
                   <td>
-                    <input v-model.number="row.harga" type="number" min="0" class="form-control form-control-sm text-end" placeholder="0" />
+                    <input
+                      v-model.number="row.harga"
+                      type="number"
+                      min="0"
+                      class="form-control form-control-sm text-end"
+                      placeholder="0"
+                    />
                   </td>
                   <td class="text-center">
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="removeRow(index)" :disabled="detailRows.length === 1">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      @click="removeRow(index)"
+                      :disabled="detailRows.length === 1"
+                    >
                       <i class="bi bi-x"></i>
                     </button>
                   </td>
@@ -195,6 +229,10 @@ async function saveData() {
 
   try {
     saving.value = true;
+    if (!auth.activeFloor) {
+      showError("Lantai belum dipilih", "Silakan pilih Lt 1 atau Lt 2 sebelum menyimpan.");
+      return;
+    }
     const payload = {
       ...form,
       jam: timeStringWITA().slice(0, 5),
@@ -202,7 +240,7 @@ async function saveData() {
       createdBy: auth.currentUser?.username || auth.currentUser?.displayName || form.namaAdmin,
       updatedBy: auth.currentUser?.username || auth.currentUser?.displayName || form.namaAdmin,
     };
-    const result = await saveOrderOnline(payload);
+    const result = await saveOrderOnline(payload, auth.activeFloor);
     await swal(`Order online berhasil disimpan (${result.savedCount} detail)`, "success");
     resetForm();
   } catch (err) {

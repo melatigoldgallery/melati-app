@@ -246,6 +246,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { Modal } from "bootstrap";
 import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, where } from "firebase/firestore";
+import { floorDoc, floorCollection } from "@/services/floor-scope";
+import { useAuthStore } from "@/stores/auth";
 import { db } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
@@ -318,6 +320,8 @@ const lastStockFetchAt = ref(0);
 const STOCK_SNAPSHOT_TTL = 60000;
 let stockFetchPromise = null;
 let autoSnapshotTimer = null;
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
 
 const todayKey = computed(() => todayStringWITA());
 const warnaTotal = computed(() => warnaRows.value.reduce((sum, row) => sum + (parseInt(row.value, 10) || 0), 0));
@@ -469,7 +473,7 @@ function computeCurrentSummarySnapshot(sourceStockData) {
 async function saveSnapshotByDate(dateKey, { backfilled = false } = {}) {
   const live = await getStockSnapshot({ force: true });
   const snap = computeCurrentSummarySnapshot(live);
-  const docRef = doc(db, "daily_stock_reports", dateKey);
+  const docRef = floorDoc(db, "daily_stock_reports", dateKey, activeFloor.value);
   await setDoc(
     docRef,
     {
@@ -488,7 +492,7 @@ async function ensureYesterdaySnapshotIfMissing() {
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const yesterdayKey = formatDateKey(yesterday);
   if (!yesterdayKey) return;
-  const docRef = doc(db, "daily_stock_reports", yesterdayKey);
+  const docRef = floorDoc(db, "daily_stock_reports", yesterdayKey, activeFloor.value);
   const snap = await getDoc(docRef);
   if (!snap.exists()) {
     await saveSnapshotByDate(yesterdayKey, { backfilled: true });
@@ -503,7 +507,7 @@ async function ensureTodaySnapshotIfPassed() {
   if (now >= cutoff) {
     const key = formatDateKey(now);
     if (!key) return;
-    const docRef = doc(db, "daily_stock_reports", key);
+    const docRef = floorDoc(db, "daily_stock_reports", key, activeFloor.value);
     const snap = await getDoc(docRef);
     if (!snap.exists()) {
       await saveSnapshotByDate(key);
@@ -539,7 +543,7 @@ async function loadReport() {
   loading.value = true;
 
   try {
-    const docRef = doc(db, "daily_stock_reports", selectedDate.value);
+    const docRef = floorDoc(db, "daily_stock_reports", selectedDate.value, activeFloor.value);
     const snap = await getDoc(docRef);
 
     let normalized;
@@ -693,7 +697,7 @@ async function saveWarnaEdit() {
     });
     detailJenisTotal.value = detailJenisRows.value.reduce((sum, row) => sum + toInt(row.qty), 0);
 
-    const docRef = doc(db, "daily_stock_reports", selectedDate.value);
+    const docRef = floorDoc(db, "daily_stock_reports", selectedDate.value, activeFloor.value);
     await setDoc(
       docRef,
       {
@@ -819,7 +823,7 @@ async function handleExportDetailBulanan() {
   exporting.value = true;
   try {
     const reportQ = query(
-      collection(db, "daily_stock_reports"),
+      floorCollection(db, "daily_stock_reports", activeFloor.value),
       where("date", ">=", startDate),
       where("date", "<=", endDate),
       orderBy("date", "desc"),
@@ -834,7 +838,7 @@ async function handleExportDetailBulanan() {
     const reports = reportSnap.docs.map((d) => normalizeReport(d.data(), d.id));
 
     const logsQ = query(
-      collection(db, "daily_stock_logs"),
+      floorCollection(db, "daily_stock_logs", activeFloor.value),
       where("date", ">=", startDate),
       where("date", "<=", endDate),
       orderBy("date", "desc"),

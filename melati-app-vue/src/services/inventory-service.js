@@ -1,6 +1,6 @@
 /**
- * Inventory Service — Brankas Stock Management
- * Collections: stocks/{subDoc}, daily_stock_logs/{date}, daily_stock_reports/{date}
+ * Inventory Service — Brankas Stock Management (Floor-Scoped)
+ * Collections: floors/{floorId}/stocks/{subDoc}, floors/{floorId}/dailyStockLogs/{date}, floors/{floorId}/dailyStockReports/{date}
  */
 import {
   collection,
@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
+import { floorCollection, floorDoc } from "./floor-scope";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -96,7 +97,12 @@ const ALL_SUB_DOCS = [
 ];
 
 export const STOCK_DOCS = [...ALL_SUB_DOCS];
-const STAFF_CACHE_KEY = "inventoryStaffOptionsCache";
+
+// Cache keys now include floorId to prevent cross-floor pollution
+function getStaffCacheKey(floorId = "") {
+  return `inventoryStaffOptionsCache:${floorId || "default"}`;
+}
+
 const STAFF_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 function toInt(value) {
@@ -124,16 +130,21 @@ function getDetailTypes(mainCat) {
 // ── Firestore Operations ───────────────────────────────────────────────────
 
 /**
- * Fetch all stock sub-documents at once.
+ * Fetch all stock sub-documents at once (floor-scoped).
+ * @param {string} [floorId] - Optional floor ID; uses active floor if not provided
  * @returns {Object} { [subDoc]: { [mainCat]: { quantity, details, lastUpdated, history } } }
  */
-export async function fetchAllStockData() {
-  const refs = ALL_SUB_DOCS.map((id) => doc(db, "stocks", id));
-  const snaps = await Promise.all(refs.map((r) => getDoc(r)));
+export async function fetchAllStockData(floorId = "") {
   const result = {};
-  ALL_SUB_DOCS.forEach((id, i) => {
-    result[id] = snaps[i].exists() ? snaps[i].data() : {};
+  const snap = await getDocs(floorCollection(db, "stocks", floorId));
+  snap.forEach((docSnap) => {
+    result[docSnap.id] = docSnap.data() || {};
   });
+
+  ALL_SUB_DOCS.forEach((id) => {
+    if (!result[id]) result[id] = {};
+  });
+
   return result;
 }
 
@@ -167,8 +178,8 @@ export function mergeStockByLatest(localData = {}, incomingData = {}) {
   return merged;
 }
 
-export function subscribeStocksRealtime(onData) {
-  const ref = collection(db, "stocks");
+export function subscribeStocksRealtime(onData, floorId = "") {
+  const ref = floorCollection(db, "stocks", floorId);
   return onSnapshot(ref, (snap) => {
     const incoming = {};
     snap.forEach((d) => {
@@ -178,10 +189,12 @@ export function subscribeStocksRealtime(onData) {
   });
 }
 
-export async function fetchStaffOptions({ force = false } = {}) {
+export async function fetchStaffOptions({ force = false, floorId = "" } = {}) {
+  const cacheKey = getStaffCacheKey(floorId);
+
   if (!force) {
     try {
-      const raw = localStorage.getItem(STAFF_CACHE_KEY);
+      const raw = localStorage.getItem(cacheKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed?.timestamp && Array.isArray(parsed?.data)) {
@@ -196,31 +209,22 @@ export async function fetchStaffOptions({ force = false } = {}) {
 
   let result = [];
   try {
-    const staffQuery = query(collection(db, "salesStaff"), where("status", "==", "active"), orderBy("nama", "asc"));
+    const staffQuery = query(
+      floorCollection(db, "penjualanAksesoris", floorId),
+      where("status", "==", "active"),
+      orderBy("nama", "asc"),
+    );
     const snap = await getDocs(staffQuery);
     result = snap.docs.map((d) => (d.data()?.nama || "").trim()).filter(Boolean);
   } catch {
     result = [];
   }
 
-  if (!result.length) {
-    try {
-      const usersSnap = await getDocs(collection(db, "users"));
-      result = usersSnap.docs
-        .map((d) => {
-          const data = d.data() || {};
-          return (data.displayName || data.username || "").trim();
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b, "id"));
-    } catch {
-      result = [];
-    }
-  }
+  // Floor-only mode: do not fallback to legacy global users collection.
 
   try {
     localStorage.setItem(
-      STAFF_CACHE_KEY,
+      cacheKey,
       JSON.stringify({
         timestamp: Date.now(),
         data: result,
@@ -234,7 +238,7 @@ export async function fetchStaffOptions({ force = false } = {}) {
 }
 
 /**
- * Update stock quantity for a specific (subDoc, mainCat).
+ * Update stock quantity for a specific (subDoc, mainCat) - Floor-Scoped.
  * Builds history, saves to Firestore, and logs to daily_stock_logs.
  *
  * @param {Object} opts
@@ -244,11 +248,12 @@ export async function fetchStaffOptions({ force = false } = {}) {
  * @param {Object|null} opts.newDetails   - Detail map for typed categories
  * @param {string} opts.petugas     - Operator name
  * @param {string} opts.keterangan  - Reason/description
+ * @param {string} [opts.floorId]   - Floor ID; uses active floor if not provided
  */
-export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails, petugas, keterangan }) {
+export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails, petugas, keterangan, floorId = "" }) {
   const { todayStringWITA } = useWITA();
 
-  const ref = doc(db, "stocks", subDoc);
+  const ref = floorDoc(db, "stocks", subDoc, floorId);
   const snap = await getDoc(ref);
   const docData = snap.exists() ? snap.data() : {};
   const existing = docData[mainCat] || { quantity: 0, lastUpdated: null, history: [] };
@@ -322,7 +327,7 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
   // Log to daily_stock_logs only if there is an actual change
   if (petugas && keterangan && netChange !== 0) {
     const dateStr = todayStringWITA();
-    const logRef = doc(db, "daily_stock_logs", dateStr);
+    const logRef = floorDoc(db, "dailyStockLogs", dateStr, floorId);
     await setDoc(
       logRef,
       {
@@ -344,8 +349,8 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
   }
 }
 
-export async function updateKomputerStock({ mainCat, newQuantity, newDetails = null }) {
-  const ref = doc(db, "stocks", "stok-komputer");
+export async function updateKomputerStock({ mainCat, newQuantity, newDetails = null, floorId = "" }) {
+  const ref = floorDoc(db, "stocks", "stok-komputer", floorId);
   const snap = await getDoc(ref);
   const docData = snap.exists() ? snap.data() : {};
   const existing = docData[mainCat] || { quantity: 0, lastUpdated: null };
@@ -374,8 +379,8 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
  * @param {string} mainCat
  * @returns {number}
  */
-export function calcFisikTotal(stockData, mainCat) {
-  return SUB_CATEGORIES.reduce((sum, sub) => {
+export function calcFisikTotal(stockData, mainCat, subCategories = SUB_CATEGORIES) {
+  return subCategories.reduce((sum, sub) => {
     const item = stockData[sub.key]?.[mainCat];
     if (!item) return sum;
     if (item.details && Object.keys(item.details).length > 0) {
@@ -404,19 +409,20 @@ export function getStockStatus(fisik, komputer) {
  * @param {string} dateStr - YYYY-MM-DD
  * @returns {{ source: 'saved'|'none', data: Object|null }}
  */
-export async function fetchDailyReport(dateStr) {
-  const ref = doc(db, "daily_stock_reports", dateStr);
+export async function fetchDailyReport(dateStr, floorId = "") {
+  const ref = floorDoc(db, "dailyStockReports", dateStr, floorId);
   const snap = await getDoc(ref);
   if (snap.exists()) return { source: "saved", data: snap.data() };
   return { source: "none", data: null };
 }
 
 /**
- * Save a daily stock snapshot computed from live stockData.
+ * Save a daily stock snapshot computed from live stockData - Floor-Scoped.
  * @param {string} dateStr  - YYYY-MM-DD
  * @param {Object} stockData - result of fetchAllStockData()
+ * @param {string} [floorId] - Floor ID; uses active floor if not provided
  */
-export async function saveDailyReport(dateStr, stockData) {
+export async function saveDailyReport(dateStr, stockData, floorId = "") {
   const SUB_LABEL_MAP = {
     brankas: "Stok Brankas",
     posting: "Belum Posting",
@@ -447,7 +453,7 @@ export async function saveDailyReport(dateStr, stockData) {
     });
   });
 
-  const ref = doc(db, "daily_stock_reports", dateStr);
+  const ref = floorDoc(db, "dailyStockReports", dateStr, floorId);
   await setDoc(ref, {
     date: dateStr,
     createdAt: Timestamp.now(),

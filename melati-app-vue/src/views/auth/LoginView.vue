@@ -4,50 +4,82 @@
     <div class="login-overlay"></div>
 
     <main class="login-shell">
-      <section class="login-card" aria-label="Form Login Melati Gold Shop">
-        <div class="brand-ribbon" aria-hidden="true">MELATI GOLD</div>
+      <section class="login-card" :aria-label="`Form Login ${brandName}`">
+        <div class="brand-ribbon" aria-hidden="true">{{ brandRibbonText }}</div>
 
         <header class="login-header">
-          <img src="/img/Melati.jfif" alt="Logo Melati Gold Shop" width="72" height="72" class="brand-logo" />
-          <h1 class="brand-title">Melati Gold Shop</h1>
+          <img :alt="`Logo ${brandName}`" src="/img/Melati.jfif" width="72" height="72" class="brand-logo" />
+          <h1 class="brand-title">{{ brandName }}</h1>
           <p class="brand-subtitle">Sistem Manajemen Toko</p>
         </header>
 
-        <form class="login-form" @submit.prevent="handleLogin">
-          <label class="field-label" for="identifier">Email / Username</label>
-          <div class="field-wrap">
-            <span class="field-icon" aria-hidden="true"><i class="bi bi-person"></i></span>
-            <input
-              id="identifier"
-              v-model="form.identifier"
-              type="text"
-              class="field-input"
-              placeholder="Masukkan email atau username"
-              required
-              autocomplete="username"
-            />
+        <section v-if="!selectedFloor" class="floor-picker" aria-label="Pilih lantai operasional">
+          <div class="picker-head">
+            <p class="floor-picker-title mb-1">Pilih Lantai Operasional</p>
+            <p class="floor-picker-subtitle mb-0">Pilih lantai kerja Anda untuk melanjutkan proses login.</p>
+          </div>
+          <div class="floor-grid">
+            <button type="button" class="floor-tile" @click="selectFloor('L1')">
+              <span class="floor-tile-icon"><i class="bi bi-building"></i></span>
+              <span class="floor-tile-title">Lantai 1</span>
+              <span class="floor-tile-note">Melati Gold Shop</span>
+            </button>
+            <button type="button" class="floor-tile" @click="selectFloor('L2')">
+              <span class="floor-tile-icon"><i class="bi bi-building-fill"></i></span>
+              <span class="floor-tile-title">Lantai 2</span>
+              <span class="floor-tile-note">Melati Gold Young</span>
+            </button>
+          </div>
+        </section>
+
+        <form v-else class="login-form" @submit.prevent="handleLogin">
+          <div class="floor-switcher" role="group" aria-label="Ganti lantai">
+            <div class="floor-switcher-head">
+              <span class="floor-switcher-label">Akses Lantai: {{ floorLabel }}</span>
+              <button type="button" class="floor-reset-link d-none d-md-block" @click="selectedFloor = ''">
+                Pilih Lantai
+              </button>
+            </div>
           </div>
 
-          <label class="field-label" for="password">Password</label>
-          <div class="field-wrap">
-            <span class="field-icon" aria-hidden="true"><i class="bi bi-lock"></i></span>
-            <input
-              id="password"
-              v-model="form.password"
-              :type="showPassword ? 'text' : 'password'"
-              class="field-input"
-              placeholder="Masukkan password"
-              required
-              autocomplete="current-password"
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              @click="showPassword = !showPassword"
-              :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
-            >
-              <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
-            </button>
+          <div class="field-group">
+            <label class="field-label" for="identifier">Email / Username</label>
+            <div class="field-wrap">
+              <span class="field-icon" aria-hidden="true"><i class="bi bi-person"></i></span>
+              <input
+                id="identifier"
+                v-model="form.identifier"
+                type="text"
+                class="field-input"
+                placeholder="Masukkan email atau username"
+                required
+                autocomplete="username"
+              />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="password">Password</label>
+            <div class="field-wrap">
+              <span class="field-icon" aria-hidden="true"><i class="bi bi-lock"></i></span>
+              <input
+                id="password"
+                v-model="form.password"
+                :type="showPassword ? 'text' : 'password'"
+                class="field-input"
+                placeholder="Masukkan password"
+                required
+                autocomplete="current-password"
+              />
+              <button
+                type="button"
+                class="toggle-password"
+                @click="showPassword = !showPassword"
+                :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+              >
+                <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+              </button>
+            </div>
           </div>
 
           <div v-if="errorMsg" class="error-box" role="alert" aria-live="polite">
@@ -62,16 +94,17 @@
           </button>
         </form>
 
-        <footer class="login-footer">&copy; 2026 Melati Gold Shop. All rights reserved.</footer>
+        <footer class="login-footer">&copy; 2026 {{ brandName }}. All rights reserved.</footer>
       </section>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { getFloorLabel, normalizeFloorId } from "@/config/floor-config";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -81,12 +114,28 @@ const form = ref({ identifier: "", password: "" });
 const showPassword = ref(false);
 const loading = ref(false);
 const errorMsg = ref("");
+const selectedFloor = ref("");
+const floorLabel = computed(() => getFloorLabel(selectedFloor.value || "L1"));
+const effectiveFloor = computed(() => selectedFloor.value || "L1");
+const brandName = computed(() => (effectiveFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop"));
+const brandRibbonText = computed(() => (effectiveFloor.value === "L2" ? "MELATI YOUNG" : "MELATI GOLD"));
+
+function selectFloor(floorId) {
+  selectedFloor.value = normalizeFloorId(floorId);
+  errorMsg.value = "";
+}
+
+onMounted(() => {
+  if (window.matchMedia("(max-width: 767.98px)").matches && !selectedFloor.value) {
+    selectFloor("L1");
+  }
+});
 
 async function handleLogin() {
   errorMsg.value = "";
   loading.value = true;
   try {
-    await auth.login(form.value.identifier, form.value.password);
+    await auth.login(form.value.identifier, form.value.password, selectedFloor.value);
     const redirect = route.query.redirect || "/dashboard";
     router.push(redirect);
   } catch (err) {
@@ -109,12 +158,118 @@ function mapFirebaseError(code) {
     "auth/operation-not-allowed": "Metode login belum diaktifkan di Firebase Auth.",
     "auth/username-not-found": "Username tidak ditemukan. Gunakan email atau hubungi admin.",
     "auth/username-no-email": "Username belum ditautkan dengan email login. Hubungi admin.",
+    "auth/floor-required": "Pilih lantai terlebih dahulu.",
+    "auth/floor-user-mismatch": "Akun tidak terdaftar untuk lantai yang dipilih.",
+    "auth/floor-role-not-allowed": "Role akun tidak diizinkan untuk lantai yang dipilih.",
   };
   return map[code] || "Terjadi kesalahan. Coba lagi.";
 }
 </script>
 
 <style scoped>
+.floor-picker-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.floor-picker-subtitle {
+  font-size: 0.83rem;
+  color: var(--ink-700);
+}
+
+.picker-head {
+  margin-bottom: 14px;
+}
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.floor-tile {
+  border: 1px solid #d5deeb;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.floor-tile:hover {
+  transform: translateY(-2px);
+  border-color: #e0ae19;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.floor-tile-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffe8a3 0%, #f2bf3b 100%);
+  color: #3e2d00;
+  margin-bottom: 4px;
+}
+
+.floor-tile-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.floor-tile-note {
+  font-size: 0.77rem;
+  color: #5f6878;
+}
+
+.floor-switcher {
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(145deg, #ffffff 0%, #f6f9fc 100%);
+  margin-bottom: 2px;
+}
+
+.floor-switcher-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.floor-reset-link {
+  border: 0;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #59667a;
+  text-decoration: underline;
+}
+
+.floor-switcher-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: #334155;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 .login-page {
   --gold-primary: #ffd447;
   --gold-secondary: #b68617;
@@ -173,7 +328,7 @@ function mapFirebaseError(code) {
 
 .login-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
   position: relative;
   overflow: hidden;
   border-radius: 18px;
@@ -183,19 +338,19 @@ function mapFirebaseError(code) {
   box-shadow:
     0 18px 50px rgba(6, 12, 22, 0.26),
     0 0 0 3px rgba(255, 212, 71, 0.12);
-  padding: 22px 18px 16px;
+  padding: 22px 18px 18px;
 }
 
 .brand-ribbon {
   position: absolute;
-  top: 25px;
-  right: -56px;
+  top: 30px;
+  right: -36px;
   transform: rotate(45deg);
   background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
   color: #111;
   font-weight: 700;
   letter-spacing: 0.6px;
-  padding: 6px 64px;
+  padding: 5px 64px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   text-transform: uppercase;
   font-size: 10px;
@@ -204,7 +359,7 @@ function mapFirebaseError(code) {
 
 .login-header {
   text-align: center;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .brand-logo {
@@ -231,7 +386,7 @@ function mapFirebaseError(code) {
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
 }
 
 .field-label {
@@ -271,7 +426,7 @@ function mapFirebaseError(code) {
   background: transparent;
   color: var(--ink-900);
   padding: 12px 10px 12px 0;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
 }
 
 .field-input::placeholder {
@@ -303,7 +458,7 @@ function mapFirebaseError(code) {
   margin-top: 4px;
   border: 1px solid var(--gold-secondary);
   border-radius: 12px;
-  padding: 5px 12px;
+  padding: 8px 12px;
   width: 100%;
   font-weight: 700;
   background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-secondary) 100%);
@@ -333,7 +488,7 @@ function mapFirebaseError(code) {
 }
 
 .login-footer {
-  margin-top: 14px;
+  margin-top: 16px;
   color: #5f6878;
   font-size: 0.76rem;
   text-align: center;
@@ -344,9 +499,13 @@ function mapFirebaseError(code) {
     padding: 28px;
   }
 
+  .floor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .login-card {
-    max-width: 460px;
-    padding: 28px 24px 18px;
+    max-width: 400px;
+    padding: 28px 24px 20px;
     border-radius: 20px;
   }
 
@@ -364,13 +523,17 @@ function mapFirebaseError(code) {
   }
 
   .field-input {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
 }
 
 @media (min-width: 1100px) {
   .login-card {
-    max-width: 325px;
+    max-width: 400px;
+  }
+
+  .brand-title {
+    font-size: 1.6rem;
   }
 }
 </style>

@@ -1,5 +1,4 @@
 import {
-  collection,
   deleteDoc,
   doc,
   getDocs,
@@ -13,8 +12,14 @@ import {
 } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/config/firebase";
+import { floorCollection, floorDoc, scopeStoragePath } from "@/services/floor-scope";
+import { normalizeFloorId } from "@/config/floor-config";
 
 const COLLECTION_NAME = "order_online";
+
+function getOrderCollection(floorId = "") {
+  return floorCollection(db, COLLECTION_NAME, floorId);
+}
 
 function pad2(value) {
   return String(value).padStart(2, "0");
@@ -105,7 +110,8 @@ export function normalizeOrderRows(rows = []) {
     );
 }
 
-export async function saveOrderOnline(payload) {
+export async function saveOrderOnline(payload, floorId = "") {
+  const normalizedFloorId = normalizeFloorId(floorId, "L1");
   const rows = normalizeOrderRows(payload.detailBarang || []);
   if (!rows.length) throw new Error("Minimal satu detail barang harus diisi");
 
@@ -126,7 +132,7 @@ export async function saveOrderOnline(payload) {
 
   const batch = writeBatch(db);
   rows.forEach((row) => {
-    const rowRef = doc(collection(db, COLLECTION_NAME));
+    const rowRef = doc(getOrderCollection(normalizedFloorId));
     batch.set(rowRef, {
       orderNo,
       tanggal,
@@ -156,7 +162,7 @@ export async function saveOrderOnline(payload) {
   return { orderNo, savedCount: rows.length };
 }
 
-export async function fetchOrderOnlineByRange(startDate, endDate, statusPengambilan = "") {
+export async function fetchOrderOnlineByRange(startDate, endDate, statusPengambilan = "", floorId = "") {
   const start = normalizeText(startDate);
   const end = normalizeText(endDate);
   if (!start || !end) return [];
@@ -169,7 +175,32 @@ export async function fetchOrderOnlineByRange(startDate, endDate, statusPengambi
 
   conditions.push(orderBy("tanggal", "desc"));
 
-  const snap = await getDocs(query(collection(db, COLLECTION_NAME), ...conditions, limit(1000)));
+  const snap = await getDocs(query(getOrderCollection(floorId), ...conditions, limit(1000)));
+  const data = snap.docs;
+
+  return data
+    .map((item) => ({ id: item.id, ...item.data() }))
+    .sort((left, right) => {
+      const leftKey = `${left.tanggal || ""} ${left.jam || ""}`;
+      const rightKey = `${right.tanggal || ""} ${right.jam || ""}`;
+      return rightKey.localeCompare(leftKey);
+    });
+}
+
+export async function fetchOrderOnlineByRangeForManagement(startDate, endDate, statusPengambilan = "", floorId = "") {
+  const start = normalizeText(startDate);
+  const end = normalizeText(endDate);
+  if (!start || !end) return [];
+
+  const conditions = [where("tanggal", ">=", start), where("tanggal", "<=", end)];
+
+  if (statusPengambilan) {
+    conditions.push(where("statusPengambilan", "==", statusPengambilan));
+  }
+
+  conditions.push(orderBy("tanggal", "desc"));
+
+  const snap = await getDocs(query(getOrderCollection(floorId), ...conditions));
   return snap.docs
     .map((item) => ({ id: item.id, ...item.data() }))
     .sort((left, right) => {
@@ -179,8 +210,9 @@ export async function fetchOrderOnlineByRange(startDate, endDate, statusPengambi
     });
 }
 
-export async function updateOrderOnlineData(id, payload) {
-  await updateDoc(doc(db, COLLECTION_NAME, id), {
+export async function updateOrderOnlineData(id, payload, floorId = "") {
+  const floorRef = floorDoc(db, COLLECTION_NAME, id, floorId);
+  await updateDoc(floorRef, {
     tanggal: normalizeText(payload.tanggal),
     namaAdmin: normalizeText(payload.namaAdmin || payload.namaSales),
     namaSales: normalizeText(payload.namaAdmin || payload.namaSales),
@@ -196,19 +228,25 @@ export async function updateOrderOnlineData(id, payload) {
   });
 }
 
-export async function uploadOrderProof(file, { orderNo, docId }) {
+export async function uploadOrderProof(file, { orderNo, docId, floorId = "" } = {}) {
   if (!file) throw new Error("File bukti pengambilan wajib dipilih");
   const optimizedFile = await compressImageFile(file);
   const safeName = String(optimizedFile.name || file.name || "bukti").replace(/[^a-zA-Z0-9._-]+/g, "_");
-  const path = `order-online/proof/${normalizeText(orderNo) || "unknown"}/${normalizeText(docId) || "item"}/${Date.now()}-${safeName}`;
+  const path = scopeStoragePath(
+    `order-online/proof/${normalizeText(orderNo) || "unknown"}/${normalizeText(docId) || "item"}/${Date.now()}-${safeName}`,
+    floorId,
+  );
   const fileRef = storageRef(storage, path);
-  await uploadBytes(fileRef, optimizedFile, { contentType: optimizedFile.type || file.type || "application/octet-stream" });
+  await uploadBytes(fileRef, optimizedFile, {
+    contentType: optimizedFile.type || file.type || "application/octet-stream",
+  });
   const url = await getDownloadURL(fileRef);
   return { url, path };
 }
 
-export async function updateOrderPickup(id, payload) {
-  await updateDoc(doc(db, COLLECTION_NAME, id), {
+export async function updateOrderPickup(id, payload, floorId = "") {
+  const floorRef = floorDoc(db, COLLECTION_NAME, id, floorId);
+  await updateDoc(floorRef, {
     statusPengambilan: payload.statusPengambilan || "BELUM_DIAMBIL",
     namaStafHandle: normalizeText(payload.namaStafHandle || ""),
     waktuPengambilan: normalizeText(payload.waktuPengambilan || ""),
@@ -219,6 +257,18 @@ export async function updateOrderPickup(id, payload) {
   });
 }
 
-export async function deleteOrderOnline(id) {
-  await deleteDoc(doc(db, COLLECTION_NAME, id));
+export async function updateOrderContactStatus(id, payload, floorId = "") {
+  const floorRef = floorDoc(db, COLLECTION_NAME, id, floorId);
+  await updateDoc(floorRef, {
+    waktuDihubungiTerakhir: normalizeText(payload.waktuDihubungiTerakhir || ""),
+    metodeKontakTerakhir: normalizeText(payload.metodeKontakTerakhir || "manual"),
+    dihubungiOleh: normalizeText(payload.dihubungiOleh || ""),
+    updatedAt: Timestamp.now(),
+    updatedBy: normalizeText(payload.updatedBy || payload.dihubungiOleh || ""),
+  });
+}
+
+export async function deleteOrderOnline(id, floorId = "") {
+  const floorRef = floorDoc(db, COLLECTION_NAME, id, floorId);
+  await deleteDoc(floorRef);
 }

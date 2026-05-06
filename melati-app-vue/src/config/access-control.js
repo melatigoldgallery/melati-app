@@ -33,6 +33,7 @@ export const PAGE_ACCESS_SECTIONS = [
       { key: "servis.input", label: "Input Servis", route: "/servis/input" },
       { key: "servis.data", label: "Data Servis", route: "/servis/data" },
       { key: "servis.laporan", label: "Laporan Servis", route: "/servis/laporan" },
+      { key: "servis.manajemen", label: "Manajemen Servis", route: "/servis/manajemen" },
     ],
   },
   {
@@ -41,7 +42,7 @@ export const PAGE_ACCESS_SECTIONS = [
     pages: [
       { key: "order-online.input", label: "Input Order", route: "/order-online/input" },
       { key: "order-online.data", label: "Data Order", route: "/order-online/data" },
-      { key: "order-online.laporan", label: "Laporan Order", route: "/order-online/laporan" },
+      { key: "order-online.manajemen", label: "Manajemen Order", route: "/order-online/manajemen" },
     ],
   },
   {
@@ -99,6 +100,11 @@ export const PAGE_ACCESS_SECTIONS = [
         label: "Maintenance",
         route: "/pengaturan/maintenance",
       },
+      {
+        key: "admin.inventory-manajemen-stok",
+        label: "Setting Manajemen Stok",
+        route: "/pengaturan/manajemen-stok",
+      },
     ],
   },
 ];
@@ -131,6 +137,7 @@ const SENSITIVE_PAGE_KEYS = new Set([
   "admin.antrian-closing",
   "admin.theme-appearance",
   "admin.maintenance",
+  "admin.inventory-manajemen-stok",
 ]);
 
 const LEGACY_PERMISSION_TO_PAGE = {
@@ -161,9 +168,13 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "servis.input-servis": "servis.input",
   "servis.data-servis": "servis.data",
   "servis.laporan-servis": "servis.laporan",
+  "servis.manajemen-servis": "servis.manajemen",
+  "servis.manajemen": "servis.manajemen",
   "order-online.input-order": "order-online.input",
   "order-online.data-order": "order-online.data",
-  "order-online.laporan-order": "order-online.laporan",
+  "order-online.manajemen-order": "order-online.manajemen",
+  "order-online.laporan-order": "order-online.manajemen",
+  "order-online.laporan": "order-online.manajemen",
   "promosi.setting-promosi": "promosi.setting",
   "admin.kelola-user": "admin.users",
   "admin.kode-akses": "admin.access-codes",
@@ -172,6 +183,8 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "admin.tema-warna": "admin.theme-appearance",
   "admin.theme-appearance": "admin.theme-appearance",
   "admin.maintenance": "admin.maintenance",
+  "admin.setting-manajemen-stok": "admin.inventory-manajemen-stok",
+  "admin.inventory-manajemen-stok": "admin.inventory-manajemen-stok",
 };
 
 export function getDefaultPageAccess(pageKey, role = "staff") {

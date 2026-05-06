@@ -20,6 +20,9 @@
           data-bs-toggle="dropdown"
           aria-expanded="false"
         >
+          <span v-if="auth.activeFloor" class="badge bg-light text-dark border small me-1">
+            {{ floorLabel }}
+          </span>
           <span class="badge btn-primary text-uppercase small">{{ auth.userRole }}</span>
           <i class="bi bi-chevron-down role-dropdown-icon ms-1" aria-hidden="true"></i>
         </button>
@@ -40,6 +43,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { getFloorLabel } from "@/config/floor-config";
 
 defineEmits(["toggle-sidebar"]);
 
@@ -48,6 +52,7 @@ const route = useRoute();
 const router = useRouter();
 
 const pageTitle = computed(() => route.meta?.title || "");
+const floorLabel = computed(() => getFloorLabel(auth.activeFloor || "L1"));
 
 // Clock
 const currentTime = ref("");

@@ -33,7 +33,7 @@
             <label class="form-label small fw-semibold">Jenis Penjualan</label>
             <select v-model="form.tipe" @change="onTipeChange" class="form-select form-select-sm">
               <option value="aksesoris">Aksesoris</option>
-              <option value="silver">Silver</option>
+              <option v-if="!isL2Floor" value="silver">Silver</option>
               <option value="kotak">Kotak</option>
               <option value="manual">Manual</option>
             </select>
@@ -620,7 +620,7 @@
           <i class="bi bi-x-circle me-1"></i>
           Batal
         </button>
-        <button @click="savePenjualan" :disabled="isSaving" class="btn btn-primary btn-sm">
+        <button @click="savePenjualan" :disabled="isSaveBlocked()" class="btn btn-primary btn-sm">
           <span v-if="isSaving" class="spinner-border spinner-border-sm me-1"></span>
           <i v-else class="bi bi-save me-1"></i>
           Simpan Penjualan
@@ -823,28 +823,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
-import {
-  getDocs,
-  query,
-  collection,
-  where,
-  orderBy,
-  addDoc,
-  serverTimestamp,
-  doc,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { getDocs, query, where, orderBy, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import { floorCollection } from "@/services/floor-scope";
 import Swal from "sweetalert2";
 import { db } from "@/config/firebase";
 import { useAccessoriesStore } from "@/stores/accessories";
+import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import { getSafeAmount, resolveReceiptPayment } from "@/utils/print-payment";
 
 const store = useAccessoriesStore();
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
+const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
 const { swal, error: showError } = useAlert();
 const MAX_KODE_PER_TRANSACTION = 10;
 
@@ -1065,7 +1059,7 @@ async function focusJumlahBayar() {
 }
 
 async function confirmSaveShortcut() {
-  if (!isShortcutTipe.value || isSaving.value) return;
+  if (!isShortcutTipe.value || isSaveBlocked()) return;
 
   const result = await Swal.fire({
     icon: "question",
@@ -1084,7 +1078,7 @@ async function confirmSaveShortcut() {
 }
 
 async function handleHargaEnter(formatter) {
-  if (!isShortcutTipe.value) return;
+  if (!isShortcutTipe.value || showPrintModal.value || showPrintOfflineModal.value) return;
 
   if (typeof formatter === "function") {
     formatter();
@@ -1099,6 +1093,8 @@ async function handleHargaEnter(formatter) {
 }
 
 async function handleJumlahBayarEnter() {
+  if (showPrintModal.value || showPrintOfflineModal.value) return;
+
   formatJumlahBayar();
 
   // For manual sales, Enter on jumlah bayar should trigger the same save flow
@@ -1597,8 +1593,12 @@ const isPrinting = ref(false);
 const lastPrintType = ref("receipt");
 const lastSaleData = ref(null);
 
+function isSaveBlocked() {
+  return isSaving.value || showPrintModal.value || showPrintOfflineModal.value;
+}
+
 async function savePenjualan() {
-  if (isSaving.value) return;
+  if (isSaveBlocked()) return;
   isSaving.value = true;
 
   try {
@@ -1772,26 +1772,33 @@ async function savePenjualan() {
           const hasKnownPrefix = !!jenisBarang[prefix];
           const jenisPrefix = hasKnownPrefix ? prefix : "LAIN";
 
-          return addDoc(collection(db, "mutasiKode"), {
-            kode: rawKode || "-",
-            namaBarang: item.namaBarang || "Tidak ada nama",
-            kadar: item.kadar || "-",
-            berat: parseFloat(item.berat) || 0,
-            keterangan: item.keterangan || "",
-            hargaPerGram: parseFloat(item.hargaPerGram) || 0,
-            totalHarga: item.totalHarga || 0,
-            tanggalInput: form.tanggal,
-            sales: form.salesName,
-            penjualanId: saleId,
-            isMutated: false,
-            tanggalMutasi: null,
-            mutasiKeterangan: "",
-            mutasiHistory: [],
-            timestamp: serverTimestamp(),
-            lastUpdated: serverTimestamp(),
-            jenisPrefix,
-            jenisNama: jenisBarang[prefix] || "Lainnya",
-          });
+          // Create floor doc ref with generated id.
+          const floorRef = doc(floorCollection(db, "mutasiKode", activeFloor.value));
+
+          return setDoc(
+            floorRef,
+            {
+              kode: rawKode || "-",
+              namaBarang: item.namaBarang || "Tidak ada nama",
+              kadar: item.kadar || "-",
+              berat: parseFloat(item.berat) || 0,
+              keterangan: item.keterangan || "",
+              hargaPerGram: parseFloat(item.hargaPerGram) || 0,
+              totalHarga: item.totalHarga || 0,
+              tanggalInput: form.tanggal,
+              sales: form.salesName,
+              penjualanId: saleId,
+              isMutated: false,
+              tanggalMutasi: null,
+              mutasiKeterangan: "",
+              mutasiHistory: [],
+              timestamp: serverTimestamp(),
+              lastUpdated: serverTimestamp(),
+              jenisPrefix,
+              jenisNama: jenisBarang[prefix] || "Lainnya",
+            },
+            { merge: true },
+          );
         }),
       );
     }
@@ -1803,6 +1810,11 @@ async function savePenjualan() {
       sisaPembayaran: sisaPembayaran.value,
     };
 
+    // Prevent Enter key from hitting focused element behind the print modal.
+    const activeElement = typeof document !== "undefined" ? document.activeElement : null;
+    if (activeElement && typeof activeElement.blur === "function") {
+      activeElement.blur();
+    }
     showPrintModal.value = true;
   } catch (err) {
     showError("Gagal menyimpan transaksi", err.message);
@@ -2115,8 +2127,13 @@ async function handleStockSync(e) {
 onMounted(async () => {
   await store.loadSalesCatalog();
   try {
-    const q = query(collection(db, "salesStaff"), where("status", "==", "active"), orderBy("nama", "asc"));
-    const snap = await getDocs(q);
+    const snap = await getDocs(
+      query(
+        floorCollection(db, "salesStaff", activeFloor.value),
+        where("status", "==", "active"),
+        orderBy("nama", "asc"),
+      ),
+    );
     salesList.value = snap.docs.map((d) => d.data().nama);
   } catch (_) {
     salesList.value = [];

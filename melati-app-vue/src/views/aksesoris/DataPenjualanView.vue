@@ -30,7 +30,7 @@
               <option value="">Semua Jenis</option>
               <option value="aksesoris">Aksesoris</option>
               <option value="kotak">Kotak</option>
-              <option value="silver">Silver</option>
+              <option v-if="!isL2Floor" value="silver">Silver</option>
               <option value="manual">Manual</option>
             </select>
             <select v-model="filterSales" class="form-select form-select-sm" style="width: 150px">
@@ -438,12 +438,16 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useAccessoriesStore } from "@/stores/accessories";
+import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import { getSafeAmount, resolveReprintReceiptPayment } from "@/utils/print-payment";
 
 const store = useAccessoriesStore();
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
+const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
 const { swal, error: showError } = useAlert();
 
 // --- State -------------------------------------------------------------------

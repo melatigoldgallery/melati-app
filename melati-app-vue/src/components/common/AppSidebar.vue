@@ -3,7 +3,7 @@
     <!-- Logo -->
     <div class="px-3 mb-3 d-flex align-items-center gap-2">
       <img src="/img/Melati.jfif" alt="Melati" width="36" height="36" class="rounded-circle" />
-      <span v-if="!collapsed" class="fw-bold text-white fs-6">Melati Gold Shop</span>
+      <span v-if="!collapsed" class="fw-bold text-white fs-6">{{ brandName }}</span>
     </div>
 
     <hr class="border-secondary my-1" />
@@ -61,7 +61,7 @@
     <!-- Footer text -->
     <div class="sidebar-footer px-3 text-center small text-white-50">
       <p v-if="!collapsed" class="small">
-        &copy; 2025 Melati Gold Shop.
+        &copy; 2026 {{ brandName }}.
         <br />
         All rights reserved.
       </p>
@@ -73,6 +73,7 @@
 import { ref, computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { menuStructure } from "@/config/menu-structure";
+import { normalizeFloorId } from "@/config/floor-config";
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
@@ -86,6 +87,8 @@ function onLinkClick() {
 }
 
 const auth = useAuthStore();
+const activeFloor = computed(() => normalizeFloorId(auth.activeFloor, "L1"));
+const brandName = computed(() => (activeFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop"));
 
 // Filter menu berdasarkan role user
 function canOpenItem(item) {

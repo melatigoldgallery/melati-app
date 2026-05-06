@@ -29,7 +29,7 @@
             <label class="form-label small fw-semibold">Jenis Laporan</label>
             <select v-model="filter.jenis" class="form-select form-select-sm">
               <option value="kotak-aksesoris">Kotak &amp; Aksesoris</option>
-              <option value="silver">Silver</option>
+              <option v-if="!isL2Floor" value="silver">Silver</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -337,9 +337,13 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { fetchStockReport } from "@/services/stock-service";
+import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
+const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
 const { error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 

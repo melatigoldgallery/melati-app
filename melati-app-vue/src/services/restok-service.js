@@ -6,16 +6,17 @@ import {
   collection,
   doc,
   getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
   getDoc,
   serverTimestamp,
+  setDoc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
+import { floorCollection, floorDoc } from "./floor-scope";
 
 export const JENIS_OPTIONS = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "GELANG", "GIWANG"];
 
@@ -26,14 +27,14 @@ export const JENIS_OPTIONS = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "GELANG",
  * @param {string} monthStr - e.g. "2024-06"
  * @returns {Array}
  */
-export async function fetchRestokByMonth(monthStr) {
+export async function fetchRestokByMonth(monthStr, floorId = "") {
   const [year, month] = monthStr.split("-");
   const start = `${year}-${month}-01`;
   const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
   const end = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
 
   const q = query(
-    collection(db, "restokBarang"),
+    floorCollection(db, "restokBarang", floorId),
     where("tanggal", ">=", start),
     where("tanggal", "<=", end),
     orderBy("tanggal", "desc"),
@@ -50,20 +51,27 @@ export async function fetchRestokByMonth(monthStr) {
  * @param {Array}  rows    - [{ jenis, nama, kadar, berat, panjang }]
  * @param {string} tanggal - YYYY-MM-DD
  */
-export async function addRestokItems(rows, tanggal) {
+export async function addRestokItems(rows, tanggal, floorId = "") {
   await Promise.all(
     rows.map((row) =>
-      addDoc(collection(db, "restokBarang"), {
-        tanggal,
-        jenis: row.jenis,
-        nama: row.nama,
-        kadar: row.kadar || "",
-        berat: row.berat || "",
-        panjang: row.panjang || "",
-        status: "perlu",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }),
+      (() => {
+        const floorRef = doc(floorCollection(db, "restokBarang", floorId));
+        return setDoc(
+          floorRef,
+          {
+            tanggal,
+            jenis: row.jenis,
+            nama: row.nama,
+            kadar: row.kadar || "",
+            berat: row.berat || "",
+            panjang: row.panjang || "",
+            status: "perlu",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+      })(),
     ),
   );
 }
@@ -73,8 +81,9 @@ export async function addRestokItems(rows, tanggal) {
  * Sets tanggalRestok automatically when status becomes "sudah".
  * @param {string} id
  * @param {string} newStatus
+ * @param {string} floorId
  */
-export async function updateRestokStatus(id, newStatus) {
+export async function updateRestokStatus(id, newStatus, floorId = "") {
   const updateData = { status: newStatus, updatedAt: serverTimestamp() };
   if (newStatus === "sudah") {
     const today = new Date();
@@ -83,7 +92,8 @@ export async function updateRestokStatus(id, newStatus) {
     const dd = String(today.getDate()).padStart(2, "0");
     updateData.tanggalRestok = `${yyyy}-${mm}-${dd}`;
   }
-  await updateDoc(doc(db, "restokBarang", id), updateData);
+  const floorRef = floorDoc(db, "restokBarang", id, floorId);
+  await updateDoc(floorRef, updateData);
 }
 
 /**
@@ -91,23 +101,25 @@ export async function updateRestokStatus(id, newStatus) {
  * @param {string} id
  * @param {Object} data - partial fields to update
  */
-export async function updateRestokItem(id, data) {
-  await updateDoc(doc(db, "restokBarang", id), { ...data, updatedAt: serverTimestamp() });
+export async function updateRestokItem(id, data, floorId = "") {
+  const floorRef = floorDoc(db, "restokBarang", id, floorId);
+  await updateDoc(floorRef, { ...data, updatedAt: serverTimestamp() });
 }
 
 /**
  * Delete a restok item permanently.
  * @param {string} id
  */
-export async function deleteRestokItem(id) {
-  await deleteDoc(doc(db, "restokBarang", id));
+export async function deleteRestokItem(id, floorId = "") {
+  const floorRef = floorDoc(db, "restokBarang", id, floorId);
+  await deleteDoc(floorRef);
 }
 
 /**
  * Get supplier WhatsApp phone from settings/whatsapp.
  * @returns {string}
  */
-export async function getSupplierPhone() {
-  const snap = await getDoc(doc(db, "settings", "whatsapp"));
+export async function getSupplierPhone(floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "whatsapp", floorId));
   return snap.exists() ? snap.data().supplierPhone || "" : "";
 }

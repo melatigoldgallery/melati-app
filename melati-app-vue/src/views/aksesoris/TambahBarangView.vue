@@ -58,11 +58,22 @@
               <option value="">-- Pilih Jenis --</option>
               <option value="kotak">Kotak Perhiasan</option>
               <option value="aksesoris">Aksesoris Perhiasan</option>
-              <option value="silver">Silver</option>
+              <option v-if="!isL2Floor" value="silver">Silver</option>
             </select>
           </div>
         </div>
       </div>
+    </div>
+    <div class="d-flex justify-content-end mb-2">
+      <button
+        v-if="!isL2Floor"
+        @click="openPrintQrModal"
+        :disabled="form.jenis !== 'silver' || isLoadingCodes"
+        class="btn btn-outline-success btn-sm"
+      >
+        <i class="bi bi-upc-scan me-1"></i>
+        Cetak QR Silver
+      </button>
     </div>
 
     <!-- Card 2: Detail Barang -->
@@ -564,6 +575,7 @@ import {
   orderBy,
   limit,
 } from "firebase/firestore";
+import { floorCollection, floorDoc, floorSubCollection, floorSegmentsWithFloorId } from "@/services/floor-scope";
 import { Modal } from "bootstrap";
 import { db } from "@/config/firebase";
 import { useAccessoriesStore } from "@/stores/accessories";
@@ -574,6 +586,8 @@ import { useAuthStore } from "@/stores/auth";
 
 const store = useAccessoriesStore();
 const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
+const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
 const { swal, error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 
@@ -772,7 +786,7 @@ async function loadHistory() {
     // Filter tanggal dilakukan client-side (format YYYY-MM-DD → string comparison valid)
     const snap = await getDocs(
       query(
-        collection(db, "stokAksesorisTransaksi"),
+        floorCollection(db, "stokAksesorisTransaksi", activeFloor.value),
         where("jenis", "==", "tambah"),
         orderBy("timestamp", "desc"),
         limit(1000),
@@ -872,8 +886,8 @@ async function hapusTransaksi() {
     }
 
     await runTransaction(db, async (txn) => {
-      const txRef = doc(db, "stokAksesorisTransaksi", deleteTarget.value.id);
-      const stockRef = doc(db, "stokAksesoris", deleteTarget.value.kode);
+      const txRef = floorDoc(db, "stokAksesorisTransaksi", deleteTarget.value.id, activeFloor.value);
+      const stockRef = floorDoc(db, "stokAksesoris", deleteTarget.value.kode, activeFloor.value);
       const [txSnap, stockSnap] = await Promise.all([txn.get(txRef), txn.get(stockRef)]);
       if (!txSnap.exists()) throw new Error("Transaksi tidak ditemukan");
       if (stockSnap.exists()) {
@@ -971,11 +985,11 @@ async function simpanKode() {
       ...(activeKodeTab.value === "kotak" ? { harga: kodeForm.value.harga } : {}),
     };
     if (kodeFormMode.value === "add") {
-      await addDoc(collection(db, "kodeAksesoris", "kategori", activeKodeTab.value), data);
+      await addDoc(floorSubCollection(db, "kodeAksesoris", "kategori", activeKodeTab.value, activeFloor.value), data);
       // Inisialisasi stokAksesoris/{kode} jika belum ada, agar tambah barang
       // hanya perlu increment (tidak membuat dokumen baru = sesuai behavior lama)
       const kodeText = data.text;
-      const stokRef = doc(db, "stokAksesoris", kodeText);
+      const stokRef = floorDoc(db, "stokAksesoris", kodeText, activeFloor.value);
       const stokSnap = await getDoc(stokRef);
       if (!stokSnap.exists()) {
         await setDoc(stokRef, {
@@ -992,7 +1006,19 @@ async function simpanKode() {
       }
     } else {
       const { text: _text, ...updateData } = data;
-      await updateDoc(doc(db, "kodeAksesoris", "kategori", activeKodeTab.value, kodeForm.value.id), updateData);
+      await updateDoc(
+        doc(
+          db,
+          ...floorSegmentsWithFloorId(
+            activeFloor.value,
+            "kodeAksesoris",
+            "kategori",
+            activeKodeTab.value,
+            kodeForm.value.id,
+          ),
+        ),
+        updateData,
+      );
     }
     formKodeModal.hide();
     swal("Kode berhasil disimpan");
@@ -1021,7 +1047,18 @@ function openHapusKode(k) {
 async function hapusKode() {
   isKodeDeleting.value = true;
   try {
-    await deleteDoc(doc(db, "kodeAksesoris", "kategori", activeKodeTab.value, deleteKodeTarget.value.id));
+    await deleteDoc(
+      doc(
+        db,
+        ...floorSegmentsWithFloorId(
+          activeFloor.value,
+          "kodeAksesoris",
+          "kategori",
+          activeKodeTab.value,
+          deleteKodeTarget.value.id,
+        ),
+      ),
+    );
     deleteKodeModal.hide();
     swal("Kode berhasil dihapus");
     await loadKodeBarang(activeKodeTab.value);
