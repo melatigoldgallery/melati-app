@@ -38,13 +38,10 @@
                 Nama Sales
                 <span class="text-danger">*</span>
               </label>
-              <input
-                v-model="form.namaSales"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Nama sales"
-                required
-              />
+              <select v-model="form.namaSales" class="form-select form-select-sm" required>
+                <option value="">Pilih...</option>
+                <option v-for="s in salesOptions" :key="s.id" :value="s.nama">{{ s.nama }}</option>
+              </select>
             </div>
             <div class="col-md-3">
               <label class="form-label small fw-semibold">
@@ -337,7 +334,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import {
@@ -347,6 +344,7 @@ import {
   saveServis,
   printServisSlip,
 } from "@/services/servis-service";
+import { fetchSalesList } from "@/services/sales-service";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 
 const { swal, error: showError } = useAlert();
@@ -390,6 +388,19 @@ const form = ref({
   jenisInput: "servis",
   servisRows: [newServisRow()],
   customRows: [newCustomRow()],
+});
+
+const salesOptions = ref([]);
+
+onMounted(async () => {
+  try {
+    const list = await fetchSalesList();
+    salesOptions.value = list
+      .filter((s) => (s.status || "active") === "active")
+      .map((s) => ({ id: s.id, nama: s.nama }));
+  } catch (e) {
+    console.error("Failed loading sales list:", e?.message || e);
+  }
 });
 
 // ── Computed ──────────────────────────────────────────────────────────────

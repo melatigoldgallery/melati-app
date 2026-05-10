@@ -3,12 +3,12 @@ import admin from "firebase-admin";
 import minimist from "minimist";
 
 const args = minimist(process.argv.slice(2), {
-  boolean: ["apply", "dry-run"],
+  boolean: ["apply", "dry-run", "replace"],
   string: ["sourceServiceAccount", "destServiceAccount", "sourceProjectId", "destProjectId", "collections", "floorId"],
   default: {
     floorId: "L2",
     collections:
-      "dailyStockSnapshot,daily_stock_logs,daily_stock_reports,kodeAksesoris,mutasiKode,penjualanAksesoris,stocks,stokAksesoris,stokAksesorisTransaksi,stokSksesorisTransaksi",
+      "dailyStockSnapshot,daily_stock_logs,daily_stock_reports,kodeAksesoris,mutasiKode,penjualanAksesoris,restokBarang,salesStaff,settings,stocks,stokAksesoris,stokAksesorisTransaksi",
     "dry-run": false,
   },
 });
@@ -20,6 +20,7 @@ const requestedCollections = String(args.collections || "")
   .filter(Boolean);
 const applyChanges = Boolean(args.apply);
 const dryRun = Boolean(args["dry-run"]);
+const replaceTarget = Boolean(args.replace);
 const sourceServiceAccountPath = args.sourceServiceAccount;
 const destServiceAccountPath = args.destServiceAccount || process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
@@ -91,6 +92,19 @@ function destCollection(collectionName) {
   return destDb.collection("floors").doc(floorId).collection(collectionName);
 }
 
+async function clearDestinationCollection(destinationCollectionRef, destinationName) {
+  const destinationPath = destinationCollectionRef.path;
+
+  if (dryRun || !applyChanges) {
+    console.log(`Dry run only: would clear destination ${destinationPath} before copy.`);
+    return;
+  }
+
+  console.log(`Clearing destination ${destinationPath} before copy...`);
+  await destDb.recursiveDelete(destinationCollectionRef);
+  console.log(`Cleared destination ${destinationName}.`);
+}
+
 async function copyCollectionRecursive(sourceCollectionRef, destinationCollectionRef, label, visited = new Set()) {
   const sourcePath = sourceCollectionRef.path;
   if (visited.has(sourcePath)) return 0;
@@ -145,6 +159,10 @@ async function copyRootCollection(sourceName, destinationName) {
   const sourceCollectionRef = sourceDb.collection(sourceName);
   const destinationCollectionRef = destCollection(destinationName);
 
+  if (replaceTarget) {
+    await clearDestinationCollection(destinationCollectionRef, destinationName);
+  }
+
   const copied = await copyCollectionRecursive(
     sourceCollectionRef,
     destinationCollectionRef,
@@ -170,6 +188,7 @@ async function main() {
       .join(", ")}`,
   );
   console.log(dryRun ? "Mode: dry-run" : applyChanges ? "Mode: apply" : "Mode: preview");
+  console.log(`Replace target first: ${replaceTarget ? "yes" : "no"}`);
 
   if (!applyChanges) {
     console.log("No changes will be written until you re-run with --apply.");

@@ -49,7 +49,6 @@
 
       <div class="footer-info text-muted small text-end">
         Masuk sebagai:
-        <strong>{{ auth.user?.email || "-" }}</strong>
         <span class="badge ms-1 text-capitalize role-badge">{{ auth.userRole }}</span>
       </div>
     </div>
@@ -583,7 +582,7 @@ const adminFeatures = [
   transition:
     transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1),
     box-shadow 0.25s ease;
-  background: linear-gradient(135deg, var(--btn-bg) 0%, rgb(238, 238, 238) 100%);
+  background: linear-gradient(135deg, var(--btn-bg) 0%, rgb(198, 225, 245) 100%);
   box-shadow: 0 8px 22px rgba(14, 35, 60, 0.08);
   border: none;
 }
@@ -601,7 +600,7 @@ const adminFeatures = [
 }
 
 .quick-btn:hover {
-  transform: translateY(-8px) scale(1.02);
+  transform: translateY(-2px);
   box-shadow: 0 20px 50px rgba(10, 30, 60, 0.12);
 }
 

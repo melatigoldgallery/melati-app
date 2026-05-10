@@ -34,14 +34,36 @@ import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
  */
 export async function processSale(cartItems, transactionData, floorId = "") {
   const stockLines = [];
+  const transaksiManual =
+    String(transactionData?.jenisPenjualan || "")
+      .trim()
+      .toLowerCase() === "manual";
 
   cartItems.forEach((item) => {
-    if (item.tipe !== "manual" && item.kode && item.kode !== "-") {
+    const tipe = String(item?.tipe || "")
+      .trim()
+      .toLowerCase();
+    const kode = String(item?.kode || "").trim();
+    const kodeLock = String(item?.kodeLock || "").trim();
+    const qty = Number(item?.qty ?? 1) || 1;
+
+    if (tipe !== "manual" && kode && kode !== "-") {
       stockLines.push({
         source: "sale",
-        kode: item.kode,
-        qty: item.qty ?? 1,
-        kategori: item.tipe ?? null,
+        kode,
+        qty,
+        kategori: tipe || null,
+        item,
+      });
+      return;
+    }
+
+    if ((tipe === "manual" || transaksiManual) && kodeLock && kodeLock !== "-") {
+      stockLines.push({
+        source: "lock",
+        kode: kodeLock,
+        qty,
+        kategori: null,
         item,
       });
     }

@@ -44,7 +44,7 @@
         <div :class="['col-12', showMissed ? 'col-md-4' : 'col-md-5']">
           <div class="queue-card card-current gold-border">
             <div class="queue-card-header">
-              <h1>SEDANG DILAYANI</h1>
+              <h1 :class="{ 'queue-card-title--compact': showMissed }">SEDANG DILAYANI</h1>
             </div>
             <div class="queue-card-body">
               <Transition name="queue-change" mode="out-in">
@@ -61,7 +61,7 @@
           <div v-if="showMissed" class="col-12 col-md-4">
             <div class="queue-card card-delayed gold-border">
               <div class="queue-card-header queue-card-header-delayed">
-                <h1>ANTRIAN TERLEWAT</h1>
+                <h1 class="queue-card-title--compact">ANTRIAN TERLEWAT</h1>
               </div>
               <div class="queue-card-body">
                 <div :class="['queue-number', missedFontClass]">
@@ -76,7 +76,9 @@
         <div :class="['col-12', showMissed ? 'col-md-4' : 'col-md-5']">
           <div class="queue-card card-next gold-border">
             <div class="queue-card-header">
-              <h1>{{ showMissed ? "ANTRIAN BERIKUTNYA" : "AKAN DIPANGGIL" }}</h1>
+              <h1 :class="{ 'queue-card-title--compact': showMissed }">
+                {{ showMissed ? "ANTRIAN BERIKUTNYA" : "AKAN DIPANGGIL" }}
+              </h1>
             </div>
             <div class="queue-card-body">
               <Transition name="queue-change" mode="out-in">
@@ -341,7 +343,7 @@ onUnmounted(() => {
 /* ── Main / Page Title ────────────────────────────────────────────────────── */
 main {
   padding: 0;
-  min-height: calc(100vh - 200px);
+  min-height: calc(100vh - 250px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -354,7 +356,7 @@ main {
 }
 .page-title h1 {
   font-family: "Roboto", serif;
-  font-size: 4rem;
+  font-size: 7rem;
   font-weight: 700;
   color: #3a2c1c;
   margin-bottom: 0;
@@ -419,7 +421,7 @@ main {
 }
 .queue-card-header h1 {
   font-family: "Times New Roman", Times, serif;
-  font-size: clamp(1.6rem, 2.6vw, 3.25rem);
+  font-size: clamp(1.6rem, 3.8vw, 5rem);
   font-weight: bold;
   margin: 0;
   color: #3a2c1c;
@@ -427,6 +429,10 @@ main {
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+}
+
+.queue-card-header h1.queue-card-title--compact {
+  font-size: clamp(1.25rem, 2.8vw, 3.1rem);
 }
 
 /* ── Card Body ───────────────────────────────────────────────────────────── */

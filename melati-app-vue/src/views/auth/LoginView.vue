@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { getFloorLabel, normalizeFloorId } from "@/config/floor-config";
@@ -120,15 +120,36 @@ const effectiveFloor = computed(() => selectedFloor.value || "L1");
 const brandName = computed(() => (effectiveFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop"));
 const brandRibbonText = computed(() => (effectiveFloor.value === "L2" ? "MELATI YOUNG" : "MELATI GOLD"));
 
+const mobileMediaQuery = window.matchMedia("(max-width: 767.98px)");
+
 function selectFloor(floorId) {
   selectedFloor.value = normalizeFloorId(floorId);
   errorMsg.value = "";
 }
 
-onMounted(() => {
-  if (window.matchMedia("(max-width: 767.98px)").matches && !selectedFloor.value) {
-    selectFloor("L1");
+function handleMediaQueryChange(e) {
+  if (e.matches) {
+    // Mobile: auto-select L1
+    selectedFloor.value = "L1";
+  } else {
+    // Desktop: show floor picker
+    selectedFloor.value = "";
   }
+}
+
+onMounted(() => {
+  // Initial state based on current viewport
+  if (mobileMediaQuery.matches) {
+    selectedFloor.value = "L1";
+  }
+
+  // Listen for viewport changes (resize, dev tools toggle, etc.)
+  mobileMediaQuery.addEventListener("change", handleMediaQueryChange);
+});
+
+onUnmounted(() => {
+  // Cleanup: remove listener to prevent memory leaks
+  mobileMediaQuery.removeEventListener("change", handleMediaQueryChange);
 });
 
 async function handleLogin() {

@@ -700,7 +700,7 @@ function resolveSnapshotScope(scope = "global", floorId = "") {
       catalogRef: floorDoc.collection("stokAksesoris"),
       txRef: floorDoc.collection("stokAksesorisTransaksi"),
       snapshotRef: floorDoc.collection("dailyStockSnapshot"),
-      dailyReportsRef: floorDoc.collection("dailyStockReports"),
+      dailyReportsRef: floorDoc.collection("daily_stock_reports"),
       lockRef: floorDoc.collection("systemLocks"),
     };
   }
@@ -712,7 +712,7 @@ function resolveSnapshotScope(scope = "global", floorId = "") {
     catalogRef: db.collection("stokAksesoris"),
     txRef: db.collection("stokAksesorisTransaksi"),
     snapshotRef: db.collection("dailyStockSnapshot"),
-    dailyReportsRef: db.collection("dailyStockReports"),
+    dailyReportsRef: db.collection("daily_stock_reports"),
     lockRef: db.collection("systemLocks"),
   };
 }

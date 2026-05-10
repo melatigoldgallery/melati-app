@@ -161,7 +161,7 @@ async function run() {
     const floorCatalogRef = db.collection("floors").doc(floor).collection("stokAksesoris");
     const floorTxRef = db.collection("floors").doc(floor).collection("stokAksesorisTransaksi");
     const floorSnapCol = db.collection("floors").doc(floor).collection("dailyStockSnapshot");
-    const floorReportsCol = db.collection("floors").doc(floor).collection("dailyStockReports");
+    const floorReportsCol = db.collection("floors").doc(floor).collection("daily_stock_reports");
 
     for (const dateYmd of dates) {
       try {

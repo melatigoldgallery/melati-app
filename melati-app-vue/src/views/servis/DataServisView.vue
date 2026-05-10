@@ -643,12 +643,10 @@
             </div>
             <div v-if="statusForm.statusPengambilan === 'Sudah Diambil'" class="mb-2">
               <label class="form-label small fw-semibold">Nama Staf Handle</label>
-              <input
-                v-model="statusForm.stafHandle"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Nama staf"
-              />
+              <select v-model="statusForm.stafHandle" class="form-select form-select-sm">
+                <option value="">Pilih...</option>
+                <option v-for="s in salesOptions" :key="s.id" :value="s.nama">{{ s.nama }}</option>
+              </select>
             </div>
             <!-- Bukti foto pengambilan -->
             <div v-if="statusForm.statusPengambilan === 'Sudah Diambil'" class="mb-2">
@@ -796,12 +794,10 @@
           <div class="modal-body">
             <div class="mb-2">
               <label class="form-label small fw-semibold">Nama Penerima</label>
-              <input
-                v-model="penerimaanForm.penerima"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Nama staff"
-              />
+              <select v-model="penerimaanForm.penerima" class="form-select form-select-sm">
+                <option value="">Pilih...</option>
+                <option v-for="s in salesOptions" :key="s.id" :value="s.nama">{{ s.nama }}</option>
+              </select>
             </div>
             <div class="mb-2">
               <label class="form-label small fw-semibold">
@@ -861,12 +857,10 @@
             </p>
             <div class="mb-2">
               <label class="form-label small fw-semibold">Nama Sales</label>
-              <input
-                v-model="returnOwnerForm.salesName"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Nama sales"
-              />
+              <select v-model="returnOwnerForm.salesName" class="form-select form-select-sm">
+                <option value="">Pilih...</option>
+                <option v-for="s in salesOptions" :key="s.id" :value="s.nama">{{ s.nama }}</option>
+              </select>
             </div>
             <div class="mb-2">
               <label class="form-label small fw-semibold">
@@ -964,7 +958,10 @@
               </div>
               <div class="col-md-3">
                 <label class="form-label small fw-semibold">Nama Sales</label>
-                <input v-model="editForm.namaSales" type="text" class="form-control form-control-sm" />
+                <select v-model="editForm.namaSales" class="form-select form-select-sm">
+                  <option value="">Pilih...</option>
+                  <option v-for="s in salesOptions" :key="s.id" :value="s.nama">{{ s.nama }}</option>
+                </select>
               </div>
               <div class="col-md-3">
                 <label class="form-label small fw-semibold">Nama Customer</label>
@@ -1305,6 +1302,7 @@ import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import { useAuthStore } from "@/stores/auth";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
+import { fetchSalesList } from "@/services/sales-service";
 import {
   fetchServisByRange,
   subscribeServisByRange,
@@ -1366,6 +1364,7 @@ let unsubscribe = null;
 const statusSaving = ref(false);
 const photoInputRef = ref(null);
 const photoFile = ref(null);
+const salesOptions = ref([]);
 const photoPreviewUrl = ref("");
 const revertPassword = ref("");
 const revertVerifying = ref(false);
@@ -1389,6 +1388,7 @@ const statusForm = ref({
   statusPembayaranUpdate: "",
 });
 const statusTargetItem = ref(null);
+const statusModalWasOpen = ref(false);
 
 const hasPhotoEvidence = computed(() => Boolean(photoFile.value || statusForm.value.existingBuktiUrl));
 const showPelunasanField = computed(
@@ -2054,6 +2054,34 @@ function onStatusServisToggleChange() {
     return;
   }
 
+  // If toggling to 'Sudah Selesai', ensure penerimaan servis exists first.
+  const target = statusTargetItem.value || null;
+  const willBeSelesai = initialStatus === "Sudah Selesai" ? false : true;
+
+  if (willBeSelesai) {
+    const hasPenerimaan =
+      (target && target.statusPenerimaanServis === "Sudah Diterima") ||
+      (target && (target.penerimaServis || target.waktuPenerimaan || target.buktiPenerimaanUrl));
+
+    if (!hasPenerimaan) {
+      // prevent toggle and ask user to perform penerimaan first
+      statusForm.value.toggleStatusServis = false;
+      statusForm.value.statusServis = initialStatus;
+      (async () => {
+        const res = await confirm({
+          title: "Penerimaan wajib",
+          text: "Penerimaan servis wajib sebelum menandai 'Sudah Selesai'. Buka form penerimaan sekarang?",
+          confirmText: "Buka Penerimaan",
+        });
+        if (res.isConfirmed) {
+          const id = target?.id ? [target.id] : [];
+          openPenerimaanModal(id);
+        }
+      })();
+      return;
+    }
+  }
+
   statusForm.value.statusServis = initialStatus === "Sudah Selesai" ? "Belum Selesai" : "Sudah Selesai";
 }
 
@@ -2146,7 +2174,36 @@ function openPenerimaanModal(ids = []) {
   if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
   penerimaanPhotoPreviewUrl.value = "";
   if (penerimaanInputRef.value) penerimaanInputRef.value.value = "";
-  Modal.getOrCreateInstance(document.getElementById("penerimaanModal")).show();
+  // If status modal is currently open, hide it and remember to restore later
+  try {
+    const statusEl = document.getElementById("statusModal");
+    if (statusEl && statusEl.classList.contains("show")) {
+      const statusInst = Modal.getInstance(statusEl) || Modal.getOrCreateInstance(statusEl);
+      statusInst.hide();
+      statusModalWasOpen.value = true;
+    } else {
+      statusModalWasOpen.value = false;
+    }
+  } catch (e) {
+    statusModalWasOpen.value = false;
+  }
+
+  const penerimaanEl = document.getElementById("penerimaanModal");
+  const penerimaanInst = Modal.getOrCreateInstance(penerimaanEl);
+  // Add one-time hidden handler to restore status modal if it was open
+  const onHidden = () => {
+    try {
+      if (statusModalWasOpen.value) {
+        const statusEl = document.getElementById("statusModal");
+        if (statusEl) Modal.getOrCreateInstance(statusEl).show();
+      }
+    } finally {
+      penerimaanEl.removeEventListener("hidden.bs.modal", onHidden);
+      statusModalWasOpen.value = false;
+    }
+  };
+  penerimaanEl.addEventListener("hidden.bs.modal", onHidden);
+  penerimaanInst.show();
 }
 
 async function onPenerimaanPhotoChange(e) {
@@ -2911,6 +2968,18 @@ onMounted(() => {
   // Hindari browser password manager mengisi field pencarian dengan username tersimpan.
   searchText.value = "";
   window.addEventListener("storage", handleStorageSync);
+
+  // Load sales staff options for dropdowns
+  (async () => {
+    try {
+      const list = await fetchSalesList();
+      salesOptions.value = list
+        .filter((s) => (s.status || "active") === "active")
+        .map((s) => ({ id: s.id, nama: s.nama }));
+    } catch (e) {
+      console.error("Failed loading sales list:", e?.message || e);
+    }
+  })();
 
   const revertModalEl = document.getElementById("revertPickupModal");
   if (revertModalEl) {

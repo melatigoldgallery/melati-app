@@ -47,17 +47,6 @@
             Tampilkan
           </button>
         </div>
-
-        <div class="d-flex align-items-center flex-wrap gap-3 mt-2 small">
-          <span v-if="cacheIndicatorText" class="text-muted">
-            <i class="bi bi-database me-1"></i>
-            {{ cacheIndicatorText }}
-          </span>
-          <span v-if="showUpdateIndicator" class="text-success">
-            <i class="bi bi-arrow-repeat me-1"></i>
-            Data telah diperbarui secara real-time
-          </span>
-        </div>
       </div>
     </div>
 
@@ -130,7 +119,7 @@
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-sm table-hover table-bordered mb-0">
-              <thead class="table-primary sticky-top">
+              <thead class="table-primary sticky-top small">
                 <tr>
                   <th class="text-center" style="width: 48px">No</th>
                   <th>Tanggal</th>
@@ -161,10 +150,10 @@
                   </td>
                   <td class="small">{{ row.kode }}</td>
                   <td class="small">{{ row.nama }}</td>
-                  <td class="text-center">{{ row.pcs }}</td>
-                  <td class="text-center">{{ row.gr }}</td>
-                  <td class="text-center">{{ row.kadar }}</td>
-                  <td class="text-end small fw-semibold">{{ row.hargaLabel }}</td>
+                  <td class="small text-center">{{ row.pcs }}</td>
+                  <td class="small text-center">{{ row.gr }}</td>
+                  <td class="small text-center">{{ row.kadar }}</td>
+                  <td class="small text-end small fw-semibold">{{ row.hargaLabel }}</td>
                   <td class="text-center">
                     <span class="badge" :class="statusClass(row.status)">
                       <template v-if="row.statusLine2">
@@ -181,11 +170,11 @@
               </tbody>
               <tfoot>
                 <tr class="table-light fw-semibold">
-                  <td colspan="7" class="text-end">TOTAL</td>
-                  <td class="text-center">{{ tableTotals.pcs }}</td>
-                  <td class="text-center">{{ tableTotals.beratLabel }}</td>
+                  <td colspan="7" class="small text-end">TOTAL</td>
+                  <td class="small text-center">{{ tableTotals.pcs }}</td>
+                  <td class="small text-center">{{ tableTotals.beratLabel }}</td>
                   <td></td>
-                  <td class="text-end">Rp {{ formatCurrency(summaryTotals.harga) }}</td>
+                  <td class="small text-end">Rp {{ formatCurrency(summaryTotals.harga) }}</td>
                   <td colspan="2"></td>
                 </tr>
               </tfoot>
@@ -266,14 +255,27 @@ const filterSales = ref("all");
 const reportType = ref("rekap");
 const searchText = ref("");
 const hasLoaded = ref(false);
-const cacheIndicatorText = ref("");
-const showUpdateIndicator = ref(false);
 const currentPage = ref(1);
 const pageSize = ref(25);
 
 let realtimeUnsub = null;
-let hideIndicatorTimer = null;
 let isRealtimeReloading = false;
+let cacheValidationInProgress = false;
+
+function mergeTransactions(cached, incoming) {
+  const idMap = new Map();
+  incoming.forEach((trx) => {
+    const key = trx.id || `${trx.tanggal}-${trx.jam}-${trx.sales}`;
+    idMap.set(key, trx);
+  });
+  cached.forEach((trx) => {
+    const key = trx.id || `${trx.tanggal}-${trx.jam}-${trx.sales}`;
+    if (!idMap.has(key)) {
+      idMap.set(key, trx);
+    }
+  });
+  return Array.from(idMap.values());
+}
 
 const transactions = computed(() => store.transactions ?? []);
 
@@ -419,7 +421,6 @@ watch([filterEnd, hasLoaded], () => {
 
 onBeforeUnmount(() => {
   clearRealtimeListener();
-  if (hideIndicatorTimer) clearTimeout(hideIndicatorTimer);
 });
 
 function parseTimestampValue(ts) {
@@ -574,6 +575,16 @@ function getItemHarga(item) {
   return harga;
 }
 
+function getJenisLabel(trx, item) {
+  const jenisRaw = normalizeJenis(trx?.jenisPenjualan) || "-";
+  if (jenisRaw !== "manual") return jenisRaw;
+
+  const kodeLock = String(item?.kodeLock || "").trim();
+  if (!kodeLock || kodeLock === "-") return "manual";
+
+  return `manual (${kodeLock})`;
+}
+
 function computeTotals(data) {
   let pcs = 0;
   let berat = 0;
@@ -619,13 +630,14 @@ function buildDetailRows(data) {
     const trxKey = trx.id || `${tanggal}-${sales}-${jam}`;
 
     (trx.items ?? []).forEach((item, idx) => {
+      const jenisLabel = getJenisLabel(trx, item);
       rows.push(
         rowObject({
           key: `${trxKey}-${idx}`,
           tanggal,
           jam,
           sales,
-          jenis: jenisRaw,
+          jenis: jenisLabel,
           jenisRaw,
           kode: getItemKode(item),
           nama: getItemNama(item),
@@ -656,6 +668,7 @@ function buildRekapRows(data) {
     const statusGroupKey = getStatusGroupKey(trx);
 
     (trx.items ?? []).forEach((item, idx) => {
+      const jenisLabel = getJenisLabel(trx, item);
       const kode = getItemKode(item);
       const nama = getItemNama(item);
       const pcs = getItemQty(item);
@@ -671,7 +684,7 @@ function buildRekapRows(data) {
             tanggal,
             jam: "-",
             sales: "-",
-            jenis: jenisRaw,
+            jenis: jenisLabel,
             jenisRaw,
             kode,
             nama,
@@ -789,7 +802,7 @@ async function loadReport(forceRefresh = false) {
 
   store.stopTodayListener();
   clearRealtimeListener();
-  showUpdateIndicator.value = false;
+  cacheValidationInProgress = false;
 
   if (!forceRefresh) {
     const cached = loadFromCache();
@@ -797,13 +810,12 @@ async function loadReport(forceRefresh = false) {
       store.transactions = cached;
       store.hasMoreTransactions = false;
       hasLoaded.value = true;
-      cacheIndicatorText.value = `Menggunakan data cache (${filterStart.value} - ${filterEnd.value})`;
+      cacheValidationInProgress = true;
       setupRealtimeListener();
       return;
     }
   }
 
-  cacheIndicatorText.value = "";
   await store.loadTransactions(filterStart.value, filterEnd.value);
   saveToCache(store.transactions);
   hasLoaded.value = true;
@@ -816,7 +828,6 @@ async function loadMore() {
 }
 
 async function refreshReportDataOnly() {
-  cacheIndicatorText.value = "";
   await store.loadTransactions(filterStart.value, filterEnd.value);
   saveToCache(store.transactions);
   hasLoaded.value = true;
@@ -843,6 +854,23 @@ function setupRealtimeListener() {
 
     if (isFirstSnapshot) {
       isFirstSnapshot = false;
+
+      // Jika menggunakan cache, validasi dengan first snapshot dari Firestore
+      if (cacheValidationInProgress) {
+        cacheValidationInProgress = false;
+        const firestoreData = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        // Jika jumlah data berbeda, merge dan invalidate cache
+        if (firestoreData.length !== store.transactions.length) {
+          const merged = mergeTransactions(store.transactions, firestoreData);
+          store.transactions = merged;
+          clearCurrentCache();
+          saveToCache(merged);
+        }
+      }
       return;
     }
 
@@ -854,13 +882,16 @@ function setupRealtimeListener() {
     isRealtimeReloading = true;
     try {
       clearCurrentCache();
-      await refreshReportDataOnly();
-      showUpdateIndicator.value = true;
 
-      if (hideIndicatorTimer) clearTimeout(hideIndicatorTimer);
-      hideIndicatorTimer = setTimeout(() => {
-        showUpdateIndicator.value = false;
-      }, 3000);
+      const firestoreData = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // Merge dengan data existing
+      const merged = mergeTransactions(store.transactions, firestoreData);
+      store.transactions = merged;
+      saveToCache(merged);
     } catch (error) {
       swal(error?.message || "Gagal memuat ulang data real-time", "warning");
     } finally {

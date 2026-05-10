@@ -3,6 +3,7 @@
  * Backfill critical collections to floor-scoped paths during cutover phase.
  */
 
+import fs from "node:fs";
 import admin from "firebase-admin";
 import minimist from "minimist";
 
@@ -15,12 +16,15 @@ const CRITICAL_COLLECTIONS = [
   { name: "servis", floorField: "floorId" },
   { name: "setting_tema", floorField: "floorId" },
   { name: "antrian_closing_settings", floorField: "floorId" },
+  { name: "kodeAksesoris", recursive: true },
 ];
 
 const collection = argv.collection || argv.c;
 const defaultFloor = argv.defaultFloor || argv.d || "L1";
 const batchSize = parseInt(argv.batchSize || argv.b || 100, 10);
 const dryRun = argv.dryRun || argv["dry-run"] || false;
+const serviceAccountPath = argv.serviceAccount || argv.sa || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const projectId = argv.projectId || argv.p || "sistem-antrian-76aa8";
 
 function normalizeFloor(value) {
   const raw = String(value || "")
@@ -32,19 +36,72 @@ function normalizeFloor(value) {
 
 function initFirebase() {
   if (admin.apps.length === 0) {
+    if (serviceAccountPath) {
+      const raw = fs.readFileSync(serviceAccountPath, "utf8");
+      const serviceAccount = JSON.parse(raw);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id || projectId,
+      });
+      return;
+    }
+
     admin.initializeApp({
-      projectId: "sistem-antrian-76aa8",
+      projectId,
     });
   }
 }
 
+async function copyCollectionTree(sourceRef, destRef, dryRunMode) {
+  const snap = await sourceRef.get();
+  if (snap.empty) {
+    console.log(`   ⊘ No documents found at ${sourceRef.path}`);
+    return 0;
+  }
+
+  let copied = 0;
+  for (const docSnap of snap.docs) {
+    const targetRef = destRef.doc(docSnap.id);
+
+    if (dryRunMode) {
+      console.log(`   [DRY] ${docSnap.ref.path} → ${targetRef.path}`);
+    } else {
+      await targetRef.set(docSnap.data(), { merge: true });
+      console.log(`   ✓ Copied ${docSnap.ref.path} → ${targetRef.path}`);
+    }
+
+    copied++;
+
+    const childCollections = await docSnap.ref.listCollections();
+    for (const childCollection of childCollections) {
+      const childDestRef = targetRef.collection(childCollection.id);
+      // eslint-disable-next-line no-await-in-loop
+      copied += await copyCollectionTree(childCollection, childDestRef, dryRunMode);
+    }
+  }
+
+  return copied;
+}
+
 async function backfillCollection(collectionConfig) {
-  const { name: collectionName, floorField } = collectionConfig;
+  const { name: collectionName, floorField, recursive } = collectionConfig;
   let totalCopied = 0;
   let totalSkipped = 0;
 
   console.log(`\n📦 Backfilling collection: ${collectionName}`);
   console.log(`   Floor field: ${floorField}, Default floor: ${defaultFloor}, Dry run: ${dryRun}`);
+
+  if (recursive) {
+    const db = admin.firestore();
+    const sourceRef = db.collection(collectionName);
+    const destRef = db.collection("floors").doc(defaultFloor).collection(collectionName);
+
+    console.log(`   Recursive copy target: floors/${defaultFloor}/${collectionName}`);
+
+    const copied = await copyCollectionTree(sourceRef, destRef, dryRun);
+    console.log(`   → Total copied: ${copied}, Skipped: 0`);
+    return copied;
+  }
 
   const db = admin.firestore();
   let query = db.collection(collectionName).limit(batchSize);

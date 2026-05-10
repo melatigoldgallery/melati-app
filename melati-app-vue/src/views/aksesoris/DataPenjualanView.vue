@@ -149,7 +149,7 @@
                 <td class="small">{{ displayTanggal(row.trx) }}</td>
                 <td class="small text-muted">{{ displayJam(row.trx) }}</td>
                 <td class="text-center small">{{ row.trx.salesName || "—" }}</td>
-                <td class="text-center small">{{ row.trx.jenisPenjualan || "—" }}</td>
+                <td class="text-center small">{{ formatJenisPenjualan(row.trx) }}</td>
                 <td class="small">
                   {{ row.item ? row.item.kodeText || row.item.kode || "—" : "—" }}
                 </td>
@@ -713,6 +713,23 @@ function getRestorableItems(trx) {
     return (trx.items ?? []).filter((i) => i.kodeLock && i.kodeLock !== "-");
   }
   return [];
+}
+
+function formatJenisPenjualan(trx) {
+  if (!trx) return "—";
+
+  const jenis = String(trx.jenisPenjualan || trx.jenis || "—").trim();
+  if (!jenis || jenis === "—") return "—";
+
+  if (jenis.toLowerCase() !== "manual") return jenis;
+
+  const lockCodes = [...new Set((trx.items ?? [])
+    .map((item) => String(item?.kodeLock || "").trim())
+    .filter((kode) => kode && kode !== "-"))];
+
+  if (!lockCodes.length) return "manual";
+
+  return `manual (${lockCodes.join(", ")})`;
 }
 
 function unlockSearchInput() {

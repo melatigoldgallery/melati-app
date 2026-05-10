@@ -1,6 +1,6 @@
 /**
  * Inventory Service — Brankas Stock Management (Floor-Scoped)
- * Collections: floors/{floorId}/stocks/{subDoc}, floors/{floorId}/dailyStockLogs/{date}, floors/{floorId}/dailyStockReports/{date}
+ * Collections: floors/{floorId}/stocks/{subDoc}, floors/{floorId}/dailyStockLogs/{date}, floors/{floorId}/daily_stock_reports/{date}
  */
 import {
   collection,
@@ -410,7 +410,7 @@ export function getStockStatus(fisik, komputer) {
  * @returns {{ source: 'saved'|'none', data: Object|null }}
  */
 export async function fetchDailyReport(dateStr, floorId = "") {
-  const ref = floorDoc(db, "dailyStockReports", dateStr, floorId);
+  const ref = floorDoc(db, "daily_stock_reports", dateStr, floorId);
   const snap = await getDoc(ref);
   if (snap.exists()) return { source: "saved", data: snap.data() };
   return { source: "none", data: null };
@@ -453,7 +453,7 @@ export async function saveDailyReport(dateStr, stockData, floorId = "") {
     });
   });
 
-  const ref = floorDoc(db, "dailyStockReports", dateStr, floorId);
+  const ref = floorDoc(db, "daily_stock_reports", dateStr, floorId);
   await setDoc(ref, {
     date: dateStr,
     createdAt: Timestamp.now(),
