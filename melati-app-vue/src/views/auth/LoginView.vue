@@ -18,14 +18,14 @@
             <p class="floor-picker-title mb-1">Pilih Lantai Operasional</p>
             <p class="floor-picker-subtitle mb-0">Pilih lantai kerja Anda untuk melanjutkan proses login.</p>
           </div>
-          <div class="floor-grid">
-            <button type="button" class="floor-tile" @click="selectFloor('L1')">
-              <span class="floor-tile-icon"><i class="bi bi-building"></i></span>
+          <div class="floor-grid mt-4">
+            <button type="button" class="floor-tile text-center" @click="selectFloor('L1')">
+              <span class="floor-tile-icon text-center"><i class="bi bi-building-fill"></i></span>
               <span class="floor-tile-title">Lantai 1</span>
               <span class="floor-tile-note">Melati Gold Shop</span>
             </button>
-            <button type="button" class="floor-tile" @click="selectFloor('L2')">
-              <span class="floor-tile-icon"><i class="bi bi-building-fill"></i></span>
+            <button type="button" class="floor-tile text-center" @click="selectFloor('L2')">
+              <span class="floor-tile-icon text-center"><i class="bi bi-building"></i></span>
               <span class="floor-tile-title">Lantai 2</span>
               <span class="floor-tile-note">Melati Gold Young</span>
             </button>
@@ -94,7 +94,7 @@
           </button>
         </form>
 
-        <footer class="login-footer">&copy; 2026 {{ brandName }}. All rights reserved.</footer>
+        <footer class="login-footer mt-5">&copy; 2026 {{ brandName }}. All rights reserved.</footer>
       </section>
     </main>
   </div>
@@ -216,8 +216,8 @@ function mapFirebaseError(code) {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
+  align-items: center;
+  text-align: center;
   gap: 2px;
   transition:
     transform 0.2s ease,
@@ -360,6 +360,9 @@ function mapFirebaseError(code) {
     0 18px 50px rgba(6, 12, 22, 0.26),
     0 0 0 3px rgba(255, 212, 71, 0.12);
   padding: 22px 18px 18px;
+  min-height: 450px;
+  display: flex;
+  flex-direction: column;
 }
 
 .brand-ribbon {
