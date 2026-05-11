@@ -11,7 +11,6 @@ import {
   orderBy,
   query,
   setDoc,
-  where,
   arrayUnion,
   Timestamp,
 } from "firebase/firestore";
@@ -100,7 +99,7 @@ export const STOCK_DOCS = [...ALL_SUB_DOCS];
 
 // Cache keys now include floorId to prevent cross-floor pollution
 function getStaffCacheKey(floorId = "") {
-  return `inventoryStaffOptionsCache:${floorId || "default"}`;
+  return `inventoryStaffOptionsCache:v2:${floorId || "default"}`;
 }
 
 const STAFF_CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -209,13 +208,13 @@ export async function fetchStaffOptions({ force = false, floorId = "" } = {}) {
 
   let result = [];
   try {
-    const staffQuery = query(
-      floorCollection(db, "penjualanAksesoris", floorId),
-      where("status", "==", "active"),
-      orderBy("nama", "asc"),
-    );
+    const staffQuery = query(floorCollection(db, "salesStaff", floorId), orderBy("nama", "asc"));
     const snap = await getDocs(staffQuery);
-    result = snap.docs.map((d) => (d.data()?.nama || "").trim()).filter(Boolean);
+    result = snap.docs
+      .map((d) => d.data())
+      .filter((data) => (data?.status || "active") === "active")
+      .map((data) => (data?.nama || "").trim())
+      .filter(Boolean);
   } catch {
     result = [];
   }
