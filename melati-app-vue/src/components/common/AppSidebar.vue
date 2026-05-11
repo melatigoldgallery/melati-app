@@ -13,7 +13,12 @@
       <template v-for="item in visibleMenu" :key="item.label">
         <!-- Single item (no children) -->
         <li v-if="!item.children" class="nav-item">
-          <RouterLink :to="item.to" class="nav-link sidebar-link" active-class="active" @click="onLinkClick">
+          <RouterLink
+            :to="resolveMenuLink(item.to)"
+            class="nav-link sidebar-link"
+            active-class="active"
+            @click="onLinkClick"
+          >
             <i :class="['bi', item.icon, 'me-2']"></i>
             <span v-if="!collapsed">{{ item.label }}</span>
           </RouterLink>
@@ -43,7 +48,7 @@
             <ul v-if="!collapsed && openGroups.includes(item.label)" class="nav flex-column ps-3 sidebar-submenu">
               <li v-for="child in visibleChildren(item.children)" :key="child.to" class="nav-item">
                 <RouterLink
-                  :to="child.to"
+                  :to="resolveMenuLink(child.to)"
                   class="nav-link sidebar-link-child"
                   active-class="active"
                   @click="onLinkClick"
@@ -89,6 +94,12 @@ function onLinkClick() {
 const auth = useAuthStore();
 const activeFloor = computed(() => normalizeFloorId(auth.activeFloor, "L1"));
 const brandName = computed(() => (activeFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop"));
+
+function resolveMenuLink(to) {
+  if (typeof to !== "string") return to;
+  if (to !== "/antrian/display") return to;
+  return { path: to, query: { floor: activeFloor.value } };
+}
 
 // Filter menu berdasarkan role user
 function canOpenItem(item) {

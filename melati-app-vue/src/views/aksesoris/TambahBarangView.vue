@@ -276,7 +276,6 @@
                       <th>Nama</th>
                       <th>Kadar</th>
                       <th>Berat</th>
-                      <th class="text-center" style="width: 80px">Stok</th>
                       <th style="width: 120px">Qty</th>
                     </tr>
                   </thead>
@@ -286,7 +285,6 @@
                       <td class="small">{{ r.nama }}</td>
                       <td class="small">{{ r.kadar || "-" }}</td>
                       <td class="small">{{ r.berat || "-" }}</td>
-                      <td class="small text-center">{{ r.stok }}</td>
                       <td>
                         <input type="number" class="form-control form-control-sm" min="0" v-model.number="r.qty" />
                       </td>
@@ -639,20 +637,19 @@ async function openPrintQrModal() {
     loadPrinters();
   }
 
-  // Load silver codes with stok > 0 from active floor
+  // Load all silver codes from master catalog (kodeAksesoris)
   isLoadingCodes.value = true;
   try {
-    const silvercodes = await fetchKodeWithStockByKategori("silver", activeFloor.value);
+    const silvercodes = await fetchKodesByKategori("silver", activeFloor.value);
     printRows.value = silvercodes.map((k) => ({
       kode: k.kode || k.text || "",
       nama: k.nama || "",
       kadar: k.kadar || "",
       berat: k.berat || "",
-      stok: k.stok || 0,
       qty: 0,
     }));
     if (!printRows.value.length) {
-      swal("Tidak ada silver dengan stok > 0", "info");
+      swal("Tidak ada kode silver", "info");
       return;
     }
   } catch (e) {

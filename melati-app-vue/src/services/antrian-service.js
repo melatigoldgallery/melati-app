@@ -1,6 +1,6 @@
 import { rtdb } from "@/config/firebase";
 import { ref as dbRef, onValue, set, get, push, remove } from "firebase/database";
-import { floorDataRef } from "./floor-scope";
+import { floorDataRef, floorDataRefWithFloorId } from "./floor-scope";
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -20,7 +20,8 @@ export const LETTERS_MAP = {
   D: "Pembelian Emas",
 };
 
-function queueRef() {
+function queueRef(floorId = "") {
+  if (floorId) return floorDataRefWithFloorId(rtdb, floorId, "queue", "state");
   return floorDataRef(rtdb, "queue", "state");
 }
 
@@ -33,8 +34,13 @@ function analyticsRef(year, month, day) {
 }
 
 // ── State subscription ─────────────────────────────────────────────────────
-export function subscribeQueue(callback) {
-  return onValue(queueRef(), (snap) => {
+export function subscribeQueue(arg1, arg2) {
+  const floorId = typeof arg1 === "string" ? arg1 : "";
+  const callback = typeof arg1 === "function" ? arg1 : arg2;
+  if (typeof callback !== "function") {
+    throw new Error("subscribeQueue requires a callback");
+  }
+  return onValue(queueRef(floorId), (snap) => {
     const val = snap.val() || {};
     callback({
       currentLetter: val.currentLetter ?? 0,

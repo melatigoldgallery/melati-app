@@ -36,7 +36,7 @@
         <div class="card-body pt-1">
           <div class="row g-2">
             <div v-for="link in desktopQuickLinks" :key="link.to" class="col-6 col-md-3">
-              <RouterLink :to="link.to" class="text-decoration-none d-block">
+              <RouterLink :to="resolveQuickLink(link.to)" class="text-decoration-none d-block">
                 <div class="quick-btn" :style="{ '--btn-bg': link.color }">
                   <i :class="['bi', link.icon]" aria-hidden="true"></i>
                   <span>{{ link.label }}</span>
@@ -154,8 +154,10 @@
 import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { normalizeUserRole } from "@/config/access-control";
+import { normalizeFloorId } from "@/config/floor-config";
 
 const auth = useAuthStore();
+const activeFloor = computed(() => normalizeFloorId(auth.activeFloor, "L1"));
 
 function canOpen(pageKey) {
   return !pageKey || auth.canAccessPage(pageKey);
@@ -168,6 +170,11 @@ const normalizedRole = computed(() => {
 const isL2Admin = computed(() => {
   return auth.activeFloor === "L2" && (auth.userRole === "admin" || auth.userRole === "admin_custom");
 });
+
+function resolveQuickLink(to) {
+  if (to !== "/antrian/display") return to;
+  return { path: to, query: { floor: activeFloor.value } };
+}
 
 const systems = [
   {

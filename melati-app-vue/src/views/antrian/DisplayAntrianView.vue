@@ -108,7 +108,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRoute } from "vue-router";
+import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
 import { subscribeQueue, formatQueue } from "@/services/antrian-service";
 
 const currentDisplay = ref("-");
@@ -117,6 +119,12 @@ const missedDisplay = ref("-");
 const missedCount = ref(0);
 const currentTime = ref("");
 const currentDate = ref("");
+
+const route = useRoute();
+const activeFloor = computed(() => {
+  const normalized = normalizeFloorId(route.query.floor, DEFAULT_FLOOR_ID);
+  return normalized || DEFAULT_FLOOR_ID;
+});
 
 let clockInterval = null;
 let audioCtx = null;
@@ -162,42 +170,40 @@ function playNotif() {
   }
 }
 
+function getCurrentServingDisplay(letterIndex, number) {
+  const safeNumber = Math.max(1, Number(number) || 1);
+  return formatQueue(letterIndex, safeNumber > 1 ? safeNumber - 1 : 1);
+}
+
 onMounted(() => {
   updateClock();
   clockInterval = setInterval(updateClock, 1000);
 
-  unsubscribeQueue = subscribeQueue((state) => {
-    const newDisplay = formatQueue(state.currentLetter, state.currentNumber);
+  subscribeToQueue();
+});
+
+watch(activeFloor, () => {
+  subscribeToQueue();
+});
+
+function subscribeToQueue() {
+  if (unsubscribeQueue) unsubscribeQueue();
+  unsubscribeQueue = subscribeQueue(activeFloor.value, (state) => {
+    const newDisplay = getCurrentServingDisplay(state.currentLetter, state.currentNumber);
     if (prevDisplay !== "-" && newDisplay !== prevDisplay) {
       playNotif();
     }
     prevDisplay = newDisplay;
     currentDisplay.value = newDisplay;
 
-    // Calculate next queue number (skip any in skipList)
-    let nextNum = state.currentNumber + 1;
-    let nextLetter = state.currentLetter;
-    if (nextNum > 50) {
-      nextNum = 1;
-      nextLetter = (nextLetter + 1) % 4;
-    }
-    const skipSet = new Set(state.skipList);
-    let safety = 0;
-    while (skipSet.has(formatQueue(nextLetter, nextNum)) && safety++ < 200) {
-      nextNum++;
-      if (nextNum > 50) {
-        nextNum = 1;
-        nextLetter = (nextLetter + 1) % 4;
-      }
-    }
-    nextDisplay.value = formatQueue(nextLetter, nextNum);
+    nextDisplay.value = formatQueue(state.currentLetter, Math.max(1, Number(state.currentNumber) || 1));
 
     // Missed queue
     const missed = state.missedQueue.filter((v) => v);
     missedCount.value = missed.length;
     missedDisplay.value = missed.length > 0 ? missed.join(", ") : "-";
   });
-});
+}
 
 onUnmounted(() => {
   clearInterval(clockInterval);
@@ -356,7 +362,7 @@ main {
 }
 .page-title h1 {
   font-family: "Roboto", serif;
-  font-size: 7rem;
+  font-size: 6rem;
   font-weight: 700;
   color: #3a2c1c;
   margin-bottom: 0;

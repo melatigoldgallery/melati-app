@@ -315,6 +315,35 @@ export async function bulkMarkServisPenerimaan(ids = [], payload = {}) {
   return updatedCount;
 }
 
+export async function bulkFillPenerimaan(ids = [], payload = {}) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (!uniqueIds.length) return 0;
+
+  const chunkSize = 450;
+  let updatedCount = 0;
+
+  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+    const chunk = uniqueIds.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    const updatedAt = Timestamp.now();
+    const waktuPenerimaan = payload.waktuPenerimaan || new Date().toISOString();
+
+    chunk.forEach((id) => {
+      batch.update(doc(db, "servis", id), {
+        penerimaServis: payload.penerimaServis || null,
+        waktuPenerimaan,
+        updatedAt,
+      });
+    });
+
+    await batch.commit();
+    updatedCount += chunk.length;
+  }
+
+  notifyServisDataChanged();
+  return updatedCount;
+}
+
 export async function updateServisData(id, data) {
   const docRef = doc(db, "servis", id);
   await updateDoc(docRef, {

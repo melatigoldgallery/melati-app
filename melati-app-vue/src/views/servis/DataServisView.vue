@@ -106,6 +106,17 @@
           Sudah Diambil ({{ selectedServisPickupCount }})
         </button>
         <button
+          v-if="hasLoaded && isSupervisor"
+          class="btn btn-outline-warning btn-sm fw-semibold flex-fill flex-md-grow-0"
+          :disabled="isFillPenerimaanDisabled"
+          @click="updateSelectedServisPenerimaan"
+          title="Isi penerimaan servis untuk data lama tanpa mengubah status pengambilan"
+        >
+          <span v-if="bulkFillingPenerimaan" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-file-text me-1"></i>
+          Isi Penerimaan ({{ selectedServisPickupCount }})
+        </button>
+        <button
           v-if="hasLoaded && canReturnOwner"
           class="btn btn-outline-dark btn-sm fw-semibold flex-fill flex-md-grow-0"
           :disabled="isReturnOwnerSelectedDisabled"
@@ -1309,6 +1320,7 @@ import {
   updateServisStatus,
   bulkMarkServisSudahDiambil,
   bulkMarkServisPenerimaan,
+  bulkFillPenerimaan,
   updateServisData,
   deleteServis,
   verifySupervisorPassword,
@@ -1344,6 +1356,7 @@ const searchText = ref("");
 const searchReadonly = ref(true);
 const hasLoaded = ref(false);
 const bulkUpdatingStatusServis = ref(false);
+const bulkFillingPenerimaan = ref(false);
 const selectedServisIds = ref([]);
 const normalizedUserRole = computed(() =>
   String(authStore.userRole || "")
@@ -1843,6 +1856,10 @@ const isMarkTakenSelectedDisabled = computed(
     selectedServisPickupCount.value === 0,
 );
 
+const isFillPenerimaanDisabled = computed(
+  () => loading.value || !hasLoaded.value || bulkFillingPenerimaan.value || selectedServisPickupCount.value === 0,
+);
+
 const isReturnOwnerSelectedDisabled = computed(
   () =>
     loading.value ||
@@ -2001,6 +2018,46 @@ async function updateSelectedServisSudahDiambil() {
     showError("Gagal update massal status pengambilan", e.message);
   } finally {
     bulkUpdatingStatusServis.value = false;
+  }
+}
+
+async function updateSelectedServisPenerimaan() {
+  if (!isSupervisor.value) {
+    return swal("Aksi ini hanya untuk supervisor", "warning");
+  }
+
+  const targetIds = selectedServisIds.value.filter((id) =>
+    filteredList.value.some((item) => item.id === id && isPickupSelectable(item)),
+  );
+  if (!targetIds.length) {
+    return swal("Pilih data yang ingin diisi penerimaan terlebih dahulu", "warning");
+  }
+
+  const result = await confirm({
+    title: "Isi penerimaan untuk data terpilih?",
+    text:
+      `${targetIds.length} data yang dicentang akan diisi penerimaan dengan nama penerima "${authStore.userName}" ` +
+      "dan waktu saat ini. Status pengambilan tidak akan berubah.",
+    confirmText: "Ya, isi penerimaan",
+  });
+  if (!result.isConfirmed) return;
+
+  bulkFillingPenerimaan.value = true;
+  try {
+    const updatedCount = await bulkFillPenerimaan(targetIds, {
+      penerimaServis: authStore.userName || "Admin",
+      waktuPenerimaan: new Date().toISOString(),
+    });
+    selectedServisIds.value = [];
+    invalidateCurrentRangeCache();
+    swal(`${updatedCount} data terpilih berhasil diisi penerimaan`);
+
+    // For non-today date, fetch again because this view is not real-time.
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("Gagal isi massal penerimaan", e.message);
+  } finally {
+    bulkFillingPenerimaan.value = false;
   }
 }
 

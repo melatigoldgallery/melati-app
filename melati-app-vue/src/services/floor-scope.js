@@ -41,8 +41,17 @@ export function floorDataPath(...segments) {
   return `floorData/${floorId}/${segments.join("/")}`;
 }
 
+export function floorDataPathWithFloorId(floorId, ...segments) {
+  const resolved = resolveFloorId(floorId);
+  return `floorData/${resolved}/${segments.join("/")}`;
+}
+
 export function floorDataRef(rtdb, ...pathSegments) {
   return dbRef(rtdb, floorDataPath(...pathSegments));
+}
+
+export function floorDataRefWithFloorId(rtdb, floorId, ...pathSegments) {
+  return dbRef(rtdb, floorDataPathWithFloorId(floorId, ...pathSegments));
 }
 
 // ── Storage Helpers ───────────────────────────────────────────────────────
