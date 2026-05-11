@@ -178,7 +178,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
    * @returns {string} new sale ID
    */
   async function saveTransaction(cartItems, transactionData) {
-    const saleId = await processSale(cartItems, transactionData);
+    const saleId = await processSale(cartItems, transactionData, authStore.activeFloor || "");
 
     const affectedKodes = [
       ...cartItems.filter((i) => i.tipe !== "manual" && i.kode).map((i) => i.kode),

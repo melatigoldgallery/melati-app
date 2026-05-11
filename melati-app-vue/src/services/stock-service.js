@@ -33,6 +33,18 @@ import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
  * @returns {string} The new sale document ID
  */
 export async function processSale(cartItems, transactionData, floorId = "") {
+  function normalizeKode(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function normalizeKategori(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase();
+  }
+
   const stockLines = [];
   const transaksiManual =
     String(transactionData?.jenisPenjualan || "")
@@ -74,16 +86,19 @@ export async function processSale(cartItems, transactionData, floorId = "") {
   const stockRows = await fetchStockReport(todayStr, todayStr, floorId);
   const rowsByKode = new Map();
   stockRows.forEach((row) => {
-    const key = row.kode;
+    const key = normalizeKode(row.kode);
+    if (!key) return;
     if (!rowsByKode.has(key)) rowsByKode.set(key, []);
     rowsByKode.get(key).push(row);
   });
 
   function selectStockRow(kode, kategori = null) {
-    const candidates = rowsByKode.get(kode) || [];
+    const normalizedKode = normalizeKode(kode);
+    const candidates = rowsByKode.get(normalizedKode) || [];
     if (!candidates.length) return null;
     if (kategori) {
-      const matched = candidates.find((r) => (r.kategori || "").toLowerCase() === kategori.toLowerCase());
+      const targetKategori = normalizeKategori(kategori);
+      const matched = candidates.find((r) => normalizeKategori(r.kategori) === targetKategori);
       if (matched) return matched;
     }
     return candidates[0];
@@ -95,7 +110,7 @@ export async function processSale(cartItems, transactionData, floorId = "") {
       if (line.source === "lock") throw new Error(`Stok kode lock "${line.kode}" tidak cukup`);
       throw new Error(`Barang "${line.kode}" tidak ditemukan di katalog`);
     }
-    const key = `${line.kode}::${(row.kategori || line.kategori || "").toLowerCase()}`;
+    const key = `${normalizeKode(line.kode)}::${normalizeKategori(row.kategori || line.kategori)}`;
     return {
       ...line,
       stockKey: key,
