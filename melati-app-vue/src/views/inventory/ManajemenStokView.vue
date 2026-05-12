@@ -482,7 +482,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Modal } from "bootstrap";
 import { useAlert } from "@/composables/useAlert";
 import { useAuthStore } from "@/stores/auth";
@@ -520,7 +520,7 @@ const staffOptions = ref([]);
 const displaySettings = ref(normalizeInventorySettings());
 const activeTab = ref("");
 
-const CACHE_KEY = "melati-stock-cache-v2";
+const CACHE_KEY_PREFIX = "melati-stock-cache-v2";
 const CACHE_TTL = 5 * 60 * 1000;
 const modalMap = new Map();
 
@@ -709,13 +709,23 @@ function closeModal(id) {
   modal?.hide();
 }
 
+function getCacheFloorId() {
+  return String(auth.activeFloor || "").trim().toUpperCase() || "UNSCOPED";
+}
+
+function getCacheKey() {
+  return `${CACHE_KEY_PREFIX}:${getCacheFloorId()}`;
+}
+
 function readCache() {
+  const cacheKey = getCacheKey();
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.timestamp || !parsed?.data) return null;
     if (Date.now() - parsed.timestamp > CACHE_TTL) return null;
+    if (parsed.floorId && parsed.floorId !== getCacheFloorId()) return null;
     return parsed.data;
   } catch {
     return null;
@@ -723,10 +733,12 @@ function readCache() {
 }
 
 function writeCache(data) {
+  const cacheKey = getCacheKey();
   try {
     localStorage.setItem(
-      CACHE_KEY,
+      cacheKey,
       JSON.stringify({
+        floorId: getCacheFloorId(),
         timestamp: Date.now(),
         data,
       }),
@@ -734,6 +746,44 @@ function writeCache(data) {
   } catch {
     // ignore quota or parse errors
   }
+}
+
+function sumDetails(details = {}) {
+  return Object.values(details).reduce((sum, v) => sum + toInt(v), 0);
+}
+
+function normalizeDetails(details = {}) {
+  const normalized = {};
+  Object.keys(details).forEach((key) => {
+    normalized[key] = toInt(details[key]);
+  });
+  return normalized;
+}
+
+function applyLocalUpdate({ subDoc, mainCat, details = null, quantity = null }) {
+  const prevSub = stockData.value[subDoc] || {};
+  const prevItem = prevSub[mainCat] || {};
+  const nextItem = {
+    ...prevItem,
+    lastUpdated: new Date().toISOString(),
+  };
+
+  if (details) {
+    const normalized = normalizeDetails(details);
+    nextItem.details = normalized;
+    nextItem.quantity = sumDetails(normalized);
+  } else if (quantity !== null && quantity !== undefined) {
+    nextItem.quantity = toInt(quantity);
+    if (prevItem.details) nextItem.details = prevItem.details;
+  }
+
+  stockData.value = {
+    ...stockData.value,
+    [subDoc]: {
+      ...prevSub,
+      [mainCat]: nextItem,
+    },
+  };
 }
 
 async function loadData({ force = false } = {}) {
@@ -763,6 +813,14 @@ async function loadStaffOptions() {
   } catch {
     staffOptions.value = [];
   }
+}
+
+async function syncFloorScopedState() {
+  await loadDisplaySettings();
+  await loadData({ force: true });
+  await loadStaffOptions();
+  setupRealtimeListener();
+  setupDisplaySettingsRealtime();
 }
 
 function ensureActiveTab() {
@@ -946,6 +1004,27 @@ async function submitTypedUpdate() {
       keterangan: typedForm.value.keterangan,
       floorId: auth.activeFloor,
     });
+    applyLocalUpdate({
+      subDoc: typedForm.value.subDoc,
+      mainCat: typedForm.value.mainCat,
+      details: { ...typedForm.value.details },
+    });
+    // Keep komputer (stok-komputer) in sync for typed categories
+    try {
+      await updateKomputerStock({
+        mainCat: typedForm.value.mainCat,
+        newQuantity: null,
+        newDetails: { ...typedForm.value.details },
+        floorId: auth.activeFloor,
+      });
+      applyLocalUpdate({
+        subDoc: "stok-komputer",
+        mainCat: typedForm.value.mainCat,
+        details: { ...typedForm.value.details },
+      });
+    } catch {
+      // non-fatal: continue to reload data even if komputer update fails
+    }
     await loadData({ force: true });
     closeModal("typedUpdateModal");
     toast(`Update ${typedForm.value.mainCat} berhasil`);
@@ -974,6 +1053,27 @@ async function submitHalaUpdate() {
       keterangan: halaForm.value.keterangan,
       floorId: auth.activeFloor,
     });
+    applyLocalUpdate({
+      subDoc: halaForm.value.subDoc,
+      mainCat: halaForm.value.mainCat,
+      details: { ...halaForm.value.details },
+    });
+    // Keep komputer (stok-komputer) in sync for hala categories
+    try {
+      await updateKomputerStock({
+        mainCat: halaForm.value.mainCat,
+        newQuantity: null,
+        newDetails: { ...halaForm.value.details },
+        floorId: auth.activeFloor,
+      });
+      applyLocalUpdate({
+        subDoc: "stok-komputer",
+        mainCat: halaForm.value.mainCat,
+        details: { ...halaForm.value.details },
+      });
+    } catch {
+      // ignore komputer update failure
+    }
     await loadData({ force: true });
     closeModal("halaUpdateModal");
     toast(`Update ${halaForm.value.mainCat} berhasil`);
@@ -1034,10 +1134,11 @@ function setupRealtimeListener() {
 }
 
 function handleStorageSync(event) {
-  if (event.key !== CACHE_KEY || !event.newValue) return;
+  if (event.key !== getCacheKey() || !event.newValue) return;
   try {
     const parsed = JSON.parse(event.newValue);
     if (!parsed?.data) return;
+    if (parsed.floorId && parsed.floorId !== getCacheFloorId()) return;
     stockData.value = mergeStockByLatest(stockData.value, parsed.data);
   } catch {
     // ignore malformed storage payload
@@ -1103,14 +1204,18 @@ async function initDailySnapshots() {
 }
 
 onMounted(async () => {
-  await loadDisplaySettings();
-  await loadData();
-  await loadStaffOptions();
-  setupRealtimeListener();
-  setupDisplaySettingsRealtime();
+  await syncFloorScopedState();
   window.addEventListener("storage", handleStorageSync);
   await initDailySnapshots();
 });
+
+watch(
+  () => auth.activeFloor,
+  async (nextFloor, previousFloor) => {
+    if (!nextFloor || nextFloor === previousFloor) return;
+    await syncFloorScopedState();
+  },
+);
 
 onUnmounted(() => {
   if (unsubRealtime) unsubRealtime();

@@ -616,15 +616,8 @@
                 <span class="badge" :class="statusServisBadge(statusForm.statusServis)">
                   {{ statusForm.statusServis || "-" }}
                 </span>
-                <small class="text-muted">
-                  {{
-                    statusForm.statusServis === statusForm.initialStatusServis
-                      ? "Status saat ini"
-                      : "Status setelah simpan"
-                  }}
-                </small>
               </div>
-              <div class="form-check">
+              <div v-if="isSupervisor" class="form-check">
                 <input
                   id="statusServisToggle"
                   v-model="statusForm.toggleStatusServis"
@@ -635,6 +628,9 @@
                 <label class="form-check-label small" for="statusServisToggle">
                   {{ statusServisToggleLabel }}
                 </label>
+              </div>
+              <div v-if="!isSupervisor && statusForm.statusServis === 'Sudah Selesai'" class="small text-muted">
+                Jika perlu ubah "Sudah Selesai" ke "Belum Selesai", hubungi supervisor.
               </div>
             </div>
             <div class="mb-2">
@@ -671,6 +667,11 @@
                 accept="image/*"
                 class="form-control form-control-sm"
                 @change="onPhotoChange"
+              />
+              <UploadProgress
+                :progress="pengambilanUploadProgress"
+                label="Upload"
+                aria-label="Progress upload bukti pengambilan"
               />
               <div v-if="!hasPhotoEvidence" class="small text-danger mt-1">
                 Upload foto bukti sebelum menyimpan status "Sudah Diambil".
@@ -822,6 +823,11 @@
                 class="form-control form-control-sm"
                 @change="onPenerimaanPhotoChange"
               />
+              <UploadProgress
+                :progress="penerimaanUploadProgress"
+                label="Upload"
+                aria-label="Progress upload bukti penerimaan"
+              />
               <div v-if="!hasPenerimaanPhoto" class="small text-danger mt-1">Upload foto bukti sebelum menyimpan.</div>
               <div v-if="penerimaanPhotoPreviewUrl" class="mt-2">
                 <img
@@ -884,6 +890,11 @@
                 accept="image/*"
                 class="form-control form-control-sm"
                 @change="onReturnOwnerPhotoChange"
+              />
+              <UploadProgress
+                :progress="returnOwnerUploadProgress"
+                label="Upload"
+                aria-label="Progress upload bukti return"
               />
               <div v-if="!hasReturnOwnerPhoto" class="small text-danger mt-1">
                 Upload foto bukti return sebelum menyimpan.
@@ -1313,6 +1324,7 @@ import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import { useAuthStore } from "@/stores/auth";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
+import UploadProgress from "@/components/common/UploadProgress.vue";
 import { fetchSalesList } from "@/services/sales-service";
 import {
   fetchServisByRange,
@@ -1379,6 +1391,7 @@ const photoInputRef = ref(null);
 const photoFile = ref(null);
 const salesOptions = ref([]);
 const photoPreviewUrl = ref("");
+const pengambilanUploadProgress = ref(null);
 const revertPassword = ref("");
 const revertVerifying = ref(false);
 const allowRevertWithoutPassword = ref(false);
@@ -1430,6 +1443,7 @@ const penerimaanSaving = ref(false);
 const penerimaanInputRef = ref(null);
 const penerimaanPhotoFile = ref(null);
 const penerimaanPhotoPreviewUrl = ref("");
+const penerimaanUploadProgress = ref(null);
 const penerimaanTargetIds = ref([]);
 const penerimaanForm = ref({
   penerima: "",
@@ -1450,6 +1464,15 @@ const returnOwnerSaving = ref(false);
 const returnOwnerInputRef = ref(null);
 const returnOwnerPhotoFile = ref(null);
 const returnOwnerPhotoPreviewUrl = ref("");
+const returnOwnerUploadProgress = ref(null);
+
+const UPLOAD_PROGRESS_CEILING = 98;
+
+function mapUploadProgress(value) {
+  const progress = Number(value);
+  if (!Number.isFinite(progress)) return 0;
+  return Math.min(UPLOAD_PROGRESS_CEILING, Math.max(0, Math.round(progress)));
+}
 const returnOwnerTargetIds = ref([]);
 const returnOwnerForm = ref({
   salesName: "",
@@ -2085,6 +2108,7 @@ function openStatusModal(item) {
   photoFile.value = null;
   if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   photoPreviewUrl.value = "";
+  pengambilanUploadProgress.value = null;
   if (photoInputRef.value) photoInputRef.value.value = "";
   statusForm.value = {
     id: item.id,
@@ -2187,6 +2211,7 @@ async function compressImageFile(file, options = {}) {
 async function onPhotoChange(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+  pengambilanUploadProgress.value = null;
   if (!file.type.startsWith("image/")) {
     swal("File harus berupa gambar", "warning");
     e.target.value = "";
@@ -2213,6 +2238,7 @@ function clearPhoto() {
   if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
   photoFile.value = null;
   photoPreviewUrl.value = "";
+  pengambilanUploadProgress.value = null;
   if (photoInputRef.value) photoInputRef.value.value = "";
 }
 
@@ -2230,6 +2256,7 @@ function openPenerimaanModal(ids = []) {
   penerimaanPhotoFile.value = null;
   if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
   penerimaanPhotoPreviewUrl.value = "";
+  penerimaanUploadProgress.value = null;
   if (penerimaanInputRef.value) penerimaanInputRef.value.value = "";
   // If status modal is currently open, hide it and remember to restore later
   try {
@@ -2266,6 +2293,7 @@ function openPenerimaanModal(ids = []) {
 async function onPenerimaanPhotoChange(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+  penerimaanUploadProgress.value = null;
   if (!file.type.startsWith("image/")) {
     swal("File harus berupa gambar", "warning");
     e.target.value = "";
@@ -2292,6 +2320,7 @@ function clearPenerimaanPhoto() {
   if (penerimaanPhotoPreviewUrl.value) URL.revokeObjectURL(penerimaanPhotoPreviewUrl.value);
   penerimaanPhotoFile.value = null;
   penerimaanPhotoPreviewUrl.value = "";
+  penerimaanUploadProgress.value = null;
   if (penerimaanInputRef.value) penerimaanInputRef.value.value = "";
 }
 
@@ -2304,7 +2333,12 @@ async function savePenerimaanServis() {
   try {
     const targetId = penerimaanTargetIds.value[0];
     const waktuPenerimaan = new Date().toISOString();
-    const { url, path, liteUrl, litePath } = await uploadBuktiPenerimaanServis(penerimaanPhotoFile.value, targetId);
+    penerimaanUploadProgress.value = 0;
+    const { url, path, liteUrl, litePath } = await uploadBuktiPenerimaanServis(penerimaanPhotoFile.value, targetId, {
+      onProgress: (progress) => {
+        penerimaanUploadProgress.value = mapUploadProgress(progress);
+      },
+    });
 
     const payload = {
       penerimaServis: penerimaanForm.value.penerima.trim(),
@@ -2318,6 +2352,7 @@ async function savePenerimaanServis() {
     };
 
     const updatedCount = await bulkMarkServisPenerimaan(penerimaanTargetIds.value, payload);
+    if (penerimaanUploadProgress.value !== null) penerimaanUploadProgress.value = 100;
     selectedServisIds.value = [];
     invalidateCurrentRangeCache();
     Modal.getInstance(document.getElementById("penerimaanModal"))?.hide();
@@ -2339,6 +2374,7 @@ function openReturnOwnerModal(ids = []) {
   returnOwnerPhotoFile.value = null;
   if (returnOwnerPhotoPreviewUrl.value) URL.revokeObjectURL(returnOwnerPhotoPreviewUrl.value);
   returnOwnerPhotoPreviewUrl.value = "";
+  returnOwnerUploadProgress.value = null;
   if (returnOwnerInputRef.value) returnOwnerInputRef.value.value = "";
   Modal.getOrCreateInstance(document.getElementById("returnOwnerModal")).show();
 }
@@ -2346,6 +2382,7 @@ function openReturnOwnerModal(ids = []) {
 async function onReturnOwnerPhotoChange(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+  returnOwnerUploadProgress.value = null;
   if (!file.type.startsWith("image/")) {
     swal("File harus berupa gambar", "warning");
     e.target.value = "";
@@ -2372,6 +2409,7 @@ function clearReturnOwnerPhoto() {
   if (returnOwnerPhotoPreviewUrl.value) URL.revokeObjectURL(returnOwnerPhotoPreviewUrl.value);
   returnOwnerPhotoFile.value = null;
   returnOwnerPhotoPreviewUrl.value = "";
+  returnOwnerUploadProgress.value = null;
   if (returnOwnerInputRef.value) returnOwnerInputRef.value.value = "";
 }
 
@@ -2384,7 +2422,12 @@ async function saveReturnOwner() {
   try {
     const targetId = returnOwnerTargetIds.value[0];
     const waktuPengambilan = new Date().toISOString();
-    const { url, path, liteUrl, litePath } = await uploadBuktiPengambilan(returnOwnerPhotoFile.value, targetId);
+    returnOwnerUploadProgress.value = 0;
+    const { url, path, liteUrl, litePath } = await uploadBuktiPengambilan(returnOwnerPhotoFile.value, targetId, {
+      onProgress: (progress) => {
+        returnOwnerUploadProgress.value = mapUploadProgress(progress);
+      },
+    });
 
     const payload = {
       stafHandle: returnOwnerForm.value.salesName.trim(),
@@ -2403,6 +2446,7 @@ async function saveReturnOwner() {
     };
 
     const updatedCount = await bulkMarkServisSudahDiambil(returnOwnerTargetIds.value, payload);
+    if (returnOwnerUploadProgress.value !== null) returnOwnerUploadProgress.value = 100;
     selectedServisIds.value = [];
     invalidateCurrentRangeCache();
     Modal.getInstance(document.getElementById("returnOwnerModal"))?.hide();
@@ -2439,11 +2483,15 @@ async function saveStatus() {
     return swal("Data tidak bisa disimpan jika status belum selesai", "warning");
   }
 
-  if (
-    !isVerifiedRevertToNotTaken &&
-    statusForm.value.statusServis === "Sudah Selesai" &&
-    (targetItem?.statusPenerimaanServis || "Belum Diterima") !== "Sudah Diterima"
-  ) {
+  const hasPenerimaanData = Boolean(
+    targetItem &&
+    (targetItem.statusPenerimaanServis === "Sudah Diterima" ||
+      targetItem.penerimaServis ||
+      targetItem.waktuPenerimaan ||
+      targetItem.buktiPenerimaanUrl),
+  );
+
+  if (!isVerifiedRevertToNotTaken && statusForm.value.statusServis === "Sudah Selesai" && !hasPenerimaanData) {
     return swal("Penerimaan servis wajib sebelum status menjadi Sudah Selesai", "warning");
   }
 
@@ -2488,7 +2536,12 @@ async function saveStatus() {
       updates.waktuPengambilan = new Date().toISOString();
       // Upload foto if provided
       if (photoFile.value) {
-        const { url, path, liteUrl, litePath } = await uploadBuktiPengambilan(photoFile.value, statusForm.value.id);
+        pengambilanUploadProgress.value = 0;
+        const { url, path, liteUrl, litePath } = await uploadBuktiPengambilan(photoFile.value, statusForm.value.id, {
+          onProgress: (progress) => {
+            pengambilanUploadProgress.value = mapUploadProgress(progress);
+          },
+        });
         updates.buktiPengambilanUrl = url;
         updates.buktiPengambilanPath = path;
         if (liteUrl) updates.buktiPengambilanLiteUrl = liteUrl;
@@ -2506,6 +2559,7 @@ async function saveStatus() {
       updates.returnOwnerProofLitePath = null;
     }
     await updateServisStatus(statusForm.value.id, updates);
+    if (pengambilanUploadProgress.value !== null) pengambilanUploadProgress.value = 100;
     invalidateCurrentRangeCache();
     Modal.getInstance(document.getElementById("statusModal"))?.hide();
     swal("Status berhasil diperbarui");

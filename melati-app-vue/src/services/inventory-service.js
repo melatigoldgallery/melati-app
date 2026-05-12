@@ -359,12 +359,15 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
     lastUpdated: new Date().toISOString(),
   };
 
-  if (newDetails && TYPED_CATS.includes(mainCat)) {
-    const details = sanitizeDetails(COLOR_TYPES, newDetails);
+  // Support typed categories generically (color / hala)
+  const detailTypes = getDetailTypes(mainCat);
+  if (detailTypes && newDetails) {
+    const details = sanitizeDetails(detailTypes, newDetails);
     next.details = details;
     next.quantity = totalFromDetails(details);
-  } else if (existing.details && TYPED_CATS.includes(mainCat)) {
-    next.details = sanitizeDetails(COLOR_TYPES, existing.details);
+  } else if (detailTypes && existing.details) {
+    next.details = sanitizeDetails(detailTypes, existing.details);
+    next.quantity = totalFromDetails(next.details);
   }
 
   await setDoc(ref, { [mainCat]: next }, { merge: true });

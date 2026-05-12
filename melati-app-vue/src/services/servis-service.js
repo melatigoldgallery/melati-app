@@ -18,7 +18,7 @@ import {
   collection,
   Timestamp,
 } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "@/config/firebase";
 import { verifyStoredSecret } from "@/utils/security";
 import { floorDoc } from "@/services/floor-scope";
@@ -594,7 +594,38 @@ async function createLiteImageBlob(file, options = {}) {
   });
 }
 
-export async function uploadBuktiPengambilan(file, servisId) {
+function notifyUploadProgress(onProgress, value) {
+  if (typeof onProgress !== "function") return;
+  try {
+    onProgress(value);
+  } catch (e) {
+    console.warn("Progress callback error", e);
+  }
+}
+
+function uploadFileWithProgress(ref, file, metadata, onProgress) {
+  if (typeof onProgress !== "function") {
+    return uploadBytes(ref, file, metadata);
+  }
+
+  notifyUploadProgress(onProgress, 0);
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(ref, file, metadata);
+    task.on(
+      "state_changed",
+      (snapshot) => {
+        const total = snapshot.totalBytes || 0;
+        const progress = total ? Math.round((snapshot.bytesTransferred / total) * 100) : 0;
+        notifyUploadProgress(onProgress, progress);
+      },
+      (error) => reject(error),
+      () => resolve(task.snapshot),
+    );
+  });
+}
+
+export async function uploadBuktiPengambilan(file, servisId, options = {}) {
+  const onProgress = options?.onProgress;
   const timestamp = Date.now();
   const ext = file.type === "image/png" ? "png" : "jpg";
   const fileName = `servis_${servisId}_${timestamp}.${ext}`;
@@ -603,10 +634,15 @@ export async function uploadBuktiPengambilan(file, servisId) {
   const storagePath = `bukti-pengambilan/${year}/${month}/${fileName}`;
   const sRef = storageRef(storage, storagePath);
   const uploaderUid = auth.currentUser?.uid || "";
-  await uploadBytes(sRef, file, {
-    contentType: file.type || "image/jpeg",
-    customMetadata: { uploadedBy: uploaderUid },
-  });
+  await uploadFileWithProgress(
+    sRef,
+    file,
+    {
+      contentType: file.type || "image/jpeg",
+      customMetadata: { uploadedBy: uploaderUid },
+    },
+    onProgress,
+  );
   const url = await getDownloadURL(sRef);
 
   let liteUrl;
@@ -627,10 +663,12 @@ export async function uploadBuktiPengambilan(file, servisId) {
     console.warn("Upload foto lite gagal, lanjut pakai foto asli", e);
   }
 
+  notifyUploadProgress(onProgress, 100);
   return { url, path: storagePath, liteUrl, litePath };
 }
 
-export async function uploadBuktiPenerimaanServis(file, servisId) {
+export async function uploadBuktiPenerimaanServis(file, servisId, options = {}) {
+  const onProgress = options?.onProgress;
   const timestamp = Date.now();
   const ext = file.type === "image/png" ? "png" : "jpg";
   const fileName = `servis_penerimaan_${servisId}_${timestamp}.${ext}`;
@@ -639,10 +677,15 @@ export async function uploadBuktiPenerimaanServis(file, servisId) {
   const storagePath = `bukti-penerimaan-servis/${year}/${month}/${fileName}`;
   const sRef = storageRef(storage, storagePath);
   const uploaderUid = auth.currentUser?.uid || "";
-  await uploadBytes(sRef, file, {
-    contentType: file.type || "image/jpeg",
-    customMetadata: { uploadedBy: uploaderUid },
-  });
+  await uploadFileWithProgress(
+    sRef,
+    file,
+    {
+      contentType: file.type || "image/jpeg",
+      customMetadata: { uploadedBy: uploaderUid },
+    },
+    onProgress,
+  );
   const url = await getDownloadURL(sRef);
 
   let liteUrl;
@@ -663,6 +706,7 @@ export async function uploadBuktiPenerimaanServis(file, servisId) {
     console.warn("Upload foto penerimaan lite gagal, lanjut pakai foto asli", e);
   }
 
+  notifyUploadProgress(onProgress, 100);
   return { url, path: storagePath, liteUrl, litePath };
 }
 
