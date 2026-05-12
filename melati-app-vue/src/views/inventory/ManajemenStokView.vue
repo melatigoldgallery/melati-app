@@ -29,12 +29,7 @@
 
     <template v-else>
       <div class="summary-grid mb-3" :style="summaryGridStyle">
-        <div
-          v-for="card in summaryCards"
-          :key="card.id"
-          class="summary-grid-item"
-          @click="activeTab = card.id"
-        >
+        <div v-for="card in summaryCards" :key="card.id" class="summary-grid-item" @click="activeTab = card.id">
           <div class="summary-card" :style="cardStyle(card.id)">
             <div class="summary-title">{{ card.label }}</div>
             <div :class="['summary-value', summaryValueClass(card.id)]">{{ summary[card.id]?.fisik ?? 0 }}</div>
@@ -150,7 +145,9 @@
           </div>
         </div>
       </div>
-      <div v-else class="alert alert-warning mb-0">Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.</div>
+      <div v-else class="alert alert-warning mb-0">
+        Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.
+      </div>
     </template>
 
     <div class="modal fade" id="simpleUpdateModal" tabindex="-1" aria-hidden="true">
@@ -383,13 +380,13 @@
                 <table class="table table-sm table-bordered align-middle">
                   <thead>
                     <tr>
-                      <th>Warna</th>
+                      <th>{{ komputerDetailLabel }}</th>
                       <th>Jumlah</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="ct in COLOR_TYPES" :key="ct">
-                      <td>{{ COLOR_LABELS[ct] }}</td>
+                    <tr v-for="ct in komputerDetailTypes" :key="ct">
+                      <td>{{ komputerDetailLabels[ct] || ct }}</td>
                       <td>
                         <input
                           v-model.number="komputerColorForm.details[ct]"
@@ -564,6 +561,7 @@ const komputerForm = ref({
 
 const komputerColorForm = ref({
   mainCat: "",
+  detailType: "",
   details: {},
 });
 
@@ -580,6 +578,17 @@ const hasTabs = computed(() => tabs.value.length > 0);
 const tableRows = computed(() => displaySettings.value.tableRows.filter((row) => row.enabled));
 const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
 const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
+const komputerDetailTypes = computed(() => {
+  if (komputerColorForm.value.detailType === "hala") return HALA_TYPES;
+  if (komputerColorForm.value.detailType === "color") return COLOR_TYPES;
+  return [];
+});
+const komputerDetailLabels = computed(() => {
+  if (komputerColorForm.value.detailType === "hala") return HALA_LABELS;
+  if (komputerColorForm.value.detailType === "color") return COLOR_LABELS;
+  return {};
+});
+const komputerDetailLabel = computed(() => (komputerColorForm.value.detailType === "hala" ? "Jenis" : "Warna"));
 const summaryGridStyle = computed(() => {
   const grid = displaySettings.value.summaryGrid || {};
   return {
@@ -617,12 +626,23 @@ function getCardType(id) {
   return getCardById(id)?.type || "simple";
 }
 
+function getCardDetailMode(id) {
+  const card = getCardById(id);
+  const mode = String(card?.detailMode || "")
+    .trim()
+    .toLowerCase();
+  if (mode === "color" || mode === "hala" || mode === "default") return mode;
+  if (card?.type === "color") return "color";
+  if (card?.type === "hala") return "hala";
+  return "default";
+}
+
 function isColorType(id) {
-  return getCardType(id) === "color";
+  return getCardDetailMode(id) === "color";
 }
 
 function isHalaType(id) {
-  return getCardType(id) === "hala";
+  return getCardDetailMode(id) === "hala";
 }
 
 function cardStyle(cardId) {
@@ -649,13 +669,16 @@ function getItem(subDoc, mainCat) {
 function getQty(mainCat, subDoc) {
   const item = getItem(subDoc, mainCat);
   if (!item) return 0;
-  if (item.details && Object.keys(item.details).length > 0) {
+  const detailMode = getCardDetailMode(mainCat);
+  if ((detailMode === "color" || detailMode === "hala") && item.details && Object.keys(item.details).length > 0) {
     return Object.values(item.details).reduce((sum, v) => sum + toInt(v), 0);
   }
   return toInt(item.quantity);
 }
 
 function hasDetails(mainCat, subDoc) {
+  const detailMode = getCardDetailMode(mainCat);
+  if (detailMode !== "color" && detailMode !== "hala") return false;
   const item = getItem(subDoc, mainCat);
   return !!(item?.details && Object.keys(item.details).length > 0);
 }
@@ -673,8 +696,9 @@ function formatDate(value) {
 }
 
 function getTypeLabel(mainCat, key) {
-  if (isColorType(mainCat)) return COLOR_LABELS[key] || key;
-  if (isHalaType(mainCat)) return HALA_LABELS[key] || key;
+  const detailMode = getCardDetailMode(mainCat);
+  if (detailMode === "color") return COLOR_LABELS[key] || key;
+  if (detailMode === "hala") return HALA_LABELS[key] || key;
   return key;
 }
 
@@ -710,15 +734,20 @@ function closeModal(id) {
 }
 
 function getCacheFloorId() {
-  return String(auth.activeFloor || "").trim().toUpperCase() || "UNSCOPED";
+  return String(auth.activeFloor || "")
+    .trim()
+    .toUpperCase();
 }
 
 function getCacheKey() {
-  return `${CACHE_KEY_PREFIX}:${getCacheFloorId()}`;
+  const floorId = getCacheFloorId();
+  if (!floorId) return "";
+  return `${CACHE_KEY_PREFIX}:${floorId}`;
 }
 
 function readCache() {
   const cacheKey = getCacheKey();
+  if (!cacheKey) return null;
   try {
     const raw = localStorage.getItem(cacheKey);
     if (!raw) return null;
@@ -734,6 +763,7 @@ function readCache() {
 
 function writeCache(data) {
   const cacheKey = getCacheKey();
+  if (!cacheKey) return;
   try {
     localStorage.setItem(
       cacheKey,
@@ -835,7 +865,7 @@ function ensureActiveTab() {
 }
 
 function applyDisplaySettings(payload = {}) {
-  displaySettings.value = normalizeInventorySettings(payload);
+  displaySettings.value = normalizeInventorySettings(payload, auth.activeFloor);
   ensureActiveTab();
 }
 
@@ -868,7 +898,8 @@ async function refreshData() {
 }
 
 function openUpdateModal(mainCat, sub) {
-  if (isColorType(mainCat)) {
+  const detailMode = getCardDetailMode(mainCat);
+  if (detailMode === "color") {
     const item = getItem(sub.key, mainCat) || {};
     const details = {};
     COLOR_TYPES.forEach((k) => {
@@ -887,7 +918,7 @@ function openUpdateModal(mainCat, sub) {
     return;
   }
 
-  if (isHalaType(mainCat)) {
+  if (detailMode === "hala") {
     const item = getItem(sub.key, mainCat) || {};
     const details = {};
     HALA_TYPES.forEach((k) => {
@@ -919,13 +950,17 @@ function openUpdateModal(mainCat, sub) {
 
 function openKomputerModal(mainCat) {
   const item = getItem("stok-komputer", mainCat) || { quantity: 0, details: {} };
-  if (isColorType(mainCat)) {
+  const detailMode = getCardDetailMode(mainCat);
+  if (detailMode === "color" || detailMode === "hala") {
+    const detailType = detailMode;
+    const types = detailMode === "hala" ? HALA_TYPES : COLOR_TYPES;
     const details = {};
-    COLOR_TYPES.forEach((k) => {
+    types.forEach((k) => {
       details[k] = toInt(item.details?.[k]);
     });
     komputerColorForm.value = {
       mainCat,
+      detailType,
       details,
     };
     showModal("komputerColorModal");
@@ -1002,6 +1037,7 @@ async function submitTypedUpdate() {
       newDetails: { ...typedForm.value.details },
       petugas: typedForm.value.petugas.trim(),
       keterangan: typedForm.value.keterangan,
+      detailType: "color",
       floorId: auth.activeFloor,
     });
     applyLocalUpdate({
@@ -1009,22 +1045,6 @@ async function submitTypedUpdate() {
       mainCat: typedForm.value.mainCat,
       details: { ...typedForm.value.details },
     });
-    // Keep komputer (stok-komputer) in sync for typed categories
-    try {
-      await updateKomputerStock({
-        mainCat: typedForm.value.mainCat,
-        newQuantity: null,
-        newDetails: { ...typedForm.value.details },
-        floorId: auth.activeFloor,
-      });
-      applyLocalUpdate({
-        subDoc: "stok-komputer",
-        mainCat: typedForm.value.mainCat,
-        details: { ...typedForm.value.details },
-      });
-    } catch {
-      // non-fatal: continue to reload data even if komputer update fails
-    }
     await loadData({ force: true });
     closeModal("typedUpdateModal");
     toast(`Update ${typedForm.value.mainCat} berhasil`);
@@ -1051,6 +1071,7 @@ async function submitHalaUpdate() {
       newDetails: { ...halaForm.value.details },
       petugas: halaForm.value.petugas.trim(),
       keterangan: halaForm.value.keterangan,
+      detailType: "hala",
       floorId: auth.activeFloor,
     });
     applyLocalUpdate({
@@ -1058,22 +1079,6 @@ async function submitHalaUpdate() {
       mainCat: halaForm.value.mainCat,
       details: { ...halaForm.value.details },
     });
-    // Keep komputer (stok-komputer) in sync for hala categories
-    try {
-      await updateKomputerStock({
-        mainCat: halaForm.value.mainCat,
-        newQuantity: null,
-        newDetails: { ...halaForm.value.details },
-        floorId: auth.activeFloor,
-      });
-      applyLocalUpdate({
-        subDoc: "stok-komputer",
-        mainCat: halaForm.value.mainCat,
-        details: { ...halaForm.value.details },
-      });
-    } catch {
-      // ignore komputer update failure
-    }
     await loadData({ force: true });
     closeModal("halaUpdateModal");
     toast(`Update ${halaForm.value.mainCat} berhasil`);
@@ -1110,6 +1115,7 @@ async function submitKomputerColorUpdate() {
       mainCat: komputerColorForm.value.mainCat,
       newQuantity: null,
       newDetails: { ...komputerColorForm.value.details },
+      detailType: komputerColorForm.value.detailType,
       floorId: auth.activeFloor,
     });
     await loadData({ force: true });
@@ -1124,17 +1130,15 @@ async function submitKomputerColorUpdate() {
 
 function setupRealtimeListener() {
   if (unsubRealtime) unsubRealtime();
-  unsubRealtime = subscribeStocksRealtime(
-    (incoming) => {
-      stockData.value = mergeStockByLatest(stockData.value, incoming);
-      writeCache(stockData.value);
-    },
-    auth.activeFloor,
-  );
+  unsubRealtime = subscribeStocksRealtime((incoming) => {
+    stockData.value = mergeStockByLatest(stockData.value, incoming);
+    writeCache(stockData.value);
+  }, auth.activeFloor);
 }
 
 function handleStorageSync(event) {
-  if (event.key !== getCacheKey() || !event.newValue) return;
+  const cacheKey = getCacheKey();
+  if (!cacheKey || event.key !== cacheKey || !event.newValue) return;
   try {
     const parsed = JSON.parse(event.newValue);
     if (!parsed?.data) return;

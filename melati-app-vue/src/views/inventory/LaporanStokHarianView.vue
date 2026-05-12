@@ -251,34 +251,14 @@ import { useAuthStore } from "@/stores/auth";
 import { db } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
-import { MAIN_CATEGORIES, fetchAllStockData } from "@/services/inventory-service";
+import { MAIN_CATEGORIES, SUB_CATEGORIES, fetchAllStockData } from "@/services/inventory-service";
 
 const { toast, error: showError } = useAlert();
 const { todayStringWITA, nowWITA } = useWITA();
 
-const SUMMARY_CATEGORIES = [
-  "brankas",
-  "posting",
-  "barang-display",
-  "barang-rusak",
-  "batu-lepas",
-  "manual",
-  "admin",
-  "contoh-custom",
-  "DP",
-];
+const SUMMARY_CATEGORIES = SUB_CATEGORIES.map((sub) => sub.key);
 
-const REVERSE_CATEGORY_MAPPING = {
-  brankas: "Stok Brankas",
-  posting: "Belum Posting",
-  "barang-display": "Display",
-  "barang-rusak": "Rusak",
-  "batu-lepas": "Batu Lepas",
-  manual: "Manual",
-  admin: "Admin",
-  DP: "DP",
-  "contoh-custom": "Contoh Custom",
-};
+const REVERSE_CATEGORY_MAPPING = Object.fromEntries(SUB_CATEGORIES.map((sub) => [sub.key, sub.label]));
 
 const COLOR_TYPES = ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"];
 const COLOR_LABELS = { HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink", KUNING: "Kuning" };
@@ -421,7 +401,7 @@ async function getStockSnapshot({ force = false } = {}) {
   if (stockFetchPromise) return stockFetchPromise;
 
   stockFetchPromise = (async () => {
-    const stockData = await fetchAllStockData();
+    const stockData = await fetchAllStockData(activeFloor.value);
     stockDataSnapshot.value = stockData;
     lastStockFetchAt.value = Date.now();
     stockFetchPromise = null;
@@ -851,15 +831,7 @@ async function handleExportDetailBulanan() {
 
     const headers = [
       "Tanggal",
-      "DP",
-      "Admin",
-      "Brankas",
-      "Display",
-      "Rusak",
-      "Batu Lepas",
-      "Manual",
-      "Custom",
-      "Posting",
+      ...SUMMARY_CATEGORIES.map((key) => REVERSE_CATEGORY_MAPPING[key] || key),
       "TOTAL",
       "Komputer",
       "Status",
@@ -874,21 +846,14 @@ async function handleExportDetailBulanan() {
         const b = rep.breakdown?.[mainCat] || {};
         const total = SUMMARY_CATEGORIES.reduce((sum, key) => sum + toInt(b[key]?.total), 0);
         const item = rep.items?.[mainCat] || {};
-        wsRows.push([
+        const row = [
           rep.date,
-          toInt(b.DP?.total),
-          toInt(b.admin?.total),
-          toInt(b.brankas?.total),
-          toInt(b["barang-display"]?.total),
-          toInt(b["barang-rusak"]?.total),
-          toInt(b["batu-lepas"]?.total),
-          toInt(b.manual?.total),
-          toInt(b["contoh-custom"]?.total),
-          toInt(b.posting?.total),
+          ...SUMMARY_CATEGORIES.map((key) => toInt(b[key]?.total)),
           total,
           toInt(item.komputer),
           item.status || "-",
-        ]);
+        ];
+        wsRows.push(row);
       });
       wsRows.push([]);
     });
@@ -897,11 +862,11 @@ async function handleExportDetailBulanan() {
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Laporan Stok Detail");
 
-    const logHeaders = ["Tanggal"];
-    SUMMARY_CATEGORIES.forEach((cat) => {
-      logHeaders.push(REVERSE_CATEGORY_MAPPING[cat], `${REVERSE_CATEGORY_MAPPING[cat]} Ket`);
-    });
-    logHeaders.push("TOTAL");
+    const logHeaders = [
+      "Tanggal",
+      ...SUMMARY_CATEGORIES.flatMap((cat) => [REVERSE_CATEGORY_MAPPING[cat], `${REVERSE_CATEGORY_MAPPING[cat]} Ket`]),
+      "TOTAL",
+    ];
 
     const logRows = [["LAPORAN STOK DETAIL BULANAN MELATI BAWAH"], [`Bulan: ${monthYear}`], []];
 
@@ -911,11 +876,11 @@ async function handleExportDetailBulanan() {
       logRows.push([mainCat]);
       logRows.push(logHeaders);
       rows.forEach((row) => {
-        const values = [row.Tanggal];
-        SUMMARY_CATEGORIES.forEach((cat) => {
-          values.push(toInt(row[cat]), row[`${cat}_ket`] || "");
-        });
-        values.push(toInt(row.TOTAL));
+        const values = [
+          row.Tanggal,
+          ...SUMMARY_CATEGORIES.flatMap((cat) => [toInt(row[cat]), row[`${cat}_ket`] || ""]),
+          toInt(row.TOTAL),
+        ];
         logRows.push(values);
       });
       logRows.push([]);

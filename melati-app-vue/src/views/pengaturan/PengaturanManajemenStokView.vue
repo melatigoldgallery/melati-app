@@ -34,6 +34,7 @@
                       <th style="min-width: 140px">ID Card</th>
                       <th style="min-width: 180px">Nama Card / Tab</th>
                       <th style="width: 120px">Tipe</th>
+                      <th style="width: 140px">Modal</th>
                       <th style="width: 130px">Warna</th>
                       <th class="text-center" style="width: 70px">Aktif</th>
                       <th class="text-center" style="width: 80px">Summary</th>
@@ -66,6 +67,17 @@
                           <option value="color">Color</option>
                           <option value="hala">Hala</option>
                           <option value="computer">Computer</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          v-model="card.detailMode"
+                          class="form-select form-select-sm"
+                          :disabled="card.type === 'computer'"
+                        >
+                          <option value="default">Default</option>
+                          <option value="color">Warna</option>
+                          <option value="hala">Jenis Perhiasan</option>
                         </select>
                       </td>
                       <td>
@@ -108,7 +120,7 @@
                       </td>
                     </tr>
                     <tr v-if="!form.cards.length">
-                      <td colspan="8" class="text-center text-muted py-3">Belum ada card.</td>
+                      <td colspan="9" class="text-center text-muted py-3">Belum ada card.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -195,19 +207,43 @@
               <div class="row g-2 mb-3">
                 <div class="col-6">
                   <label class="form-label small mb-1">Kolom Desktop (>=1200px)</label>
-                  <input v-model.number="form.summaryGrid.xl" type="number" min="1" max="7" class="form-control form-control-sm" />
+                  <input
+                    v-model.number="form.summaryGrid.xl"
+                    type="number"
+                    min="1"
+                    max="7"
+                    class="form-control form-control-sm"
+                  />
                 </div>
                 <div class="col-6">
                   <label class="form-label small mb-1">Kolom Laptop (>=992px)</label>
-                  <input v-model.number="form.summaryGrid.lg" type="number" min="1" max="6" class="form-control form-control-sm" />
+                  <input
+                    v-model.number="form.summaryGrid.lg"
+                    type="number"
+                    min="1"
+                    max="6"
+                    class="form-control form-control-sm"
+                  />
                 </div>
                 <div class="col-6">
                   <label class="form-label small mb-1">Kolom Tablet (>=768px)</label>
-                  <input v-model.number="form.summaryGrid.md" type="number" min="1" max="4" class="form-control form-control-sm" />
+                  <input
+                    v-model.number="form.summaryGrid.md"
+                    type="number"
+                    min="1"
+                    max="4"
+                    class="form-control form-control-sm"
+                  />
                 </div>
                 <div class="col-6">
                   <label class="form-label small mb-1">Jarak Antar Card (px)</label>
-                  <input v-model.number="form.summaryGrid.gap" type="number" min="6" max="28" class="form-control form-control-sm" />
+                  <input
+                    v-model.number="form.summaryGrid.gap"
+                    type="number"
+                    min="6"
+                    max="28"
+                    class="form-control form-control-sm"
+                  />
                 </div>
               </div>
 
@@ -229,7 +265,7 @@
                 <strong>{{ formattedLastUpdated }}</strong>
                 <span class="mx-1">|</span>
                 Oleh:
-                <strong>{{ form.updatedBy || '-' }}</strong>
+                <strong>{{ form.updatedBy || "-" }}</strong>
               </div>
 
               <div class="d-grid gap-2">
@@ -292,7 +328,9 @@ const formattedLastUpdated = computed(() => {
 });
 
 const summaryPreviewCount = computed(() => {
-  const count = form.cards.filter((card) => card.enabled && card.type !== "computer" && card.showInSummary !== false).length;
+  const count = form.cards.filter(
+    (card) => card.enabled && card.type !== "computer" && card.showInSummary !== false,
+  ).length;
   return Math.max(count, 4);
 });
 
@@ -306,7 +344,7 @@ const summaryPreviewStyle = computed(() => {
 });
 
 function applySettings(data = {}) {
-  const normalized = normalizeInventorySettings(data);
+  const normalized = normalizeInventorySettings(data, auth.activeFloor);
   form.cards = normalized.cards.map((card) => ({ ...card }));
   form.tableRows = normalized.tableRows.map((row) => ({ ...row }));
   form.summaryGrid = { ...normalized.summaryGrid };
@@ -319,6 +357,7 @@ function addCard() {
     id: "",
     label: "",
     type: "simple",
+    detailMode: "default",
     enabled: true,
     showInSummary: true,
     colorStart: "#eef7ff",
@@ -343,6 +382,7 @@ function moveCard(index, direction) {
 function syncCardType(card) {
   if (card.type === "computer") {
     card.showInSummary = false;
+    card.detailMode = "default";
   }
 }
 
@@ -372,10 +412,15 @@ function getPayload() {
   return {
     cards: form.cards.map((card, index) => ({
       ...card,
-      id: String(card.id || "").trim().toUpperCase(),
+      id: String(card.id || "")
+        .trim()
+        .toUpperCase(),
       label: String(card.label || "").trim(),
       order: index + 1,
       showInSummary: card.type === "computer" ? false : !!card.showInSummary,
+      detailMode: String(card.detailMode || "default")
+        .trim()
+        .toLowerCase(),
     })),
     tableRows: form.tableRows.map((row, index) => ({
       ...row,
@@ -460,7 +505,11 @@ async function saveSettings() {
 
   saving.value = true;
   try {
-    await saveInventorySettings(payload, auth.user?.email || auth.user?.username || auth.userRole || "System", auth.activeFloor);
+    await saveInventorySettings(
+      payload,
+      auth.user?.email || auth.user?.username || auth.userRole || "System",
+      auth.activeFloor,
+    );
     toast("Pengaturan manajemen stok berhasil disimpan");
     await loadSettings();
   } catch (e) {

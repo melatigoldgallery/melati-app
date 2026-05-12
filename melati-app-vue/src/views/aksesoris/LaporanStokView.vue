@@ -344,6 +344,7 @@ import { useWITA } from "@/composables/useWITA";
 const authStore = useAuthStore();
 const activeFloor = computed(() => authStore.activeFloor || "L1");
 const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
+const exportFloorLabel = computed(() => (isL2Floor.value ? "Melati Atas" : "Melati Bawah"));
 const { error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 
@@ -457,7 +458,7 @@ async function exportPdf() {
   doc.setFont(undefined, "bold");
   doc.text(title, doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
   doc.setFontSize(11);
-  doc.text("Melati Gold Shop", doc.internal.pageSize.getWidth() / 2, 22, { align: "center" });
+  doc.text(exportFloorLabel.value, doc.internal.pageSize.getWidth() / 2, 22, { align: "center" });
   doc.setFontSize(9);
   doc.setFont(undefined, "normal");
   doc.text(dateRange, doc.internal.pageSize.getWidth() / 2, 28, { align: "center" });

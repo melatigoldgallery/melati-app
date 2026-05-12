@@ -126,6 +126,19 @@ function getDetailTypes(mainCat) {
   return null;
 }
 
+function getDetailTypesByMode(detailType = "") {
+  const normalized = String(detailType || "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "color") return COLOR_TYPES;
+  if (normalized === "hala") return HALA_TYPES;
+  return null;
+}
+
+function resolveDetailTypes(mainCat, detailType = "") {
+  return getDetailTypesByMode(detailType) || getDetailTypes(mainCat);
+}
+
 // ── Firestore Operations ───────────────────────────────────────────────────
 
 /**
@@ -247,9 +260,19 @@ export async function fetchStaffOptions({ force = false, floorId = "" } = {}) {
  * @param {Object|null} opts.newDetails   - Detail map for typed categories
  * @param {string} opts.petugas     - Operator name
  * @param {string} opts.keterangan  - Reason/description
- * @param {string} [opts.floorId]   - Floor ID; uses active floor if not provided
+ * @param {string} [opts.detailType] - Optional detail mode override ("color" | "hala")
+ * @param {string} [opts.floorId]    - Floor ID; uses active floor if not provided
  */
-export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails, petugas, keterangan, floorId = "" }) {
+export async function updateStockItem({
+  subDoc,
+  mainCat,
+  newQuantity,
+  newDetails,
+  petugas,
+  keterangan,
+  detailType = "",
+  floorId = "",
+}) {
   const { todayStringWITA } = useWITA();
 
   const ref = floorDoc(db, "stocks", subDoc, floorId);
@@ -258,7 +281,7 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
   const existing = docData[mainCat] || { quantity: 0, lastUpdated: null, history: [] };
   const beforeQty = toInt(existing.quantity);
   const now = new Date().toISOString();
-  const detailTypes = getDetailTypes(mainCat);
+  const detailTypes = resolveDetailTypes(mainCat, detailType);
 
   const updated = {
     quantity: 0,
@@ -348,7 +371,7 @@ export async function updateStockItem({ subDoc, mainCat, newQuantity, newDetails
   }
 }
 
-export async function updateKomputerStock({ mainCat, newQuantity, newDetails = null, floorId = "" }) {
+export async function updateKomputerStock({ mainCat, newQuantity, newDetails = null, detailType = "", floorId = "" }) {
   const ref = floorDoc(db, "stocks", "stok-komputer", floorId);
   const snap = await getDoc(ref);
   const docData = snap.exists() ? snap.data() : {};
@@ -360,7 +383,7 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
   };
 
   // Support typed categories generically (color / hala)
-  const detailTypes = getDetailTypes(mainCat);
+  const detailTypes = resolveDetailTypes(mainCat, detailType);
   if (detailTypes && newDetails) {
     const details = sanitizeDetails(detailTypes, newDetails);
     next.details = details;

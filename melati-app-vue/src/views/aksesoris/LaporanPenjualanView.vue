@@ -241,6 +241,7 @@ const { swal } = useAlert();
 const authStore = useAuthStore();
 const activeFloor = computed(() => authStore.activeFloor || "L1");
 const isL2Floor = computed(() => String(activeFloor.value || "").toUpperCase() === "L2");
+const exportFloorLabel = computed(() => (isL2Floor.value ? "MELATI ATAS" : "MELATI BAWAH"));
 
 const today = new Date();
 const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -954,7 +955,7 @@ async function exportRekapToExcel() {
       : ["Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga Total", "Status"];
 
   const titleRows = [
-    ["LAPORAN PENJUALAN MELATI BAWAH"],
+    [`LAPORAN PENJUALAN ${exportFloorLabel.value}`],
     [filterJenis.value === "all" ? "SEMUA JENIS" : filterJenis.value.toUpperCase()],
     [`${filterStart.value} - ${filterEnd.value}`],
     [],
@@ -1026,7 +1027,7 @@ async function exportDetailToExcel() {
     "Keterangan",
   ];
   const titleRows = [
-    ["LAPORAN PENJUALAN DETAIL - MELATI BAWAH"],
+    [`LAPORAN PENJUALAN DETAIL - ${exportFloorLabel.value}`],
     [filterJenis.value === "all" ? "SEMUA JENIS" : filterJenis.value.toUpperCase()],
     [`${filterStart.value} - ${filterEnd.value}`],
     [],
@@ -1058,7 +1059,7 @@ async function exportRekapToPdf() {
 
   doc.setFontSize(16);
   doc.setFont(undefined, "bold");
-  doc.text("LAPORAN PENJUALAN MELATI BAWAH", 148.5, 15, { align: "center" });
+  doc.text(`LAPORAN PENJUALAN ${exportFloorLabel.value}`, 148.5, 15, { align: "center" });
   doc.setFontSize(11);
   doc.text(`${filterStart.value} - ${filterEnd.value}`, 148.5, 22, { align: "center" });
 
@@ -1132,7 +1133,7 @@ async function exportDetailToPdfSingleDate() {
 
   doc.setFontSize(16);
   doc.setFont(undefined, "bold");
-  doc.text("LAPORAN PENJUALAN DETAIL - MELATI BAWAH", 148.5, 12, { align: "center" });
+  doc.text(`LAPORAN PENJUALAN DETAIL - ${exportFloorLabel.value}`, 148.5, 12, { align: "center" });
   doc.setFontSize(11);
   doc.text(`Tanggal: ${filterStart.value}`, 148.5, 20, { align: "center" });
 
@@ -1184,7 +1185,7 @@ async function exportDetailToPdfDateRange() {
 
   doc.setFontSize(16);
   doc.setFont(undefined, "bold");
-  doc.text("LAPORAN PENJUALAN DETAIL - MELATI BAWAH", 148.5, 12, { align: "center" });
+  doc.text(`LAPORAN PENJUALAN DETAIL - ${exportFloorLabel.value}`, 148.5, 12, { align: "center" });
   doc.setFontSize(11);
   doc.text(`Tanggal: ${filterStart.value} - ${filterEnd.value}`, 148.5, 20, { align: "center" });
 

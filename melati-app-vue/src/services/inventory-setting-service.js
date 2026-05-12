@@ -1,19 +1,19 @@
 import { getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
-import { getActiveFloor } from "@/config/floor-config";
+import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
 import { floorDoc } from "@/services/floor-scope";
 
 const DEFAULT_CARD_PRESETS = {
-  KALUNG: { type: "color", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
-  LIONTIN: { type: "color", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
-  ANTING: { type: "simple", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
-  CINCIN: { type: "simple", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
-  GELANG: { type: "simple", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
-  GIWANG: { type: "simple", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
-  "HALA & SDW": { type: "hala", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
-  BERLIAN: { type: "simple", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
-  "KENDARI & EMAS BALI": { type: "hala", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
-  "STOK KOMPUTER": { type: "computer", colorStart: "#e3f2fd", colorEnd: "#90caf9" },
+  KALUNG: { type: "color", detailMode: "color", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
+  LIONTIN: { type: "color", detailMode: "color", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
+  ANTING: { type: "simple", detailMode: "default", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
+  CINCIN: { type: "simple", detailMode: "default", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
+  GELANG: { type: "simple", detailMode: "default", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
+  GIWANG: { type: "simple", detailMode: "default", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
+  "HALA & SDW": { type: "hala", detailMode: "hala", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
+  BERLIAN: { type: "simple", detailMode: "default", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
+  "KENDARI & EMAS BALI": { type: "hala", detailMode: "hala", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
+  "STOK KOMPUTER": { type: "computer", detailMode: "default", colorStart: "#e3f2fd", colorEnd: "#90caf9" },
 };
 
 const DEFAULT_TABLE_ROWS = [
@@ -29,6 +29,7 @@ const DEFAULT_TABLE_ROWS = [
 ];
 
 const CARD_TYPES = new Set(["simple", "color", "hala", "computer"]);
+const DETAIL_MODES = new Set(["default", "color", "hala"]);
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const DEFAULT_SUMMARY_GRID = Object.freeze({
   md: 2,
@@ -36,6 +37,15 @@ const DEFAULT_SUMMARY_GRID = Object.freeze({
   xl: 3,
   gap: 12,
 });
+
+function getFloorDefaultDetailMode(floorId, cardId) {
+  const normalizedFloor = normalizeFloorId(floorId);
+  if (normalizedFloor === "L1") {
+    if (cardId === "KALUNG" || cardId === "LIONTIN") return "color";
+    if (cardId === "HALA & SDW" || cardId === "KENDARI & EMAS BALI") return "hala";
+  }
+  return "default";
+}
 
 function getSettingsDoc(floorId = "") {
   const activeFloor = floorId || getActiveFloor();
@@ -53,6 +63,14 @@ function normalizeText(value, fallback = "") {
 function normalizeColor(value, fallback) {
   const normalized = String(value || "").trim();
   if (HEX_COLOR_RE.test(normalized)) return normalized.toLowerCase();
+  return fallback;
+}
+
+function normalizeDetailMode(value, fallback = "default") {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (DETAIL_MODES.has(normalized)) return normalized;
   return fallback;
 }
 
@@ -77,17 +95,22 @@ function normalizeSummaryGrid(input = {}) {
   };
 }
 
-function normalizeCard(input = {}, fallback = {}, index = 0) {
+function normalizeCard(input = {}, fallback = {}, index = 0, floorId = "") {
   const fallbackId = normalizeText(fallback.id || "", `CARD_${index + 1}`);
   const id = normalizeText(input.id, fallbackId).toUpperCase();
   const label = normalizeText(input.label, fallback.label || id);
   const preset = DEFAULT_CARD_PRESETS[id] || {};
   const type = CARD_TYPES.has(input.type) ? input.type : fallback.type || preset.type || "simple";
+  const detailMode = normalizeDetailMode(
+    input.detailMode,
+    getFloorDefaultDetailMode(floorId, id) || preset.detailMode || "default",
+  );
 
   return {
     id,
     label,
     type,
+    detailMode: type === "computer" ? "default" : detailMode,
     enabled: input.enabled !== false,
     showInSummary: type === "computer" ? false : input.showInSummary !== false,
     order: normalizeOrder(input.order, normalizeOrder(fallback.order, index + 1)),
@@ -107,13 +130,14 @@ function normalizeTableRow(input = {}, fallback = {}, index = 0) {
   };
 }
 
-export function buildDefaultInventorySettings() {
+export function buildDefaultInventorySettings(floorId = "") {
   const cards = Object.keys(DEFAULT_CARD_PRESETS).map((id, index) => {
     const preset = DEFAULT_CARD_PRESETS[id];
     return {
       id,
       label: id,
       type: preset.type,
+      detailMode: getFloorDefaultDetailMode(floorId, id) || preset.detailMode || "default",
       enabled: true,
       showInSummary: preset.type !== "computer",
       order: index + 1,
@@ -131,13 +155,13 @@ export function buildDefaultInventorySettings() {
   };
 }
 
-export function normalizeInventorySettings(raw = {}) {
-  const defaults = buildDefaultInventorySettings();
+export function normalizeInventorySettings(raw = {}, floorId = "") {
+  const defaults = buildDefaultInventorySettings(floorId);
   const candidateCards = Array.isArray(raw.cards) && raw.cards.length ? raw.cards : defaults.cards;
   const cardMap = new Map();
 
   candidateCards.forEach((card, index) => {
-    const normalized = normalizeCard(card, defaults.cards[index] || {}, index);
+    const normalized = normalizeCard(card, defaults.cards[index] || {}, index, floorId);
     if (!normalized.id || cardMap.has(normalized.id)) return;
     cardMap.set(normalized.id, normalized);
   });
@@ -193,7 +217,7 @@ export async function ensureInventorySettings(floorId = "") {
   if (snap.exists()) return;
 
   await setDoc(docRef, {
-    ...buildDefaultInventorySettings(),
+    ...buildDefaultInventorySettings(floorId),
     lastUpdated: new Date().toISOString(),
     updatedBy: auth.currentUser?.email || "System (Initial)",
   });
@@ -201,12 +225,12 @@ export async function ensureInventorySettings(floorId = "") {
 
 export async function fetchInventorySettings(floorId = "") {
   const snap = await getDoc(getSettingsDoc(floorId));
-  const source = snap.exists() ? snap.data() : buildDefaultInventorySettings();
-  return normalizeInventorySettings(source);
+  const source = snap.exists() ? snap.data() : buildDefaultInventorySettings(floorId);
+  return normalizeInventorySettings(source, floorId);
 }
 
 export async function saveInventorySettings(payload, updatedBy = "System", floorId = "") {
-  const normalized = normalizeInventorySettings(payload);
+  const normalized = normalizeInventorySettings(payload, floorId);
   await setDoc(getSettingsDoc(floorId), {
     ...normalized,
     lastUpdated: new Date().toISOString(),
@@ -218,8 +242,8 @@ export function subscribeInventorySettings(onData, onError, floorId = "") {
   return onSnapshot(
     getSettingsDoc(floorId),
     (snap) => {
-      const source = snap.exists() ? snap.data() : buildDefaultInventorySettings();
-      onData(normalizeInventorySettings(source));
+      const source = snap.exists() ? snap.data() : buildDefaultInventorySettings(floorId);
+      onData(normalizeInventorySettings(source, floorId));
     },
     (error) => {
       if (typeof onError === "function") onError(error);
