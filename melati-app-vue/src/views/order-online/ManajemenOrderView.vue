@@ -167,9 +167,7 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">
-              Update Fisik Barang - {{ formatBulanDisplay(modalData.bulan) }}
-            </h5>
+            <h5 class="modal-title">Update Fisik Barang - {{ formatBulanDisplay(modalData.bulan) }}</h5>
             <button type="button" class="btn-close" @click="closeUpdateModal"></button>
           </div>
           <div class="modal-body">
@@ -214,13 +212,15 @@
 
             <div class="mb-3">
               <label class="form-label fw-semibold">Nama Staff</label>
-              <input
-                v-model="modalData.staffName"
-                type="text"
-                class="form-control"
-                placeholder="Masukkan nama staff"
-                required
-              />
+              <select v-model="modalData.staffName" class="form-select" required>
+                <option value="">Pilih staff</option>
+                <option v-for="staff in activeSalesStaffOptions" :key="staff.id" :value="staff.nama">
+                  {{ staff.nama }}
+                </option>
+              </select>
+              <small v-if="activeSalesStaffOptions.length === 0" class="text-muted d-block mt-1">
+                Data salesStaff belum tersedia.
+              </small>
             </div>
           </div>
           <div class="modal-footer">
@@ -242,6 +242,7 @@ import { computed, onMounted, ref } from "vue";
 import { useAlert } from "@/composables/useAlert";
 import { useAuthStore } from "@/stores/auth";
 import { fetchOrderOnlineByRangeForManagement } from "@/services/order-online-service";
+import { fetchSalesList } from "@/services/sales-service";
 import {
   formatBulan,
   getOrderOnlineManagementByUser,
@@ -263,6 +264,7 @@ const showAllMonths = ref(false);
 
 const allOrderData = ref([]);
 const managementRows = ref([]);
+const salesStaffOptions = ref([]);
 
 const dashboardCards = ref({
   belumDiambil: 0,
@@ -282,6 +284,10 @@ const modalData = ref({
 });
 
 const currentUserId = computed(() => authStore.currentUser?.uid || authStore.user?.uid || "");
+const activeSalesStaffOptions = computed(() => {
+  const active = (salesStaffOptions.value || []).filter((item) => (item?.status || "active") === "active");
+  return active.length ? active : salesStaffOptions.value;
+});
 
 function getOrderQty(item) {
   const qty = Number(item?.jml);
@@ -445,6 +451,16 @@ async function loadManagementData() {
 
   const data = await getOrderOnlineManagementByUser(userId);
   managementRows.value = data.orders || [];
+}
+
+async function loadSalesStaffOptions() {
+  try {
+    const data = await fetchSalesList();
+    salesStaffOptions.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error loading sales staff options:", error);
+    salesStaffOptions.value = [];
+  }
 }
 
 async function initializeManagementMonths(orderBelumDiambilRows) {
@@ -625,7 +641,7 @@ function formatTimestamp(timestamp) {
 
 onMounted(async () => {
   try {
-    await refreshDashboard();
+    await Promise.all([refreshDashboard(), loadSalesStaffOptions()]);
   } catch (error) {
     console.error("Error initializing order management view:", error);
   } finally {

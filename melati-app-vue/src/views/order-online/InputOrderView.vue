@@ -38,13 +38,15 @@
                 Nama Admin
                 <span class="text-danger">*</span>
               </label>
-              <input
-                v-model="form.namaAdmin"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Nama admin"
-                required
-              />
+              <select v-model="form.namaAdmin" class="form-select form-select-sm" required>
+                <option value="">Input nama</option>
+                <option v-for="staff in activeSalesStaffOptions" :key="staff.id" :value="staff.nama">
+                  {{ staff.nama }}
+                </option>
+              </select>
+              <small v-if="activeSalesStaffOptions.length === 0" class="text-muted d-block mt-1">
+                Data salesStaff belum tersedia.
+              </small>
             </div>
             <div class="col-md-3">
               <label class="form-label small fw-semibold">
@@ -182,21 +184,28 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from "vue";
+import { reactive, ref, computed, onMounted } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import { saveOrderOnline } from "@/services/order-online-service";
+import { fetchSalesList } from "@/services/sales-service";
 
 const auth = useAuthStore();
 const { swal, error: showError } = useAlert();
 const { todayStringWITA, timeStringWITA } = useWITA();
 
 const saving = ref(false);
+const salesStaffOptions = ref([]);
+
+const activeSalesStaffOptions = computed(() => {
+  const active = (salesStaffOptions.value || []).filter((item) => (item?.status || "active") === "active");
+  return active.length ? active : salesStaffOptions.value;
+});
 
 const form = reactive({
   tanggal: todayStringWITA(),
-  namaAdmin: auth.currentUser?.displayName || auth.currentUser?.username || "",
+  namaAdmin: "",
   namaCustomer: "",
   kontak: "",
 });
@@ -216,9 +225,19 @@ function removeRow(index) {
   detailRows.value.splice(index, 1);
 }
 
+async function loadSalesStaffOptions() {
+  try {
+    const data = await fetchSalesList();
+    salesStaffOptions.value = Array.isArray(data) ? data : [];
+  } catch (err) {
+    salesStaffOptions.value = [];
+    console.error("Gagal memuat data sales staff:", err);
+  }
+}
+
 function resetForm() {
   form.tanggal = todayStringWITA();
-  form.namaAdmin = auth.currentUser?.displayName || auth.currentUser?.username || "";
+  form.namaAdmin = "";
   form.namaCustomer = "";
   form.kontak = "";
   detailRows.value = [{ jml: 1, namaBarang: "", berat: "", karat: "", harga: "" }];
@@ -249,4 +268,6 @@ async function saveData() {
     saving.value = false;
   }
 }
+
+onMounted(loadSalesStaffOptions);
 </script>

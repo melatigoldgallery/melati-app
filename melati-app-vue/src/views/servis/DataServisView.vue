@@ -334,7 +334,7 @@
                 </button>
                 <button
                   v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
-                  class="btn btn-success btn-sm flex-fill"
+                  class="btn btn-secondary btn-sm flex-fill"
                   :disabled="contactingServisId === item.id"
                   @click="markCustomerContacted(item)"
                 >
@@ -343,6 +343,16 @@
                   Sudah Dihubungi
                 </button>
               </div>
+              <button
+                v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
+                class="btn btn-success btn-sm"
+                :disabled="contactingServisId === item.id"
+                @click="contactCustomerViaWhatsApp(item)"
+              >
+                <span v-if="contactingServisId === item.id" class="spinner-border spinner-border-sm me-1"></span>
+                <i v-else class="bi bi-whatsapp me-1"></i>
+                Hubungi WhatsApp
+              </button>
             </div>
           </div>
         </div>
@@ -379,13 +389,14 @@
                 <th class="text-end" style="min-width: 80px">Ongkos</th>
                 <th class="text-center" style="min-width: 100px">Status Servis</th>
                 <th style="min-width: 140px">Penerimaan Servis</th>
+                <th style="min-width: 180px">Hubungi Customer</th>
                 <th style="min-width: 110px">Pengambilan Servis</th>
                 <th class="text-center" style="min-width: 140px">Aksi</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="filteredList.length === 0">
-                <td :colspan="filterJenis === 'custom' ? 18 : 17" class="text-center text-muted py-5">
+                <td :colspan="filterJenis === 'custom' ? 19 : 18" class="text-center text-muted py-5">
                   <i class="bi bi-inbox display-5 d-block mb-2 opacity-25"></i>
                   Tidak ada data servis.
                 </td>
@@ -485,6 +496,30 @@
                     </span>
                   </div>
                   <span v-if="!item.penerimaServis && !item.waktuPenerimaan" class="text-muted">-</span>
+                </td>
+                <td class="align-middle small">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <span class="text-muted d-flex flex-column">
+                      <span>Terakhir dihubungi</span>
+                      <span v-if="item.waktuDihubungiTerakhir">{{ formatWaktu(item.waktuDihubungiTerakhir) }}</span>
+                      <span v-else>-</span>
+                    </span>
+                    <button
+                      v-if="item.statusServis === 'Sudah Selesai' && item.noHp"
+                      class="btn btn-success btn-sm"
+                      :disabled="contactingServisId === item.id"
+                      @click="contactCustomerViaWhatsApp(item)"
+                      title="Hubungi WhatsApp"
+                    >
+                      <span
+                        v-if="contactingServisId === item.id"
+                        class="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      <i v-else class="bi bi-whatsapp"></i>
+                    </button>
+                  </div>
                 </td>
                 <td class="align-middle small">
                   <div
@@ -1285,23 +1320,32 @@
 
     <!-- ── Bukti Viewer Modal ── -->
     <div class="modal fade" id="buktiModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
           <div class="modal-header py-2">
             <h6 class="modal-title fw-semibold">
               <i class="bi bi-image me-1"></i>
               {{ buktiViewTitle }}
             </h6>
+            <div class="d-flex align-items-center gap-1 me-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" @click="zoomOutBukti">-</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" @click="zoomInBukti">+</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" @click="resetBuktiZoom">
+                {{ Math.round(buktiZoom * 100) }}%
+              </button>
+            </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <div class="modal-body text-center">
-            <img
-              v-if="buktiViewUrl"
-              :src="buktiViewUrl"
-              alt="Bukti Pengambilan"
-              class="img-fluid rounded"
-              style="max-height: 70vh"
-            />
+          <div class="modal-body p-0">
+            <div class="bukti-zoom-stage" @wheel.prevent="onBuktiWheel">
+              <img
+                v-if="buktiViewUrl"
+                :src="buktiViewUrl"
+                alt="Bukti Pengambilan"
+                class="bukti-zoom-image"
+                :style="{ transform: `scale(${buktiZoom})` }"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1538,6 +1582,7 @@ const deleteSaving = ref(false);
 // Bukti viewer
 const buktiViewUrl = ref("");
 const buktiViewTitle = ref("Bukti Foto");
+const buktiZoom = ref(1);
 const showPrintFailedModal = ref(false);
 const printFailedMessage = ref("Pastikan printing service sudah dijalankan di komputer ini.");
 const failedPrintItem = ref(null);
@@ -1621,20 +1666,34 @@ function normalizePhoneForDisplay(phone) {
   return cleaned || "-";
 }
 
+function normalizePhoneForWhatsApp(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  return digits;
+}
+
 function getContactMessage(item) {
-  const namaCustomer = item?.namaCustomer || "Kak";
+  const namaCustomer = item?.namaCustomer || "Test";
   const namaBarang = getItemNama(item) || "-";
   const isCustom = (item?.jenisInput || "servis") === "custom";
   const jenisLabel = isCustom ? "CUSTOM" : getItemJenisServis(item) || "SERVIS";
-  const barangLabel = isCustom ? "Barang custom" : "Barang servis";
 
   return (
     `Halo Kak ${namaCustomer},\n` +
-    `${barangLabel} Kakak sudah selesai.\n` +
-    `(${namaBarang})\n` +
+    "Barang servis Kakak sudah selesai.\n" +
+    `${namaBarang}\n` +
     `Jenis: ${jenisLabel}\n` +
     `Silahkan datang ke Melati Gold Shop untuk mengambil barangnya ya kak. Terima kasih`
   );
+}
+
+function buildWhatsAppContactUrl(item) {
+  const phone = normalizePhoneForWhatsApp(item?.noHp);
+  if (!phone) return "";
+  const message = encodeURIComponent(getContactMessage(item));
+  return `https://wa.me/${phone}?text=${message}`;
 }
 
 function buildContactExportText() {
@@ -2770,6 +2829,36 @@ async function markCustomerContacted(item) {
   }
 }
 
+async function contactCustomerViaWhatsApp(item) {
+  if (!item?.id) return;
+  if (!item.noHp) return swal("Nomor HP tidak tersedia", "warning");
+  if (contactingServisId.value) return;
+
+  const url = buildWhatsAppContactUrl(item);
+  if (!url) return swal("Nomor HP tidak valid untuk WhatsApp", "warning");
+
+  const popup = window.open(url, "_blank", "noopener,noreferrer");
+  if (!popup) {
+    window.location.href = url;
+  }
+
+  contactingServisId.value = item.id;
+  try {
+    await updateServisStatus(item.id, {
+      waktuDihubungiTerakhir: new Date().toISOString(),
+      metodeKontakTerakhir: "whatsapp",
+      dihubungiOleh: authStore.userDisplayName || authStore.userName || authStore.userEmail || "staf",
+    });
+    invalidateCurrentRangeCache();
+    swal("WhatsApp dibuka dan waktu kontak terakhir disimpan", "success");
+    if (!isToday()) await loadData();
+  } catch (e) {
+    showError("WhatsApp terbuka, tapi gagal menyimpan status kontak", e.message);
+  } finally {
+    contactingServisId.value = "";
+  }
+}
+
 function openBuktiModal(item) {
   const url = getBuktiPengambilanUrl(item);
   if (!url) {
@@ -2791,7 +2880,29 @@ function openBuktiModalByUrl(url, title = "Bukti Foto") {
   if (!url) return;
   buktiViewUrl.value = url;
   buktiViewTitle.value = title;
+  buktiZoom.value = 1;
   Modal.getOrCreateInstance(document.getElementById("buktiModal")).show();
+}
+
+function zoomInBukti() {
+  buktiZoom.value = Math.min(4, Number((buktiZoom.value + 0.2).toFixed(2)));
+}
+
+function zoomOutBukti() {
+  buktiZoom.value = Math.max(0.5, Number((buktiZoom.value - 0.2).toFixed(2)));
+}
+
+function resetBuktiZoom() {
+  buktiZoom.value = 1;
+}
+
+function onBuktiWheel(event) {
+  if (!buktiViewUrl.value) return;
+  if (event.deltaY < 0) {
+    zoomInBukti();
+    return;
+  }
+  zoomOutBukti();
 }
 
 async function rePrint(item) {
@@ -3227,6 +3338,22 @@ function handleRevertStatusServisModalHidden() {
 
 .mobile-servis-card-body {
   padding: 0.75rem 0.8rem;
+}
+
+.bukti-zoom-stage {
+  height: calc(100vh - 56px);
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+}
+
+.bukti-zoom-image {
+  max-width: 94vw;
+  max-height: 92vh;
+  transform-origin: center center;
+  transition: transform 0.12s ease-out;
 }
 
 .mobile-top-row {
