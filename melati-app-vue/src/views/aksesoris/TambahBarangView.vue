@@ -557,14 +557,8 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import {
-  collection,
   doc,
-  getDoc,
   getDocs,
-  addDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
   runTransaction,
   serverTimestamp,
   increment,
@@ -580,7 +574,6 @@ import { useAccessoriesStore } from "@/stores/accessories";
 import {
   addStock,
   fetchKodesByKategori,
-  fetchKodeWithStockByKategori,
   verifyDeleteTambahBarangPassword,
 } from "@/services/stock-service";
 import { useAlert } from "@/composables/useAlert";
@@ -973,6 +966,21 @@ const kodeForm = ref({ id: null, kode: "", nama: "", kadar: "", berat: "", harga
 const isKodeSaving = ref(false);
 let formKodeModal = null;
 
+function buildStokKodeData(data) {
+  const isSilver = activeKodeTab.value === "silver";
+  const isKotak = activeKodeTab.value === "kotak";
+  return {
+    kode: data.text,
+    nama: data.nama,
+    kategori: activeKodeTab.value,
+    kadar: isSilver ? data.kadar || null : null,
+    berat: isSilver ? data.berat || null : null,
+    harga: isKotak ? data.harga || null : null,
+    isActive: true,
+    updatedAt: serverTimestamp(),
+  };
+}
+
 function openTambahKode() {
   kodeFormMode.value = "add";
   kodeForm.value = { id: null, kode: "", nama: "", kadar: "", berat: "", harga: "" };
@@ -1007,41 +1015,48 @@ async function simpanKode() {
       ...(activeKodeTab.value === "silver" ? { kadar: kodeForm.value.kadar, berat: kodeForm.value.berat } : {}),
       ...(activeKodeTab.value === "kotak" ? { harga: kodeForm.value.harga } : {}),
     };
+    const stokRef = floorDoc(db, "stokAksesoris", data.text, activeFloor.value);
+    const stokData = buildStokKodeData(data);
     if (kodeFormMode.value === "add") {
-      await addDoc(floorSubCollection(db, "kodeAksesoris", "kategori", activeKodeTab.value, activeFloor.value), data);
-      // Inisialisasi stokAksesoris/{kode} jika belum ada, agar tambah barang
-      // hanya perlu increment (tidak membuat dokumen baru = sesuai behavior lama)
-      const kodeText = data.text;
-      const stokRef = floorDoc(db, "stokAksesoris", kodeText, activeFloor.value);
-      const stokSnap = await getDoc(stokRef);
-      if (!stokSnap.exists()) {
-        await setDoc(stokRef, {
-          kode: kodeText,
-          nama: data.nama,
-          kategori: activeKodeTab.value,
-          kadar: activeKodeTab.value === "silver" ? kodeForm.value.kadar || null : null,
-          berat: activeKodeTab.value === "silver" ? kodeForm.value.berat || null : null,
-          stok: 0,
-          isActive: true,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
+      const kodeRef = doc(floorSubCollection(db, "kodeAksesoris", "kategori", activeKodeTab.value, activeFloor.value));
+      await runTransaction(db, async (txn) => {
+        const stokSnap = await txn.get(stokRef);
+        txn.set(kodeRef, data);
+        if (stokSnap.exists()) {
+          txn.update(stokRef, stokData);
+        } else {
+          txn.set(stokRef, {
+            ...stokData,
+            stok: 0,
+            createdAt: serverTimestamp(),
+          });
+        }
+      });
     } else {
       const { text: _text, ...updateData } = data;
-      await updateDoc(
-        doc(
-          db,
-          ...floorSegmentsWithFloorId(
-            activeFloor.value,
-            "kodeAksesoris",
-            "kategori",
-            activeKodeTab.value,
-            kodeForm.value.id,
-          ),
+      const kodeRef = doc(
+        db,
+        ...floorSegmentsWithFloorId(
+          activeFloor.value,
+          "kodeAksesoris",
+          "kategori",
+          activeKodeTab.value,
+          kodeForm.value.id,
         ),
-        updateData,
       );
+      await runTransaction(db, async (txn) => {
+        const stokSnap = await txn.get(stokRef);
+        txn.update(kodeRef, updateData);
+        if (stokSnap.exists()) {
+          txn.update(stokRef, stokData);
+        } else {
+          txn.set(stokRef, {
+            ...stokData,
+            stok: 0,
+            createdAt: serverTimestamp(),
+          });
+        }
+      });
     }
     formKodeModal.hide();
     swal("Kode berhasil disimpan");
@@ -1070,18 +1085,24 @@ function openHapusKode(k) {
 async function hapusKode() {
   isKodeDeleting.value = true;
   try {
-    await deleteDoc(
-      doc(
-        db,
-        ...floorSegmentsWithFloorId(
-          activeFloor.value,
-          "kodeAksesoris",
-          "kategori",
-          activeKodeTab.value,
-          deleteKodeTarget.value.id,
-        ),
+    const kodeText = String(deleteKodeTarget.value?.kode || deleteKodeTarget.value?.text || "")
+      .trim()
+      .toUpperCase();
+    const kodeRef = doc(
+      db,
+      ...floorSegmentsWithFloorId(
+        activeFloor.value,
+        "kodeAksesoris",
+        "kategori",
+        activeKodeTab.value,
+        deleteKodeTarget.value.id,
       ),
     );
+    const stokRef = kodeText ? floorDoc(db, "stokAksesoris", kodeText, activeFloor.value) : null;
+    await runTransaction(db, async (txn) => {
+      txn.delete(kodeRef);
+      if (stokRef) txn.delete(stokRef);
+    });
     deleteKodeModal.hide();
     swal("Kode berhasil dihapus");
     await loadKodeBarang(activeKodeTab.value);

@@ -104,7 +104,7 @@
       <div class="app-intro-container">
         <div class="app-intro-header text-center mb-4">
           <img src="/img/Melati.jfif" alt="Melati Gold Shop Logo" class="app-logo mb-3" />
-          <h1 class="app-title">Sistem Custom dan Servis</h1>
+          <h1 class="app-title">Sistem Servis dan Order Online</h1>
           <p class="app-subtitle">Melati Gold Shop</p>
         </div>
 
@@ -116,8 +116,7 @@
                 Tentang Aplikasi
               </h2>
               <p class="card-text small mb-0 text-center">
-                Sistem ini digunakan untuk memproses data servis, dokumentasi bukti pengambilan, dan update status
-                barang customer dengan mudah.
+                Sistem ini digunakan untuk memantau data servis dan order online customer dengan lebih cepat.
               </p>
             </div>
           </div>
@@ -139,10 +138,16 @@
           </div>
         </div>
 
-        <div class="app-servis mt-4 mb-3 text-center">
-          <RouterLink to="/servis/data" class="btn btn-warning btn-md w-100">
-            <i class="bi bi-box-arrow-in-right me-2"></i>
-            Data Servis
+        <div class="app-servis mt-4 mb-3">
+          <RouterLink
+            v-for="link in adminActionLinks"
+            :key="link.to"
+            :to="link.to"
+            class="btn btn-sm w-100"
+            :class="link.class"
+          >
+            <i :class="['bi', link.icon, 'me-2']"></i>
+            {{ link.label }}
           </RouterLink>
         </div>
       </div>
@@ -385,7 +390,10 @@ const mobileDashboardVariant = computed(() => {
   if ((normalizedRole.value === "staff" || normalizedRole.value === "hrd") && canOpen("absensi.pengajuan-izin")) {
     return "staff";
   }
-  if ((normalizedRole.value === "admin" || normalizedRole.value === "admin_custom") && canOpen("servis.data")) {
+  if (
+    (normalizedRole.value === "admin" || normalizedRole.value === "admin_custom") &&
+    (canOpen("servis.data") || canOpen("order-online.data"))
+  ) {
     return "admin";
   }
   // Supervisor: gunakan dashboard desktop apa adanya.
@@ -417,24 +425,43 @@ const staffFeatures = [
 
 const adminFeatures = [
   {
-    title: "Data Servis Harian",
-    desc: "Pantau daftar servis dan custom per tanggal agar proses pengecekan lebih cepat.",
-    icon: "bi-table",
+    title: "Data Servis",
+    desc: "Pantau daftar servis, custom, status pengerjaan, dan bukti pengambilan customer.",
+    icon: "bi-tools",
     color: "linear-gradient(135deg,#f59f00 0%,#f76707 100%)",
   },
   {
-    title: "Bukti Pengambilan",
-    desc: "Pastikan dokumentasi pengambilan tersimpan rapi untuk validasi dan arsip data.",
-    icon: "bi-camera",
-    color: "linear-gradient(135deg,#e67700 0%,#d9480f 100%)",
+    title: "Order Online",
+    desc: "Lihat data pesanan online customer agar tindak lanjut order lebih terkontrol.",
+    icon: "bi-shop",
+    color: "linear-gradient(135deg,#e11d48 0%,#fb7185 100%)",
   },
   {
     title: "Update Status Cepat",
-    desc: "Ubah status servis dan pengambilan langsung dari dashboard sesuai progres pekerjaan.",
+    desc: "Perbarui progres servis dan order dari halaman data sesuai pekerjaan berjalan.",
     icon: "bi-arrow-repeat",
-    color: "linear-gradient(135deg,#fd7e14 0%,#fa5252 100%)",
+    color: "linear-gradient(135deg,#0c8599 0%,#1c7ed6 100%)",
   },
 ];
+
+const adminActionLinks = computed(() =>
+  [
+    {
+      label: "Data Servis",
+      to: "/servis/data",
+      icon: "bi-tools",
+      class: "btn-warning",
+      pageKey: "servis.data",
+    },
+    {
+      label: "Data Order Online",
+      to: "/order-online/data",
+      icon: "bi-shop",
+      class: "btn-primary",
+      pageKey: "order-online.data",
+    },
+  ].filter((link) => canOpen(link.pageKey)),
+);
 </script>
 
 <style scoped>
@@ -694,6 +721,12 @@ const adminFeatures = [
 .app-servis .btn {
   border-radius: 12px;
   font-weight: 600;
+}
+
+.app-servis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 @keyframes fadeInUp {

@@ -170,15 +170,30 @@
 
             <div class="d-grid gap-2 mobile-action-grid">
               <div class="d-flex gap-2">
-                <button class="btn btn-success btn-sm flex-fill" @click="markCustomerContacted(row)">
-                  <i class="bi bi-telephone-outbound me-1"></i>
-                  Sudah Dihubungi
-                </button>
                 <button class="btn btn-warning btn-sm flex-fill" @click="openStatusModal(row)">
                   <i class="bi bi-arrow-repeat me-1"></i>
                   Update Status
                 </button>
+                <button
+                  class="btn btn-secondary btn-sm flex-fill"
+                  :disabled="contactingOrderId === row.id"
+                  @click="markCustomerContacted(row)"
+                >
+                  <span v-if="contactingOrderId === row.id" class="spinner-border spinner-border-sm me-1"></span>
+                  <i v-else class="bi bi-telephone-outbound me-1"></i>
+                  Sudah Dihubungi
+                </button>
               </div>
+              <button
+                v-if="row.kontak"
+                class="btn btn-success btn-sm w-100"
+                :disabled="contactingOrderId === row.id"
+                @click="contactCustomerViaWhatsApp(row)"
+              >
+                <span v-if="contactingOrderId === row.id" class="spinner-border spinner-border-sm me-1"></span>
+                <i v-else class="bi bi-whatsapp me-1"></i>
+                Hubungi WhatsApp
+              </button>
             </div>
           </div>
         </div>
@@ -209,7 +224,7 @@
                 <th style="width: 90px">Kadar</th>
                 <th style="width: 110px" class="text-start">Harga</th>
                 <th style="min-width: 140px">Handle / Waktu</th>
-                <th style="min-width: 150px">Terakhir Dihubungi</th>
+                <th style="min-width: 150px">Hubungi Customer</th>
                 <th style="width: 90px" class="text-center">Bukti</th>
                 <th style="min-width: 160px" class="text-center">Aksi</th>
               </tr>
@@ -243,11 +258,29 @@
                     {{ row.waktuPengambilan ? formatDisplayDateTime(row.waktuPengambilan) : "-" }}
                   </div>
                 </td>
-                <td class="small">
-                  <div class="text-dark">
-                    {{ row.waktuDihubungiTerakhir ? formatDisplayDateTime(row.waktuDihubungiTerakhir) : "-" }}
+                <td class="small align-middle">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <span class="text-muted d-flex flex-column contact-last-text">
+                      <span>Terakhir dihubungi</span>
+                      <span v-if="row.waktuDihubungiTerakhir">{{ formatDisplayDateTime(row.waktuDihubungiTerakhir) }}</span>
+                      <span v-else>-</span>
+                    </span>
+                    <button
+                      v-if="row.kontak"
+                      class="btn btn-success btn-sm"
+                      :disabled="contactingOrderId === row.id"
+                      @click="contactCustomerViaWhatsApp(row)"
+                      title="Hubungi WhatsApp"
+                    >
+                      <span
+                        v-if="contactingOrderId === row.id"
+                        class="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      <i v-else class="bi bi-whatsapp"></i>
+                    </button>
                   </div>
-                  <div v-if="row.dihubungiOleh" class="text-muted" style="font-size: 0.75rem">Oleh: {{ row.dihubungiOleh }}</div>
                 </td>
                 <td class="text-center">
                   <a
@@ -532,6 +565,21 @@ function buildContactMessage(row) {
   );
 }
 
+function normalizePhoneForWhatsApp(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  return digits;
+}
+
+function buildWhatsAppContactUrl(row) {
+  const phone = normalizePhoneForWhatsApp(row?.kontak);
+  if (!phone) return "";
+  const message = encodeURIComponent(buildContactMessage(row));
+  return `https://wa.me/${phone}?text=${message}`;
+}
+
 function buildContactExportText() {
   const items = rows.value;
   if (!items.length) return "Tidak ada data order online untuk diekspor.";
@@ -624,6 +672,39 @@ async function markCustomerContacted(row) {
     await loadData();
   } catch (error) {
     showError("Gagal menyimpan status kontak", error?.message || "Silakan coba lagi.");
+  } finally {
+    contactingOrderId.value = "";
+  }
+}
+
+async function contactCustomerViaWhatsApp(row) {
+  if (!row?.id || contactingOrderId.value) return;
+  if (!row.kontak) return swal("Nomor HP tidak tersedia", "warning");
+
+  const url = buildWhatsAppContactUrl(row);
+  if (!url) return swal("Nomor HP tidak valid untuk WhatsApp", "warning");
+
+  const popup = window.open(url, "_blank", "noopener,noreferrer");
+  if (!popup) {
+    window.location.href = url;
+  }
+
+  contactingOrderId.value = row.id;
+  try {
+    const contactTime = formatLocalDateTime(nowWITA());
+    await updateOrderContactStatus(
+      row.id,
+      {
+        waktuDihubungiTerakhir: contactTime,
+        metodeKontakTerakhir: "whatsapp",
+        dihubungiOleh: auth.currentUser?.username || auth.currentUser?.displayName || auth.currentUser?.email || "staf",
+      },
+      activeFloor.value,
+    );
+    await swal("WhatsApp dibuka dan waktu kontak terakhir disimpan", "success");
+    await loadData();
+  } catch (error) {
+    showError("WhatsApp terbuka, tapi gagal menyimpan status kontak", error?.message || "Silakan coba lagi.");
   } finally {
     contactingOrderId.value = "";
   }
@@ -863,6 +944,11 @@ async function deleteRow(row) {
 .mobile-action-grid .btn {
   font-size: 0.73rem;
   font-weight: 600;
+}
+
+.contact-last-text {
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 @media (max-width: 420px) {
