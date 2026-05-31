@@ -243,18 +243,20 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { Modal } from "bootstrap";
-import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, where } from "firebase/firestore";
+import { collection, getDoc, getDocs, orderBy, query, setDoc, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { floorDoc, floorCollection } from "@/services/floor-scope";
 import { useAuthStore } from "@/stores/auth";
-import { db } from "@/config/firebase";
+import { db, functions } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import { MAIN_CATEGORIES, SUB_CATEGORIES, fetchAllStockData } from "@/services/inventory-service";
+import { fetchInventorySettings } from "@/services/inventory-setting-service";
 
 const { toast, error: showError } = useAlert();
-const { todayStringWITA, nowWITA } = useWITA();
+const { todayStringWITA } = useWITA();
 
 const SUMMARY_CATEGORIES = SUB_CATEGORIES.map((sub) => sub.key);
 
@@ -265,6 +267,18 @@ const COLOR_LABELS = { HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink
 const HALA_TYPES = ["KA", "LA", "AN", "CA", "SA", "GA"];
 const HALA_LABELS = { KA: "Kalung", LA: "Liontin", AN: "Anting", CA: "Cincin", SA: "Giwang", GA: "Gelang" };
 const JEWELRY_TYPED_CATEGORIES = ["HALA & SDW", "KENDARI & EMAS BALI"];
+const LEGACY_LOG_TEXT_LIMIT = 30000;
+const SUMMARY_COLUMN_COLORS = {
+  brankas: "#e3f2fd",
+  posting: "#e8f5e9",
+  "barang-display": "#fff3e0",
+  "barang-rusak": "#fce4ec",
+  "batu-lepas": "#ede7f6",
+  manual: "#f3e5f5",
+  admin: "#e0f7fa",
+  DP: "#f9fbe7",
+  lainnya: "#efebe9",
+};
 
 const loading = ref(false);
 const saving = ref(false);
@@ -299,7 +313,6 @@ const stockDataSnapshot = ref({});
 const lastStockFetchAt = ref(0);
 const STOCK_SNAPSHOT_TTL = 60000;
 let stockFetchPromise = null;
-let autoSnapshotTimer = null;
 const authStore = useAuthStore();
 const activeFloor = computed(() => authStore.activeFloor || "L1");
 
@@ -322,14 +335,6 @@ function formatDateTime(dateLike) {
     return `${d.toLocaleDateString("id-ID")} ${d.toLocaleTimeString("id-ID")}`;
   }
   return "";
-}
-
-function formatDateKey(date) {
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 function itemOf(cat) {
@@ -450,72 +455,15 @@ function computeCurrentSummarySnapshot(sourceStockData) {
   return { date: selectedDate.value, createdAt: null, items, breakdown };
 }
 
-async function saveSnapshotByDate(dateKey, { backfilled = false } = {}) {
-  const live = await getStockSnapshot({ force: true });
-  const snap = computeCurrentSummarySnapshot(live);
-  const docRef = floorDoc(db, "daily_stock_reports", dateKey, activeFloor.value);
-  await setDoc(
-    docRef,
-    {
-      date: dateKey,
-      createdAt: new Date().toISOString(),
-      items: snap.items,
-      breakdown: snap.breakdown,
-      ...(backfilled ? { backfilled: true } : {}),
-    },
-    { merge: true },
-  );
-}
-
-async function ensureYesterdaySnapshotIfMissing() {
-  const now = nowWITA();
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const yesterdayKey = formatDateKey(yesterday);
-  if (!yesterdayKey) return;
-  const docRef = floorDoc(db, "daily_stock_reports", yesterdayKey, activeFloor.value);
-  const snap = await getDoc(docRef);
-  if (!snap.exists()) {
-    await saveSnapshotByDate(yesterdayKey, { backfilled: true });
-    toast("Snapshot kemarin (backfill) dibuat dengan breakdown lengkap");
-  }
-}
-
-async function ensureTodaySnapshotIfPassed() {
-  const now = nowWITA();
-  const cutoff = new Date(now);
-  cutoff.setHours(23, 0, 0, 0);
-  if (now >= cutoff) {
-    const key = formatDateKey(now);
-    if (!key) return;
-    const docRef = floorDoc(db, "daily_stock_reports", key, activeFloor.value);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) {
-      await saveSnapshotByDate(key);
-      toast("Snapshot otomatis dibuat dengan breakdown lengkap");
-    }
-  }
-}
-
-function scheduleAutoSnapshot() {
-  const now = nowWITA();
-  const target = new Date(now);
-  target.setHours(23, 0, 0, 0);
-  if (now > target) target.setDate(target.getDate() + 1);
-  const delay = Math.max(1000, target.getTime() - now.getTime());
-  autoSnapshotTimer = window.setTimeout(async () => {
-    try {
-      const now2 = nowWITA();
-      const key = formatDateKey(now2);
-      if (key) {
-        await saveSnapshotByDate(key);
-        toast("Snapshot otomatis terekam 23:00 WITA");
-      }
-    } catch (err) {
-      showError("Gagal snapshot otomatis", err?.message || "");
-    } finally {
-      scheduleAutoSnapshot();
-    }
-  }, delay);
+async function saveSnapshotByDate(dateKey, reason = "manual") {
+  const callable = httpsCallable(functions, "saveDailySnapshot");
+  const res = await callable({
+    scope: "floor",
+    floorId: activeFloor.value,
+    dateYmd: dateKey,
+    reason,
+  });
+  return res?.data || {};
 }
 
 async function loadReport() {
@@ -551,8 +499,14 @@ async function saveSnapshot() {
   if (!selectedDate.value) return;
   saving.value = true;
   try {
-    await saveSnapshotByDate(selectedDate.value);
-    toast("Snapshot berhasil disimpan");
+    const result = await saveSnapshotByDate(selectedDate.value, "laporan-stok-harian");
+    if (result?.created) {
+      toast("Snapshot berhasil disimpan via Cloud Function");
+    } else if (result?.reason === "locked") {
+      toast("Snapshot sedang diproses, silakan coba lagi sesaat");
+    } else {
+      toast("Snapshot sudah tersedia");
+    }
     await loadReport();
   } catch (err) {
     showError("Gagal menyimpan snapshot", err?.message || "");
@@ -709,10 +663,104 @@ async function saveWarnaEdit() {
   }
 }
 
-function groupLogsByMainCategory(logDocs) {
+function safeCellText(value, maxLen = LEGACY_LOG_TEXT_LIMIT) {
+  const text = String(value || "");
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen)} ...[dipotong]`;
+}
+
+function toExcelSafeSheetName(name, fallback = "Sheet") {
+  const invalidChars = /[\\/*?:[\]]/g;
+  const clean = String(name || "")
+    .replace(invalidChars, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (clean || fallback).slice(0, 31);
+}
+
+function makeUniqueSheetName(name, usedNames, fallback = "Sheet") {
+  const base = toExcelSafeSheetName(name, fallback);
+  let candidate = base;
+  let idx = 2;
+  while (usedNames.has(candidate)) {
+    const suffix = `_${idx}`;
+    candidate = `${base.slice(0, Math.max(1, 31 - suffix.length))}${suffix}`;
+    idx += 1;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function normalizeExportCategoriesFromCards(cards = []) {
+  const nonComputer = cards
+    .filter((card) => card?.enabled !== false)
+    .filter((card) => String(card?.type || "").toLowerCase() !== "computer")
+    .filter((card) => card?.showInSummary !== false)
+    .map((card) => ({
+      id: String(card?.id || "")
+        .trim()
+        .toUpperCase(),
+      label: String(card?.label || card?.id || "")
+        .trim()
+        .toUpperCase(),
+      order: Number(card?.order || 0),
+    }))
+    .filter((card) => card.id);
+
+  const uniqueById = new Map();
+  nonComputer.forEach((card, index) => {
+    if (uniqueById.has(card.id)) return;
+    uniqueById.set(card.id, { ...card, order: card.order || index + 1 });
+  });
+
+  return [...uniqueById.values()]
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, "id"))
+    .map((card) => ({ id: card.id, label: card.label || card.id }));
+}
+
+async function resolveExportCategories() {
+  try {
+    const settings = await fetchInventorySettings(activeFloor.value);
+    const fromSettings = normalizeExportCategoriesFromCards(settings?.cards || []);
+    if (fromSettings.length) return fromSettings;
+  } catch (_) {
+    // fallback to static categories if settings cannot be read
+  }
+  return MAIN_CATEGORIES.map((cat) => ({ id: cat, label: cat }));
+}
+
+async function fetchLogsWithFallback(startDate, endDate) {
+  const collectionsToTry = ["dailyStockLogs", "daily_stock_logs"];
+  const merged = new Map();
+
+  for (const collectionName of collectionsToTry) {
+    try {
+      const logsQ = query(
+        floorCollection(db, collectionName, activeFloor.value),
+        where("date", ">=", startDate),
+        where("date", "<=", endDate),
+        orderBy("date", "desc"),
+      );
+      const logsSnap = await getDocs(logsQ);
+      logsSnap.docs.forEach((d) => {
+        const data = d.data() || {};
+        const dateKey = String(data.date || "");
+        const dedupeKey = `${dateKey}::${d.id}`;
+        if (!merged.has(dedupeKey)) merged.set(dedupeKey, { id: d.id, ...data });
+      });
+    } catch (_) {
+      // noop: continue to next fallback collection
+    }
+  }
+
+  return [...merged.values()];
+}
+
+function groupLogsByMainCategory(logDocs, categories = MAIN_CATEGORIES) {
   const locations = [...SUMMARY_CATEGORIES];
+  const categorySet = new Set(categories);
   const grouped = {};
-  MAIN_CATEGORIES.forEach((cat) => {
+  categories.forEach((cat) => {
     grouped[cat] = [];
   });
 
@@ -720,9 +768,11 @@ function groupLogsByMainCategory(logDocs) {
   logDocs.forEach((docData) => {
     const logs = Array.isArray(docData.logs) ? docData.logs : [];
     logs.forEach((log) => {
-      const mainCat = log.jenis;
+      const mainCat = String(log.jenis || "")
+        .trim()
+        .toUpperCase();
       const location = log.lokasi;
-      if (!MAIN_CATEGORIES.includes(mainCat) || !locations.includes(location)) return;
+      if (!categorySet.has(mainCat) || !locations.includes(location)) return;
       const key = `${mainCat}_${docData.date}`;
       if (!dateMap.has(key)) {
         dateMap.set(key, { date: docData.date, mainCat, data: {} });
@@ -755,7 +805,7 @@ function groupLogsByMainCategory(logDocs) {
           const user = log.userName || "user";
           const ket = log.keterangan || "";
           const qty = Math.abs(after - before);
-          return `stok awal ${before} ${user} ${action} ${qty} : ${ket}`;
+          return safeCellText(`stok awal ${before} ${user} ${action} ${qty} : ${ket}`);
         })
         .join("\n");
       total += row[loc];
@@ -764,7 +814,7 @@ function groupLogsByMainCategory(logDocs) {
     grouped[entry.mainCat].push(row);
   });
 
-  MAIN_CATEGORIES.forEach((cat) => {
+  categories.forEach((cat) => {
     grouped[cat].sort((a, b) => a.Tanggal.localeCompare(b.Tanggal));
   });
   return grouped;
@@ -788,6 +838,131 @@ function monthNameInd(month, year) {
   return `${names[month - 1]} ${year}`;
 }
 
+function hexToArgb(hex, fallback = "FFF5F5F5") {
+  const normalized = String(hex || "")
+    .trim()
+    .replace("#", "")
+    .toUpperCase();
+  if (/^[0-9A-F]{6}$/.test(normalized)) return `FF${normalized}`;
+  return fallback;
+}
+
+function buildReportLookup(reports = [], categoryIds = []) {
+  const lookup = new Map();
+  const dates = new Set();
+
+  reports.forEach((rep) => {
+    const dateKey = String(rep?.date || "")
+      .trim()
+      .slice(0, 10);
+    if (!dateKey) return;
+    dates.add(dateKey);
+
+    categoryIds.forEach((cat) => {
+      const item = rep?.items?.[cat] || {};
+      const breakdown = rep?.breakdown?.[cat] || {};
+      const breakdownTotals = {};
+      SUMMARY_CATEGORIES.forEach((catKey) => {
+        breakdownTotals[catKey] = toInt(breakdown?.[catKey]?.total);
+      });
+      lookup.set(`${cat}::${dateKey}`, {
+        hasReport: true,
+        total: toInt(item.total),
+        komputer: toInt(item.komputer),
+        status: item.status || "-",
+        breakdownTotals,
+      });
+    });
+  });
+
+  return {
+    lookup,
+    dates: [...dates].sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+function buildCategoryRowsForExport(mainCat, groupedRows = [], reportDates = [], reportLookup = new Map()) {
+  const byDate = new Map(
+    groupedRows.map((row) => [
+      String(row?.Tanggal || "")
+        .trim()
+        .slice(0, 10),
+      row,
+    ]),
+  );
+
+  const dateKeys = [...new Set([...reportDates, ...[...byDate.keys()].filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+  if (!dateKeys.length) return [];
+
+  return dateKeys.map((dateKey) => {
+    const base = { Tanggal: dateKey };
+    const reportMeta = reportLookup.get(`${mainCat}::${dateKey}`) || {};
+
+    SUMMARY_CATEGORIES.forEach((catKey) => {
+      const reportValue = toInt(reportMeta?.breakdownTotals?.[catKey]);
+      base[catKey] = reportMeta?.hasReport ? reportValue : toInt(byDate.get(dateKey)?.[catKey]);
+      base[`${catKey}_ket`] = safeCellText(byDate.get(dateKey)?.[`${catKey}_ket`] || "");
+    });
+
+    base.TOTAL = reportMeta?.hasReport
+      ? toInt(reportMeta.total)
+      : SUMMARY_CATEGORIES.reduce((sum, catKey) => sum + toInt(base[catKey]), 0);
+    base.KOMPUTER = reportMeta?.hasReport ? toInt(reportMeta.komputer) : "";
+    base.STATUS = reportMeta?.hasReport ? reportMeta.status || "-" : "-";
+    return base;
+  });
+}
+
+function downloadExcelBuffer(arrayBuffer, filename) {
+  const blob = new Blob([arrayBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+function applyCategoryHeaderStyle(cell, argbColor) {
+  cell.font = { bold: true, color: { argb: "FF222222" } };
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
+  cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  cell.border = {
+    top: { style: "thin", color: { argb: "FFBDBDBD" } },
+    left: { style: "thin", color: { argb: "FFBDBDBD" } },
+    bottom: { style: "thin", color: { argb: "FFBDBDBD" } },
+    right: { style: "thin", color: { argb: "FFBDBDBD" } },
+  };
+}
+
+function applyCategoryBodyStyle(cell, argbColor, { isKet = false } = {}) {
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
+  cell.alignment = {
+    vertical: "top",
+    horizontal: isKet ? "left" : "center",
+    wrapText: !!isKet,
+  };
+  cell.border = {
+    top: { style: "thin", color: { argb: "FFE0E0E0" } },
+    left: { style: "thin", color: { argb: "FFE0E0E0" } },
+    bottom: { style: "thin", color: { argb: "FFE0E0E0" } },
+    right: { style: "thin", color: { argb: "FFE0E0E0" } },
+  };
+}
+
+function statusFillArgb(statusText) {
+  const status = String(statusText || "")
+    .trim()
+    .toLowerCase();
+  if (status.includes("klop")) return "FFC8E6C9";
+  if (status.includes("kurang") || status.includes("minus")) return "FFFFCDD2";
+  if (status.includes("lebih")) return "FFFFE0B2";
+  return "FFF5F5F5";
+}
+
 async function handleExportDetailBulanan() {
   if (!exportMonth.value) {
     toast("Pilih bulan yang akan diexport", "error");
@@ -802,6 +977,9 @@ async function handleExportDetailBulanan() {
 
   exporting.value = true;
   try {
+    const exportCategories = await resolveExportCategories();
+    const categoryIds = exportCategories.map((c) => c.id);
+
     const reportQ = query(
       floorCollection(db, "daily_stock_reports", activeFloor.value),
       where("date", ">=", startDate),
@@ -816,20 +994,17 @@ async function handleExportDetailBulanan() {
     }
 
     const reports = reportSnap.docs.map((d) => normalizeReport(d.data(), d.id));
+    const { lookup: reportLookup, dates: reportDates } = buildReportLookup(reports, categoryIds);
 
-    const logsQ = query(
-      floorCollection(db, "daily_stock_logs", activeFloor.value),
-      where("date", ">=", startDate),
-      where("date", "<=", endDate),
-      orderBy("date", "desc"),
-    );
-    const logsSnap = await getDocs(logsQ);
-    const logsData = logsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const groupedLogs = groupLogsByMainCategory(logsData);
+    const logsData = await fetchLogsWithFallback(startDate, endDate);
+    const groupedLogs = groupLogsByMainCategory(logsData, categoryIds);
 
-    const { utils, writeFileXLSX } = await import("xlsx");
+    const excelModule = await import("exceljs");
+    const ExcelJS = excelModule?.default?.Workbook ? excelModule.default : excelModule;
+    const workbook = new ExcelJS.Workbook();
+    const usedSheetNames = new Set();
 
-    const headers = [
+    const summaryHeaders = [
       "Tanggal",
       ...SUMMARY_CATEGORIES.map((key) => REVERSE_CATEGORY_MAPPING[key] || key),
       "TOTAL",
@@ -837,11 +1012,15 @@ async function handleExportDetailBulanan() {
       "Status",
     ];
 
-    const wsRows = [["LAPORAN STOK DETAIL BULANAN"], [`Bulan: ${monthYear}`], []];
-
-    MAIN_CATEGORIES.forEach((mainCat) => {
-      wsRows.push([mainCat]);
-      wsRows.push(headers);
+    const summarySheetName = makeUniqueSheetName("Laporan Stok Detail", usedSheetNames);
+    const summaryWs = workbook.addWorksheet(summarySheetName);
+    summaryWs.addRow(["LAPORAN STOK DETAIL BULANAN"]);
+    summaryWs.addRow([`Bulan: ${monthYear}`]);
+    summaryWs.addRow([]);
+    exportCategories.forEach((category) => {
+      const mainCat = category.id;
+      summaryWs.addRow([category.label || mainCat]);
+      summaryWs.addRow(summaryHeaders);
       reports.forEach((rep) => {
         const b = rep.breakdown?.[mainCat] || {};
         const total = SUMMARY_CATEGORIES.reduce((sum, key) => sum + toInt(b[key]?.total), 0);
@@ -853,43 +1032,94 @@ async function handleExportDetailBulanan() {
           toInt(item.komputer),
           item.status || "-",
         ];
-        wsRows.push(row);
+        summaryWs.addRow(row);
       });
-      wsRows.push([]);
+      summaryWs.addRow([]);
     });
-
-    const ws = utils.aoa_to_sheet(wsRows);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Laporan Stok Detail");
+    summaryWs.getColumn(1).width = 14;
+    for (let i = 2; i <= summaryHeaders.length; i += 1) {
+      summaryWs.getColumn(i).width = i === summaryHeaders.length ? 20 : 14;
+    }
 
     const logHeaders = [
       "Tanggal",
       ...SUMMARY_CATEGORIES.flatMap((cat) => [REVERSE_CATEGORY_MAPPING[cat], `${REVERSE_CATEGORY_MAPPING[cat]} Ket`]),
       "TOTAL",
+      "Komputer",
+      "Status",
     ];
 
-    const logRows = [["LAPORAN STOK DETAIL BULANAN MELATI BAWAH"], [`Bulan: ${monthYear}`], []];
+    exportCategories.forEach((category) => {
+      const mainCat = category.id;
+      const sheetName = makeUniqueSheetName(category.label || mainCat, usedSheetNames, `Sheet_${mainCat}`);
+      const wsCat = workbook.addWorksheet(sheetName);
+      wsCat.addRow(["LAPORAN STOK DETAIL BULANAN"]);
+      wsCat.addRow([`Bulan: ${monthYear}`]);
+      wsCat.addRow([`Jenis: ${category.label || mainCat}`]);
+      wsCat.addRow([]);
+      wsCat.addRow(logHeaders);
 
-    MAIN_CATEGORIES.forEach((mainCat) => {
-      const rows = groupedLogs[mainCat] || [];
-      if (!rows.length) return;
-      logRows.push([mainCat]);
-      logRows.push(logHeaders);
-      rows.forEach((row) => {
-        const values = [
-          row.Tanggal,
-          ...SUMMARY_CATEGORIES.flatMap((cat) => [toInt(row[cat]), row[`${cat}_ket`] || ""]),
-          toInt(row.TOTAL),
-        ];
-        logRows.push(values);
+      const rows = buildCategoryRowsForExport(mainCat, groupedLogs[mainCat] || [], reportDates, reportLookup);
+      if (!rows.length) {
+        const placeholder = ["Tidak ada data", ...new Array(logHeaders.length - 1).fill("")];
+        wsCat.addRow(placeholder);
+      } else {
+        rows.forEach((row) => {
+          wsCat.addRow([
+            row.Tanggal,
+            ...SUMMARY_CATEGORIES.flatMap((cat) => [toInt(row[cat]), safeCellText(row[`${cat}_ket`] || "")]),
+            toInt(row.TOTAL),
+            row.KOMPUTER === "" ? "" : toInt(row.KOMPUTER),
+            row.STATUS || "-",
+          ]);
+        });
+      }
+
+      wsCat.getColumn(1).width = 14;
+      let colCursor = 2;
+      SUMMARY_CATEGORIES.forEach((catKey) => {
+        wsCat.getColumn(colCursor).width = 12;
+        wsCat.getColumn(colCursor + 1).width = 36;
+
+        const argb = hexToArgb(SUMMARY_COLUMN_COLORS[catKey], "FFF1F1F1");
+        applyCategoryHeaderStyle(wsCat.getCell(5, colCursor), argb);
+        applyCategoryHeaderStyle(wsCat.getCell(5, colCursor + 1), argb);
+
+        const lastRow = wsCat.rowCount;
+        for (let rowIndex = 6; rowIndex <= lastRow; rowIndex += 1) {
+          applyCategoryBodyStyle(wsCat.getCell(rowIndex, colCursor), argb);
+          applyCategoryBodyStyle(wsCat.getCell(rowIndex, colCursor + 1), argb, { isKet: true });
+        }
+        colCursor += 2;
       });
-      logRows.push([]);
+
+      const totalCol = 2 + SUMMARY_CATEGORIES.length * 2;
+      const komputerCol = totalCol + 1;
+      const statusCol = totalCol + 2;
+
+      wsCat.getColumn(totalCol).width = 11;
+      wsCat.getColumn(komputerCol).width = 11;
+      wsCat.getColumn(statusCol).width = 18;
+
+      applyCategoryHeaderStyle(wsCat.getCell(5, 1), "FFECEFF1");
+      applyCategoryHeaderStyle(wsCat.getCell(5, totalCol), "FFE0E0E0");
+      applyCategoryHeaderStyle(wsCat.getCell(5, komputerCol), "FFD1C4E9");
+      applyCategoryHeaderStyle(wsCat.getCell(5, statusCol), "FFC8E6C9");
+
+      const lastDataRow = wsCat.rowCount;
+      for (let rowIndex = 6; rowIndex <= lastDataRow; rowIndex += 1) {
+        applyCategoryBodyStyle(wsCat.getCell(rowIndex, 1), "FFF5F5F5");
+        applyCategoryBodyStyle(wsCat.getCell(rowIndex, totalCol), "FFF5F5F5");
+        applyCategoryBodyStyle(wsCat.getCell(rowIndex, komputerCol), "FFEDE7F6");
+        const statusCell = wsCat.getCell(rowIndex, statusCol);
+        applyCategoryBodyStyle(statusCell, statusFillArgb(statusCell.value || ""));
+      }
+
+      wsCat.views = [{ state: "frozen", ySplit: 5 }];
     });
 
-    const ws2 = utils.aoa_to_sheet(logRows);
-    utils.book_append_sheet(wb, ws2, "Laporan Stok Detail Bulanan");
-
-    writeFileXLSX(wb, `Laporan_Stok_Detail_${monthYear.replace(" ", "_")}.xlsx`);
+    const outputBuffer = await workbook.xlsx.writeBuffer();
+    downloadExcelBuffer(outputBuffer, `Laporan_Stok_Detail_${monthYear.replace(" ", "_")}.xlsx`);
     toast("Export berhasil");
   } catch (err) {
     showError("Gagal export", err?.message || "");
@@ -902,23 +1132,8 @@ onMounted(async () => {
   detailJenisModalInstance = new Modal(detailJenisModalEl.value);
   warnaModalInstance = new Modal(warnaModalEl.value);
 
-  try {
-    await ensureYesterdaySnapshotIfMissing();
-    await ensureTodaySnapshotIfPassed();
-  } catch {
-    // skip auto-ensure if no permission
-  }
-
-  scheduleAutoSnapshot();
   await getStockSnapshot();
   await loadReport();
-});
-
-onBeforeUnmount(() => {
-  if (autoSnapshotTimer) {
-    clearTimeout(autoSnapshotTimer);
-    autoSnapshotTimer = null;
-  }
 });
 </script>
 

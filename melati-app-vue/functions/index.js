@@ -850,17 +850,23 @@ function computeDailyStockReportsFromStockData(stockData = [], snapshotDateYmd =
   };
 }
 
-async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global", floorId = "") {
+async function ensureSnapshotByDateYmdForScope({
+  triggerSource = "manual-callable",
+  scope = "global",
+  floorId = "",
+  dateYmd = "",
+}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateYmd)) {
+    throw new Error("INVALID_DATE_YMD");
+  }
+
   const scopeConfig = resolveSnapshotScope(scope, floorId);
-  const todayYmd = formatYmd(toWitaParts(new Date()));
-  const yesterdayYmd = shiftYmd(todayYmd, -1);
-  const dateKey = formatDmy(toWitaParts(toDateFromYmd(yesterdayYmd, "00:00:00")));
-  const snapshotId = yesterdayYmd;
+  const dateKey = formatDmy(toWitaParts(toDateFromYmd(dateYmd, "00:00:00")));
+  const snapshotId = dateYmd;
   const lockId = `snapshot_lock_${scopeConfig.scopeKey}_${snapshotId}`;
 
   const lockRef = scopeConfig.lockRef.doc(lockId);
   const snapshotRef = scopeConfig.snapshotRef.doc(snapshotId);
-
   let hasLock = false;
 
   const existingByDateSnap = await scopeConfig.snapshotRef.where("date", "==", dateKey).limit(1).get();
@@ -871,15 +877,13 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
       dateKey,
       triggerSource,
     });
-    return { success: true, created: false, reason: "exists-by-date", snapshotId };
+    return { success: true, created: false, reason: "exists-by-date", snapshotId, dateKey, dateYmd };
   }
 
   try {
     await db.runTransaction(async (tx) => {
       const snapshotSnap = await tx.get(snapshotRef);
-      if (snapshotSnap.exists) {
-        throw new Error("SNAPSHOT_ALREADY_EXISTS");
-      }
+      if (snapshotSnap.exists) throw new Error("SNAPSHOT_ALREADY_EXISTS");
 
       const lockSnap = await tx.get(lockRef);
       if (lockSnap.exists) {
@@ -887,9 +891,7 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
         const lockTsMillis =
           lockData.createdAt && typeof lockData.createdAt.toMillis === "function" ? lockData.createdAt.toMillis() : 0;
         const lockAge = Date.now() - lockTsMillis;
-        if (lockAge < LOCK_TTL_MS) {
-          throw new Error("LOCKED");
-        }
+        if (lockAge < LOCK_TTL_MS) throw new Error("LOCKED");
       }
 
       tx.set(lockRef, {
@@ -904,11 +906,11 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
 
     hasLock = true;
 
-    const stockData = await buildSnapshotStockDataByScope({ yesterdayYmd, scopeConfig });
+    const stockData = await buildSnapshotStockDataByScope({ yesterdayYmd: dateYmd, scopeConfig });
 
     await snapshotRef.set({
       date: dateKey,
-      dateYmd: yesterdayYmd,
+      dateYmd,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       totalItems: stockData.length,
       stockData,
@@ -919,11 +921,11 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
       floorId: scopeConfig.floorId,
     });
 
-    const dailyReportsRef = scopeConfig.dailyReportsRef.doc(yesterdayYmd);
+    const dailyReportsRef = scopeConfig.dailyReportsRef.doc(dateYmd);
     const dailyReportSnap = await dailyReportsRef.get();
     if (!dailyReportSnap.exists) {
       await dailyReportsRef.set({
-        ...computeDailyStockReportsFromStockData(stockData, yesterdayYmd),
+        ...computeDailyStockReportsFromStockData(stockData, dateYmd),
         snapshotDateKey: dateKey,
         source: "snapshot-bridge",
         triggerSource,
@@ -941,7 +943,7 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
       totalItems: stockData.length,
     });
 
-    return { success: true, created: true, snapshotId, dateKey };
+    return { success: true, created: true, snapshotId, dateKey, dateYmd };
   } catch (error) {
     if (error.message === "SNAPSHOT_ALREADY_EXISTS") {
       logger.info("Snapshot already exists", {
@@ -950,7 +952,7 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
         snapshotId,
         triggerSource,
       });
-      return { success: true, created: false, reason: "exists", snapshotId };
+      return { success: true, created: false, reason: "exists", snapshotId, dateKey, dateYmd };
     }
     if (error.message === "LOCKED") {
       logger.info("Snapshot creation locked by another process", {
@@ -959,13 +961,14 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
         snapshotId,
         triggerSource,
       });
-      return { success: true, created: false, reason: "locked", snapshotId };
+      return { success: true, created: false, reason: "locked", snapshotId, dateKey, dateYmd };
     }
 
     logger.error("Failed to ensure daily snapshot", {
       scopeKey: scopeConfig.scopeKey,
       floorId: scopeConfig.floorId,
       triggerSource,
+      dateYmd,
       error: error.message,
       stack: error.stack,
     });
@@ -982,6 +985,17 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
       }
     }
   }
+}
+
+async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global", floorId = "") {
+  const todayYmd = formatYmd(toWitaParts(new Date()));
+  const yesterdayYmd = shiftYmd(todayYmd, -1);
+  return ensureSnapshotByDateYmdForScope({
+    triggerSource,
+    scope,
+    floorId,
+    dateYmd: yesterdayYmd,
+  });
 }
 
 async function ensureSnapshotsForAllScopes(triggerSource) {
@@ -1073,6 +1087,49 @@ export const scheduledCreateDailyStockReports = onSchedule(
   },
 );
 
+export const saveDailySnapshot = onCall(
+  {
+    region: "asia-southeast2",
+    memory: "256MiB",
+    timeoutSeconds: 180,
+  },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["admin", "supervisor", "staff"].includes(role)) {
+      throw new HttpsError("permission-denied", "Anda tidak memiliki akses untuk menyimpan snapshot.");
+    }
+
+    const scopeRaw = String(request.data?.scope || "floor")
+      .trim()
+      .toLowerCase();
+    const scope = scopeRaw === "global" ? "global" : "floor";
+    const floorId = String(request.data?.floorId || "")
+      .trim()
+      .toUpperCase();
+    const dateYmd = String(request.data?.dateYmd || "").trim();
+    const reason = String(request.data?.reason || "manual").trim() || "manual";
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateYmd)) {
+      throw new HttpsError("invalid-argument", "Format tanggal harus YYYY-MM-DD.");
+    }
+
+    const result = await ensureSnapshotByDateYmdForScope({
+      triggerSource: `callable-saveDailySnapshot:${reason}`,
+      scope,
+      floorId,
+      dateYmd,
+    });
+
+    return {
+      ok: true,
+      role,
+      scope,
+      floorId: floorId || null,
+      ...result,
+    };
+  },
+);
+
 export const backfillSnapshots = onCall(
   {
     region: "asia-southeast2",
@@ -1111,83 +1168,16 @@ export const backfillSnapshots = onCall(
     let current = startYmd;
     while (true) {
       try {
-        const scopeConfig = resolveSnapshotScope(scope, floorId);
-        const snapshotId = current;
-        const lockId = `snapshot_lock_${scopeConfig.scopeKey}_${snapshotId}`;
-        const lockRef = scopeConfig.lockRef.doc(lockId);
-        const snapshotRef = scopeConfig.snapshotRef.doc(snapshotId);
-
-        // Acquire lightweight lock and ensure snapshot not already present
-        await db.runTransaction(async (tx) => {
-          const snapshotSnap = await tx.get(snapshotRef);
-          if (snapshotSnap.exists) throw new Error("SNAPSHOT_ALREADY_EXISTS");
-
-          const lockSnap = await tx.get(lockRef);
-          if (lockSnap.exists) {
-            const lockData = lockSnap.data() || {};
-            const lockTsMillis =
-              lockData.createdAt && typeof lockData.createdAt.toMillis === "function"
-                ? lockData.createdAt.toMillis()
-                : 0;
-            const lockAge = Date.now() - lockTsMillis;
-            if (lockAge < LOCK_TTL_MS) throw new Error("LOCKED");
-          }
-
-          tx.set(lockRef, {
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: "processing",
-            triggerSource: "backfill",
-            snapshotId,
-            scopeKey: scopeConfig.scopeKey,
-            floorId: scopeConfig.floorId,
-          });
-        });
-
-        const stockData = await buildSnapshotStockDataByScope({ yesterdayYmd: current, scopeConfig });
-
-        await snapshotRef.set({
-          date: formatDmy(toWitaParts(toDateFromYmd(current, "00:00:00"))),
-          dateYmd: current,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-          totalItems: stockData.length,
-          stockData,
-          createdBy: "cloud-function-backfill",
-          version: "3.0",
+        const result = await ensureSnapshotByDateYmdForScope({
           triggerSource: "backfill",
-          scopeKey: scopeConfig.scopeKey,
-          floorId: scopeConfig.floorId,
+          scope,
+          floorId,
+          dateYmd: current,
         });
-
-        const dailyReportsRef = scopeConfig.dailyReportsRef.doc(current);
-        const dailyReportSnap = await dailyReportsRef.get();
-        if (!dailyReportSnap.exists) {
-          await dailyReportsRef.set({
-            ...computeDailyStockReportsFromStockData(stockData, current),
-            snapshotDateKey: formatDmy(toWitaParts(toDateFromYmd(current, "00:00:00"))),
-            source: "snapshot-backfill",
-            triggerSource: "backfill",
-            scopeKey: scopeConfig.scopeKey,
-            floorId: scopeConfig.floorId,
-          });
-        }
-
-        // delete lock
-        try {
-          await lockRef.delete();
-        } catch (e) {
-          logger.warn("Failed to delete backfill lock", { lockId, error: e.message });
-        }
-
-        results.push({ date: current, created: true });
+        results.push({ date: current, created: !!result?.created, reason: result?.reason || null });
       } catch (error) {
-        if (error.message === "SNAPSHOT_ALREADY_EXISTS") {
-          results.push({ date: current, created: false, reason: "exists" });
-        } else if (error.message === "LOCKED") {
-          results.push({ date: current, created: false, reason: "locked" });
-        } else {
-          logger.error("Backfill snapshot error", { date: current, error: error.message });
-          results.push({ date: current, error: error.message });
-        }
+        logger.error("Backfill snapshot error", { date: current, error: error.message });
+        results.push({ date: current, error: error.message });
       }
 
       if (current === endYmd) break;
