@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div>
@@ -133,9 +133,10 @@
                   Role
                   <span class="text-danger">*</span>
                 </label>
-                <select v-model="form.role" class="form-select form-select-sm">
+                <input v-model="form.role" list="roleOptions" class="form-control form-control-sm" placeholder="Ketik atau pilih role" />
+                <datalist id="roleOptions">
                   <option v-for="role in availableRoles" :key="role" :value="role">{{ getRoleLabel(role) }}</option>
-                </select>
+                </datalist>
               </div>
               <div class="col-12">
                 <label class="form-label small">
@@ -490,7 +491,7 @@ function openEdit(u) {
     username: u.username,
     email: u.email || "",
     displayName: u.displayName || "",
-    role: availableRoles.value.includes(userRole) ? userRole : getDefaultRoleForActiveFloor(),
+    role: userRole,
     password: "",
     confirmPassword: "",
     permissions: permissionsFromPagesAccess(pagesAccess),
@@ -505,7 +506,8 @@ async function saveUser() {
   const normalizedUsername = normalizeUsername(username);
   const normalizedEmail = String(email || "").trim();
   const normalizedRole = normalizeUserRole(role, getDefaultRoleForActiveFloor());
-  if (!isRoleAllowedForFloor(normalizedRole, activeFloor.value)) {
+  
+  if (normalizedRole === "supervisor" && !isRoleAllowedForFloor(normalizedRole, activeFloor.value)) {
     formError.value = `Role ${normalizedRole} tidak diizinkan untuk ${activeFloorLabel.value}.`;
     return;
   }

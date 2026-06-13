@@ -1685,7 +1685,7 @@ function getContactMessage(item) {
     "Barang servis Kakak sudah selesai.\n" +
     `${namaBarang}\n` +
     `Jenis: ${jenisLabel}\n` +
-    `Silahkan datang ke Melati Gold Shop untuk mengambil barangnya ya kak. Terima kasih`
+    `Silahkan datang ke Melati Gold Shop untuk mengambil barangnya dan nota servis warna pink jangan lupa dibawa ya kak. Terima kasih`
   );
 }
 

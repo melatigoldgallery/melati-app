@@ -62,8 +62,7 @@ function normalizeUserRole(role, fallback = "staff") {
   if (!raw) return normalizedFallback;
   if (raw === "staf") return "staff";
   if (raw === "hr") return "hrd";
-  if (["admin", "supervisor", "staff", "hrd", "admin_custom"].includes(raw)) return raw;
-  return normalizedFallback;
+  return raw;
 }
 
 function isRoleAllowedForFloor(role, floorId) {
@@ -73,9 +72,10 @@ function isRoleAllowedForFloor(role, floorId) {
       .trim()
       .toUpperCase() === "L2"
   ) {
-    return ["supervisor", "admin"].includes(normalizedRole);
+    if (["staff", "hrd"].includes(normalizedRole)) return false;
+    return true;
   }
-  return ["supervisor", "admin", "staff", "hrd"].includes(normalizedRole);
+  return true;
 }
 
 function normalizeMaintenanceCollectionKey(value) {

@@ -103,7 +103,8 @@ function resolveMenuLink(to) {
 
 // Filter menu berdasarkan role user
 function canOpenItem(item) {
-  if (!item.roles.includes(auth.userRole)) return false;
+  const isStandardRole = ["admin", "supervisor", "staff", "hrd", "admin_custom"].includes(auth.userRole);
+  if (isStandardRole && !item.roles.includes(auth.userRole)) return false;
   if (!item.pageKey) return true;
   return auth.canAccessPage(item.pageKey);
 }
@@ -112,7 +113,8 @@ const visibleChildren = (children) => children.filter((child) => canOpenItem(chi
 
 const visibleMenu = computed(() =>
   menuStructure.filter((item) => {
-    if (!item.roles.includes(auth.userRole)) return false;
+    const isStandardRole = ["admin", "supervisor", "staff", "hrd", "admin_custom"].includes(auth.userRole);
+    if (isStandardRole && !item.roles.includes(auth.userRole)) return false;
     if (item.children?.length) return visibleChildren(item.children).length > 0;
     return canOpenItem(item);
   }),

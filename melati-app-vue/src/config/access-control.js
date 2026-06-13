@@ -123,8 +123,7 @@ export function normalizeUserRole(role, fallback = "staff") {
   if (!raw) return normalizedFallback;
   if (raw === "staf") return "staff";
   if (raw === "hr") return "hrd";
-  if (KNOWN_USER_ROLES.has(raw)) return raw;
-  return normalizedFallback;
+  return raw;
 }
 
 const SENSITIVE_PAGE_KEYS = new Set([
