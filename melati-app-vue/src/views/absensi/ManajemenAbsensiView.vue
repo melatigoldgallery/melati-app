@@ -509,7 +509,10 @@ async function loadSalesStaffOptions() {
   try {
     const employees = await fetchEmployees();
     salesStaffOptions.value = employees
-      .filter((emp) => String(emp.type || "").toLowerCase() === "staff")
+      .filter((emp) => {
+        const type = String(emp.type || "").toLowerCase();
+        return type === "staff" || type === "ob";
+      })
       .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "id"));
   } catch (e) {
     salesStaffOptions.value = [];
