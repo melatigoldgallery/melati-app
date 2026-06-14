@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3 stock-page">
     <div class="page-header d-flex justify-content-between align-items-center mb-3">
       <div class="">
@@ -28,128 +28,208 @@
     </div>
 
     <template v-else>
-      <div class="summary-grid mb-3" :style="summaryGridStyle">
-        <div v-for="card in summaryCards" :key="card.id" class="summary-grid-item" @click="activeTab = card.id">
-          <div class="summary-card" :style="cardStyle(card.id)">
-            <div class="summary-title">{{ card.label }}</div>
-            <div :class="['summary-value', summaryValueClass(card.id)]">{{ summary[card.id]?.fisik ?? 0 }}</div>
-            <small class="summary-status">{{ summary[card.id]?.status.label ?? "-" }}</small>
-          </div>
-        </div>
-      </div>
-
-      <ul v-if="hasTabs" class="nav nav-tabs compact justify-content-center overflow-auto mb-0">
-        <li v-for="tab in tabs" :key="tab.id" class="nav-item">
+      <!-- Pill Navigation for Aggregate vs Physical Barcode -->
+      <ul class="nav nav-pills mb-3 justify-content-center scrollable-pills main-pills">
+        <li class="nav-item">
           <button
-            class="nav-link text-nowrap small text-dark fw-bold"
-            :class="{ active: activeTab === tab.id }"
-            @click="activeTab = tab.id"
+            class="nav-link px-3 py-1.5 fw-semibold rounded-pill me-2 d-flex align-items-center gap-2"
+            :class="mainTab === 'agregat' ? 'active bg-primary text-white' : 'text-secondary'"
+            @click="mainTab = 'agregat'"
           >
-            {{ tab.label }}
+            <i class="bi bi-grid-3x3-gap"></i>
+            Stok Summary
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link px-3 py-1.5 fw-semibold rounded-pill d-flex align-items-center gap-2"
+            :class="mainTab === 'lacakFisik' ? 'active bg-primary text-white' : 'text-secondary'"
+            @click="mainTab = 'lacakFisik'"
+          >
+            <i class="bi bi-qr-code-scan"></i>
+            Lacak Barang (Barcode)
           </button>
         </li>
       </ul>
 
-      <div v-if="hasTabs" class="card border-0 shadow-sm rounded-0 rounded-bottom">
-        <div class="card-body p-0">
-          <div v-if="!isComputerTab" class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th style="width: 44px">No</th>
-                  <th>Jenis</th>
-                  <th v-if="showRincianColumn" class="text-center">Rincian</th>
-                  <th class="text-center">Jumlah</th>
-                  <th class="text-center">Aksi</th>
-                  <th class="text-center">Riwayat</th>
-                  <th class="text-center">Terakhir Update</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(sub, idx) in tableRows" :key="sub.key">
-                  <td class="fw-semibold">{{ idx + 1 }}</td>
-                  <td class="fw-semibold">{{ sub.label }}</td>
-                  <td v-if="showRincianColumn" class="text-center">
-                    <button
-                      v-if="hasDetails(activeTab, sub.key)"
-                      class="btn btn-outline-primary btn-sm"
-                      @click="openDetailModal(activeTab, sub)"
-                    >
-                      <i class="bi bi-eye"></i>
-                    </button>
-                    <span v-else class="text-muted">-</span>
-                  </td>
-                  <td class="text-center">
-                    <span class="badge bg-success fs-6 px-2">{{ getQty(activeTab, sub.key) }}</span>
-                  </td>
-                  <td class="text-center">
-                    <button class="btn btn-success btn-sm" @click="openUpdateModal(activeTab, sub)">
-                      <i class="bi bi-pencil me-1"></i>
-                      Update
-                    </button>
-                  </td>
-                  <td class="text-center">
-                    <button class="btn btn-info btn-sm text-white" @click="openHistoryModal(activeTab, sub)">
-                      <i class="bi bi-clock-history"></i>
-                    </button>
-                  </td>
-                  <td class="text-center text-muted small">
-                    {{ formatDate(getItem(sub.key, activeTab)?.lastUpdated) }}
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr class="table-light fw-bold">
-                  <td :colspan="showRincianColumn ? 3 : 2">Total Fisik</td>
-                  <td class="text-center">{{ summary[activeTab]?.fisik ?? 0 }}</td>
-                  <td colspan="3" class="text-center">
-                    <span class="badge" :class="`bg-${summary[activeTab]?.status.cls ?? 'secondary'}`">
-                      {{ summary[activeTab]?.status.label ?? "-" }}
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <div v-else class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th style="width: 44px">No</th>
-                  <th>Jenis Barang</th>
-                  <th class="text-center">Jumlah</th>
-                  <th class="text-center">Aksi</th>
-                  <th class="text-center">Terakhir Update</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(card, idx) in nonComputerCards" :key="card.id">
-                  <td class="fw-semibold">{{ idx + 1 }}</td>
-                  <td class="fw-semibold">{{ card.label }}</td>
-                  <td class="text-center">
-                    <span class="badge bg-primary fs-6 px-2">{{ getQty(card.id, "stok-komputer") }}</span>
-                  </td>
-                  <td class="text-center">
-                    <button class="btn btn-primary btn-sm" @click="openKomputerModal(card.id)">
-                      <i class="bi bi-pencil me-1"></i>
-                      Update
-                    </button>
-                  </td>
-                  <td class="text-center text-muted small">
-                    {{ formatDate(getItem("stok-komputer", card.id)?.lastUpdated) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+      <!-- Stok Agregat Content -->
+      <div v-if="mainTab === 'agregat'">
+        <div class="summary-grid mb-3" :style="summaryGridStyle">
+          <div v-for="card in summaryCards" :key="card.id" class="summary-grid-item" @click="activeTab = card.id">
+            <div class="summary-card" :style="cardStyle(card.id)">
+              <div class="summary-title">{{ card.label }}</div>
+              <div :class="['summary-value', summaryValueClass(card.id)]">{{ summary[card.id]?.fisik ?? 0 }}</div>
+              <small class="summary-status">{{ summary[card.id]?.status.label ?? "-" }}</small>
+            </div>
           </div>
         </div>
+
+        <ul v-if="hasTabs" class="nav nav-tabs compact justify-content-center overflow-auto mb-0">
+          <li v-for="tab in tabs" :key="tab.id" class="nav-item">
+            <button
+              class="nav-link text-nowrap small text-dark fw-bold"
+              :class="{ active: activeTab === tab.id }"
+              @click="activeTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </li>
+        </ul>
+
+        <div v-if="hasTabs" class="card border-0 shadow-sm rounded-0 rounded-bottom">
+          <div class="card-body p-0">
+            <div v-if="!isComputerTab" class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 44px">No</th>
+                    <th>Jenis</th>
+                    <th class="text-center">Rincian Barcode</th>
+                    <th class="text-center">Jumlah</th>
+                    <th class="text-center">Aksi</th>
+                    <th class="text-center">Riwayat</th>
+                    <th class="text-center">Terakhir Update</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(sub, idx) in tableRows" :key="sub.key">
+                    <td class="fw-semibold">{{ idx + 1 }}</td>
+                    <td class="fw-semibold">{{ sub.label }}</td>
+                    <td class="text-center">
+                      <button
+                        v-if="sub.key !== 'barang-display' || showRincianColumn"
+                        class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1"
+                        @click="openBarcodeRincianModal(activeTab, sub)"
+                      >
+                        <i class="bi bi-qr-code-scan"></i>
+                        <span>Lihat</span>
+                      </button>
+                      <span v-else class="text-muted small">-</span>
+                    </td>
+                    <td class="text-center">
+                      <span class="badge bg-success fs-6 px-2">{{ getQty(activeTab, sub.key) }}</span>
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-success btn-sm" @click="openUpdateModal(activeTab, sub)">
+                        <i class="bi bi-pencil me-1"></i>
+                        Update
+                      </button>
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-info btn-sm text-white" @click="openHistoryModal(activeTab, sub)">
+                        <i class="bi bi-clock-history"></i>
+                      </button>
+                    </td>
+                    <td class="text-center text-muted small">
+                      {{ formatDate(getItem(sub.key, activeTab)?.lastUpdated) }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="table-light fw-bold">
+                    <td colspan="3">Total Fisik</td>
+                    <td class="text-center">{{ summary[activeTab]?.fisik ?? 0 }}</td>
+                    <td colspan="3" class="text-center">
+                      <span class="badge" :class="`bg-${summary[activeTab]?.status.cls ?? 'secondary'}`">
+                        {{ summary[activeTab]?.status.label ?? "-" }}
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div v-else class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 44px">No</th>
+                    <th>Jenis Barang</th>
+                    <th class="text-center">Jumlah</th>
+                    <th class="text-center">Aksi</th>
+                    <th class="text-center">Terakhir Update</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(card, idx) in nonComputerCards" :key="card.id">
+                    <td class="fw-semibold">{{ idx + 1 }}</td>
+                    <td class="fw-semibold">{{ card.label }}</td>
+                    <td class="text-center">
+                      <span class="badge bg-primary fs-6 px-2">{{ getQty(card.id, "stok-komputer") }}</span>
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-primary btn-sm" @click="openKomputerModal(card.id)">
+                        <i class="bi bi-pencil me-1"></i>
+                        Update
+                      </button>
+                    </td>
+                    <td class="text-center text-muted small">
+                      {{ formatDate(getItem("stok-komputer", card.id)?.lastUpdated) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div v-else class="alert alert-warning mb-0">
+          Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.
+        </div>
       </div>
-      <div v-else class="alert alert-warning mb-0">
-        Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.
+
+      <!-- Lacak Fisik (Barcode) Content -->
+      <div v-else-if="mainTab === 'lacakFisik'">
+        <ul class="nav nav-tabs compact justify-content-center overflow-auto mb-3">
+          <li class="nav-item">
+            <button
+              class="nav-link text-nowrap small text-dark fw-bold"
+              :class="{ active: physicalTab === 'antrian' }"
+              @click="physicalTab = 'antrian'"
+            >
+              Request Pindah Data
+            </button>
+          </li>
+          <li class="nav-item">
+            <button
+              class="nav-link text-nowrap small text-dark fw-bold"
+              :class="{ active: physicalTab === 'log' }"
+              @click="physicalTab = 'log'"
+            >
+              Riwayat Pindah Data
+            </button>
+          </li>
+          <li class="nav-item">
+            <button
+              class="nav-link text-nowrap small text-dark fw-bold"
+              :class="{ active: physicalTab === 'opname' }"
+              @click="physicalTab = 'opname'"
+            >
+              Stok Opname Data
+            </button>
+          </li>
+        </ul>
+
+        <div v-if="physicalTab === 'antrian'">
+          <MovementQueue />
+        </div>
+        <div v-else-if="physicalTab === 'log'">
+          <MutationLog />
+        </div>
+        <div v-else-if="physicalTab === 'opname'">
+          <StockOpname
+            :cards="nonComputerCards"
+            :locations="tableRows.filter((r) => r.key !== 'barang-display')"
+            :color-types="COLOR_TYPES"
+            :color-labels="COLOR_LABELS"
+            :hala-types="HALA_TYPES"
+            :hala-labels="HALA_LABELS"
+            :staff-options="staffOptions"
+          />
+        </div>
       </div>
     </template>
 
+    <!-- Modal Update Simple (Fisik Display) -->
     <div class="modal fade" id="simpleUpdateModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -201,6 +281,7 @@
       </div>
     </div>
 
+    <!-- Modal Update Typed (Fisik Display) -->
     <div class="modal fade" id="typedUpdateModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-md">
         <div class="modal-content">
@@ -228,8 +309,8 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="ct in COLOR_TYPES" :key="ct">
-                      <td>{{ COLOR_LABELS[ct] }}</td>
+                    <tr v-for="ct in Object.keys(typedForm.details)" :key="ct">
+                      <td>{{ COLOR_LABELS[ct] || `${ct} (Lainnya)` }}</td>
                       <td class="text-center">{{ typedForm.original[ct] ?? 0 }}</td>
                       <td>
                         <input
@@ -267,6 +348,7 @@
       </div>
     </div>
 
+    <!-- Modal Update Hala (Fisik Display) -->
     <div class="modal fade" id="halaUpdateModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-md">
         <div class="modal-content">
@@ -294,8 +376,8 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="ht in HALA_TYPES" :key="ht">
-                      <td>{{ HALA_LABELS[ht] }}</td>
+                    <tr v-for="ht in Object.keys(halaForm.details)" :key="ht">
+                      <td>{{ HALA_LABELS[ht] || `${ht} (Lainnya)` }}</td>
                       <td class="text-center">{{ halaForm.original[ht] ?? 0 }}</td>
                       <td>
                         <input
@@ -327,6 +409,96 @@
             <div class="modal-footer py-2">
               <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
               <button class="btn btn-success btn-sm" :disabled="saving">Simpan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Update Barcode -->
+    <div class="modal fade" id="barcodeUpdateModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+          <form @submit.prevent="submitBarcodeUpdate">
+            <div class="modal-header py-3 bg-primary text-white border-0">
+              <h6 class="modal-title fw-bold">
+                <i class="bi bi-qr-code-scan me-2"></i>
+                Update Barcode: {{ barcodeForm.mainCat }} - {{ barcodeForm.subLabel }}
+              </h6>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Scan / Paste Barcode</label>
+                <textarea
+                  v-model="barcodeForm.barcodes"
+                  class="form-control form-control-sm border-2 rounded-2"
+                  rows="4"
+                  placeholder="Scan barcode satu-persatu atau paste list barcode di sini (pisahkan dengan spasi/enter)..."
+                  required
+                ></textarea>
+                <div class="form-text text-muted small">Masukkan satu atau beberapa barcode sekaligus.</div>
+              </div>
+              <!-- Dropdown Klasifikasi Dinamis (Hanya muncul jika ada barcode BARU dan kategori butuh warna/jenis) -->
+              <div v-if="currentDetailOptions.length > 0 && hasNewBarcode" class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Klasifikasi Warna / Jenis (Untuk Barcode Baru)</label>
+                <select v-model="barcodeForm.detailType" class="form-select form-select-sm border-2 rounded-2" required>
+                  <option value="">-- Pilih Klasifikasi --</option>
+                  <option v-for="opt in currentDetailOptions" :key="`classif-${opt}`" :value="opt">
+                    {{ getDetailLabel(opt) }}
+                  </option>
+                </select>
+                <div class="form-text text-muted small">
+                  <i class="bi bi-info-circle text-info me-1"></i>
+                  Ditujukan bagi barcode baru agar terdaftar ke kelompok warna/jenis yang benar.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Lokasi Tujuan</label>
+                <select v-model="barcodeForm.destination" class="form-select form-select-sm border-2 rounded-2" required>
+                  <option value="">-- Pilih Lokasi Tujuan --</option>
+                  <option v-for="row in tableRows" :key="`dest-${row.key}`" :value="row.key">
+                    {{ row.label }}
+                  </option>
+                  <option value="mutasi">Mutasi</option>
+                  <option value="laku">Terjual</option>
+                </select>
+                <div class="form-text text-muted small">
+                  <i class="bi bi-info-circle text-info me-1"></i>
+                  Sistem akan mendeteksi lokasi asal masing-masing barcode secara otomatis dari database.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Petugas</label>
+                <select v-model="barcodeForm.petugas" class="form-select form-select-sm border-2 rounded-2" required>
+                  <option value="">-- Pilih Nama Staff --</option>
+                  <option v-for="staff in staffOptions" :key="`barcode-staff-${staff}`" :value="staff">
+                    {{ staff }}
+                  </option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small fw-bold text-secondary">Catatan / Keterangan</label>
+                <input
+                  v-model="barcodeForm.keterangan"
+                  type="text"
+                  class="form-control form-control-sm border-2 rounded-2"
+                  placeholder="Tulis catatan jika diperlukan..."
+                />
+              </div>
+              <div v-if="barcodeStatus" class="alert alert-info py-2 px-3 mt-3 small border-0 rounded-2 d-flex align-items-center gap-2">
+                <div class="spinner-border spinner-border-sm text-info" role="status" v-if="saving"></div>
+                <span>{{ barcodeStatus }}</span>
+              </div>
+            </div>
+            <div class="modal-footer py-2 border-0 bg-light-subtle">
+              <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal" :disabled="saving">
+                Batal
+              </button>
+              <button class="btn btn-primary btn-sm rounded-pill px-4" :disabled="saving">
+                <span class="spinner-border spinner-border-sm me-1" role="status" v-if="saving"></span>
+                Simpan
+              </button>
             </div>
           </form>
         </div>
@@ -435,7 +607,38 @@
                     <td>{{ formatDate(h.date) }}</td>
                     <td>{{ formatHistoryQty(h) }}</td>
                     <td>{{ h.petugas || "-" }}</td>
-                    <td>{{ formatHistoryNote(h) }}</td>
+                    <td>
+                      <div 
+                        v-if="!h.barcodes || !h.barcodes.length || (h.keterangan && h.keterangan.toLowerCase() !== 'mutasi barcode')" 
+                        class="fw-semibold text-dark mb-1"
+                      >
+                        {{ formatHistoryNote(h) }}
+                      </div>
+                      <div v-if="h.barcodes && h.barcodes.length" class="d-flex flex-wrap gap-1 align-items-center">
+                        <span 
+                          v-if="getHistoryRecordClassification(historyInfo.mainCat, h)"
+                          class="badge bg-info text-dark fw-bold border"
+                          style="font-size: 0.7rem;"
+                        >
+                          {{ getHistoryRecordClassification(historyInfo.mainCat, h) }}
+                        </span>
+                        <span 
+                          v-for="bc in h.barcodes.slice(0, 5)" 
+                          :key="getBarcodeKey(bc)" 
+                          class="badge bg-light text-primary border monospace fw-bold" 
+                          style="font-size: 0.7rem;"
+                        >
+                          {{ getBarcodeKey(bc) }}
+                        </span>
+                        <span 
+                          v-if="h.totalBarcodesCount > 5" 
+                          class="badge bg-secondary-subtle text-secondary border fw-semibold"
+                          style="font-size: 0.7rem;"
+                        >
+                          +{{ h.totalBarcodesCount - 5 }} lagi
+                        </span>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -446,31 +649,132 @@
       </div>
     </div>
 
-    <div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header py-2">
-            <h6 class="modal-title fw-semibold">Rincian - {{ detailInfo.mainCat }} / {{ detailInfo.subLabel }}</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- Modal Rincian & Daftar Barcode (Unified) -->
+    <div class="modal fade" id="barcodeRincianModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+          <div class="modal-header py-3 bg-primary text-white border-0">
+            <h6 class="modal-title fw-bold">
+              <i class="bi bi-qr-code-scan me-2"></i>
+              Rincian Barcode: {{ selectedCategory }} - {{ selectedLocationLabel }}
+            </h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
-          <div class="modal-body p-2">
-            <table class="table table-sm mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Jenis</th>
-                  <th class="text-center">Jumlah</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(qty, key) in detailData" :key="key">
-                  <td>{{ getTypeLabel(detailInfo.mainCat, key) }}</td>
-                  <td class="text-center fw-bold">{{ qty }}</td>
-                </tr>
-                <tr v-if="Object.keys(detailData).length === 0">
-                  <td colspan="2" class="text-center text-muted">Tidak ada detail</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="modal-body p-4 bg-light-subtle">
+            <!-- If category has sub-types (e.g. Kalung colors, Hala types) -->
+            <ul v-if="modalTabs.length > 0" class="nav nav-pills mb-3 justify-content-center scrollable-pills modal-pills">
+              <li v-for="tab in modalTabs" :key="tab.key" class="nav-item">
+                <button
+                  class="nav-link btn-sm py-1 px-3 me-2 rounded-pill fw-semibold d-flex align-items-center gap-1 border-0"
+                  :class="activeModalTab === tab.key ? 'active bg-primary text-white' : 'text-secondary bg-transparent'"
+                  @click="selectModalTab(tab.key)"
+                >
+                  {{ tab.label }}
+                  <span class="badge ms-1" :class="activeModalTab === tab.key ? 'bg-white text-primary' : 'bg-secondary text-white'">
+                    {{ getSubQty(tab.key) }}
+                  </span>
+                </button>
+              </li>
+            </ul>
+
+            <!-- Check if location is Display -->
+            <div v-if="selectedLocation === 'barang-display'" class="alert alert-warning py-4 text-center border-0 rounded-4 shadow-sm mb-0">
+              <i class="bi bi-info-circle fs-3 d-block mb-2 text-warning"></i>
+              <h6 class="fw-bold mb-1">Pelacakan Dinonaktifkan</h6>
+              <span class="text-secondary small">Pelacakan barcode individu dinonaktifkan di lokasi Display.</span>
+            </div>
+
+            <!-- Else (physical locations with tracking enabled) -->
+            <div v-else>
+              <div v-if="loadingBarcodes" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted small fw-semibold">Memuat daftar barcode...</p>
+              </div>
+              <div v-else>
+                <!-- Info & Control Bar -->
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                  <div>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-bold fs-7 d-flex align-items-center gap-1.5">
+                      <i class="bi bi-tag-fill"></i>
+                      Total: {{ activeModalTab ? getSubQty(activeModalTab) : getQty(selectedCategory, selectedLocation) }} Barcode
+                    </span>
+                  </div>
+                  <button 
+                    class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 shadow-sm transition-all hover-btn-scale"
+                    @click="copyAllBarcodes"
+                    :disabled="copyingAll || barcodes.length === 0"
+                  >
+                    <span v-if="copyingAll" class="spinner-border spinner-border-sm" role="status"></span>
+                    <i v-else class="bi bi-clipboard"></i>
+                    <span>Salin Semua Barcode</span>
+                  </button>
+                </div>
+
+                <div v-if="barcodes.length === 0" class="text-center py-5 border border-dashed rounded-4 bg-white shadow-sm">
+                  <i class="bi bi-inbox fs-2 d-block mb-2 text-muted"></i>
+                  <p class="text-secondary small mb-0">Tidak ada barcode terdaftar di lokasi/kategori ini.</p>
+                </div>
+                <div v-else>
+                  <div class="table-responsive border border-light rounded-4 shadow-sm bg-white custom-scrollbar" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0">
+                      <thead class="table-light border-bottom">
+                        <tr>
+                          <th class="ps-3 text-secondary fw-semibold small" style="width: 70px;">No</th>
+                          <th class="text-secondary fw-semibold small">Barcode</th>
+                          <th class="pe-3 text-end text-secondary fw-semibold small">Terakhir Update</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(b, idx) in barcodes" :key="b.id" class="barcode-row transition-all">
+                          <td class="ps-3 text-muted small">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
+                          <td>
+                            <div class="d-flex align-items-center gap-2">
+                              <span class="monospace fw-bold text-dark fs-7 bg-light px-2.5 py-1 rounded border">{{ b.barcode }}</span>
+                              <button 
+                                type="button"
+                                class="btn btn-link btn-xs p-1 text-secondary hover-primary border-0 bg-transparent rounded-circle d-inline-flex align-items-center justify-content-center transition-all hover-bg-light"
+                                @click="copySingleBarcode(b.barcode, idx)"
+                                title="Salin Barcode"
+                                style="width: 26px; height: 26px;"
+                              >
+                                <i :class="copiedIndex === idx ? 'bi bi-check-lg text-success' : 'bi bi-clipboard fs-7'"></i>
+                              </button>
+                            </div>
+                          </td>
+                          <td class="pe-3 text-end text-muted small">
+                            <span class="d-inline-flex align-items-center gap-1.5">
+                              <i class="bi bi-clock text-secondary opacity-75"></i>
+                              {{ formatDate(b.lastUpdated) }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <!-- Pagination Controls -->
+                  <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-light">
+                    <button
+                      class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
+                      :disabled="currentPage === 1 || loadingBarcodes"
+                      @click="loadBarcodePage(currentPage - 1)"
+                    >
+                      <i class="bi bi-chevron-left"></i>
+                      Sebelumnya
+                    </button>
+                    <span class="small fw-bold text-secondary">Halaman {{ currentPage }}</span>
+                    <button
+                      class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
+                      :disabled="!hasMore || loadingBarcodes"
+                      @click="loadBarcodePage(currentPage + 1)"
+                    >
+                      Berikutnya
+                      <i class="bi bi-chevron-right"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -481,13 +785,20 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Modal } from "bootstrap";
+import { collection, query, where, getDocs, limit, startAfter, orderBy } from "firebase/firestore";
+import { db } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { useAuthStore } from "@/stores/auth";
+import MovementQueue from "@/components/inventory/barcode-tracking/MovementQueue.vue";
+import MutationLog from "@/components/inventory/barcode-tracking/MutationLog.vue";
+import StockOpname from "@/components/inventory/barcode-tracking/StockOpname.vue";
 import {
-  COLOR_LABELS,
-  COLOR_TYPES,
-  HALA_LABELS,
-  HALA_TYPES,
+  parseBarcodes,
+  executeBarcodeMutation,
+  submitBarcodeMoveRequest,
+  checkBarcodesStatus
+} from "@/services/barcode-service";
+import {
   KETERANGAN_OPTS,
   calcFisikTotal,
   fetchAllStockData,
@@ -517,6 +828,42 @@ const staffOptions = ref([]);
 const displaySettings = ref(normalizeInventorySettings());
 const activeTab = ref("");
 
+const COLOR_TYPES = computed(() => {
+  if (displaySettings.value?.colorTypes) {
+    return displaySettings.value.colorTypes.map((c) => c.key);
+  }
+  return ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"];
+});
+
+const COLOR_LABELS = computed(() => {
+  if (displaySettings.value?.colorTypes) {
+    const labels = {};
+    displaySettings.value.colorTypes.forEach((c) => {
+      labels[c.key] = c.label;
+    });
+    return labels;
+  }
+  return { HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink", KUNING: "Kuning" };
+});
+
+const HALA_TYPES = computed(() => {
+  if (displaySettings.value?.halaTypes) {
+    return displaySettings.value.halaTypes.map((c) => c.key);
+  }
+  return ["KA", "LA", "AN", "CA", "SA", "GA"];
+});
+
+const HALA_LABELS = computed(() => {
+  if (displaySettings.value?.halaTypes) {
+    const labels = {};
+    displaySettings.value.halaTypes.forEach((c) => {
+      labels[c.key] = c.label;
+    });
+    return labels;
+  }
+  return { KA: "Kalung", LA: "Liontin", AN: "Anting", CA: "Cincin", SA: "Giwang", GA: "Gelang" };
+});
+
 const CACHE_KEY_PREFIX = "melati-stock-cache-v2";
 const CACHE_TTL = 5 * 60 * 1000;
 const modalMap = new Map();
@@ -524,6 +871,9 @@ const modalMap = new Map();
 let unsubRealtime = null;
 let unsubSettings = null;
 let snapshotTimer = null;
+
+const mainTab = ref("agregat"); // "agregat" or "lacakFisik"
+const physicalTab = ref("antrian"); // "antrian" or "log"
 
 const simpleForm = ref({
   mainCat: "",
@@ -554,6 +904,21 @@ const halaForm = ref({
   keterangan: "",
 });
 
+const barcodeForm = ref({
+  mainCat: "",
+  subDoc: "",
+  subLabel: "",
+  barcodes: "",
+  destination: "",
+  petugas: "",
+  keterangan: "",
+  detailType: "",
+});
+
+const barcodeStatus = ref(null);
+const checkingBarcodes = ref(false);
+const hasNewBarcode = ref(false);
+
 const komputerForm = ref({
   mainCat: "",
   quantity: 0,
@@ -570,6 +935,20 @@ const historyList = ref([]);
 const detailInfo = ref({ mainCat: "", subLabel: "" });
 const detailData = ref({});
 
+const selectedLocation = ref("");
+const selectedLocationLabel = ref("");
+const selectedCategory = ref("");
+const barcodes = ref([]);
+const currentPage = ref(1);
+const pageSize = 10;
+const loadingBarcodes = ref(false);
+const hasMore = ref(false);
+const pageDocs = ref([]);
+const activeModalTab = ref("");
+const barcodeCache = ref({});
+const copyingAll = ref(false);
+const copiedIndex = ref(null);
+
 const enabledCards = computed(() => displaySettings.value.cards.filter((card) => card.enabled));
 const nonComputerCards = computed(() => enabledCards.value.filter((card) => card.type !== "computer"));
 const summaryCards = computed(() => nonComputerCards.value.filter((card) => card.showInSummary !== false));
@@ -578,15 +957,53 @@ const hasTabs = computed(() => tabs.value.length > 0);
 const tableRows = computed(() => displaySettings.value.tableRows.filter((row) => row.enabled));
 const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
 const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
-const komputerDetailTypes = computed(() => {
-  if (komputerColorForm.value.detailType === "hala") return HALA_TYPES;
-  if (komputerColorForm.value.detailType === "color") return COLOR_TYPES;
+const currentDetailOptions = computed(() => {
+  const cat = barcodeForm.value.mainCat;
+  const detailMode = getCardDetailMode(cat);
+  if (detailMode === "color") return COLOR_TYPES.value;
+  if (detailMode === "hala") return HALA_TYPES.value;
   return [];
 });
+function getDetailLabel(opt) {
+  return getTypeLabel(barcodeForm.value.mainCat, opt);
+}
+const komputerDetailTypes = computed(() => {
+  let baseTypes = [];
+  if (komputerColorForm.value.detailType === "hala") {
+    baseTypes = [...HALA_TYPES.value];
+  } else if (komputerColorForm.value.detailType === "color") {
+    baseTypes = [...COLOR_TYPES.value];
+  } else {
+    return [];
+  }
+  const cat = komputerColorForm.value.mainCat;
+  const item = getItem("stok-komputer", cat);
+  if (item && item.details) {
+    Object.keys(item.details).forEach(k => {
+      if (toInt(item.details[k]) > 0 && !baseTypes.includes(k)) {
+        baseTypes.push(k);
+      }
+    });
+  }
+  return baseTypes;
+});
 const komputerDetailLabels = computed(() => {
-  if (komputerColorForm.value.detailType === "hala") return HALA_LABELS;
-  if (komputerColorForm.value.detailType === "color") return COLOR_LABELS;
-  return {};
+  let labels = {};
+  if (komputerColorForm.value.detailType === "hala") {
+    labels = { ...HALA_LABELS.value };
+  } else if (komputerColorForm.value.detailType === "color") {
+    labels = { ...COLOR_LABELS.value };
+  }
+  const cat = komputerColorForm.value.mainCat;
+  const item = getItem("stok-komputer", cat);
+  if (item && item.details) {
+    Object.keys(item.details).forEach(k => {
+      if (toInt(item.details[k]) > 0 && !labels[k]) {
+        labels[k] = `${k} (Lainnya)`;
+      }
+    });
+  }
+  return labels;
 });
 const komputerDetailLabel = computed(() => (komputerColorForm.value.detailType === "hala" ? "Jenis" : "Warna"));
 const summaryGridStyle = computed(() => {
@@ -685,7 +1102,9 @@ function hasDetails(mainCat, subDoc) {
 
 function formatDate(value) {
   if (!value) return "-";
-  const d = new Date(value);
+  let d;
+  if (value && typeof value.toDate === "function") d = value.toDate();
+  else d = new Date(value);
   if (Number.isNaN(d.getTime())) return "-";
   const dd = `${d.getDate()}`.padStart(2, "0");
   const mm = `${d.getMonth() + 1}`.padStart(2, "0");
@@ -697,9 +1116,65 @@ function formatDate(value) {
 
 function getTypeLabel(mainCat, key) {
   const detailMode = getCardDetailMode(mainCat);
-  if (detailMode === "color") return COLOR_LABELS[key] || key;
-  if (detailMode === "hala") return HALA_LABELS[key] || key;
+  if (detailMode === "color") return COLOR_LABELS.value[key] || key;
+  if (detailMode === "hala") return HALA_LABELS.value[key] || key;
   return key;
+}
+
+function getBarcodeKey(bc) {
+  return typeof bc === "object" ? bc.barcode : bc;
+}
+
+function getFallbackDetailType(mainCat, code) {
+  const cleanCode = String(code || "").trim().toUpperCase();
+  const detailMode = getCardDetailMode(mainCat);
+  
+  if (detailMode === "color") {
+    const types = COLOR_TYPES.value;
+    for (const key of types) {
+      if (cleanCode.includes(key)) return key;
+    }
+    return types[2] || "PUTIH"; // Default fallback
+  }
+  
+  if (detailMode === "hala") {
+    const types = HALA_TYPES.value;
+    for (const key of types) {
+      const parts = [`-${key}-`, key];
+      if (parts.some(p => cleanCode.includes(p))) return key;
+    }
+    return types[0] || "KA"; // Default fallback
+  }
+  
+  return "";
+}
+
+function formatBarcodeHistoryItem(mainCat, bc) {
+  if (!bc) return "";
+  if (typeof bc === "object") {
+    const label = getTypeLabel(mainCat, bc.detailType);
+    return `${label}: ${bc.barcode}`;
+  }
+  const detailType = getFallbackDetailType(mainCat, bc);
+  if (!detailType) return bc;
+  const label = getTypeLabel(mainCat, detailType);
+  return `${label}: ${bc}`;
+}
+
+function getHistoryRecordClassification(mainCat, record) {
+  if (!record?.barcodes || !record.barcodes.length) return "";
+  const firstBc = record.barcodes[0];
+  let detailType = "";
+  if (typeof firstBc === "object") {
+    detailType = firstBc.detailType;
+  } else {
+    detailType = getFallbackDetailType(mainCat, firstBc);
+  }
+  if (!detailType) return "";
+  const label = getTypeLabel(mainCat, detailType);
+  const detailMode = getCardDetailMode(mainCat);
+  const prefix = detailMode === "hala" ? "Jenis" : "Warna";
+  return `${prefix}: ${label}`;
 }
 
 function formatHistoryQty(record) {
@@ -898,54 +1373,85 @@ async function refreshData() {
 }
 
 function openUpdateModal(mainCat, sub) {
-  const detailMode = getCardDetailMode(mainCat);
-  if (detailMode === "color") {
-    const item = getItem(sub.key, mainCat) || {};
-    const details = {};
-    COLOR_TYPES.forEach((k) => {
-      details[k] = toInt(item.details?.[k]);
-    });
-    typedForm.value = {
+  if (sub.key === "barang-display") {
+    const detailMode = getCardDetailMode(mainCat);
+    if (detailMode === "color") {
+      const item = getItem(sub.key, mainCat) || {};
+      const details = {};
+      COLOR_TYPES.value.forEach((k) => {
+        details[k] = toInt(item.details?.[k]);
+      });
+      if (item.details) {
+        Object.keys(item.details).forEach((k) => {
+          if (toInt(item.details[k]) > 0 && !COLOR_TYPES.value.includes(k)) {
+            details[k] = toInt(item.details[k]);
+          }
+        });
+      }
+      typedForm.value = {
+        mainCat,
+        subDoc: sub.key,
+        subLabel: sub.label,
+        details: { ...details },
+        original: { ...details },
+        petugas: "",
+        keterangan: "",
+      };
+      showModal("typedUpdateModal");
+      return;
+    }
+
+    if (detailMode === "hala") {
+      const item = getItem(sub.key, mainCat) || {};
+      const details = {};
+      HALA_TYPES.value.forEach((k) => {
+        details[k] = toInt(item.details?.[k]);
+      });
+      if (item.details) {
+        Object.keys(item.details).forEach((k) => {
+          if (toInt(item.details[k]) > 0 && !HALA_TYPES.value.includes(k)) {
+            details[k] = toInt(item.details[k]);
+          }
+        });
+      }
+      halaForm.value = {
+        mainCat,
+        subDoc: sub.key,
+        subLabel: sub.label,
+        details: { ...details },
+        original: { ...details },
+        petugas: "",
+        keterangan: "",
+      };
+      showModal("halaUpdateModal");
+      return;
+    }
+
+    simpleForm.value = {
       mainCat,
       subDoc: sub.key,
       subLabel: sub.label,
-      details: { ...details },
-      original: { ...details },
+      quantity: getQty(mainCat, sub.key),
       petugas: "",
       keterangan: "",
     };
-    showModal("typedUpdateModal");
+    showModal("simpleUpdateModal");
     return;
   }
 
-  if (detailMode === "hala") {
-    const item = getItem(sub.key, mainCat) || {};
-    const details = {};
-    HALA_TYPES.forEach((k) => {
-      details[k] = toInt(item.details?.[k]);
-    });
-    halaForm.value = {
-      mainCat,
-      subDoc: sub.key,
-      subLabel: sub.label,
-      details: { ...details },
-      original: { ...details },
-      petugas: "",
-      keterangan: "",
-    };
-    showModal("halaUpdateModal");
-    return;
-  }
-
-  simpleForm.value = {
+  barcodeForm.value = {
     mainCat,
     subDoc: sub.key,
     subLabel: sub.label,
-    quantity: getQty(mainCat, sub.key),
+    barcodes: "",
+    destination: sub.key, // Default to the same location for easy base registration
     petugas: "",
     keterangan: "",
+    detailType: "",
   };
-  showModal("simpleUpdateModal");
+  hasNewBarcode.value = false;
+  barcodeStatus.value = null;
+  showModal("barcodeUpdateModal");
 }
 
 function openKomputerModal(mainCat) {
@@ -953,11 +1459,18 @@ function openKomputerModal(mainCat) {
   const detailMode = getCardDetailMode(mainCat);
   if (detailMode === "color" || detailMode === "hala") {
     const detailType = detailMode;
-    const types = detailMode === "hala" ? HALA_TYPES : COLOR_TYPES;
+    const types = detailMode === "hala" ? HALA_TYPES.value : COLOR_TYPES.value;
     const details = {};
     types.forEach((k) => {
       details[k] = toInt(item.details?.[k]);
     });
+    if (item.details) {
+      Object.keys(item.details).forEach((k) => {
+        if (toInt(item.details[k]) > 0 && !types.includes(k)) {
+          details[k] = toInt(item.details[k]);
+        }
+      });
+    }
     komputerColorForm.value = {
       mainCat,
       detailType,
@@ -983,17 +1496,361 @@ function openHistoryModal(mainCat, sub) {
   showModal("historyModal");
 }
 
-function openDetailModal(mainCat, sub) {
-  detailInfo.value = {
-    mainCat,
-    subLabel: sub.label,
-  };
-  detailData.value = getItem(sub.key, mainCat)?.details || {};
-  showModal("detailModal");
+const modalTabs = computed(() => {
+  const cat = selectedCategory.value;
+  const detailMode = getCardDetailMode(cat);
+  let baseTabs = [];
+  
+  if (detailMode === "color") {
+    baseTabs = COLOR_TYPES.value.map(k => ({ key: k, label: COLOR_LABELS.value[k] || k }));
+  } else if (detailMode === "hala") {
+    baseTabs = HALA_TYPES.value.map(k => ({ key: k, label: HALA_LABELS.value[k] || k }));
+  } else {
+    return [];
+  }
+  
+  const loc = selectedLocation.value;
+  const item = getItem(loc, cat);
+  if (item && item.details) {
+    const activeKeys = new Set(baseTabs.map(t => t.key));
+    Object.keys(item.details).forEach(k => {
+      const qty = toInt(item.details[k]);
+      if (qty > 0 && !activeKeys.has(k)) {
+        baseTabs.push({
+          key: k,
+          label: `${k} (Lainnya)`,
+          isFallback: true
+        });
+      }
+    });
+  }
+  
+  return baseTabs;
+});
+
+function getSubQty(subType) {
+  const cat = selectedCategory.value;
+  const loc = selectedLocation.value;
+  const item = getItem(loc, cat);
+  return toInt(item?.details?.[subType]);
+}
+
+function selectModalTab(tabKey) {
+  activeModalTab.value = tabKey;
+  pageDocs.value = [];
+  currentPage.value = 1;
+  barcodes.value = [];
+  hasMore.value = false;
+  if (selectedLocation.value !== "barang-display") {
+    loadBarcodePage(1);
+  }
+}
+
+function openBarcodeRincianModal(mainCat, sub) {
+  selectedLocation.value = sub.key;
+  selectedLocationLabel.value = sub.label;
+  selectedCategory.value = mainCat;
+
+  // Clear cache to guarantee we fetch fresh data from Firestore on open
+  barcodeCache.value = {};
+
+  if (modalTabs.value.length > 0) {
+    const firstWithStock = modalTabs.value.find(tab => getSubQty(tab.key) > 0);
+    activeModalTab.value = firstWithStock ? firstWithStock.key : modalTabs.value[0].key;
+  } else {
+    activeModalTab.value = "";
+  }
+
+  pageDocs.value = [];
+  currentPage.value = 1;
+  barcodes.value = [];
+  hasMore.value = false;
+
+  if (sub.key !== "barang-display") {
+    loadBarcodePage(1);
+  }
+
+  showModal("barcodeRincianModal");
+}
+
+async function copyAllBarcodes() {
+  const cat = selectedCategory.value;
+  const loc = selectedLocation.value;
+  const subType = activeModalTab.value || null;
+  const detailMode = getCardDetailMode(cat);
+  const hasDetails = detailMode === "color" || detailMode === "hala";
+
+  if (!cat || !loc) return;
+
+  copyingAll.value = true;
+  try {
+    let q;
+    if (hasDetails) {
+      q = query(
+        collection(db, "floors", auth.activeFloor, "barcodes"),
+        where("category", "==", cat),
+        where("location", "==", loc),
+        where("detailType", "==", subType),
+        orderBy("barcode", "asc")
+      );
+    } else {
+      q = query(
+        collection(db, "floors", auth.activeFloor, "barcodes"),
+        where("category", "==", cat),
+        where("location", "==", loc)
+      );
+    }
+    const snaps = await getDocs(q);
+    const list = [];
+    snaps.forEach((doc) => {
+      const data = doc.data();
+      if (data?.barcode) {
+        list.push(data.barcode);
+      }
+    });
+
+    if (list.length === 0) {
+      toast("Tidak ada barcode untuk disalin", "warning");
+      return;
+    }
+
+    if (!hasDetails) {
+      list.sort(); // Sort alphabetically on the client side
+    }
+
+    const textToCopy = list.join("\n");
+    await navigator.clipboard.writeText(textToCopy);
+    toast(`Berhasil menyalin ${list.length} barcode ke clipboard!`);
+  } catch (e) {
+    showError("Gagal menyalin barcode", e.message);
+  } finally {
+    copyingAll.value = false;
+  }
+}
+
+function copySingleBarcode(code, index) {
+  navigator.clipboard.writeText(code);
+  copiedIndex.value = index;
+  toast("Barcode disalin");
+  setTimeout(() => {
+    if (copiedIndex.value === index) {
+      copiedIndex.value = null;
+    }
+  }, 2000);
+}
+
+async function loadBarcodePage(pageNumber) {
+  const cat = selectedCategory.value;
+  const loc = selectedLocation.value;
+  const subType = activeModalTab.value || null;
+  const detailMode = getCardDetailMode(cat);
+  const hasDetails = detailMode === "color" || detailMode === "hala";
+  const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
+  const currentLastUpdated = getItem(loc, cat)?.lastUpdated || "";
+  const currentQty = subType ? getSubQty(subType) : getQty(cat, loc);
+
+  const cachedData = barcodeCache.value[cacheKey];
+  const isCacheValid = cachedData && 
+                       cachedData.lastUpdated === currentLastUpdated &&
+                       cachedData.quantity === currentQty;
+
+  if (isCacheValid && cachedData.pages[pageNumber]) {
+    const pageData = cachedData.pages[pageNumber];
+    barcodes.value = pageData.barcodes;
+    hasMore.value = pageData.hasMore;
+    currentPage.value = pageNumber;
+    return;
+  }
+
+  let targetPage = pageNumber;
+  if (!isCacheValid) {
+    const prefix = `${cat}:${loc}:`;
+    Object.keys(barcodeCache.value).forEach((key) => {
+      if (key.startsWith(prefix)) {
+        delete barcodeCache.value[key];
+      }
+    });
+
+    barcodeCache.value[cacheKey] = {
+      lastUpdated: currentLastUpdated,
+      quantity: currentQty,
+      pages: {}
+    };
+    targetPage = 1;
+    pageDocs.value = [];
+  }
+
+  loadingBarcodes.value = true;
+  try {
+    let q;
+    if (hasDetails) {
+      q = query(
+        collection(db, "floors", auth.activeFloor, "barcodes"),
+        where("category", "==", cat),
+        where("location", "==", loc),
+        where("detailType", "==", subType),
+        orderBy("barcode", "asc"),
+        limit(pageSize)
+      );
+    } else {
+      q = query(
+        collection(db, "floors", auth.activeFloor, "barcodes"),
+        where("category", "==", cat),
+        where("location", "==", loc),
+        limit(pageSize)
+      );
+    }
+
+    if (targetPage > 1 && pageDocs.value[targetPage - 2]) {
+      if (hasDetails) {
+        q = query(
+          collection(db, "floors", auth.activeFloor, "barcodes"),
+          where("category", "==", cat),
+          where("location", "==", loc),
+          where("detailType", "==", subType),
+          orderBy("barcode", "asc"),
+          startAfter(pageDocs.value[targetPage - 2]),
+          limit(pageSize)
+        );
+      } else {
+        q = query(
+          collection(db, "floors", auth.activeFloor, "barcodes"),
+          where("category", "==", cat),
+          where("location", "==", loc),
+          startAfter(pageDocs.value[targetPage - 2]),
+          limit(pageSize)
+        );
+      }
+    }
+
+    const snaps = await getDocs(q);
+    const pageItems = [];
+    snaps.forEach((doc) => {
+      pageItems.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    barcodes.value = pageItems;
+    hasMore.value = pageItems.length === pageSize;
+    currentPage.value = targetPage;
+
+    if (snaps.docs.length > 0) {
+      pageDocs.value[targetPage - 1] = snaps.docs[snaps.docs.length - 1];
+    }
+
+    barcodeCache.value[cacheKey].pages[targetPage] = {
+      barcodes: pageItems,
+      hasMore: hasMore.value,
+      lastDoc: snaps.docs.length > 0 ? snaps.docs[snaps.docs.length - 1] : null
+    };
+
+  } catch (e) {
+    showError("Gagal memuat list barcode", e.message);
+  } finally {
+    loadingBarcodes.value = false;
+  }
 }
 
 function hasTypedChanges(details, original) {
   return Object.keys(details || {}).some((key) => toInt(details[key]) !== toInt(original?.[key]));
+}
+
+// Debounce Watcher untuk Memeriksa Status Barcode
+let checkTimeout = null;
+watch(
+  () => barcodeForm.value.barcodes,
+  (newVal) => {
+    if (checkTimeout) clearTimeout(checkTimeout);
+    const parsed = parseBarcodes(newVal);
+    if (parsed.length === 0) {
+      hasNewBarcode.value = false;
+      return;
+    }
+
+    checkTimeout = setTimeout(async () => {
+      checkingBarcodes.value = true;
+      try {
+        const res = await checkBarcodesStatus(parsed, auth.activeFloor);
+        if (res && Array.isArray(res.results)) {
+          // Jika ada minimal 1 barcode yang belum terdaftar di database
+          hasNewBarcode.value = res.results.some(item => !item.exists);
+        } else {
+          hasNewBarcode.value = false;
+        }
+      } catch {
+        hasNewBarcode.value = true; // Fallback aman
+      } finally {
+        checkingBarcodes.value = false;
+      }
+    }, 600);
+  }
+);
+
+async function submitBarcodeUpdate() {
+  if (!barcodeForm.value.petugas.trim()) return toast("Petugas wajib diisi", "warning");
+  if (!barcodeForm.value.destination) return toast("Lokasi tujuan wajib dipilih", "warning");
+  if (!barcodeForm.value.barcodes.trim()) return toast("Barcode tidak boleh kosong", "warning");
+  // Validasi klasifikasi wajib dipilih jika ada barcode baru dan kategori membutuhkan rincian detail
+  if (currentDetailOptions.value.length > 0 && hasNewBarcode.value && !barcodeForm.value.detailType) {
+    return toast("Klasifikasi warna/jenis wajib dipilih", "warning");
+  }
+
+  const barcodesArray = parseBarcodes(barcodeForm.value.barcodes);
+  if (barcodesArray.length === 0) return toast("Tidak ada barcode yang valid", "warning");
+
+  saving.value = true;
+  barcodeStatus.value = `Memproses ${barcodesArray.length} barcode...`;
+  try {
+    const userRole = auth.userRole?.toLowerCase();
+    const isSupervisor = ["supervisor", "admin", "input"].includes(userRole);
+
+    // Chunking logic (max 200 barcodes per transaction)
+    const chunks = [];
+    const chunkSize = 200;
+    for (let i = 0; i < barcodesArray.length; i += chunkSize) {
+      chunks.push(barcodesArray.slice(i, i + chunkSize));
+    }
+
+    if (isSupervisor) {
+      for (let i = 0; i < chunks.length; i++) {
+        barcodeStatus.value = `Memproses ${barcodesArray.length} barcode (Bagian ${i + 1}/${chunks.length})...`;
+        await executeBarcodeMutation({
+          barcodes: chunks[i],
+          origin: barcodeForm.value.subDoc, // Pass origin location
+          destination: barcodeForm.value.destination,
+          pemindah: barcodeForm.value.petugas.trim(),
+          notes: barcodeForm.value.keterangan?.trim() || "",
+          floorId: auth.activeFloor,
+          defaultDetailType: barcodeForm.value.detailType
+        });
+      }
+      toast("Mutasi barcode berhasil diproses langsung.");
+    } else {
+      for (let i = 0; i < chunks.length; i++) {
+        barcodeStatus.value = `Mengajukan ${barcodesArray.length} barcode (Bagian ${i + 1}/${chunks.length})...`;
+        await submitBarcodeMoveRequest({
+          barcodes: chunks[i],
+          origin: barcodeForm.value.subDoc, // Pass origin location
+          destination: barcodeForm.value.destination,
+          pemindah: barcodeForm.value.petugas.trim(),
+          notes: barcodeForm.value.keterangan?.trim() || "",
+          floorId: auth.activeFloor,
+          defaultDetailType: barcodeForm.value.detailType
+        });
+      }
+      toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
+    }
+
+    await loadData({ force: true });
+    closeModal("barcodeUpdateModal");
+  } catch (e) {
+    showError("Gagal memproses mutasi barcode", e.message);
+    barcodeStatus.value = `Gagal: ${e.message}`;
+  } finally {
+    saving.value = false;
+  }
 }
 
 async function submitSimpleUpdate() {
@@ -1325,5 +2182,117 @@ onUnmounted(() => {
 
 .modal-header .btn-close {
   filter: invert(1);
+}
+
+/* Scrollable Pills styling for better UI/UX */
+.scrollable-pills {
+  display: flex;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 5px;
+  width: 100%;
+}
+
+.scrollable-pills::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollable-pills::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+
+.scrollable-pills::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-pills .nav-link {
+  font-size: 0.88rem;
+  padding: 8px 18px;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+.modal-pills {
+  gap: 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding-bottom: 12px;
+  width: 100%;
+}
+
+.modal-pills .nav-link {
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  white-space: nowrap;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50rem !important;
+}
+
+.modal-pills .nav-link .badge {
+  font-size: 0.72rem;
+  padding: 2.5px 5.5px;
+  border-radius: 50rem;
+  transition: all 0.25s ease;
+}
+
+.modal-pills .nav-link.active {
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25) !important;
+}
+
+.barcode-row {
+  transition: background-color 0.15s ease;
+}
+
+.barcode-row:hover {
+  background-color: rgba(13, 110, 253, 0.03) !important;
+}
+
+.hover-primary {
+  transition: all 0.15s ease;
+}
+
+.hover-primary:hover {
+  color: #0d6efd !important;
+  transform: scale(1.1);
+}
+
+.hover-bg-light {
+  transition: background-color 0.15s ease;
+}
+
+.hover-bg-light:hover {
+  background-color: #f1f3f5 !important;
+}
+
+.hover-btn-scale {
+  transition: all 0.2s ease;
+}
+
+.hover-btn-scale:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(13, 110, 253, 0.15) !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
+}
+
+.monospace {
+  font-family: var(--bs-font-monospace), monospace;
 }
 </style>

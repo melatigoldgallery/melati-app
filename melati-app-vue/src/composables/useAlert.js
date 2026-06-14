@@ -29,13 +29,14 @@ export function useAlert() {
   const confirm = (options = {}) =>
     Swal.fire({
       title: options.title || "Konfirmasi",
-      text: options.text || "Apakah Anda yakin?",
+      text: options.text || (options.html ? undefined : "Apakah Anda yakin?"),
+      html: options.html,
       icon: options.icon || "warning",
       showCancelButton: true,
       confirmButtonColor: "#c8a96e",
       cancelButtonColor: "#6c757d",
-      confirmButtonText: options.confirmText || "Ya, lanjutkan",
-      cancelButtonText: "Batal",
+      confirmButtonText: options.confirmText || options.confirmButtonText || "Ya, lanjutkan",
+      cancelButtonText: options.cancelButtonText || "Batal",
     });
 
   const error = (message, detail = "") => Swal.fire({ icon: "error", title: message, text: detail || undefined });

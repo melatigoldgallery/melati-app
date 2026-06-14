@@ -1443,3 +1443,631 @@ export const migrateToFloorScoped = onCall(
     }
   },
 );
+
+// ============================================================================
+// BARCODE TRACKING FUNCTIONS
+// ============================================================================
+
+const PREFIX_TO_CATEGORY = {
+  C: "CINCIN",
+  K: "KALUNG",
+  L: "LIONTIN",
+  A: "ANTING",
+  G: "GELANG",
+  S: "GIWANG",
+  Z: "HALA & SDW",
+  V: "HALA & SDW",
+};
+
+function parseBarcodeCategoryAndType(code) {
+  const cleanCode = String(code || "").trim().toUpperCase();
+  const prefix = cleanCode.charAt(0);
+  let mainCat = PREFIX_TO_CATEGORY[prefix] || "CINCIN";
+  let subType = null;
+
+  if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
+    const lower = cleanCode.toLowerCase();
+    if (lower.includes("hijau")) subType = "HIJAU";
+    else if (lower.includes("biru")) subType = "BIRU";
+    else if (lower.includes("pink")) subType = "PINK";
+    else if (lower.includes("kuning")) subType = "KUNING";
+    else subType = "PUTIH";
+  } else if (mainCat === "HALA & SDW") {
+    const lower = cleanCode.toLowerCase();
+    if (lower.includes("-ka-") || lower.includes("ka")) subType = "KA";
+    else if (lower.includes("-la-") || lower.includes("la")) subType = "LA";
+    else if (lower.includes("-an-") || lower.includes("an")) subType = "AN";
+    else if (lower.includes("-ca-") || lower.includes("ca")) subType = "CA";
+    else if (lower.includes("-sa-") || lower.includes("sa")) subType = "SA";
+    else if (lower.includes("-ga-") || lower.includes("ga")) subType = "GA";
+    else subType = "KA";
+  }
+  
+  return { mainCat, subType };
+}
+
+async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "") {
+  const barcodeIds = barcodes.map(b => (typeof b === 'string' ? b : b.barcode).trim().toUpperCase());
+  const barcodeRefs = barcodeIds.map(id => dbFloorRef.collection("barcodes").doc(id));
+  
+  // Step 1: Read all barcode documents inside the transaction
+  const barcodeSnaps = await Promise.all(barcodeRefs.map(ref => t.get(ref)));
+
+  const barcodeDetails = [];
+  const targetLocations = new Set([destination]);
+
+  // 1. Validation and origin resolution phase
+  barcodeSnaps.forEach((snap, idx) => {
+    const id = barcodeIds[idx];
+    let category, detailType, resolvedOrigin, exists;
+    const originalItem = barcodes[idx];
+    const inputDetailType = typeof originalItem === 'object' ? originalItem.detailType : null;
+    
+    if (snap.exists) {
+      exists = true;
+      const data = snap.data();
+      category = data.category;
+      detailType = data.detailType;
+      resolvedOrigin = data.location || destination;
+      
+      if (data.in_display || data.in_mutasi) {
+        throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (display/mutasi luar).`);
+      }
+    } else {
+      exists = false;
+      const parsed = parseBarcodeCategoryAndType(id);
+      category = parsed.mainCat;
+      detailType = inputDetailType || defaultDetailType || parsed.subType;
+      resolvedOrigin = destination; // Base registration
+    }
+    
+    targetLocations.add(resolvedOrigin);
+    barcodeDetails.push({ id, category, detailType, resolvedOrigin, exists });
+  });
+
+  // Step 2: Read all required stocks documents inside the transaction
+  const stockLocationList = Array.from(targetLocations);
+  const stockRefs = stockLocationList.map(loc => dbFloorRef.collection("stocks").doc(loc));
+  const stockSnaps = await Promise.all(stockRefs.map(ref => t.get(ref)));
+
+  const stockDataMap = {};
+  stockLocationList.forEach((loc, idx) => {
+    stockDataMap[loc] = stockSnaps[idx].exists ? stockSnaps[idx].data() : {};
+  });
+
+  // Step 3: Accumulate stock changes
+  const changes = {};
+  const addChange = (loc, cat, type, diff) => {
+    if (!changes[loc]) changes[loc] = {};
+    if (!changes[loc][cat]) changes[loc][cat] = { quantity: 0, details: {} };
+    changes[loc][cat].quantity += diff;
+    if (type) {
+      if (!changes[loc][cat].details[type]) changes[loc][cat].details[type] = 0;
+      changes[loc][cat].details[type] += diff;
+    }
+  };
+
+  barcodeDetails.forEach((info) => {
+    if (info.resolvedOrigin !== destination) {
+      addChange(info.resolvedOrigin, info.category, info.detailType, -1);
+      addChange(destination, info.category, info.detailType, 1);
+    } else {
+      addChange(destination, info.category, info.detailType, 1);
+    }
+  });
+
+  // Step 4: Perform all database writes
+  // Update barcode documents
+  barcodeDetails.forEach((info) => {
+    const ref = dbFloorRef.collection("barcodes").doc(info.id);
+    const updateData = {
+      barcode: info.id,
+      category: info.category,
+      detailType: info.detailType || null,
+      location: destination,
+      in_display: destination === "barang-display",
+      in_mutasi: ["mutasi", "laku"].includes(destination),
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (!info.exists) {
+      updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+    t.set(ref, updateData, { merge: true });
+
+    // Ensure we delete it from history since it is now active again
+    const historyRef = dbFloorRef.collection("barcodesHistory").doc(info.id);
+    t.delete(historyRef);
+  });
+
+  // Write single history log document for the transaction
+  const logRef = dbFloorRef.collection("barcodeMutationLogs").doc();
+  const logData = {
+    id: logRef.id,
+    barcodeIds: barcodeDetails.map(info => info.id),
+    barcodes: barcodeDetails.map(info => ({
+      barcode: info.id,
+      category: info.category,
+      detailType: info.detailType || null,
+      origin: info.resolvedOrigin,
+    })),
+    destination,
+    pemindah: petugas,
+    status: "approved",
+    notes: notes || "",
+    timestamp: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  // For compatibility with single barcode logs
+  if (barcodeDetails.length === 1) {
+    logData.barcode = barcodeDetails[0].id;
+    logData.category = barcodeDetails[0].category;
+    logData.detailType = barcodeDetails[0].detailType || null;
+    logData.origin = barcodeDetails[0].resolvedOrigin;
+  } else {
+    logData.barcode = `GABUNGAN (${barcodeDetails.length} BARANG)`;
+    logData.category = barcodeDetails[0].category; // Transactions are always per-category
+
+    const uniqueTypes = [...new Set(barcodeDetails.map(info => info.detailType).filter(Boolean))];
+    logData.detailType = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
+
+    const uniqueOrigins = [...new Set(barcodeDetails.map(info => info.resolvedOrigin))];
+    logData.origin = uniqueOrigins.length === 1 ? uniqueOrigins[0] : "MIXED";
+  }
+
+  t.set(logRef, logData);
+
+  // Apply aggregated stock changes
+  for (const loc of Object.keys(changes)) {
+    const data = stockDataMap[loc] || {};
+    const locChanges = changes[loc];
+    const updatedData = { ...data };
+    
+    for (const cat of Object.keys(locChanges)) {
+      const existing = data[cat] || { quantity: 0, lastUpdated: null, history: [] };
+      const currentQty = parseInt(existing.quantity, 10) || 0;
+      const diffQty = locChanges[cat].quantity;
+      const newQty = Math.max(0, currentQty + diffQty);
+      
+      const updatedCategory = {
+        quantity: newQty,
+        lastUpdated: new Date().toISOString(),
+        history: Array.isArray(existing.history) ? [...existing.history] : []
+      };
+      
+      if (diffQty !== 0) {
+        const relevantBarcodes = barcodeDetails
+          .filter(info => 
+            info.category === cat && 
+            (info.resolvedOrigin === loc || destination === loc)
+          )
+          .map(info => info.id);
+
+        const truncatedBarcodes = relevantBarcodes.slice(0, 10);
+
+        updatedCategory.history.unshift({
+          date: new Date().toISOString(),
+          action: diffQty > 0 ? "Tambah" : "Kurangi",
+          quantity: Math.abs(diffQty),
+          oldQuantity: currentQty,
+          newQuantity: newQty,
+          petugas,
+          keterangan: notes || "Mutasi Barcode",
+          barcodes: truncatedBarcodes,
+          totalBarcodesCount: relevantBarcodes.length
+        });
+        if (updatedCategory.history.length > 10) {
+          updatedCategory.history = updatedCategory.history.slice(0, 10);
+        }
+      }
+      
+      const existingDetails = existing.details || {};
+      const updatedDetails = { ...existingDetails };
+      const catDetailsChanges = locChanges[cat].details;
+      
+      for (const type of Object.keys(catDetailsChanges)) {
+        const currentTypeQty = parseInt(existingDetails[type], 10) || 0;
+        const diffTypeQty = catDetailsChanges[type];
+        updatedDetails[type] = Math.max(0, currentTypeQty + diffTypeQty);
+      }
+      
+      if (Object.keys(updatedDetails).length > 0) {
+        updatedCategory.details = updatedDetails;
+      }
+      
+      updatedData[cat] = updatedCategory;
+    }
+    
+    const stockRef = dbFloorRef.collection("stocks").doc(loc);
+    t.set(stockRef, updatedData, { merge: true });
+  }
+
+  // Write dailyStockLogs
+  const dateStr = formatYmd(toWitaParts(new Date()));
+  const dailyLogRef = dbFloorRef.collection("dailyStockLogs").doc(dateStr);
+  const dailyLogs = [];
+  
+  for (const loc of Object.keys(changes)) {
+    const locChanges = changes[loc];
+    const data = stockDataMap[loc] || {};
+    for (const cat of Object.keys(locChanges)) {
+      const diffQty = locChanges[cat].quantity;
+      if (diffQty !== 0) {
+        const existing = data[cat] || { quantity: 0 };
+        const beforeQty = parseInt(existing.quantity, 10) || 0;
+        const afterQty = Math.max(0, beforeQty + diffQty);
+        
+        dailyLogs.push({
+          timestamp: admin.firestore.Timestamp.now(),
+          jenis: cat,
+          lokasi: loc,
+          action: diffQty > 0 ? "tambah" : "kurangi",
+          before: beforeQty,
+          after: afterQty,
+          quantity: Math.abs(diffQty),
+          userName: petugas,
+          keterangan: notes || "Mutasi Barcode"
+        });
+      }
+    }
+  }
+
+  if (dailyLogs.length > 0) {
+    t.set(dailyLogRef, {
+      date: dateStr,
+      logs: admin.firestore.FieldValue.arrayUnion(...dailyLogs)
+    }, { merge: true });
+  }
+}
+
+export const checkBarcodesStatus = onCall(
+  { region: "asia-southeast2", memory: "256MiB", cors: true },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!role) throw new HttpsError("unauthenticated", "Akses ditolak.");
+
+    const { barcodes = [], floorId = "L1" } = request.data || {};
+    if (!Array.isArray(barcodes) || barcodes.length === 0) {
+      throw new HttpsError("invalid-argument", "Daftar barcode kosong.");
+    }
+
+    if (barcodes.length > 500) {
+      throw new HttpsError("invalid-argument", "Maksimal 500 barcode dalam satu request.");
+    }
+
+    const uniqueBarcodes = [...new Set(barcodes)];
+    const barcodeRefs = uniqueBarcodes.map((bc) => 
+      db.collection("floors").doc(floorId).collection("barcodes").doc(bc)
+    );
+
+    const snaps = await db.getAll(...barcodeRefs);
+
+    // Identify barcodes not found in the active list
+    const missingIndices = [];
+    snaps.forEach((snap, idx) => {
+      if (!snap.exists) {
+        missingIndices.push(idx);
+      }
+    });
+
+    let historySnaps = [];
+    if (missingIndices.length > 0) {
+      const historyRefs = missingIndices.map(idx => 
+        db.collection("floors").doc(floorId).collection("barcodesHistory").doc(uniqueBarcodes[idx])
+      );
+      historySnaps = await db.getAll(...historyRefs);
+    }
+
+    let historySnapIdx = 0;
+    const results = snaps.map((snap, i) => {
+      const barcode = uniqueBarcodes[i];
+      if (!snap.exists) {
+        const histSnap = historySnaps[historySnapIdx++];
+        if (histSnap && histSnap.exists) {
+          const data = histSnap.data();
+          return {
+            barcode,
+            exists: true,
+            isArchived: true,
+            location: data.location || "",
+            in_display: !!data.in_display,
+            in_mutasi: !!data.in_mutasi,
+            category: data.category || "",
+            detailType: data.detailType || ""
+          };
+        }
+        return { barcode, exists: false, status: "new" };
+      }
+      const data = snap.data();
+      return { 
+        barcode, 
+        exists: true, 
+        isArchived: false,
+        location: data.location || "",
+        in_display: !!data.in_display,
+        in_mutasi: !!data.in_mutasi,
+        category: data.category || "",
+        detailType: data.detailType || ""
+      };
+    });
+
+    return { results };
+  }
+);
+
+export const executeBarcodeMutation = onCall(
+  { region: "asia-southeast2", memory: "512MiB", cors: true },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["supervisor", "admin", "input"].includes(role)) {
+      throw new HttpsError("permission-denied", "Akses ditolak. Membutuhkan izin supervisor atau input.");
+    }
+
+    const { 
+      floorId = "L1", 
+      barcodes = [], 
+      origin,
+      destination, 
+      pemindah, 
+      notes = "",
+      defaultDetailType = ""
+    } = request.data || {};
+
+    if (!Array.isArray(barcodes) || barcodes.length === 0) {
+      throw new HttpsError("invalid-argument", "Daftar barcode kosong.");
+    }
+    if (!destination || !pemindah) {
+      throw new HttpsError("invalid-argument", "Lokasi tujuan dan petugas wajib diisi.");
+    }
+
+    const dbFloorRef = db.collection("floors").doc(floorId);
+
+    await db.runTransaction(async (t) => {
+      await executeMutationLogic(t, dbFloorRef, barcodes, destination, pemindah, notes, origin || "any", defaultDetailType);
+    });
+
+    return { success: true };
+  }
+);
+
+export const submitBarcodeMoveRequest = onCall(
+  { region: "asia-southeast2", memory: "256MiB", cors: true },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!role) throw new HttpsError("unauthenticated", "Akses ditolak.");
+
+    const { 
+      floorId = "L1", 
+      barcodes = [], 
+      origin = "any",
+      destination, 
+      pemindah, 
+      notes = "",
+      defaultDetailType = ""
+    } = request.data || {};
+
+    if (!Array.isArray(barcodes) || barcodes.length === 0) {
+      throw new HttpsError("invalid-argument", "Daftar barcode kosong.");
+    }
+    if (!destination || !pemindah) {
+      throw new HttpsError("invalid-argument", "Lokasi tujuan dan petugas wajib diisi.");
+    }
+
+    const dbFloorRef = db.collection("floors").doc(floorId);
+    
+    const uniqueBarcodes = [...new Set(barcodes.map(b => (typeof b === 'string' ? b : b.barcode || '').trim().toUpperCase()))].filter(Boolean);
+    const barcodeRefs = uniqueBarcodes.map(bc => dbFloorRef.collection("barcodes").doc(bc));
+
+    const snaps = await db.getAll(...barcodeRefs);
+
+    const missingIndices = [];
+    snaps.forEach((snap, idx) => {
+      if (!snap.exists) {
+        missingIndices.push(idx);
+      }
+    });
+
+    let historySnaps = [];
+    if (missingIndices.length > 0) {
+      const historyRefs = missingIndices.map(idx => 
+        dbFloorRef.collection("barcodesHistory").doc(uniqueBarcodes[idx])
+      );
+      historySnaps = await db.getAll(...historyRefs);
+    }
+
+    let historySnapIdx = 0;
+    const finalBarcodes = [];
+    
+    snaps.forEach((snap, i) => {
+      const bc = uniqueBarcodes[i];
+      if (snap.exists) {
+        const data = snap.data();
+        if (data.in_display || data.in_mutasi) {
+          throw new HttpsError("failed-precondition", `Barcode ${bc} terkunci (display/mutasi luar).`);
+        }
+        finalBarcodes.push({
+          barcode: bc,
+          category: data.category,
+          detailType: data.detailType || null,
+          origin: data.location || destination
+        });
+      } else {
+        const histSnap = historySnaps[historySnapIdx++];
+        if (histSnap && histSnap.exists) {
+          const data = histSnap.data();
+          finalBarcodes.push({
+            barcode: bc,
+            category: data.category,
+            detailType: data.detailType || null,
+            origin: data.location || destination
+          });
+        } else {
+          const parsed = parseBarcodeCategoryAndType(bc);
+          finalBarcodes.push({
+            barcode: bc,
+            category: parsed.mainCat,
+            detailType: defaultDetailType || parsed.subType || null,
+            origin: destination // Base registration
+          });
+        }
+      }
+    });
+
+    const resolvedOrigins = [...new Set(finalBarcodes.map(b => b.origin))];
+    const requestOrigin = resolvedOrigins.length === 1 ? resolvedOrigins[0] : "any";
+
+    const reqRef = dbFloorRef.collection("barcodeMoveRequests").doc();
+    await reqRef.set({
+      id: reqRef.id,
+      pemindah,
+      origin: requestOrigin,
+      destination,
+      barcodes: finalBarcodes,
+      status: "pending",
+      notes,
+      defaultDetailType,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      processedAt: null,
+      processedBy: ""
+    });
+
+    return { success: true, requestId: reqRef.id };
+  }
+);
+
+export const processBarcodeMoveRequest = onCall(
+  { region: "asia-southeast2", memory: "512MiB", cors: true },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["supervisor", "admin", "input"].includes(role)) {
+      throw new HttpsError("permission-denied", "Akses ditolak. Membutuhkan izin supervisor atau input.");
+    }
+
+    const { 
+      floorId = "L1", 
+      requestId, 
+      status, 
+      processor 
+    } = request.data || {};
+
+    if (!requestId || !["approved", "rejected"].includes(status)) {
+      throw new HttpsError("invalid-argument", "Parameter tidak valid.");
+    }
+
+    const dbFloorRef = db.collection("floors").doc(floorId);
+    const reqRef = dbFloorRef.collection("barcodeMoveRequests").doc(requestId);
+
+    await db.runTransaction(async (t) => {
+      const reqSnap = await t.get(reqRef);
+      if (!reqSnap.exists) {
+        throw new HttpsError("not-found", "Request tidak ditemukan.");
+      }
+      
+      const reqData = reqSnap.data();
+      if (reqData.status !== "pending") {
+        throw new HttpsError("failed-precondition", "Request sudah diproses.");
+      }
+
+      if (status === "approved") {
+        await executeMutationLogic(
+          t, 
+          dbFloorRef, 
+          reqData.barcodes, 
+          reqData.destination, 
+          reqData.pemindah, 
+          reqData.notes || "Approved via queue", 
+          reqData.origin || "any",
+          reqData.defaultDetailType || ""
+        );
+      }
+
+      t.update(reqRef, {
+        status,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedBy: processor || "System"
+      });
+    });
+
+    return { success: true };
+  }
+);
+
+async function performBarcodeArchiving(floorId, daysThreshold = 30) {
+  const dbFloorRef = db.collection("floors").doc(floorId);
+  const thresholdDate = new Date(Date.now() - daysThreshold * 24 * 60 * 60 * 1000);
+
+  logger.info(`Archiving inactive barcodes for floor ${floorId} older than ${thresholdDate.toISOString()}`);
+
+  const snap = await dbFloorRef.collection("barcodes")
+    .where("location", "in", ["laku", "mutasi", "barang-display"])
+    .where("lastUpdated", "<", thresholdDate)
+    .limit(500)
+    .get();
+
+  if (snap.empty) {
+    logger.info(`No inactive barcodes to archive for floor ${floorId}.`);
+    return 0;
+  }
+
+  const batchWriter = db.bulkWriter();
+  let count = 0;
+
+  snap.forEach((doc) => {
+    const data = doc.data();
+    const barcodeId = doc.id;
+    const historyRef = dbFloorRef.collection("barcodesHistory").doc(barcodeId);
+    
+    // Copy to barcodesHistory
+    batchWriter.set(historyRef, {
+      ...data,
+      archivedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Delete from active barcodes
+    batchWriter.delete(doc.ref);
+    count++;
+  });
+
+  await batchWriter.close();
+  logger.info(`Successfully archived ${count} barcodes for floor ${floorId}.`);
+  return count;
+}
+
+export const scheduledArchiveInactiveBarcodes = onSchedule(
+  {
+    schedule: "0 2 * * *", // 2 AM WITA everyday
+    timeZone: "Asia/Makassar", // WITA
+    region: "asia-southeast2",
+    memory: "512MiB",
+  },
+  async (event) => {
+    for (const floorId of SNAPSHOT_FLOORS) {
+      try {
+        await performBarcodeArchiving(floorId, 30);
+      } catch (err) {
+        logger.error(`Error archiving barcodes for floor ${floorId}:`, err);
+      }
+    }
+  }
+);
+
+export const manualArchiveInactiveBarcodes = onCall(
+  { region: "asia-southeast2", memory: "512MiB" },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["admin", "supervisor"].includes(role)) {
+      throw new HttpsError("permission-denied", "Hanya admin/supervisor yang dapat menjalankan pembersihan arsip.");
+    }
+
+    const floorId = String(request.data?.floorId || "L1").trim().toUpperCase();
+    const days = parseInt(request.data?.days, 10);
+    const thresholdDays = isNaN(days) ? 30 : days;
+
+    if (!["L1", "L2"].includes(floorId)) {
+      throw new HttpsError("invalid-argument", "floorId tidak valid.");
+    }
+
+    const count = await performBarcodeArchiving(floorId, thresholdDays);
+    return { ok: true, archivedCount: count };
+  }
+);
+

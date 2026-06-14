@@ -28,6 +28,29 @@ const DEFAULT_TABLE_ROWS = [
   { key: "lainnya", label: "Lainnya", order: 9, enabled: true },
 ];
 
+const DEFAULT_COLOR_TYPES = [
+  { key: "HIJAU", label: "Hijau" },
+  { key: "BIRU", label: "Biru" },
+  { key: "PUTIH", label: "Putih" },
+  { key: "PINK", label: "Pink" },
+  { key: "KUNING", label: "Kuning" },
+];
+
+const DEFAULT_HALA_TYPES = [
+  { key: "KA", label: "KA" },
+  { key: "LA", label: "LA" },
+  { key: "AN", label: "AN" },
+  { key: "CA", label: "CA" },
+  { key: "SA", label: "SA" },
+  { key: "GA", label: "GA" },
+];
+
+let currentSettings = null;
+
+export function getCachedSettings() {
+  return currentSettings;
+}
+
 const CARD_TYPES = new Set(["simple", "color", "hala", "computer"]);
 const DETAIL_MODES = new Set(["default", "color", "hala"]);
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -150,6 +173,8 @@ export function buildDefaultInventorySettings(floorId = "") {
     cards,
     tableRows: [...DEFAULT_TABLE_ROWS],
     summaryGrid: { ...DEFAULT_SUMMARY_GRID },
+    colorTypes: [...DEFAULT_COLOR_TYPES],
+    halaTypes: [...DEFAULT_HALA_TYPES],
     lastUpdated: null,
     updatedBy: "System",
   };
@@ -202,13 +227,28 @@ export function normalizeInventorySettings(raw = {}, floorId = "") {
     row.order = index + 1;
   });
 
-  return {
+  const result = {
     cards,
     tableRows,
     summaryGrid: normalizeSummaryGrid(raw.summaryGrid || defaults.summaryGrid),
+    colorTypes: Array.isArray(raw.colorTypes)
+      ? raw.colorTypes.map(c => ({
+          key: String(c.key || "").trim().toUpperCase(),
+          label: String(c.label || "").trim()
+        })).filter(c => c.key)
+      : defaults.colorTypes,
+    halaTypes: Array.isArray(raw.halaTypes)
+      ? raw.halaTypes.map(h => ({
+          key: String(h.key || "").trim().toUpperCase(),
+          label: String(h.label || "").trim()
+        })).filter(h => h.key)
+      : defaults.halaTypes,
     lastUpdated: raw.lastUpdated || null,
     updatedBy: raw.updatedBy || "System",
   };
+
+  currentSettings = result;
+  return result;
 }
 
 export async function ensureInventorySettings(floorId = "") {

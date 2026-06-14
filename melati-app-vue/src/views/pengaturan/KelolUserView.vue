@@ -442,6 +442,7 @@ function formatTs(ts) {
 }
 
 async function loadUsers() {
+  if (!auth.isAuthenticated) return;
   loading.value = true;
   try {
     const snap = await getDocs(floorCollection(db, "users", activeFloor.value));
