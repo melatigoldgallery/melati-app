@@ -17,6 +17,7 @@ import {
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
 import { floorCollection, floorDoc } from "./floor-scope";
+import { fetchInventorySettings } from "./inventory-setting-service";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -404,11 +405,11 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
  * @param {string} mainCat
  * @returns {number}
  */
-export function calcFisikTotal(stockData, mainCat, subCategories = SUB_CATEGORIES) {
+export function calcFisikTotal(stockData, mainCat, subCategories = SUB_CATEGORIES, detailMode = "default") {
   return subCategories.reduce((sum, sub) => {
     const item = stockData[sub.key]?.[mainCat];
     if (!item) return sum;
-    if (item.details && Object.keys(item.details).length > 0) {
+    if ((detailMode === "color" || detailMode === "hala") && item.details && Object.keys(item.details).length > 0) {
       return sum + Object.values(item.details).reduce((s, v) => s + (parseInt(v) || 0), 0);
     }
     return sum + (parseInt(item.quantity) || 0);
@@ -460,11 +461,17 @@ export async function saveDailyReport(dateStr, stockData, floorId = "") {
     lainnya: "Lainnya",
   };
 
+  const settings = await fetchInventorySettings(floorId);
+  const getCardDetailMode = (id) => {
+    const card = settings?.cards?.find((c) => c.id === id);
+    return card?.detailMode || "default";
+  };
+
   const items = {};
   const breakdown = {};
 
   MAIN_CATEGORIES.forEach((mainCat) => {
-    const fisik = calcFisikTotal(stockData, mainCat);
+    const fisik = calcFisikTotal(stockData, mainCat, SUB_CATEGORIES, getCardDetailMode(mainCat));
     const komputer = parseInt(stockData["stok-komputer"]?.[mainCat]?.quantity) || 0;
     const { label: status } = getStockStatus(fisik, komputer);
     items[mainCat] = { total: fisik, komputer, status };

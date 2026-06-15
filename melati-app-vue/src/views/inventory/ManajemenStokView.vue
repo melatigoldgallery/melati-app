@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3 stock-page">
     <div class="page-header d-flex justify-content-between align-items-center mb-3">
       <div class="">
@@ -603,7 +603,7 @@ const summary = computed(() => {
   const out = {};
   nonComputerCards.value.forEach((card) => {
     const cat = card.id;
-    const fisik = calcFisikTotal(stockData.value, cat, tableRows.value);
+    const fisik = calcFisikTotal(stockData.value, cat, tableRows.value, getCardDetailMode(cat));
     const komputer = toInt(stockData.value["stok-komputer"]?.[cat]?.quantity);
     out[cat] = {
       fisik,
