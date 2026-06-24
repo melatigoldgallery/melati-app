@@ -1187,6 +1187,9 @@ function getClassificationLabel(category, key) {
 .input-group-glow input:focus {
   box-shadow: none;
 }
+.input-group-glow input::placeholder {
+  font-size: 0.88rem;
+}
 .pulse-success {
   box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.25);
   border-color: #198754 !important;

@@ -28,29 +28,27 @@
     </div>
 
     <template v-else>
-      <!-- Pill Navigation for Aggregate vs Physical Barcode -->
-      <ul class="nav nav-pills mb-3 justify-content-center scrollable-pills main-pills">
-        <li class="nav-item">
+      <!-- Pill Navigation for Aggregate vs Physical Barcode (Segmented Control style) -->
+      <div class="d-flex justify-content-center pb-3 mb-4 border-bottom">
+        <div class="main-pills-container p-1 bg-light rounded-pill d-inline-flex align-items-center shadow-sm">
           <button
-            class="nav-link px-3 py-1.5 fw-semibold rounded-pill me-2 d-flex align-items-center gap-2"
-            :class="mainTab === 'agregat' ? 'active bg-primary text-white' : 'text-secondary'"
+            class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"
+            :class="{ 'active': mainTab === 'agregat' }"
             @click="mainTab = 'agregat'"
           >
-            <i class="bi bi-grid-3x3-gap"></i>
-            Stok Summary
+            <i class="bi bi-grid-3x3-gap fs-6"></i>
+            <span>Stok Summary</span>
           </button>
-        </li>
-        <li class="nav-item">
           <button
-            class="nav-link px-3 py-1.5 fw-semibold rounded-pill d-flex align-items-center gap-2"
-            :class="mainTab === 'lacakFisik' ? 'active bg-primary text-white' : 'text-secondary'"
+            class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"
+            :class="{ 'active': mainTab === 'lacakFisik' }"
             @click="mainTab = 'lacakFisik'"
           >
-            <i class="bi bi-qr-code-scan"></i>
-            Lacak Barang (Barcode)
+            <i class="bi bi-qr-code-scan fs-6"></i>
+            <span>Lacak Barang (Barcode)</span>
           </button>
-        </li>
-      </ul>
+        </div>
+      </div>
 
       <!-- Stok Agregat Content -->
       <div v-if="mainTab === 'agregat'">
@@ -175,12 +173,164 @@
         <div v-else class="alert alert-warning mb-0">
           Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.
         </div>
+
+        <!-- Section Panduan & Alur Kerja Pelacakan Stok (Barcode Tracking) -->
+        <div class="card border-0 shadow-sm mt-4 info-board-card">
+          <div class="card-header bg-gradient-info text-white p-3 border-0">
+            <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
+              <i class="bi bi-info-circle-fill"></i>
+              <span>Informasi Update Sistem Inventory</span>
+            </h5>
+          </div>
+          <div class="card-body p-4">
+            <!-- Banner: Tujuan & Target Tutup Toko -->
+            <div class="row mb-4">
+              <div class="col-12">
+                <div class="goal-banner p-3 rounded-3 d-flex align-items-center justify-content-between flex-nowrap gap-3">
+                  <div class="d-flex align-items-center gap-3 min-w-0">
+                    <div class="icon-circle bg-white text-primary fs-3 shadow-sm flex-shrink-0">
+                      <i class="bi bi-lightning-charge-fill text-primary"></i>
+                    </div>
+                    <div class="min-w-0 text-start">
+                      <h6 class="fw-bold mb-1 text-white">Tujuan Utama: Hitung Barang Lebih Efisien!</h6>
+                      <p class="mb-0 text-white small text-wrap">
+                        Mempercepat proses hitung barang saat tutup toko. Dari estimasi awal <strong>1 jam</strong>, harapannya bisa selesai <strong>jauh lebih cepat</strong>.
+                      </p> 
+                    </div>
+                  </div>
+                  <div class="badge bg-white text-primary px-3 py-2 rounded-pill fw-bold shadow-sm flex-shrink-0 align-self-center">
+                    Target: 45 Menit Proses Hitung Selesai ⏱️
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Grid Content Panduan -->
+            <div class="row g-3">
+              <!-- Kolom Kiri: Alur Mutasi Barang -->
+              <div class="col-md-6">
+                <div class="h-100 p-3 bg-light rounded-3 border border-light-subtle shadow-sm-hover transition-all text-start">
+                  <h6 class="fw-bold text-dark mb-3 border-bottom pb-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-left-right text-primary"></i>
+                    1. Alur & Perpindahan Barang
+                  </h6>
+                  <div class="timeline-custom">
+                    <div class="timeline-item-custom pb-3">
+                      <span class="badge bg-primary-subtle text-primary mb-1">Barang Baru</span>
+                      <p class="small mb-0">
+                        Tim Input mendaftarkan barang ke kategori <strong>Belum Posting</strong>. Setelah diposting, status barcode dipindahkan ke kategori <strong>Admin</strong>.
+                      </p>
+                    </div>
+                    <div class="timeline-item-custom pb-3">
+                      <span class="badge bg-warning-subtle text-warning-emphasis mb-1">Barang BC (Cucian)</span>
+                      <p class="small mb-0">
+                        Tim Input memindahkan barcode langsung ke lokasi <strong>Stok Brankas</strong>. Jika ada staff yang mengambil untuk dipajang atau terjual, wajib dipindahkan ke lokasi <strong>Display</strong> atau <strong>Laku</strong> di sistem.
+                      </p>
+                    </div>
+                    <div class="timeline-item-custom pb-3">
+                      <span class="badge bg-info-subtle text-info-emphasis mb-1">Barang Keep</span>
+                      <p class="small mb-0">
+                        Untuk barang yang di-keep oleh customer atau staff, wajib diletakkan secara fisik di area <strong>Keep Barang</strong> dan status lokasinya disesuaikan di sistem.
+                      </p>
+                    </div>
+                    <div class="timeline-item-custom pb-0">
+                      <span class="badge bg-danger-subtle text-danger mb-1 fw-bold">Wajib Scan Barcode!</span>
+                      <p class="small mb-0">
+                        Setiap staff yang mengambil barang dari box Admin, Brankas, atau lokasi lainnya <strong>wajib scan barcode</strong> di sistem saat memindahkan barang.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Definisi Jenis / Lokasi Barang -->
+                  <div class="mt-3 pt-3 border-top border-light-subtle text-start">
+                    <span class="d-block fw-bold text-dark mb-2 small text-uppercase tracking-wider">
+                      <i class="bi bi-info-circle-fill text-info me-1"></i>
+                      Keterangan Jenis & Lokasi Barang:
+                    </span>
+                    <div class="d-flex flex-column gap-2 small">
+                      <div class="p-2 rounded bg-white border border-light-subtle shadow-sm-hover d-flex align-items-start gap-2">
+                        <span class="badge bg-primary fw-bold text-center mt-0.5" style="min-width: 90px;">Admin</span>
+                        <div class="small mb-0">
+                          Barang yang sudah diposting atau barang pajangan (<em>display</em>/dasaran) yang diambil dan dibawa ke belakang untuk disimpan di area kerja admin.
+                        </div>
+                      </div>
+                      <div class="p-2 rounded bg-white border border-light-subtle shadow-sm-hover d-flex align-items-start gap-2">
+                        <span class="badge bg-warning text-dark fw-bold text-center mt-0.5" style="min-width: 90px;">DP</span>
+                        <div class="small mb-0">
+                          Barang yang disimpan (<em>keep</em>) oleh pelanggan setelah membayar uang muka awal, atau barang yang disimpan oleh staf (staf yang melakukan <em>keep</em> wajib menyertakan DP).
+                        </div>
+                      </div>
+                      <div class="p-2 rounded bg-white border border-light-subtle shadow-sm-hover d-flex align-items-start gap-2">
+                        <span class="badge bg-info text-dark fw-bold text-center mt-0.5" style="min-width: 90px;">Barang Keep</span>
+                        <div class="small mb-0">
+                          Barang pesanan pelanggan online yang disimpan sementara dan akan segera diproses keesokan harinya.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Kolom Kanan: Prosedur SO & Box Fisik -->
+              <div class="col-md-6 text-start">
+                <div class="h-100 p-3 bg-light rounded-3 border border-light-subtle shadow-sm-hover transition-all d-flex flex-column justify-content-between">
+                  <div>
+                    <h6 class="fw-bold text-dark mb-3 border-bottom pb-2 d-flex align-items-center gap-2">
+                      <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                      2. Stock Opname (SO) Barang
+                    </h6>
+                    <p class="small">
+                      Jika jumlah barcode di sistem berbeda dengan fisik, segera lakukan koordinasi & SO dengan penanggung jawab masing-masing bagian:
+                    </p>
+                    <ul class="list-unstyled mb-3 ps-1">
+                      <li class="d-flex align-items-start gap-2 mb-2 small">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <div><strong>Stok Brankas:</strong> Koordinasi & SO dengan <strong>Tim Input</strong>.</div>
+                      </li>
+                      <li class="d-flex align-items-start gap-2 mb-2 small">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <div><strong>Stok Admin:</strong> Koordinasi & SO dengan <strong>Tim Admin</strong>.</div>
+                      </li>
+                      <li class="d-flex align-items-start gap-2 mb-2 small">
+                        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                        <div><strong>Stok Belum Posting:</strong> Koordinasi & SO dengan <strong>Bagian Posting</strong>.</div>
+                      </li>
+                    </ul>
+                    <div class="alert alert-warning border border-warning-subtle p-2 rounded-2 small mb-3">
+                      <i class="bi bi-info-circle-fill text-warning me-1"></i>
+                      Tujuan SO ini untuk melacak kode barang mana yang tidak ada, serta mengidentifikasi pengambilan barang oleh sales yang lupa update di sistem.
+                    </div>
+                    
+                    <h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2 small">
+                      <i class="bi bi-box-seam-fill text-info"></i>
+                      Penyimpanan Rapi (Fisik)
+                    </h6>
+                    <p class="small mb-0">
+                      Gunakan box fisik khusus yang disediakan (Stok Brankas, Admin, Belum Posting, dll.) guna mempermudah penataan dan pengecekan barang secara cepat.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer: Himbauan Kerjasama -->
+            <div class="mt-4 p-3 rounded-3 bg-primary-subtle border border-primary-subtle text-center">
+              <h6 class="fw-bold text-primary mb-1">
+                <i class="bi bi-people-fill me-1"></i>
+                Tolong Kerja Sama & Keterlibatannya!
+              </h6>
+              <p class="small mb-0 text-primary-emphasis">
+                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien dan kita semua bisa <strong>pulang tepat waktu!</strong> 🚀
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Lacak Fisik (Barcode) Content -->
       <div v-else-if="mainTab === 'lacakFisik'">
         <ul class="nav nav-tabs compact justify-content-center overflow-auto mb-3">
-          <li class="nav-item">
+          <li v-if="ENABLE_MUTATION_QUEUE" class="nav-item">
             <button
               class="nav-link text-nowrap small text-dark fw-bold"
               :class="{ active: physicalTab === 'antrian' }"
@@ -209,7 +359,7 @@
           </li>
         </ul>
 
-        <div v-if="physicalTab === 'antrian'">
+        <div v-if="ENABLE_MUTATION_QUEUE && physicalTab === 'antrian'">
           <MovementQueue />
         </div>
         <div v-else-if="physicalTab === 'log'">
@@ -694,20 +844,38 @@
                 <!-- Info & Control Bar -->
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                   <div>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-bold fs-7 d-flex align-items-center gap-1.5">
-                      <i class="bi bi-tag-fill"></i>
-                      Total: {{ activeModalTab ? getSubQty(activeModalTab) : getQty(selectedCategory, selectedLocation) }} Barcode
-                    </span>
+                    <button 
+                      class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 shadow-sm transition-all hover-btn-scale"
+                      @click="copyAllBarcodes"
+                      :disabled="copyingAll || barcodes.length === 0"
+                    >
+                      <span v-if="copyingAll" class="spinner-border spinner-border-sm" role="status"></span>
+                      <i v-else class="bi bi-clipboard"></i>
+                      <span>Salin Semua Barcode</span>
+                    </button>
                   </div>
-                  <button 
-                    class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 shadow-sm transition-all hover-btn-scale"
-                    @click="copyAllBarcodes"
-                    :disabled="copyingAll || barcodes.length === 0"
-                  >
-                    <span v-if="copyingAll" class="spinner-border spinner-border-sm" role="status"></span>
-                    <i v-else class="bi bi-clipboard"></i>
-                    <span>Salin Semua Barcode</span>
-                  </button>
+                  <div>
+                    <form @submit.prevent="handleBarcodeSearch" class="d-flex gap-1 align-items-center">
+                      <div class="input-group input-group-sm rounded-pill overflow-hidden border shadow-sm search-input-group" style="max-width: 220px; background: white;">
+                        <span class="input-group-text bg-white text-muted border-0 pe-1 ps-2">
+                          <i class="bi bi-search" style="font-size: 0.85rem;"></i>
+                        </span>
+                        <input 
+                          v-model="barcodeSearchQuery" 
+                          type="text" 
+                          class="form-control border-0 ps-1 py-1" 
+                          placeholder="Cari barcode..." 
+                          style="font-size: 0.85rem;"
+                        />
+                        <button v-if="barcodeSearchQuery" type="button" class="btn btn-link btn-xs p-1 text-secondary bg-transparent border-0 d-inline-flex align-items-center justify-content-center hover-primary" @click="clearBarcodeSearch" style="width: 26px;">
+                          <i class="bi bi-x fs-6"></i>
+                        </button>
+                      </div>
+                      <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1 shadow-sm transition-all hover-btn-scale" style="font-size: 0.85rem;">
+                        Cari
+                      </button>
+                    </form>
+                  </div>
                 </div>
 
                 <div v-if="barcodes.length === 0" class="text-center py-5 border border-dashed rounded-4 bg-white shadow-sm">
@@ -721,7 +889,8 @@
                         <tr>
                           <th class="ps-3 text-secondary fw-semibold small" style="width: 70px;">No</th>
                           <th class="text-secondary fw-semibold small">Barcode</th>
-                          <th class="pe-3 text-end text-secondary fw-semibold small">Terakhir Update</th>
+                          <th class="text-secondary fw-semibold small">Terakhir Update</th>
+                          <th v-if="isSupervisorOnly" class="pe-3 text-end text-secondary fw-semibold small" style="width: 90px;">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -741,11 +910,23 @@
                               </button>
                             </div>
                           </td>
-                          <td class="pe-3 text-end text-muted small">
+                          <td class="text-muted small">
                             <span class="d-inline-flex align-items-center gap-1.5">
                               <i class="bi bi-clock text-secondary opacity-75"></i>
                               {{ formatDate(b.lastUpdated) }}
                             </span>
+                          </td>
+                          <td v-if="isSupervisorOnly" class="pe-3 text-end">
+                            <button
+                              type="button"
+                              class="btn btn-outline-danger btn-xs px-2 py-0.5 rounded-pill transition-all d-inline-flex align-items-center gap-1 align-middle border-0"
+                              @click="handleDeleteBarcode(b.barcode)"
+                              :disabled="deletingBarcode === b.barcode"
+                            >
+                              <span v-if="deletingBarcode === b.barcode" class="spinner-border spinner-border-sm" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
+                              <i v-else class="bi bi-trash fs-7"></i>
+                              <span>Hapus</span>
+                            </button>
                           </td>
                         </tr>
                       </tbody>
@@ -796,7 +977,8 @@ import {
   parseBarcodes,
   executeBarcodeMutation,
   submitBarcodeMoveRequest,
-  checkBarcodesStatus
+  checkBarcodesStatus,
+  deleteSingleBarcode
 } from "@/services/barcode-service";
 import {
   KETERANGAN_OPTS,
@@ -818,8 +1000,11 @@ import {
   subscribeInventorySettings,
 } from "@/services/inventory-setting-service";
 
-const { toast, error: showError } = useAlert();
+const { toast, error: showError, confirm } = useAlert();
 const auth = useAuthStore();
+
+// Toggle untuk mengaktifkan antrian persetujuan mutasi (Movement Queue)
+const ENABLE_MUTATION_QUEUE = false;
 
 const loading = ref(false);
 const saving = ref(false);
@@ -873,7 +1058,7 @@ let unsubSettings = null;
 let snapshotTimer = null;
 
 const mainTab = ref("agregat"); // "agregat" or "lacakFisik"
-const physicalTab = ref("antrian"); // "antrian" or "log"
+const physicalTab = ref(ENABLE_MUTATION_QUEUE ? "antrian" : "log"); // "antrian" or "log"
 
 const simpleForm = ref({
   mainCat: "",
@@ -948,6 +1133,7 @@ const activeModalTab = ref("");
 const barcodeCache = ref({});
 const copyingAll = ref(false);
 const copiedIndex = ref(null);
+const barcodeSearchQuery = ref("");
 
 const enabledCards = computed(() => displaySettings.value.cards.filter((card) => card.enabled));
 const nonComputerCards = computed(() => enabledCards.value.filter((card) => card.type !== "computer"));
@@ -957,6 +1143,7 @@ const hasTabs = computed(() => tabs.value.length > 0);
 const tableRows = computed(() => displaySettings.value.tableRows.filter((row) => row.enabled));
 const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
 const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
+const isSupervisorOnly = computed(() => auth.userRole?.toLowerCase() === "supervisor");
 const currentDetailOptions = computed(() => {
   const cat = barcodeForm.value.mainCat;
   const detailMode = getCardDetailMode(cat);
@@ -1537,6 +1724,7 @@ function getSubQty(subType) {
 
 function selectModalTab(tabKey) {
   activeModalTab.value = tabKey;
+  barcodeSearchQuery.value = "";
   pageDocs.value = [];
   currentPage.value = 1;
   barcodes.value = [];
@@ -1550,6 +1738,7 @@ function openBarcodeRincianModal(mainCat, sub) {
   selectedLocation.value = sub.key;
   selectedLocationLabel.value = sub.label;
   selectedCategory.value = mainCat;
+  barcodeSearchQuery.value = "";
 
   // Clear cache to guarantee we fetch fresh data from Firestore on open
   barcodeCache.value = {};
@@ -1571,6 +1760,34 @@ function openBarcodeRincianModal(mainCat, sub) {
   }
 
   showModal("barcodeRincianModal");
+}
+
+const deletingBarcode = ref("");
+async function handleDeleteBarcode(barcodeId) {
+  const result = await confirm({
+    title: "Hapus Barcode?",
+    text: `Apakah Anda yakin ingin menghapus barcode ${barcodeId} dari sistem secara permanen? Stok fisik akan disesuaikan otomatis.`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, Hapus",
+    cancelButtonText: "Batal"
+  });
+
+  if (!result.isConfirmed) return;
+
+  deletingBarcode.value = barcodeId;
+  try {
+    await deleteSingleBarcode({ barcodeId, floorId: auth.activeFloor });
+    toast(`Barcode ${barcodeId} berhasil dihapus.`);
+    // Reload the current page of barcodes
+    await loadBarcodePage(currentPage.value);
+    // Reload stock summary and table data
+    await loadData({ force: true });
+  } catch (e) {
+    showError("Gagal menghapus barcode", e.message);
+  } finally {
+    deletingBarcode.value = "";
+  }
 }
 
 async function copyAllBarcodes() {
@@ -1645,63 +1862,48 @@ async function loadBarcodePage(pageNumber) {
   const subType = activeModalTab.value || null;
   const detailMode = getCardDetailMode(cat);
   const hasDetails = detailMode === "color" || detailMode === "hala";
-  const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
-  const currentLastUpdated = getItem(loc, cat)?.lastUpdated || "";
-  const currentQty = subType ? getSubQty(subType) : getQty(cat, loc);
+  const searchVal = barcodeSearchQuery.value.trim().toUpperCase();
+  const isSearching = !!searchVal;
 
-  const cachedData = barcodeCache.value[cacheKey];
-  const isCacheValid = cachedData && 
-                       cachedData.lastUpdated === currentLastUpdated &&
-                       cachedData.quantity === currentQty;
+  if (!isSearching) {
+    const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
+    const currentLastUpdated = getItem(loc, cat)?.lastUpdated || "";
+    const currentQty = subType ? getSubQty(subType) : getQty(cat, loc);
 
-  if (isCacheValid && cachedData.pages[pageNumber]) {
-    const pageData = cachedData.pages[pageNumber];
-    barcodes.value = pageData.barcodes;
-    hasMore.value = pageData.hasMore;
-    currentPage.value = pageNumber;
-    return;
-  }
+    const cachedData = barcodeCache.value[cacheKey];
+    const isCacheValid = cachedData && 
+                         cachedData.lastUpdated === currentLastUpdated &&
+                         cachedData.quantity === currentQty;
 
-  let targetPage = pageNumber;
-  if (!isCacheValid) {
-    const prefix = `${cat}:${loc}:`;
-    Object.keys(barcodeCache.value).forEach((key) => {
-      if (key.startsWith(prefix)) {
-        delete barcodeCache.value[key];
-      }
-    });
-
-    barcodeCache.value[cacheKey] = {
-      lastUpdated: currentLastUpdated,
-      quantity: currentQty,
-      pages: {}
-    };
-    targetPage = 1;
-    pageDocs.value = [];
-  }
-
-  loadingBarcodes.value = true;
-  try {
-    let q;
-    if (hasDetails) {
-      q = query(
-        collection(db, "floors", auth.activeFloor, "barcodes"),
-        where("category", "==", cat),
-        where("location", "==", loc),
-        where("detailType", "==", subType),
-        orderBy("barcode", "asc"),
-        limit(pageSize)
-      );
-    } else {
-      q = query(
-        collection(db, "floors", auth.activeFloor, "barcodes"),
-        where("category", "==", cat),
-        where("location", "==", loc),
-        limit(pageSize)
-      );
+    if (isCacheValid && cachedData.pages[pageNumber]) {
+      const pageData = cachedData.pages[pageNumber];
+      barcodes.value = pageData.barcodes;
+      hasMore.value = pageData.hasMore;
+      currentPage.value = pageNumber;
+      return;
     }
 
-    if (targetPage > 1 && pageDocs.value[targetPage - 2]) {
+    let targetPage = pageNumber;
+    if (!isCacheValid) {
+      const prefix = `${cat}:${loc}:`;
+      Object.keys(barcodeCache.value).forEach((key) => {
+        if (key.startsWith(prefix)) {
+          delete barcodeCache.value[key];
+        }
+      });
+
+      barcodeCache.value[cacheKey] = {
+        lastUpdated: currentLastUpdated,
+        quantity: currentQty,
+        pages: {}
+      };
+      targetPage = 1;
+      pageDocs.value = [];
+    }
+
+    loadingBarcodes.value = true;
+    try {
+      let q;
       if (hasDetails) {
         q = query(
           collection(db, "floors", auth.activeFloor, "barcodes"),
@@ -1709,7 +1911,6 @@ async function loadBarcodePage(pageNumber) {
           where("location", "==", loc),
           where("detailType", "==", subType),
           orderBy("barcode", "asc"),
-          startAfter(pageDocs.value[targetPage - 2]),
           limit(pageSize)
         );
       } else {
@@ -1717,40 +1918,190 @@ async function loadBarcodePage(pageNumber) {
           collection(db, "floors", auth.activeFloor, "barcodes"),
           where("category", "==", cat),
           where("location", "==", loc),
-          startAfter(pageDocs.value[targetPage - 2]),
           limit(pageSize)
         );
       }
-    }
 
-    const snaps = await getDocs(q);
-    const pageItems = [];
-    snaps.forEach((doc) => {
-      pageItems.push({
-        id: doc.id,
-        ...doc.data()
+      if (targetPage > 1 && pageDocs.value[targetPage - 2]) {
+        if (hasDetails) {
+          q = query(
+            collection(db, "floors", auth.activeFloor, "barcodes"),
+            where("category", "==", cat),
+            where("location", "==", loc),
+            where("detailType", "==", subType),
+            orderBy("barcode", "asc"),
+            startAfter(pageDocs.value[targetPage - 2]),
+            limit(pageSize)
+          );
+        } else {
+          q = query(
+            collection(db, "floors", auth.activeFloor, "barcodes"),
+            where("category", "==", cat),
+            where("location", "==", loc),
+            startAfter(pageDocs.value[targetPage - 2]),
+            limit(pageSize)
+          );
+        }
+      }
+
+      const snaps = await getDocs(q);
+      const pageItems = [];
+      snaps.forEach((doc) => {
+        pageItems.push({
+          id: doc.id,
+          ...doc.data()
+        });
       });
-    });
 
-    barcodes.value = pageItems;
-    hasMore.value = pageItems.length === pageSize;
-    currentPage.value = targetPage;
+      barcodes.value = pageItems;
+      hasMore.value = pageItems.length === pageSize;
+      currentPage.value = targetPage;
 
-    if (snaps.docs.length > 0) {
-      pageDocs.value[targetPage - 1] = snaps.docs[snaps.docs.length - 1];
+      if (snaps.docs.length > 0) {
+        pageDocs.value[targetPage - 1] = snaps.docs[snaps.docs.length - 1];
+      }
+
+      barcodeCache.value[cacheKey].pages[targetPage] = {
+        barcodes: pageItems,
+        hasMore: hasMore.value,
+        lastDoc: snaps.docs.length > 0 ? snaps.docs[snaps.docs.length - 1] : null
+      };
+
+    } catch (e) {
+      showError("Gagal memuat list barcode", e.message);
+    } finally {
+      loadingBarcodes.value = false;
     }
+  } else {
+    // Searching mode
+    loadingBarcodes.value = true;
+    try {
+      let q;
+      if (hasDetails) {
+        q = query(
+          collection(db, "floors", auth.activeFloor, "barcodes"),
+          where("category", "==", cat),
+          where("location", "==", loc),
+          where("detailType", "==", subType),
+          where("barcode", ">=", searchVal),
+          where("barcode", "<=", searchVal + "\uf8ff"),
+          orderBy("barcode", "asc"),
+          limit(pageSize)
+        );
+      } else {
+        q = query(
+          collection(db, "floors", auth.activeFloor, "barcodes"),
+          where("category", "==", cat),
+          where("location", "==", loc),
+          where("barcode", ">=", searchVal),
+          where("barcode", "<=", searchVal + "\uf8ff"),
+          orderBy("barcode", "asc"),
+          limit(pageSize)
+        );
+      }
 
-    barcodeCache.value[cacheKey].pages[targetPage] = {
-      barcodes: pageItems,
-      hasMore: hasMore.value,
-      lastDoc: snaps.docs.length > 0 ? snaps.docs[snaps.docs.length - 1] : null
-    };
+      if (pageNumber > 1 && pageDocs.value[pageNumber - 2]) {
+        if (hasDetails) {
+          q = query(
+            collection(db, "floors", auth.activeFloor, "barcodes"),
+            where("category", "==", cat),
+            where("location", "==", loc),
+            where("detailType", "==", subType),
+            where("barcode", ">=", searchVal),
+            where("barcode", "<=", searchVal + "\uf8ff"),
+            orderBy("barcode", "asc"),
+            startAfter(pageDocs.value[pageNumber - 2]),
+            limit(pageSize)
+          );
+        } else {
+          q = query(
+            collection(db, "floors", auth.activeFloor, "barcodes"),
+            where("category", "==", cat),
+            where("location", "==", loc),
+            where("barcode", ">=", searchVal),
+            where("barcode", "<=", searchVal + "\uf8ff"),
+            orderBy("barcode", "asc"),
+            startAfter(pageDocs.value[pageNumber - 2]),
+            limit(pageSize)
+          );
+        }
+      }
 
-  } catch (e) {
-    showError("Gagal memuat list barcode", e.message);
-  } finally {
-    loadingBarcodes.value = false;
+      const snaps = await getDocs(q);
+      const pageItems = [];
+      snaps.forEach((doc) => {
+        pageItems.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      barcodes.value = pageItems;
+      hasMore.value = pageItems.length === pageSize;
+      currentPage.value = pageNumber;
+
+      if (snaps.docs.length > 0) {
+        pageDocs.value[pageNumber - 1] = snaps.docs[snaps.docs.length - 1];
+      }
+    } catch (e) {
+      console.warn("Prefix range query failed, falling back to local memory filtering: ", e);
+      try {
+        let qFallback;
+        if (hasDetails) {
+          qFallback = query(
+            collection(db, "floors", auth.activeFloor, "barcodes"),
+            where("category", "==", cat),
+            where("location", "==", loc),
+            where("detailType", "==", subType),
+            limit(1000)
+          );
+        } else {
+          qFallback = query(
+            collection(db, "floors", auth.activeFloor, "barcodes"),
+            where("category", "==", cat),
+            where("location", "==", loc),
+            limit(1000)
+          );
+        }
+
+        const snaps = await getDocs(qFallback);
+        const allItems = [];
+        snaps.forEach((doc) => {
+          allItems.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+
+        allItems.sort((a, b) => (a.barcode || "").localeCompare(b.barcode || ""));
+
+        const filtered = allItems.filter(item => 
+          item.barcode && item.barcode.toUpperCase().includes(searchVal)
+        );
+
+        barcodes.value = filtered.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
+        hasMore.value = filtered.length > pageNumber * pageSize;
+        currentPage.value = pageNumber;
+      } catch (err) {
+        showError("Gagal mencari barcode", err.message);
+      }
+    } finally {
+      loadingBarcodes.value = false;
+    }
   }
+}
+
+async function handleBarcodeSearch() {
+  pageDocs.value = [];
+  currentPage.value = 1;
+  await loadBarcodePage(1);
+}
+
+async function clearBarcodeSearch() {
+  barcodeSearchQuery.value = "";
+  pageDocs.value = [];
+  currentPage.value = 1;
+  await loadBarcodePage(1);
 }
 
 function hasTypedChanges(details, original) {
@@ -1805,6 +2156,7 @@ async function submitBarcodeUpdate() {
   try {
     const userRole = auth.userRole?.toLowerCase();
     const isSupervisor = ["supervisor", "admin", "input"].includes(userRole);
+    const shouldProcessDirectly = isSupervisor || !ENABLE_MUTATION_QUEUE;
 
     // Chunking logic (max 200 barcodes per transaction)
     const chunks = [];
@@ -1813,7 +2165,7 @@ async function submitBarcodeUpdate() {
       chunks.push(barcodesArray.slice(i, i + chunkSize));
     }
 
-    if (isSupervisor) {
+    if (shouldProcessDirectly) {
       for (let i = 0; i < chunks.length; i++) {
         barcodeStatus.value = `Memproses ${barcodesArray.length} barcode (Bagian ${i + 1}/${chunks.length})...`;
         await executeBarcodeMutation({
@@ -1823,7 +2175,8 @@ async function submitBarcodeUpdate() {
           pemindah: barcodeForm.value.petugas.trim(),
           notes: barcodeForm.value.keterangan?.trim() || "",
           floorId: auth.activeFloor,
-          defaultDetailType: barcodeForm.value.detailType
+          defaultDetailType: barcodeForm.value.detailType,
+          category: barcodeForm.value.mainCat
         });
       }
       toast("Mutasi barcode berhasil diproses langsung.");
@@ -1837,7 +2190,8 @@ async function submitBarcodeUpdate() {
           pemindah: barcodeForm.value.petugas.trim(),
           notes: barcodeForm.value.keterangan?.trim() || "",
           floorId: auth.activeFloor,
-          defaultDetailType: barcodeForm.value.detailType
+          defaultDetailType: barcodeForm.value.detailType,
+          category: barcodeForm.value.mainCat
         });
       }
       toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
@@ -2091,6 +2445,74 @@ onUnmounted(() => {
   --tab-bg: linear-gradient(135deg, #c4dbf7 0%, #dbe9fc 100%);
 }
 
+.info-board-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.info-board-card .card-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%) !important;
+}
+
+.goal-banner {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-custom {
+  position: relative;
+  border-left: 2px solid #e2e8f0;
+  padding-left: 16px;
+  margin-left: 8px;
+}
+
+.timeline-item-custom {
+  position: relative;
+}
+
+.timeline-item-custom::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  border: 2px solid #fff;
+}
+
+.timeline-item-custom:nth-child(2)::before {
+  background-color: #eab308;
+}
+
+.timeline-item-custom:nth-child(3)::before {
+  background-color: #06b6d4;
+}
+
+.timeline-item-custom:nth-child(4)::before {
+  background-color: #ef4444;
+}
+
+.shadow-sm-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.shadow-sm-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2172,7 +2594,7 @@ onUnmounted(() => {
 }
 
 .table-responsive {
-  max-height: 580px;
+  max-height: none;
 }
 
 .modal-header {
@@ -2207,11 +2629,29 @@ onUnmounted(() => {
   background: transparent;
 }
 
-.main-pills .nav-link {
-  font-size: 0.88rem;
-  padding: 8px 18px;
-  white-space: nowrap;
-  transition: all 0.25s ease;
+.main-pills-container {
+  background-color: #f1f3f7;
+  border: 1px solid #e2e8f0;
+}
+
+.main-pill-btn {
+  font-size: 0.9rem;
+  color: #64748b;
+  cursor: pointer;
+  outline: none;
+  background-color: transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-pill-btn:hover:not(.active) {
+  color: #1e293b;
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.main-pill-btn.active {
+  background: linear-gradient(135deg, #5966e0 0%, #4c63d2 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(76, 99, 210, 0.35) !important;
 }
 
 .modal-pills {
@@ -2294,5 +2734,18 @@ onUnmounted(() => {
 
 .monospace {
   font-family: var(--bs-font-monospace), monospace;
+}
+
+.search-input-group {
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.search-input-group:focus-within {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.search-input-group .form-control:focus {
+  box-shadow: none !important;
 }
 </style>

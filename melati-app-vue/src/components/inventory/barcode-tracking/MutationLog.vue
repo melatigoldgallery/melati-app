@@ -50,31 +50,20 @@
       </div>
 
       <div v-else>
-        <!-- Search Timeline Mode (Only when searching specific barcode) -->
-        <div v-if="isSearchMode && logs.length > 0" class="px-4 py-3 bg-light-subtle border-bottom">
-          <h6 class="text-dark fw-bold small mb-3">Timeline Lacak Barcode: <span class="text-primary monospace fs-5">{{ searchedBarcode }}</span></h6>
-          <div class="timeline-container ps-3 border-start">
-            <div 
-              v-for="(log, idx) in sortedLogsForTimeline" 
-              :key="log.id" 
-              class="timeline-item position-relative pb-4"
-            >
-              <div class="timeline-dot" :class="getTimelineDotClass(log, idx === 0)"></div>
-              <div class="timeline-content ms-3">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <span class="small fw-bold text-dark">{{ getSubDocLabel(log.destination) }}</span>
-                  <span v-if="isStopLocation(log.destination)" class="badge bg-danger rounded-pill px-2 py-0.5" style="font-size: 0.65rem;">
-                    <i class="bi bi-shield-lock me-1"></i>Tracking Berhenti
-                  </span>
-                  <small class="text-muted ms-auto" style="font-size: 0.75rem;">{{ formatDate(log.timestamp) }}</small>
-                </div>
-                <p class="text-muted small mb-0">
-                  Dipindahkan oleh <span class="fw-semibold text-dark">{{ log.pemindah }}</span> dari <span class="fw-semibold text-dark">{{ getSubDocLabel(getBarcodeOriginInLog(log, searchedBarcode)) }}</span>.
-                  <span v-if="log.notes" class="text-muted italic d-block mt-1 small bg-light p-1 rounded">"{{ log.notes }}"</span>
-                </p>
-              </div>
-            </div>
+        <!-- Search Timeline Info Banner (Instead of inline timeline) -->
+        <div v-if="isSearchMode && logs.length > 0" class="px-4 py-3 bg-light-subtle border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary fs-7 monospace px-3 py-2">{{ searchedBarcode }}</span>
+            <span class="text-muted small">Ditemukan {{ logs.length }} riwayat mutasi.</span>
           </div>
+          <button 
+            type="button" 
+            class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1.5 hover-lift"
+            @click="openTimelineModal"
+          >
+            <i class="bi bi-clock-history"></i>
+            <span>Lihat Timeline Lacak</span>
+          </button>
         </div>
 
         <!-- Table View -->
@@ -82,13 +71,14 @@
           <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th class="ps-3" style="width: 15%">Waktu</th>
-                <th style="width: 12%">Barcode</th>
-                <th style="width: 12%">Kategori</th>
+                <th class="ps-3" style="width: 12%">Waktu</th>
+                <th style="width: 18%">Barcode</th>
+                <th style="width: 10%">Kategori</th>
                 <th>Rute Perpindahan</th>
-                <th style="width: 15%">Staff</th>
+                <th style="width: 12%">Staff</th>
                 <th style="width: 10%">Status</th>
-                <th class="pe-3" style="width: 20%">Catatan</th>
+                <th :class="isSupervisorOnly ? 'text-start' : 'pe-3'" style="width: 15%">Catatan</th>
+                <th v-if="isSupervisorOnly" class="pe-3 text-end" style="width: 12%">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -96,11 +86,11 @@
                 <td class="ps-3 text-muted small">
                   {{ formatDate(log.timestamp) }}
                 </td>
-                <td class="monospace fw-bold text-primary small">
+                <td class="monospace fw-bold text-primary small text-nowrap">
                   <template v-if="log.barcodes && log.barcodes.length > 1">
                     <button 
                       type="button" 
-                      class="btn btn-link btn-sm p-0 monospace fw-bold text-primary text-decoration-none d-inline-flex align-items-center gap-1 align-baseline"
+                      class="btn btn-link btn-sm p-0 monospace fw-bold text-primary text-decoration-none d-inline-flex align-items-center gap-1 align-baseline text-nowrap"
                       data-bs-toggle="modal"
                       data-bs-target="#bulkDetailModal"
                       @click="openBulkDetail(log)"
@@ -118,9 +108,11 @@
                 </td>
                 <td>
                   <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">{{ getSubDocLabel(log.origin) }}</span>
-                    <i class="bi bi-arrow-right text-muted small"></i>
-                    <span class="badge" :class="isStopLocation(log.destination) ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-primary-subtle text-primary border'">
+                    <span class="badge bg-secondary-subtle text-secondary border px-2 py-1 d-inline-block text-truncate text-center" style="width: 130px;">
+                      {{ getSubDocLabel(log.origin) }}
+                    </span>
+                    <i class="bi bi-arrow-right text-muted small flex-shrink-0"></i>
+                    <span class="badge d-inline-block text-truncate text-center" :class="isStopLocation(log.destination) ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-primary-subtle text-primary border'" style="width: 130px;">
                       {{ getSubDocLabel(log.destination) }}
                     </span>
                   </div>
@@ -133,8 +125,20 @@
                     {{ log.status || 'approved' }}
                   </span>
                 </td>
-                <td class="pe-3 text-muted small italic">
+                <td :class="isSupervisorOnly ? 'text-start' : 'pe-3'" class="text-muted small italic">
                   {{ log.notes || "-" }}
+                </td>
+                <td v-if="isSupervisorOnly" class="pe-3 text-end">
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-xs px-2 py-0.5 rounded-pill transition-all d-inline-flex align-items-center gap-1 align-middle border-0"
+                    @click="handleRevertLog(log.id)"
+                    :disabled="revertingLogId === log.id"
+                  >
+                    <span v-if="revertingLogId === log.id" class="spinner-border spinner-border-sm" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
+                    <i v-else class="bi bi-arrow-counterclockwise fs-7"></i>
+                    <span>Batalkan</span>
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -149,8 +153,8 @@
     <!-- Modal Detail Bulk Barcode (Teleported to body) -->
     <Teleport to="body">
       <div class="modal fade" id="bulkDetailModal" tabindex="-1" aria-hidden="true" ref="bulkDetailModalRef">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border-0 shadow-lg rounded-3">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header py-3 bg-primary text-white border-0">
               <h6 class="modal-title fw-bold">
                 <i class="bi bi-list-check me-2"></i>
@@ -158,7 +162,7 @@
               </h6>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
+            <div class="modal-body p-4 bg-light-subtle">
               <div v-if="selectedLog" class="mb-3">
                 <div class="row g-2 mb-3 bg-light p-2 rounded-2 small text-muted">
                   <div class="col-6"><strong>Waktu:</strong> {{ formatDate(selectedLog.timestamp) }}</div>
@@ -167,7 +171,7 @@
                   <div class="col-12" v-if="selectedLog.notes"><strong>Catatan:</strong> {{ selectedLog.notes }}</div>
                 </div>
 
-                <div class="table-responsive border rounded-3 overflow-hidden" style="max-height: 250px;">
+                <div class="table-responsive border border-light rounded-4 shadow-sm bg-white custom-scrollbar" style="max-height: 350px; overflow-y: auto;">
                   <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
                     <thead class="table-light">
                       <tr>
@@ -193,24 +197,78 @@
                 </div>
 
                 <!-- Pagination Controls client-side -->
-                <div v-if="selectedLog.barcodes.length > detailPageSize" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                <div v-if="selectedLog.barcodes.length > detailPageSize" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-light">
                   <button
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
                     :disabled="detailPage === 1"
                     @click="detailPage--"
                   >
-                    <i class="bi bi-chevron-left me-1"></i>
+                    <i class="bi bi-chevron-left"></i>
                     Sebelumnya
                   </button>
-                  <span class="small fw-semibold text-muted">Halaman {{ detailPage }} dari {{ totalDetailPages }}</span>
+                  <span class="small fw-bold text-secondary">Halaman {{ detailPage }} dari {{ totalDetailPages }}</span>
                   <button
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
                     :disabled="detailPage >= totalDetailPages"
                     @click="detailPage++"
                   >
                     Berikutnya
-                    <i class="bi bi-chevron-right ms-1"></i>
+                    <i class="bi bi-chevron-right"></i>
                   </button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer py-2 border-0 bg-light-subtle">
+              <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Timeline Lacak Barcode (Teleported to body) -->
+      <div class="modal fade" id="timelineModal" tabindex="-1" aria-hidden="true" ref="timelineModalRef">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+          <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header py-3 bg-gradient-primary text-white border-0">
+              <h6 class="modal-title fw-bold d-flex align-items-center gap-2">
+                <i class="bi bi-clock-history"></i>
+                <span>Timeline Lacak Barcode</span>
+              </h6>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light-subtle custom-scrollbar" style="max-height: 500px; overflow-y: auto;">
+              <div class="text-center mb-4">
+                <span class="text-muted small d-block mb-1">KODE BARCODE</span>
+                <h4 class="text-primary monospace fw-bold mb-0">{{ searchedBarcode }}</h4>
+              </div>
+
+              <div v-if="sortedLogsForTimeline.length === 0" class="text-center py-4 text-muted small">
+                Tidak ada riwayat untuk barcode ini.
+              </div>
+              <div v-else class="timeline-custom-modal ps-3 border-start position-relative ms-2">
+                <div 
+                  v-for="(log, idx) in sortedLogsForTimeline" 
+                  :key="log.id" 
+                  class="timeline-item-modal position-relative pb-4"
+                >
+                  <div class="timeline-dot-modal" :class="getTimelineDotClass(log, idx === 0)"></div>
+                  <div class="timeline-card-modal p-3 bg-white border border-light-subtle rounded-3 shadow-sm-hover transition-all text-start">
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                      <span class="small fw-bold text-dark fs-6">{{ getSubDocLabel(log.destination) }}</span>
+                      <span v-if="isStopLocation(log.destination)" class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.65rem;">
+                        <i class="bi bi-shield-lock me-1"></i>Tracking Berhenti
+                      </span>
+                      <small class="text-muted ms-auto" style="font-size: 0.72rem;">{{ formatDate(log.timestamp) }}</small>
+                    </div>
+                    <p class="text-muted small mb-0">
+                      Dipindahkan oleh <span class="fw-semibold text-dark">{{ log.pemindah }}</span> dari <span class="fw-semibold text-dark">{{ getSubDocLabel(getBarcodeOriginInLog(log, searchedBarcode)) }}</span>.
+                    </p>
+                    <div v-if="log.notes" class="mt-2 p-2 bg-light rounded text-muted italic small border-start border-3 border-warning">
+                      "{{ log.notes }}"
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -233,9 +291,35 @@ import { db } from "@/config/firebase";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { Modal } from "bootstrap";
+import { revertMutationLog } from "@/services/barcode-service";
 
 const auth = useAuthStore();
-const { error: showError } = useAlert();
+const { toast, error: showError, confirm } = useAlert();
+const isSupervisorOnly = computed(() => auth.userRole?.toLowerCase() === "supervisor");
+const revertingLogId = ref("");
+
+async function handleRevertLog(logId) {
+  const result = await confirm({
+    title: "Batalkan Sesi?",
+    text: "Semua barcode yang ditambahkan/dipindahkan pada sesi ini akan dihapus/di-revert massal, dan stok fisik dipulihkan otomatis.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, Batalkan",
+    cancelButtonText: "Batal"
+  });
+
+  if (!result.isConfirmed) return;
+
+  revertingLogId.value = logId;
+  try {
+    await revertMutationLog({ logId, floorId: auth.activeFloor });
+    toast("Sesi mutasi berhasil dibatalkan dan stok dipulihkan.");
+  } catch (e) {
+    showError("Gagal membatalkan sesi mutasi", e.message);
+  } finally {
+    revertingLogId.value = "";
+  }
+}
 
 const logs = ref([]);
 const loading = ref(false);
@@ -248,6 +332,8 @@ const detailPage = ref(1);
 const detailPageSize = 10;
 const bulkDetailModalRef = ref(null);
 let bulkModalInstance = null;
+const timelineModalRef = ref(null);
+let timelineModalInstance = null;
 
 const totalDetailPages = computed(() => {
   if (!selectedLog.value?.barcodes) return 0;
@@ -267,6 +353,13 @@ function openBulkDetail(log) {
     bulkModalInstance = Modal.getOrCreateInstance(bulkDetailModalRef.value);
   }
   bulkModalInstance?.show();
+}
+
+function openTimelineModal() {
+  if (!timelineModalInstance && timelineModalRef.value) {
+    timelineModalInstance = Modal.getOrCreateInstance(timelineModalRef.value);
+  }
+  timelineModalInstance?.show();
 }
 
 function getBarcodeOriginInLog(log, barcode) {
@@ -401,6 +494,11 @@ async function handleSearch() {
     });
 
     logs.value = combined;
+    if (combined.length > 0) {
+      setTimeout(() => {
+        openTimelineModal();
+      }, 50);
+    }
   } catch (e) {
     showError("Gagal melacak barcode", e.message);
   } finally {
@@ -482,5 +580,73 @@ onMounted(() => {
 }
 .italic {
   font-style: italic;
+}
+/* Force reload cache */
+
+.modal-header {
+  background: linear-gradient(135deg, #5966e0 0%, #4c63d2 100%);
+  color: #fff;
+}
+
+.modal-header .btn-close {
+  filter: invert(1);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
+}
+
+/* Timeline modal styling */
+.timeline-custom-modal {
+  border-left: 2px solid #e2e8f0 !important;
+  padding-left: 18px;
+}
+
+.timeline-item-modal {
+  position: relative;
+}
+
+.timeline-dot-modal {
+  position: absolute;
+  left: -24px;
+  top: 15px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  z-index: 2;
+}
+
+.timeline-card-modal {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%) !important;
+}
+
+.shadow-sm-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.shadow-sm-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
 </style>

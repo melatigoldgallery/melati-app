@@ -430,6 +430,24 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
 
 // ── Computed Helpers (pure, no Firestore) ─────────────────────────────────
 
+export function getCardDetailMode(mainCat) {
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.cards)) {
+    const card = settings.cards.find(c => c.id === mainCat);
+    if (card) {
+      const mode = String(card.detailMode || "").trim().toLowerCase();
+      if (mode === "color" || mode === "hala" || mode === "default") return mode;
+      if (card.type === "color") return "color";
+      if (card.type === "hala") return "hala";
+      return "default";
+    }
+  }
+  // Fallback to static defaults
+  if (TYPED_CATS.includes(mainCat)) return "color";
+  if (HALA_CATS.includes(mainCat)) return "hala";
+  return "default";
+}
+
 /**
  * Calculate total physical stock for a mainCategory across all sub-docs.
  * @param {Object} stockData - result of fetchAllStockData()
@@ -437,10 +455,13 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
  * @returns {number}
  */
 export function calcFisikTotal(stockData, mainCat, subCategories = SUB_CATEGORIES) {
+  const detailMode = getCardDetailMode(mainCat);
+  const useDetails = detailMode === "color" || detailMode === "hala";
+
   return subCategories.reduce((sum, sub) => {
     const item = stockData[sub.key]?.[mainCat];
     if (!item) return sum;
-    if (item.details && Object.keys(item.details).length > 0) {
+    if (useDetails && item.details && Object.keys(item.details).length > 0) {
       return sum + Object.values(item.details).reduce((s, v) => s + (parseInt(v) || 0), 0);
     }
     return sum + (parseInt(item.quantity) || 0);

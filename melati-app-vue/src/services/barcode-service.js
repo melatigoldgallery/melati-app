@@ -72,15 +72,15 @@ export async function checkBarcodesStatus(barcodes, floorId) {
   return res.data;
 }
 
-export async function executeBarcodeMutation({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType }) {
+export async function executeBarcodeMutation({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category }) {
   const callable = httpsCallable(functions, "executeBarcodeMutation");
-  const res = await callable({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType });
+  const res = await callable({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category });
   return res.data;
 }
 
-export async function submitBarcodeMoveRequest({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType }) {
+export async function submitBarcodeMoveRequest({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category }) {
   const callable = httpsCallable(functions, "submitBarcodeMoveRequest");
-  const res = await callable({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType });
+  const res = await callable({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category });
   return res.data;
 }
 
@@ -89,3 +89,17 @@ export async function processBarcodeMoveRequest({ requestId, status, processor, 
   const res = await callable({ requestId, status, processor, floorId });
   return res.data;
 }
+
+export async function deleteSingleBarcode({ barcodeId, floorId }) {
+  const callable = httpsCallable(functions, "deleteSingleBarcode");
+  const res = await callable({ barcodeId, floorId });
+  return res.data;
+}
+
+export async function revertMutationLog({ logId, floorId }) {
+  const callable = httpsCallable(functions, "revertMutationLog");
+  const res = await callable({ logId, floorId });
+  return res.data;
+}
+
+// Force reload cache
