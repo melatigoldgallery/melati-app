@@ -29,7 +29,7 @@
 
     <template v-else>
       <!-- Pill Navigation for Aggregate vs Physical Barcode (Segmented Control style) -->
-      <div class="d-flex justify-content-center pb-3 mb-4 border-bottom">
+      <div v-if="isBarcodeEnabled" class="d-flex justify-content-center pb-3 mb-4 border-bottom">
         <div class="main-pills-container p-1 bg-light rounded-pill d-inline-flex align-items-center shadow-sm">
           <button
             class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"
@@ -82,7 +82,7 @@
                   <tr>
                     <th style="width: 44px">No</th>
                     <th>Jenis</th>
-                    <th class="text-center">Rincian Barcode</th>
+                    <th v-if="isBarcodeEnabled" class="text-center">Rincian Barcode</th>
                     <th class="text-center">Jumlah</th>
                     <th class="text-center">Aksi</th>
                     <th class="text-center">Riwayat</th>
@@ -93,7 +93,7 @@
                   <tr v-for="(sub, idx) in tableRows" :key="sub.key">
                     <td class="fw-semibold">{{ idx + 1 }}</td>
                     <td class="fw-semibold">{{ sub.label }}</td>
-                    <td class="text-center">
+                    <td v-if="isBarcodeEnabled" class="text-center">
                       <button
                         v-if="sub.key !== 'barang-display' || showRincianColumn"
                         class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1"
@@ -125,7 +125,7 @@
                 </tbody>
                 <tfoot>
                   <tr class="table-light fw-bold">
-                    <td colspan="3">Total Fisik</td>
+                    <td :colspan="isBarcodeEnabled ? 3 : 2">Total Fisik</td>
                     <td class="text-center">{{ summary[activeTab]?.fisik ?? 0 }}</td>
                     <td colspan="3" class="text-center">
                       <span class="badge" :class="`bg-${summary[activeTab]?.status.cls ?? 'secondary'}`">
@@ -175,7 +175,7 @@
         </div>
 
         <!-- Section Panduan & Alur Kerja Pelacakan Stok (Barcode Tracking) -->
-        <div class="card border-0 shadow-sm mt-4 info-board-card">
+        <div v-if="isBarcodeEnabled" class="card border-0 shadow-sm mt-4 info-board-card">
           <div class="card-header bg-gradient-info text-white p-3 border-0">
             <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
               <i class="bi bi-info-circle-fill"></i>
@@ -227,12 +227,6 @@
                         Tim Input memindahkan barcode langsung ke lokasi <strong>Stok Brankas</strong>. Jika ada staff yang mengambil untuk dipajang atau terjual, wajib dipindahkan ke lokasi <strong>Display</strong> atau <strong>Laku</strong> di sistem.
                       </p>
                     </div>
-                    <div class="timeline-item-custom pb-3">
-                      <span class="badge bg-info-subtle text-info-emphasis mb-1">Barang Keep</span>
-                      <p class="small mb-0">
-                        Untuk barang yang di-keep oleh customer atau staff, wajib diletakkan secara fisik di area <strong>Keep Barang</strong> dan status lokasinya disesuaikan di sistem.
-                      </p>
-                    </div>
                     <div class="timeline-item-custom pb-0">
                       <span class="badge bg-danger-subtle text-danger mb-1 fw-bold">Wajib Scan Barcode!</span>
                       <p class="small mb-0">
@@ -247,23 +241,32 @@
                       <i class="bi bi-info-circle-fill text-info me-1"></i>
                       Keterangan Jenis & Lokasi Barang:
                     </span>
-                    <div class="d-flex flex-column gap-2 small">
+                    <div class="d-flex flex-column gap-2">
                       <div class="p-2 rounded bg-white border border-light-subtle shadow-sm-hover d-flex align-items-start gap-2">
-                        <span class="badge bg-primary fw-bold text-center mt-0.5" style="min-width: 90px;">Admin</span>
+                        <span class="badge bg-primary fw-bold text-center mt-0.5" style="min-width: 95px;">Admin</span>
                         <div class="small mb-0">
-                          Barang yang sudah diposting atau barang pajangan (<em>display</em>/dasaran) yang diambil dan dibawa ke belakang untuk disimpan di area kerja admin.
+                          Barang dasaran (display) atau barang sudah posting yang dibawa ke area kerja admin.
+                          <ul class="ps-3 mb-0 mt-1">
+                            <li><strong>Penyimpanan & Ambil:</strong> Tempat menyimpan barang dasaran & sudah posting wajib dipisahkan. Pengambilan fisik ke meja admin tidak perlu scan.</li>
+                            <li><strong>Batal Transaksi:</strong> Barang dasaran dikembalikan ke display tanpa scan. Barang sudah posting dikembalikan ke box Sudah Posting tanpa scan.</li>
+                            <li><strong>Keep & Laku:</strong> Jika barang dasaran di-DP/keep untuk besok, atau jika barang sudah posting terjual (laku), <strong>wajib scan barcode</strong> ke sistem.</li>
+                          </ul>
                         </div>
                       </div>
                       <div class="p-2 rounded bg-white border border-light-subtle shadow-sm-hover d-flex align-items-start gap-2">
-                        <span class="badge bg-warning text-dark fw-bold text-center mt-0.5" style="min-width: 90px;">DP</span>
+                        <span class="badge bg-warning text-dark fw-bold text-center mt-0.5" style="min-width: 95px;">DP & Keep</span>
                         <div class="small mb-0">
-                          Barang yang disimpan (<em>keep</em>) oleh pelanggan setelah membayar uang muka awal, atau barang yang disimpan oleh staf (staf yang melakukan <em>keep</em> wajib menyertakan DP).
+                          Barang pesanan pelanggan yang telah membayar uang muka (DP) atau barang keep customer yang akan segera diproses keesokan harinya. Jika barang DP atau Keep sudah ditransaksi maka pindahkan barcode ke laku atau jika batal transaksi pindahkan ke display dan dipajang.
                         </div>
                       </div>
                       <div class="p-2 rounded bg-white border border-light-subtle shadow-sm-hover d-flex align-items-start gap-2">
-                        <span class="badge bg-info text-dark fw-bold text-center mt-0.5" style="min-width: 90px;">Barang Keep</span>
+                        <span class="badge bg-success fw-bold text-center mt-0.5" style="min-width: 95px;">Sudah Posting</span>
                         <div class="small mb-0">
-                          Barang pesanan pelanggan online yang disimpan sementara dan akan segera diproses keesokan harinya.
+                          Box fisik penyimpanan barang yang telah selesai diposting.
+                          <ul class="ps-3 mb-0 mt-1">
+                            <li><strong>Prosedur Update:</strong> Tim posting cukup meletakkan barang di box Sudah Posting dan mengonfirmasi kode klip unik (beserta jumlah pcs) ke tim input. Update barcode dari <em>Belum Posting</em> ke <em>Sudah Posting</em> dilakukan oleh tim input tanpa perlu scan satu per satu.</li>
+                            <li><strong>Barang Dasaran:</strong> Jika tim posting mengambil barang dasaran untuk diposting: dikembalikan ke dasaran (tanpa scan), diletakkan di box Sudah Posting (<strong>wajib scan</strong> agar data fisik dan sistem akurat).</li>
+                          </ul>
                         </div>
                       </div>
                     </div>
@@ -289,11 +292,11 @@
                       </li>
                       <li class="d-flex align-items-start gap-2 mb-2 small">
                         <i class="bi bi-check-circle-fill text-success mt-1"></i>
-                        <div><strong>Stok Admin:</strong> Koordinasi & SO dengan <strong>Tim Admin</strong>.</div>
+                        <div><strong>Stok Belum Posting:</strong> Koordinasi & SO dengan <strong>Bagian Posting</strong>.</div>
                       </li>
                       <li class="d-flex align-items-start gap-2 mb-2 small">
                         <i class="bi bi-check-circle-fill text-success mt-1"></i>
-                        <div><strong>Stok Belum Posting:</strong> Koordinasi & SO dengan <strong>Bagian Posting</strong>.</div>
+                        <div><strong>Lokasi Lain (Rusak, Batu Lepas, dll):</strong> SO dapat dilakukan sesuai bagian (tim kalung, anting, liontin, dll). Cara SO dikoordinasikan dengan <strong>Tim Input</strong>.</div>
                       </li>
                     </ul>
                     <div class="alert alert-warning border border-warning-subtle p-2 rounded-2 small mb-3">
@@ -317,7 +320,7 @@
             <div class="mt-4 p-3 rounded-3 bg-primary-subtle border border-primary-subtle text-center">
               <h6 class="fw-bold text-primary mb-1">
                 <i class="bi bi-people-fill me-1"></i>
-                Tolong Kerja Sama & Keterlibatannya!
+                Tolong Kerja Sama & Keterlibatannya 🔥
               </h6>
               <p class="small mb-0 text-primary-emphasis">
                 Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien dan kita semua bisa <strong>pulang tepat waktu!</strong> 🚀
@@ -1135,6 +1138,10 @@ const copyingAll = ref(false);
 const copiedIndex = ref(null);
 const barcodeSearchQuery = ref("");
 
+const isBarcodeEnabled = computed(() => {
+  return !!displaySettings.value?.barcodeEnabled;
+});
+
 const enabledCards = computed(() => displaySettings.value.cards.filter((card) => card.enabled));
 const nonComputerCards = computed(() => enabledCards.value.filter((card) => card.type !== "computer"));
 const summaryCards = computed(() => nonComputerCards.value.filter((card) => card.showInSummary !== false));
@@ -1560,7 +1567,7 @@ async function refreshData() {
 }
 
 function openUpdateModal(mainCat, sub) {
-  if (sub.key === "barang-display") {
+  if (!isBarcodeEnabled.value || sub.key === "barang-display") {
     const detailMode = getCardDetailMode(mainCat);
     if (detailMode === "color") {
       const item = getItem(sub.key, mainCat) || {};

@@ -288,6 +288,7 @@ const PERMISSION_GROUPS = {
   toko: [
     { key: "profil", label: "Profil Toko" },
     { key: "sop", label: "SOP Operasional" },
+    { key: "layanan", label: "Layanan & Ongkos" },
   ],
   admin: [
     { key: "kelola-user", label: "Kelola User" },
@@ -335,6 +336,7 @@ const PERMISSION_TO_PAGE = {
   "promosi.setting-promosi": "promosi.setting",
   "toko.profil": "toko.profil",
   "toko.sop": "toko.sop",
+  "toko.layanan": "toko.layanan",
   "admin.kelola-user": "admin.users",
   "admin.kode-akses": "admin.access-codes",
   "admin.jam-absensi": "admin.jam-absensi",

@@ -380,7 +380,7 @@ const sortedLogsForTimeline = computed(() => {
 });
 
 function isStopLocation(loc) {
-  return ["barang-display", "mutasi", "laku"].includes(loc);
+  return ["mutasi", "laku"].includes(loc);
 }
 
 function getTimelineDotClass(log, isFirst) {

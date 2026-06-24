@@ -348,3 +348,61 @@ Untuk menjaga kilau berlian tetap optimal, lakukan perawatan berikut:
 ✔ Simpan di Tempat Terpisah – Hindari gesekan dengan perhiasan lain agar tidak tergores.
 ✔ Hindari Bahan Kimia – Jangan terkena parfum, hairspray, atau produk kimia lainnya.`
 };
+
+export const DEFAULT_LAYANAN_TOKO = {
+  ongkosServis: [
+    { id: "patri", name: "Patri", cost: 50000 },
+    { id: "pasang_batu", name: "Pasang Batu", cost: 30000 },
+    { id: "cuci", name: "Cuci", cost: 30000 },
+    { id: "chrome_gold", name: "Chrome Gold", cost: 50000 },
+    { id: "rosegold", name: "Rosegold", cost: 60000 },
+    { id: "whitegold", name: "Whitegold", cost: 80000 },
+    { id: "selebgold", name: "Selebgold", cost: 50000 }
+  ],
+  barangBisaServis: [
+    {
+      id: "bisa_1",
+      name: "Cincin Patah / Peyang",
+      description: "Perbaikan cincin emas yang patah atau berubah bentuk menjadi bulat kembali.",
+      cost: "Mulai dari Rp 50.000 (tergantung tingkat kerusakan)",
+      imageUrl: "",
+      imagePath: "",
+      jenis: "cincin"
+    },
+    {
+      id: "bisa_2",
+      name: "Kalung Rantai Putus",
+      description: "Penyambungan rantai kalung emas yang putus menggunakan teknik patri solder emas rapi.",
+      cost: "Mulai dari Rp 50.000",
+      imageUrl: "",
+      imagePath: "",
+      jenis: "kalung"
+    }
+  ],
+  barangTidakBisaServis: [
+    {
+      id: "tidak_1",
+      name: "Perhiasan Perak / Silver",
+      kadar: "Bukan Emas",
+      reason: "Toko kami hanya menerima servis perhiasan berbahan emas atau logam mulia sejenis.",
+      imageUrl: "",
+      imagePath: "",
+      jenis: "cincin"
+    },
+    {
+      id: "tidak_2",
+      name: "Perhiasan Imitasi / Aksesoris Fashion",
+      kadar: "Imitasi",
+      reason: "Logam dasar tidak tahan panas proses patri dan berisiko meleleh/rusak total.",
+      imageUrl: "",
+      imagePath: "",
+      jenis: "anting"
+    }
+  ],
+  hargaAksesoris: [
+    { id: "aks_1", name: "Kotak Cincin Velvet", pricePerGram: 35000, notes: "Harga per pcs" },
+    { id: "aks_2", name: "Dompet Kalung Satin", pricePerGram: 15000, notes: "Harga per pcs" },
+    { id: "aks_3", name: "Aksesoris Tambahan (Per Gram)", pricePerGram: 15000, notes: "Harga per gram perhiasan" }
+  ]
+};
+

@@ -1511,8 +1511,8 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       detailType = data.detailType;
       resolvedOrigin = data.location || destination;
       
-      if (data.in_display || data.in_mutasi) {
-        throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (display/mutasi luar).`);
+      if (data.in_mutasi) {
+        throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (sudah laku/mutasi).`);
       }
     } else {
       exists = false;
@@ -1884,8 +1884,8 @@ export const submitBarcodeMoveRequest = onCall(
       const bc = uniqueBarcodes[i];
       if (snap.exists) {
         const data = snap.data();
-        if (data.in_display || data.in_mutasi) {
-          throw new HttpsError("failed-precondition", `Barcode ${bc} terkunci (display/mutasi luar).`);
+        if (data.in_mutasi) {
+          throw new HttpsError("failed-precondition", `Barcode ${bc} terkunci (sudah laku/mutasi).`);
         }
         finalBarcodes.push({
           barcode: bc,

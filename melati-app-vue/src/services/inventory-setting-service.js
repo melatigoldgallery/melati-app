@@ -169,12 +169,15 @@ export function buildDefaultInventorySettings(floorId = "") {
     };
   });
 
+  const normalizedFloor = normalizeFloorId(floorId);
+
   return {
     cards,
     tableRows: [...DEFAULT_TABLE_ROWS],
     summaryGrid: { ...DEFAULT_SUMMARY_GRID },
     colorTypes: [...DEFAULT_COLOR_TYPES],
     halaTypes: [...DEFAULT_HALA_TYPES],
+    barcodeEnabled: normalizedFloor === "L2",
     lastUpdated: null,
     updatedBy: "System",
   };
@@ -243,6 +246,7 @@ export function normalizeInventorySettings(raw = {}, floorId = "") {
           label: String(h.label || "").trim()
         })).filter(h => h.key)
       : defaults.halaTypes,
+    barcodeEnabled: raw.barcodeEnabled !== undefined ? !!raw.barcodeEnabled : defaults.barcodeEnabled,
     lastUpdated: raw.lastUpdated || null,
     updatedBy: raw.updatedBy || "System",
   };

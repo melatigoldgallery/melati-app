@@ -53,6 +53,7 @@ const DisplayPromosiView = () => import("@/views/promosi/DisplayPromosiView.vue"
 // Informasi Toko
 const ProfilTokoView = () => import("@/views/toko/ProfilTokoView.vue");
 const SOPTokoView = () => import("@/views/toko/SOPTokoView.vue");
+const LayananTokoView = () => import("@/views/toko/LayananTokoView.vue");
 
 // Pengaturan
 const KelolUserView = () => import("@/views/pengaturan/KelolUserView.vue");
@@ -225,6 +226,11 @@ const routes = [
     path: "/toko/sop",
     component: SOPTokoView,
     meta: { requiresAuth: true, pageKey: "toko.sop" },
+  },
+  {
+    path: "/toko/layanan",
+    component: LayananTokoView,
+    meta: { requiresAuth: true, pageKey: "toko.layanan" },
   },
 
   // Pengaturan

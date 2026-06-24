@@ -41,8 +41,18 @@
         </ul>
       </div>
 
+      <!-- Warning Alert for Non-Supervisor -->
+      <div v-if="!loading && !isSupervisor" class="alert alert-warning py-3 px-4 mb-4 border-0 rounded-3 shadow-sm d-flex align-items-center gap-3">
+        <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+        <div class="text-start">
+          <strong class="d-block text-warning-emphasis fw-bold">Mode Lihat Saja (Read-Only)</strong>
+          <span class="small text-muted">Hanya Supervisor yang diizinkan untuk mengubah konfigurasi manajemen stok lantai ini.</span>
+        </div>
+      </div>
+
       <div class="settings-layout" v-if="!loading">
         <div class="settings-main">
+          <fieldset :disabled="!isSupervisor" class="border-0 p-0 m-0">
           <div class="card border-0 shadow-sm mb-3" v-if="activeSettingTab === 'layout'">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0 fw-semibold">Konfigurasi Card & Nav Link</h6>
@@ -362,10 +372,38 @@
               </div>
             </div>
           </div>
+          </fieldset>
         </div>
 
         <aside class="settings-side">
-          <div class="card border-0 shadow-sm mb-3 sticky-panel" v-if="activeSettingTab === 'layout'">
+          <fieldset :disabled="!isSupervisor" class="border-0 p-0 m-0">
+            <!-- Fitur Barcode Toggle -->
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-header bg-white border-0 py-3">
+                <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                  <i class="bi bi-qr-code-scan text-primary"></i>
+                  <span>Fitur Pelacakan Barcode</span>
+                </h6>
+              </div>
+              <div class="card-body pt-0">
+                <div class="form-check form-switch text-start mb-2">
+                  <input
+                    v-model="form.barcodeEnabled"
+                    type="checkbox"
+                    class="form-check-input"
+                    id="barcodeEnabledSwitch"
+                  />
+                  <label class="form-check-label fw-bold text-dark" for="barcodeEnabledSwitch">
+                    Aktifkan Barcode Tracking
+                  </label>
+                </div>
+                <small class="text-muted d-block text-start lh-sm">
+                  Jika aktif, mutasi barang wajib menggunakan scan barcode. Jika nonaktif, mutasi barang di-update manual dengan input angka jumlah.
+                </small>
+              </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3 sticky-panel" v-if="activeSettingTab === 'layout'">
             <div class="card-header">
               <h6 class="mb-0 fw-semibold">Pengaturan Grid Card Summary</h6>
             </div>
@@ -446,6 +484,7 @@
               </div>
             </div>
           </div>
+          </fieldset>
         </aside>
       </div>
 
@@ -479,6 +518,10 @@ const stockData = ref({});
 const originalColorKeys = ref([]);
 const originalHalaKeys = ref([]);
 
+const isSupervisor = computed(() => {
+  return auth.userRole?.toLowerCase() === "supervisor";
+});
+
 const form = reactive({
   cards: [],
   tableRows: [],
@@ -490,6 +533,7 @@ const form = reactive({
   },
   colorTypes: [],
   halaTypes: [],
+  barcodeEnabled: false,
   lastUpdated: null,
   updatedBy: "System",
 });
@@ -524,6 +568,7 @@ function applySettings(data = {}) {
   form.summaryGrid = { ...normalized.summaryGrid };
   form.colorTypes = normalized.colorTypes.map((c) => ({ ...c }));
   form.halaTypes = normalized.halaTypes.map((h) => ({ ...h }));
+  form.barcodeEnabled = !!normalized.barcodeEnabled;
   form.lastUpdated = normalized.lastUpdated;
   form.updatedBy = normalized.updatedBy;
 
@@ -657,6 +702,7 @@ function getPayload() {
       key: String(h.key || "").trim().toUpperCase(),
       label: String(h.label || "").trim(),
     })),
+    barcodeEnabled: !!form.barcodeEnabled,
   };
 }
 
@@ -819,6 +865,11 @@ async function saveSettings() {
     }
   }
 
+  if (!isSupervisor.value) {
+    toast("Hanya Supervisor yang diizinkan untuk menyimpan pengaturan ini.", "error");
+    return;
+  }
+
   saving.value = true;
   try {
     await saveInventorySettings(
@@ -836,6 +887,11 @@ async function saveSettings() {
 }
 
 async function resetToDefault() {
+  if (!isSupervisor.value) {
+    toast("Hanya Supervisor yang diizinkan untuk mereset pengaturan ini.", "error");
+    return;
+  }
+
   const result = await confirm({
     title: "Reset Pengaturan?",
     text: "Semua konfigurasi card, grid, dan jenis tabel akan kembali ke default.",
