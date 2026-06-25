@@ -50,6 +50,11 @@ const BuybackView = () => import("@/views/inventory/BuybackView.vue");
 const SettingPromosiView = () => import("@/views/promosi/SettingPromosiView.vue");
 const DisplayPromosiView = () => import("@/views/promosi/DisplayPromosiView.vue");
 
+// Informasi Toko
+const ProfilTokoView = () => import("@/views/toko/ProfilTokoView.vue");
+const SOPTokoView = () => import("@/views/toko/SOPTokoView.vue");
+const LayananTokoView = () => import("@/views/toko/LayananTokoView.vue");
+
 // Pengaturan
 const KelolUserView = () => import("@/views/pengaturan/KelolUserView.vue");
 const KodeAksesView = () => import("@/views/pengaturan/KodeAksesView.vue");
@@ -209,6 +214,23 @@ const routes = [
     path: "/promosi/setting",
     component: SettingPromosiView,
     meta: { requiresAuth: true, pageKey: "promosi.setting" },
+  },
+
+  // Informasi Toko
+  {
+    path: "/toko/profil",
+    component: ProfilTokoView,
+    meta: { requiresAuth: true, pageKey: "toko.profil" },
+  },
+  {
+    path: "/toko/sop",
+    component: SOPTokoView,
+    meta: { requiresAuth: true, pageKey: "toko.sop" },
+  },
+  {
+    path: "/toko/layanan",
+    component: LayananTokoView,
+    meta: { requiresAuth: true, pageKey: "toko.layanan" },
   },
 
   // Pengaturan

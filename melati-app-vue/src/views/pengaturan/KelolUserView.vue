@@ -285,6 +285,11 @@ const PERMISSION_GROUPS = {
     { key: "manajemen-order", label: "Manajemen Order" },
   ],
   promosi: [{ key: "setting-promosi", label: "Setting Promosi" }],
+  toko: [
+    { key: "profil", label: "Profil Toko" },
+    { key: "sop", label: "SOP Operasional" },
+    { key: "layanan", label: "Layanan & Ongkos" },
+  ],
   admin: [
     { key: "kelola-user", label: "Kelola User" },
     { key: "kode-akses", label: "Kode Akses" },
@@ -329,6 +334,9 @@ const PERMISSION_TO_PAGE = {
   "order-online.data-order": "order-online.data",
   "order-online.manajemen-order": "order-online.manajemen",
   "promosi.setting-promosi": "promosi.setting",
+  "toko.profil": "toko.profil",
+  "toko.sop": "toko.sop",
+  "toko.layanan": "toko.layanan",
   "admin.kelola-user": "admin.users",
   "admin.kode-akses": "admin.access-codes",
   "admin.jam-absensi": "admin.jam-absensi",
@@ -415,6 +423,7 @@ function getRoleLabel(role) {
 
 function getPermissionGroupLabel(group) {
   if (group === "admin") return "pengaturan";
+  if (group === "toko") return "informasi toko";
   return group.replace(/-/g, " ");
 }
 
@@ -442,6 +451,7 @@ function formatTs(ts) {
 }
 
 async function loadUsers() {
+  if (!auth.isAuthenticated) return;
   loading.value = true;
   try {
     const snap = await getDocs(floorCollection(db, "users", activeFloor.value));

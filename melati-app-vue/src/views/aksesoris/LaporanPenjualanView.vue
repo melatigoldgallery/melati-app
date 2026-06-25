@@ -229,7 +229,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { collection, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, Timestamp, where, getCountFromServer, getDocs, limit } from "firebase/firestore";
 import { floorCollection } from "@/services/floor-scope";
 import { useAuthStore } from "@/stores/auth";
 import { db } from "@/config/firebase";
@@ -261,21 +261,115 @@ const pageSize = ref(25);
 
 let realtimeUnsub = null;
 let isRealtimeReloading = false;
-let cacheValidationInProgress = false;
 
-function mergeTransactions(cached, incoming) {
-  const idMap = new Map();
-  incoming.forEach((trx) => {
-    const key = trx.id || `${trx.tanggal}-${trx.jam}-${trx.sales}`;
-    idMap.set(key, trx);
+function mergeRealtimeTransactions(cached, incomingToday) {
+  const todayParts = todayISO.split("-");
+  const todayFormatted = `${todayParts[2]}/${todayParts[1]}/${todayParts[0]}`; // "DD/MM/YYYY"
+
+  // 1. Remove all transactions from 'cached' that are for today
+  const nonTodayCached = cached.filter((trx) => {
+    // Check by tanggal string
+    const tgl = getTanggal(trx);
+    if (tgl === todayFormatted) return false;
+    
+    // Check by timestamp just in case
+    const date = parseTimestampValue(trx?.timestamp);
+    if (date) {
+      const dateISO = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      if (dateISO === todayISO) return false;
+    }
+    return true;
   });
-  cached.forEach((trx) => {
-    const key = trx.id || `${trx.tanggal}-${trx.jam}-${trx.sales}`;
-    if (!idMap.has(key)) {
-      idMap.set(key, trx);
+
+  // 2. Combine nonTodayCached with incomingToday
+  const idMap = new Map();
+  incomingToday.forEach((trx) => {
+    idMap.set(trx.id, trx);
+  });
+  nonTodayCached.forEach((trx) => {
+    if (trx.id && !idMap.has(trx.id)) {
+      idMap.set(trx.id, trx);
     }
   });
+
   return Array.from(idMap.values());
+}
+
+async function validateCache(startDate, endDate, cachedData, cachedTimestamp) {
+  try {
+    const start = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T23:59:59.999");
+    const floorId = activeFloor.value;
+
+    const qBase = query(
+      floorCollection(db, "penjualanAksesoris", floorId),
+      where("timestamp", ">=", Timestamp.fromDate(start)),
+      where("timestamp", "<=", Timestamp.fromDate(end))
+    );
+
+    // 1. Get count of documents in the range
+    const countSnap = await getCountFromServer(qBase);
+    const firestoreCount = countSnap.data().count;
+
+    if (firestoreCount !== cachedData.length) {
+      return false; // Invalid: count mismatch
+    }
+
+    if (firestoreCount === 0) {
+      return true; // Valid: both are empty
+    }
+
+    // 2. Get the latest transaction in the range by timestamp
+    const latestQuery = query(qBase, orderBy("timestamp", "desc"), limit(1));
+    const latestSnap = await getDocs(latestQuery);
+    if (latestSnap.empty) {
+      return false;
+    }
+
+    const latestDoc = latestSnap.docs[0];
+    const latestData = latestDoc.data();
+    const latestId = latestDoc.id;
+
+    // Find the corresponding item in cached data
+    const cachedItem = cachedData.find(item => item.id === latestId);
+    if (!cachedItem) {
+      return false; // Invalid: the latest transaction is not in cache
+    }
+
+    // Check if the latest transaction's updatedAt is newer than the cache timestamp
+    const firestoreUpdatedAt = latestData.updatedAt 
+      ? parseTimestampValue(latestData.updatedAt) 
+      : (latestData.timestamp ? parseTimestampValue(latestData.timestamp) : null);
+    if (firestoreUpdatedAt && firestoreUpdatedAt.getTime() > cachedTimestamp) {
+      return false; // Invalid: there has been an update since cache was saved
+    }
+
+    // 3. Get the latest updated transaction in the entire collection (limit 1)
+    const globalLatestQuery = query(
+      floorCollection(db, "penjualanAksesoris", floorId),
+      orderBy("updatedAt", "desc"),
+      limit(1)
+    );
+    const globalLatestSnap = await getDocs(globalLatestQuery);
+    if (!globalLatestSnap.empty) {
+      const globalLatestDoc = globalLatestSnap.docs[0];
+      const globalLatestData = globalLatestDoc.data();
+      const globalLatestUpdatedAt = globalLatestData.updatedAt 
+        ? parseTimestampValue(globalLatestData.updatedAt) 
+        : (globalLatestData.timestamp ? parseTimestampValue(globalLatestData.timestamp) : null);
+      if (globalLatestUpdatedAt && globalLatestUpdatedAt.getTime() > cachedTimestamp) {
+        const globalLatestTimestamp = globalLatestData.timestamp ? parseTimestampValue(globalLatestData.timestamp) : null;
+        if (globalLatestTimestamp && globalLatestTimestamp >= start && globalLatestTimestamp <= end) {
+          return false; // Invalid: a document inside our date range was updated
+        }
+      }
+    }
+
+    return true; // Valid!
+  } catch (error) {
+    console.error("Cache validation failed, falling back to reload:", error);
+    return false; // Fallback to reload on error
+  }
 }
 
 const transactions = computed(() => store.transactions ?? []);
@@ -803,7 +897,6 @@ async function loadReport(forceRefresh = false) {
 
   store.stopTodayListener();
   clearRealtimeListener();
-  cacheValidationInProgress = false;
 
   if (!forceRefresh) {
     const cached = loadFromCache();
@@ -811,8 +904,23 @@ async function loadReport(forceRefresh = false) {
       store.transactions = cached;
       store.hasMoreTransactions = false;
       hasLoaded.value = true;
-      cacheValidationInProgress = true;
       setupRealtimeListener();
+
+      // Perform cache validation in background
+      const cacheKey = getCacheKey();
+      const ts = Number(localStorage.getItem(`${cacheKey}_timestamp`) || 0);
+      const checkStart = filterStart.value;
+      const checkEnd = filterEnd.value;
+
+      validateCache(checkStart, checkEnd, cached, ts).then(async (isValid) => {
+        if (!isValid) {
+          // Verify we are still on the same date range before writing to store
+          if (filterStart.value === checkStart && filterEnd.value === checkEnd) {
+            await store.loadTransactions(checkStart, checkEnd);
+            saveToCache(store.transactions);
+          }
+        }
+      });
       return;
     }
   }
@@ -855,23 +963,6 @@ function setupRealtimeListener() {
 
     if (isFirstSnapshot) {
       isFirstSnapshot = false;
-
-      // Jika menggunakan cache, validasi dengan first snapshot dari Firestore
-      if (cacheValidationInProgress) {
-        cacheValidationInProgress = false;
-        const firestoreData = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        // Jika jumlah data berbeda, merge dan invalidate cache
-        if (firestoreData.length !== store.transactions.length) {
-          const merged = mergeTransactions(store.transactions, firestoreData);
-          store.transactions = merged;
-          clearCurrentCache();
-          saveToCache(merged);
-        }
-      }
       return;
     }
 
@@ -890,7 +981,7 @@ function setupRealtimeListener() {
       }));
 
       // Merge dengan data existing
-      const merged = mergeTransactions(store.transactions, firestoreData);
+      const merged = mergeRealtimeTransactions(store.transactions, firestoreData);
       store.transactions = merged;
       saveToCache(merged);
     } catch (error) {

@@ -15,9 +15,45 @@
     </div>
 
     <div class="content-wrapper">
+      <!-- Tab Navigation -->
+      <div class="mb-3" v-if="!loading">
+        <ul class="nav nav-pills gap-2 bg-light p-1 rounded-3 d-inline-flex border">
+          <li class="nav-item">
+            <button
+              class="nav-link px-3 py-1.5 fw-semibold rounded-pill d-flex align-items-center gap-2 border-0"
+              :class="activeSettingTab === 'layout' ? 'active shadow-sm text-white' : 'text-secondary bg-transparent'"
+              @click="activeSettingTab = 'layout'"
+            >
+              <i class="bi bi-layout-three-columns"></i>
+              Card & Lokasi
+            </button>
+          </li>
+          <li class="nav-item">
+            <button
+              class="nav-link px-3 py-1.5 fw-semibold rounded-pill d-flex align-items-center gap-2 border-0"
+              :class="activeSettingTab === 'detailTypes' ? 'active shadow-sm text-white' : 'text-secondary bg-transparent'"
+              @click="activeSettingTab = 'detailTypes'"
+            >
+              <i class="bi bi-palette"></i>
+              Warna & Jenis Perhiasan
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Warning Alert for Non-Supervisor -->
+      <div v-if="!loading && !isSupervisor" class="alert alert-warning py-3 px-4 mb-4 border-0 rounded-3 shadow-sm d-flex align-items-center gap-3">
+        <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+        <div class="text-start">
+          <strong class="d-block text-warning-emphasis fw-bold">Mode Lihat Saja (Read-Only)</strong>
+          <span class="small text-muted">Hanya Supervisor yang diizinkan untuk mengubah konfigurasi manajemen stok lantai ini.</span>
+        </div>
+      </div>
+
       <div class="settings-layout" v-if="!loading">
         <div class="settings-main">
-          <div class="card border-0 shadow-sm mb-3">
+          <fieldset :disabled="!isSupervisor" class="border-0 p-0 m-0">
+          <div class="card border-0 shadow-sm mb-3" v-if="activeSettingTab === 'layout'">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0 fw-semibold">Konfigurasi Card & Nav Link</h6>
               <button class="btn btn-sm btn-primary" @click="addCard">
@@ -128,7 +164,7 @@
             </div>
           </div>
 
-          <div class="card border-0 shadow-sm">
+          <div class="card border-0 shadow-sm" v-if="activeSettingTab === 'layout'">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0 fw-semibold">Konfigurasi Jenis Tabel</h6>
               <button class="btn btn-sm btn-primary" @click="addTableRow">
@@ -196,10 +232,178 @@
               </div>
             </div>
           </div>
+
+          <!-- Konfigurasi Warna -->
+          <div class="card border-0 shadow-sm mb-3" v-if="activeSettingTab === 'detailTypes'">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0 fw-semibold">Konfigurasi Klasifikasi Warna</h6>
+              <button class="btn btn-sm btn-primary" @click="addColorType">
+                <i class="bi bi-plus-circle me-1"></i>
+                Tambah Warna
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive settings-table-wrap">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 52px">No</th>
+                      <th style="min-width: 140px">Key Warna (ID)</th>
+                      <th style="min-width: 180px">Nama Warna (Label)</th>
+                      <th class="text-center" style="width: 120px">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(color, idx) in form.colorTypes" :key="`color-${idx}`">
+                      <td class="fw-semibold">{{ idx + 1 }}</td>
+                      <td>
+                        <input
+                          v-model="color.key"
+                          type="text"
+                          class="form-control form-control-sm text-uppercase"
+                          placeholder="Contoh: MERAH"
+                          @input="color.key = color.key.toUpperCase().replace(/\s+/g, '')"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="color.label"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Nama warna tampilan"
+                        />
+                      </td>
+                      <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                          <button class="btn btn-outline-secondary" @click="moveColorType(idx, -1)" :disabled="idx === 0">
+                            <i class="bi bi-arrow-up"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-secondary"
+                            @click="moveColorType(idx, 1)"
+                            :disabled="idx === form.colorTypes.length - 1"
+                          >
+                            <i class="bi bi-arrow-down"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-danger"
+                            @click="removeColorType(idx)"
+                          >
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr v-if="!form.colorTypes.length">
+                      <td colspan="4" class="text-center text-muted py-3">Belum ada warna.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Konfigurasi Jenis Perhiasan -->
+          <div class="card border-0 shadow-sm" v-if="activeSettingTab === 'detailTypes'">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0 fw-semibold">Konfigurasi Jenis Perhiasan</h6>
+              <button class="btn btn-sm btn-primary" @click="addHalaType">
+                <i class="bi bi-plus-circle me-1"></i>
+                Tambah Jenis
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive settings-table-wrap">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 52px">No</th>
+                      <th style="min-width: 140px">Key Jenis (ID)</th>
+                      <th style="min-width: 180px">Nama Jenis (Label)</th>
+                      <th class="text-center" style="width: 120px">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(hala, idx) in form.halaTypes" :key="`hala-${idx}`">
+                      <td class="fw-semibold">{{ idx + 1 }}</td>
+                      <td>
+                        <input
+                          v-model="hala.key"
+                          type="text"
+                          class="form-control form-control-sm text-uppercase"
+                          placeholder="Contoh: HALA_A"
+                          @input="hala.key = hala.key.toUpperCase().replace(/\s+/g, '')"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="hala.label"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Nama jenis tampilan"
+                        />
+                      </td>
+                      <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                          <button class="btn btn-outline-secondary" @click="moveHalaType(idx, -1)" :disabled="idx === 0">
+                            <i class="bi bi-arrow-up"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-secondary"
+                            @click="moveHalaType(idx, 1)"
+                            :disabled="idx === form.halaTypes.length - 1"
+                          >
+                            <i class="bi bi-arrow-down"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-danger"
+                            @click="removeHalaType(idx)"
+                          >
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr v-if="!form.halaTypes.length">
+                      <td colspan="4" class="text-center text-muted py-3">Belum ada jenis perhiasan.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          </fieldset>
         </div>
 
         <aside class="settings-side">
-          <div class="card border-0 shadow-sm mb-3 sticky-panel">
+          <fieldset :disabled="!isSupervisor" class="border-0 p-0 m-0">
+            <!-- Fitur Barcode Toggle -->
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-header bg-white border-0 py-3">
+                <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                  <i class="bi bi-qr-code-scan text-primary"></i>
+                  <span>Fitur Pelacakan Barcode</span>
+                </h6>
+              </div>
+              <div class="card-body pt-0">
+                <div class="form-check form-switch text-start mb-2">
+                  <input
+                    v-model="form.barcodeEnabled"
+                    type="checkbox"
+                    class="form-check-input"
+                    id="barcodeEnabledSwitch"
+                  />
+                  <label class="form-check-label fw-bold text-dark" for="barcodeEnabledSwitch">
+                    Aktifkan Barcode Tracking
+                  </label>
+                </div>
+                <small class="text-muted d-block text-start lh-sm">
+                  Jika aktif, mutasi barang wajib menggunakan scan barcode. Jika nonaktif, mutasi barang di-update manual dengan input angka jumlah.
+                </small>
+              </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3 sticky-panel" v-if="activeSettingTab === 'layout'">
             <div class="card-header">
               <h6 class="mb-0 fw-semibold">Pengaturan Grid Card Summary</h6>
             </div>
@@ -280,6 +484,7 @@
               </div>
             </div>
           </div>
+          </fieldset>
         </aside>
       </div>
 
@@ -301,12 +506,22 @@ import {
   normalizeInventorySettings,
   saveInventorySettings,
 } from "@/services/inventory-setting-service";
+import { fetchAllStockData } from "@/services/inventory-service";
 
 const auth = useAuthStore();
 const { toast, error: showError, confirm } = useAlert();
 
 const loading = ref(true);
 const saving = ref(false);
+const activeSettingTab = ref("layout");
+const stockData = ref({});
+const originalColorKeys = ref([]);
+const originalHalaKeys = ref([]);
+
+const isSupervisor = computed(() => {
+  return auth.userRole?.toLowerCase() === "supervisor";
+});
+
 const form = reactive({
   cards: [],
   tableRows: [],
@@ -316,6 +531,9 @@ const form = reactive({
     xl: 3,
     gap: 12,
   },
+  colorTypes: [],
+  halaTypes: [],
+  barcodeEnabled: false,
   lastUpdated: null,
   updatedBy: "System",
 });
@@ -348,8 +566,14 @@ function applySettings(data = {}) {
   form.cards = normalized.cards.map((card) => ({ ...card }));
   form.tableRows = normalized.tableRows.map((row) => ({ ...row }));
   form.summaryGrid = { ...normalized.summaryGrid };
+  form.colorTypes = normalized.colorTypes.map((c) => ({ ...c }));
+  form.halaTypes = normalized.halaTypes.map((h) => ({ ...h }));
+  form.barcodeEnabled = !!normalized.barcodeEnabled;
   form.lastUpdated = normalized.lastUpdated;
   form.updatedBy = normalized.updatedBy;
+
+  originalColorKeys.value = normalized.colorTypes.map((c) => c.key);
+  originalHalaKeys.value = normalized.halaTypes.map((h) => h.key);
 }
 
 function addCard() {
@@ -408,6 +632,42 @@ function moveRow(index, direction) {
   form.tableRows = clone;
 }
 
+function addColorType() {
+  form.colorTypes.push({ key: "", label: "" });
+}
+
+function removeColorType(index) {
+  form.colorTypes.splice(index, 1);
+}
+
+function moveColorType(index, direction) {
+  const target = index + direction;
+  if (target < 0 || target >= form.colorTypes.length) return;
+  const clone = [...form.colorTypes];
+  const current = clone[index];
+  clone[index] = clone[target];
+  clone[target] = current;
+  form.colorTypes = clone;
+}
+
+function addHalaType() {
+  form.halaTypes.push({ key: "", label: "" });
+}
+
+function removeHalaType(index) {
+  form.halaTypes.splice(index, 1);
+}
+
+function moveHalaType(index, direction) {
+  const target = index + direction;
+  if (target < 0 || target >= form.halaTypes.length) return;
+  const clone = [...form.halaTypes];
+  const current = clone[index];
+  clone[index] = clone[target];
+  clone[target] = current;
+  form.halaTypes = clone;
+}
+
 function getPayload() {
   return {
     cards: form.cards.map((card, index) => ({
@@ -434,6 +694,15 @@ function getPayload() {
       xl: Number(form.summaryGrid.xl),
       gap: Number(form.summaryGrid.gap),
     },
+    colorTypes: form.colorTypes.map((c) => ({
+      key: String(c.key || "").trim().toUpperCase(),
+      label: String(c.label || "").trim(),
+    })),
+    halaTypes: form.halaTypes.map((h) => ({
+      key: String(h.key || "").trim().toUpperCase(),
+      label: String(h.label || "").trim(),
+    })),
+    barcodeEnabled: !!form.barcodeEnabled,
   };
 }
 
@@ -483,6 +752,40 @@ function validatePayload(payload) {
     rowKeySet.add(row.key);
   }
 
+  const colorKeySet = new Set();
+  for (const c of payload.colorTypes) {
+    if (!c.key) {
+      toast("Key warna tidak boleh kosong", "warning");
+      return false;
+    }
+    if (!c.label) {
+      toast(`Label warna untuk key ${c.key} tidak boleh kosong`, "warning");
+      return false;
+    }
+    if (colorKeySet.has(c.key)) {
+      toast(`Key warna duplikat: ${c.key}`, "warning");
+      return false;
+    }
+    colorKeySet.add(c.key);
+  }
+
+  const halaKeySet = new Set();
+  for (const h of payload.halaTypes) {
+    if (!h.key) {
+      toast("Key jenis tidak boleh kosong", "warning");
+      return false;
+    }
+    if (!h.label) {
+      toast(`Label jenis untuk key ${h.key} tidak boleh kosong`, "warning");
+      return false;
+    }
+    if (halaKeySet.has(h.key)) {
+      toast(`Key jenis duplikat: ${h.key}`, "warning");
+      return false;
+    }
+    halaKeySet.add(h.key);
+  }
+
   return true;
 }
 
@@ -492,6 +795,7 @@ async function loadSettings() {
     await ensureInventorySettings(auth.activeFloor);
     const data = await fetchInventorySettings(auth.activeFloor);
     applySettings(data);
+    stockData.value = await fetchAllStockData(auth.activeFloor);
   } catch (e) {
     showError("Gagal memuat pengaturan", e.message);
   } finally {
@@ -502,6 +806,69 @@ async function loadSettings() {
 async function saveSettings() {
   const payload = getPayload();
   if (!validatePayload(payload)) return;
+
+  const deletedColors = originalColorKeys.value.filter(
+    (ok) => !payload.colorTypes.some((nc) => nc.key === ok)
+  );
+  const deletedHalas = originalHalaKeys.value.filter(
+    (ok) => !payload.halaTypes.some((nh) => nh.key === ok)
+  );
+
+  if (deletedColors.length > 0 || deletedHalas.length > 0) {
+    const deletedActiveItems = [];
+    const rowMapping = {};
+    form.tableRows.forEach((r) => {
+      rowMapping[r.key] = r.label;
+    });
+
+    Object.keys(stockData.value).forEach((locKey) => {
+      const subDoc = stockData.value[locKey] || {};
+      Object.keys(subDoc).forEach((mainCat) => {
+        const item = subDoc[mainCat] || {};
+        if (item.details) {
+          deletedColors.forEach((col) => {
+            const qty = parseInt(item.details[col], 10) || 0;
+            if (qty > 0) {
+              deletedActiveItems.push(
+                `Warna "${col}" di Kategori "${mainCat}" (${rowMapping[locKey] || locKey}): ${qty} pcs`
+              );
+            }
+          });
+          deletedHalas.forEach((hala) => {
+            const qty = parseInt(item.details[hala], 10) || 0;
+            if (qty > 0) {
+              deletedActiveItems.push(
+                `Jenis "${hala}" di Kategori "${mainCat}" (${rowMapping[locKey] || locKey}): ${qty} pcs`
+              );
+            }
+          });
+        }
+      });
+    });
+
+    if (deletedActiveItems.length > 0) {
+      const listHtml =
+        `<ul class="text-start mt-2 small" style="max-height: 200px; overflow-y: auto;">` +
+        deletedActiveItems.map((item) => `<li>${item}</li>`).join("") +
+        `</ul>`;
+
+      const result = await confirm({
+        title: "Hapus Pilihan yang Memiliki Data?",
+        html: `Pilihan yang Anda hapus masih memiliki stok aktif di sistem:<br>${listHtml}<br>Jika tetap dihapus, kolom ini tidak akan tampil lagi di tabel manajemen stok.<br><br>Apakah Anda tetap yakin ingin menyimpan?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Tetap Hapus",
+        cancelButtonText: "Batal",
+      });
+
+      if (!result.isConfirmed) return;
+    }
+  }
+
+  if (!isSupervisor.value) {
+    toast("Hanya Supervisor yang diizinkan untuk menyimpan pengaturan ini.", "error");
+    return;
+  }
 
   saving.value = true;
   try {
@@ -520,6 +887,11 @@ async function saveSettings() {
 }
 
 async function resetToDefault() {
+  if (!isSupervisor.value) {
+    toast("Hanya Supervisor yang diizinkan untuk mereset pengaturan ini.", "error");
+    return;
+  }
+
   const result = await confirm({
     title: "Reset Pengaturan?",
     text: "Semua konfigurasi card, grid, dan jenis tabel akan kembali ke default.",

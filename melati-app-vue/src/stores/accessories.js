@@ -171,6 +171,24 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     }
   }
 
+  // ─── Cache Invalidation Helper ──────────────────────────────────────────
+
+  function clearSalesReportCache() {
+    try {
+      const activeFloorId = authStore.activeFloor || "";
+      const prefix = `salesData_${activeFloorId}_`;
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      }
+    } catch (_) {
+      /* silent */
+    }
+  }
+
   /**
    * Save a new sale transaction atomically.
    * @param {Array}  cartItems      cart items
@@ -188,6 +206,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
 
     // Notify cross-tab
     notifyStockChanged(affectedKodes);
+    clearSalesReportCache();
 
     return saleId;
   }
@@ -209,6 +228,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     ];
     await refreshComputedStocks([...new Set(affectedKodes)]);
     notifyStockChanged(affectedKodes);
+    clearSalesReportCache();
   }
 
   /**
@@ -230,6 +250,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     // Patch in-memory
     const idx = transactions.value.findIndex((t) => t.id === saleId);
     if (idx !== -1) transactions.value[idx] = { ...transactions.value[idx], ...updates };
+    clearSalesReportCache();
   }
 
   /**
@@ -241,6 +262,7 @@ export const useAccessoriesStore = defineStore("accessories", () => {
     await updateSaleFull(saleId, updates);
     const idx = transactions.value.findIndex((t) => t.id === saleId);
     if (idx !== -1) transactions.value[idx] = { ...transactions.value[idx], ...updates };
+    clearSalesReportCache();
   }
 
   /**

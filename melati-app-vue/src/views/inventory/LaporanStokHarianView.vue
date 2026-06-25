@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3">
     <div class="page-header mb-3">
       <h1>
@@ -262,10 +262,10 @@ const SUMMARY_CATEGORIES = SUB_CATEGORIES.map((sub) => sub.key);
 
 const REVERSE_CATEGORY_MAPPING = Object.fromEntries(SUB_CATEGORIES.map((sub) => [sub.key, sub.label]));
 
-const COLOR_TYPES = ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"];
-const COLOR_LABELS = { HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink", KUNING: "Kuning" };
-const HALA_TYPES = ["KA", "LA", "AN", "CA", "SA", "GA"];
-const HALA_LABELS = { KA: "Kalung", LA: "Liontin", AN: "Anting", CA: "Cincin", SA: "Giwang", GA: "Gelang" };
+const COLOR_TYPES = ref(["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"]);
+const COLOR_LABELS = ref({ HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink", KUNING: "Kuning" });
+const HALA_TYPES = ref(["KA", "LA", "AN", "CA", "SA", "GA"]);
+const HALA_LABELS = ref({ KA: "Kalung", LA: "Liontin", AN: "Anting", CA: "Cincin", SA: "Giwang", GA: "Gelang" });
 const JEWELRY_TYPED_CATEGORIES = ["HALA & SDW", "KENDARI & EMAS BALI"];
 const LEGACY_LOG_TEXT_LIMIT = 30000;
 const SUMMARY_COLUMN_COLORS = {
@@ -551,9 +551,9 @@ function buildDetailRowsForCategory(mainCat, catKey, editable) {
 
   if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
     warnaModalLabel.value = "Warna";
-    return COLOR_TYPES.map((type) => ({
+    return COLOR_TYPES.value.map((type) => ({
       key: type,
-      label: COLOR_LABELS[type],
+      label: COLOR_LABELS.value[type],
       value: toInt(hasDetail ? breakdownNode.details[type] : isToday ? liveDetails[type] : 0),
       editable,
     }));
@@ -561,9 +561,9 @@ function buildDetailRowsForCategory(mainCat, catKey, editable) {
 
   if (JEWELRY_TYPED_CATEGORIES.includes(mainCat)) {
     warnaModalLabel.value = "Jenis";
-    return HALA_TYPES.map((type) => ({
+    return HALA_TYPES.value.map((type) => ({
       key: type,
-      label: HALA_LABELS[type],
+      label: HALA_LABELS.value[type],
       value: toInt(hasDetail ? breakdownNode.details[type] : isToday ? liveDetails[type] : 0),
       editable,
     }));
@@ -1128,10 +1128,33 @@ async function handleExportDetailBulanan() {
   }
 }
 
+async function loadDynamicSettings() {
+  try {
+    const settings = await fetchInventorySettings(activeFloor.value);
+    if (settings) {
+      if (Array.isArray(settings.colorTypes) && settings.colorTypes.length) {
+        COLOR_TYPES.value = settings.colorTypes.map(c => c.key);
+        const labels = {};
+        settings.colorTypes.forEach(c => { labels[c.key] = c.label; });
+        COLOR_LABELS.value = labels;
+      }
+      if (Array.isArray(settings.halaTypes) && settings.halaTypes.length) {
+        HALA_TYPES.value = settings.halaTypes.map(h => h.key);
+        const labels = {};
+        settings.halaTypes.forEach(h => { labels[h.key] = h.label; });
+        HALA_LABELS.value = labels;
+      }
+    }
+  } catch (e) {
+    console.error("Gagal load dynamic settings di laporan harian:", e);
+  }
+}
+
 onMounted(async () => {
   detailJenisModalInstance = new Modal(detailJenisModalEl.value);
   warnaModalInstance = new Modal(warnaModalEl.value);
 
+  await loadDynamicSettings();
   await getStockSnapshot();
   await loadReport();
 });

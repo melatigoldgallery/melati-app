@@ -79,6 +79,15 @@ export const PAGE_ACCESS_SECTIONS = [
     pages: [{ key: "promosi.setting", label: "Setting Promosi", route: "/promosi/setting" }],
   },
   {
+    key: "toko",
+    label: "Informasi Toko",
+    pages: [
+      { key: "toko.profil", label: "Profil Toko", route: "/toko/profil" },
+      { key: "toko.sop", label: "SOP Operasional", route: "/toko/sop" },
+      { key: "toko.layanan", label: "Layanan & Ongkos", route: "/toko/layanan" },
+    ],
+  },
+  {
     key: "admin",
     label: "Pengaturan",
     pages: [
@@ -175,6 +184,9 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "order-online.laporan-order": "order-online.manajemen",
   "order-online.laporan": "order-online.manajemen",
   "promosi.setting-promosi": "promosi.setting",
+  "toko.profil": "toko.profil",
+  "toko.sop": "toko.sop",
+  "toko.layanan": "toko.layanan",
   "admin.kelola-user": "admin.users",
   "admin.kode-akses": "admin.access-codes",
   "admin.jam-absensi": "admin.jam-absensi",

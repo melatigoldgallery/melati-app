@@ -17,7 +17,7 @@ import {
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
 import { floorCollection, floorDoc } from "./floor-scope";
-import { fetchInventorySettings } from "./inventory-setting-service";
+import { getCachedSettings } from "./inventory-setting-service";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -45,23 +45,54 @@ export const SUB_CATEGORIES = [
   { key: "lainnya", label: "Lainnya" },
 ];
 
-export const COLOR_TYPES = ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"];
-export const HALA_TYPES = ["KA", "LA", "AN", "CA", "SA", "GA"];
-export const HALA_LABELS = {
-  KA: "Kalung",
-  LA: "Liontin",
-  AN: "Anting",
-  CA: "Cincin",
-  SA: "Giwang",
-  GA: "Gelang",
-};
-export const COLOR_LABELS = {
-  HIJAU: "Hijau",
-  BIRU: "Biru",
-  PUTIH: "Putih",
-  PINK: "Pink",
-  KUNING: "Kuning",
-};
+export function getDynamicColorTypes() {
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.colorTypes)) {
+    return settings.colorTypes.map(c => c.key);
+  }
+  return ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"];
+}
+
+export function getDynamicColorLabels() {
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.colorTypes)) {
+    const labels = {};
+    settings.colorTypes.forEach(c => { labels[c.key] = c.label; });
+    return labels;
+  }
+  return {
+    HIJAU: "Hijau",
+    BIRU: "Biru",
+    PUTIH: "Putih",
+    PINK: "Pink",
+    KUNING: "Kuning",
+  };
+}
+
+export function getDynamicHalaTypes() {
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.halaTypes)) {
+    return settings.halaTypes.map(h => h.key);
+  }
+  return ["KA", "LA", "AN", "CA", "SA", "GA"];
+}
+
+export function getDynamicHalaLabels() {
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.halaTypes)) {
+    const labels = {};
+    settings.halaTypes.forEach(h => { labels[h.key] = h.label; });
+    return labels;
+  }
+  return {
+    KA: "Kalung",
+    LA: "Liontin",
+    AN: "Anting",
+    CA: "Cincin",
+    SA: "Giwang",
+    GA: "Gelang",
+  };
+}
 
 /** Categories that use color sub-types (KALUNG, LIONTIN) */
 export const TYPED_CATS = ["KALUNG", "LIONTIN"];
@@ -122,8 +153,8 @@ function totalFromDetails(details = {}) {
 }
 
 function getDetailTypes(mainCat) {
-  if (TYPED_CATS.includes(mainCat)) return COLOR_TYPES;
-  if (HALA_CATS.includes(mainCat)) return HALA_TYPES;
+  if (TYPED_CATS.includes(mainCat)) return getDynamicColorTypes();
+  if (HALA_CATS.includes(mainCat)) return getDynamicHalaTypes();
   return null;
 }
 
@@ -131,8 +162,8 @@ function getDetailTypesByMode(detailType = "") {
   const normalized = String(detailType || "")
     .trim()
     .toLowerCase();
-  if (normalized === "color") return COLOR_TYPES;
-  if (normalized === "hala") return HALA_TYPES;
+  if (normalized === "color") return getDynamicColorTypes();
+  if (normalized === "hala") return getDynamicHalaTypes();
   return null;
 }
 
@@ -334,7 +365,7 @@ export async function updateStockItem({
     if (detailChanges.length) {
       historyEntry.items = detailChanges.map((it) => ({
         jewelryType: it.type,
-        jewelryName: COLOR_LABELS[it.type] || HALA_LABELS[it.type] || it.type,
+        jewelryName: getDynamicColorLabels()[it.type] || getDynamicHalaLabels()[it.type] || it.type,
         quantity: it.diff,
         oldQuantity: it.oldQty,
         newQuantity: it.newQty,
@@ -399,17 +430,38 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
 
 // ── Computed Helpers (pure, no Firestore) ─────────────────────────────────
 
+export function getCardDetailMode(mainCat) {
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.cards)) {
+    const card = settings.cards.find(c => c.id === mainCat);
+    if (card) {
+      const mode = String(card.detailMode || "").trim().toLowerCase();
+      if (mode === "color" || mode === "hala" || mode === "default") return mode;
+      if (card.type === "color") return "color";
+      if (card.type === "hala") return "hala";
+      return "default";
+    }
+  }
+  // Fallback to static defaults
+  if (TYPED_CATS.includes(mainCat)) return "color";
+  if (HALA_CATS.includes(mainCat)) return "hala";
+  return "default";
+}
+
 /**
  * Calculate total physical stock for a mainCategory across all sub-docs.
  * @param {Object} stockData - result of fetchAllStockData()
  * @param {string} mainCat
  * @returns {number}
  */
-export function calcFisikTotal(stockData, mainCat, subCategories = SUB_CATEGORIES, detailMode = "default") {
+export function calcFisikTotal(stockData, mainCat, subCategories = SUB_CATEGORIES) {
+  const detailMode = getCardDetailMode(mainCat);
+  const useDetails = detailMode === "color" || detailMode === "hala";
+
   return subCategories.reduce((sum, sub) => {
     const item = stockData[sub.key]?.[mainCat];
     if (!item) return sum;
-    if ((detailMode === "color" || detailMode === "hala") && item.details && Object.keys(item.details).length > 0) {
+    if (useDetails && item.details && Object.keys(item.details).length > 0) {
       return sum + Object.values(item.details).reduce((s, v) => s + (parseInt(v) || 0), 0);
     }
     return sum + (parseInt(item.quantity) || 0);

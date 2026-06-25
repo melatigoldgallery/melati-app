@@ -142,6 +142,16 @@ export const menuStructure = [
     children: [{ label: "Setting Promosi", to: "/promosi/setting", pageKey: "promosi.setting", roles: ALL }],
   },
   {
+    label: "Informasi Toko",
+    icon: "bi-shop",
+    roles: ALL,
+    children: [
+      { label: "Profil Toko", to: "/toko/profil", pageKey: "toko.profil", roles: ALL },
+      { label: "SOP Operasional", to: "/toko/sop", pageKey: "toko.sop", roles: ALL },
+      { label: "Layanan & Ongkos", to: "/toko/layanan", pageKey: "toko.layanan", roles: ALL },
+    ],
+  },
+  {
     label: "Pengaturan",
     icon: "bi-gear",
     roles: ALL,
