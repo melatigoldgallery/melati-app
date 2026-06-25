@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3">
     <!-- Page Header -->
     <div class="page-header mb-3">
@@ -1094,10 +1094,38 @@
                         <input v-model="row.karat" type="text" class="form-control form-control-sm" placeholder="22K" />
                       </td>
                       <td>
-                        <select v-model="row.jenisServis" class="form-select form-select-sm">
-                          <option value="">Pilih...</option>
-                          <option v-for="j in JENIS_SERVIS_OPTIONS" :key="j" :value="j">{{ j }}</option>
-                        </select>
+                        <div class="dropdown">
+                          <button
+                            class="form-select form-select-sm text-start w-100"
+                            type="button"
+                            :id="'dropdownServisEdit-' + idx"
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            data-bs-popper-config='{"strategy":"fixed"}'
+                            aria-expanded="false"
+                            :title="row.jenisServis || 'Pilih...'"
+                          >
+                            <span class="text-truncate d-inline-block" style="max-width: 110px;">
+                              {{ getSelectedServisLabel(row.jenisServis) }}
+                            </span>
+                          </button>
+                          <ul class="dropdown-menu p-2 shadow-sm" :aria-labelledby="'dropdownServisEdit-' + idx" style="max-height: 250px; overflow-y: auto; min-width: 180px;">
+                            <li v-for="option in JENIS_SERVIS_OPTIONS" :key="option" class="px-2 py-1">
+                              <div class="form-check">
+                                <input
+                                  class="form-check-input"
+                                  type="checkbox"
+                                  :id="'checkEdit-' + idx + '-' + option"
+                                  :checked="isServisOptionChecked(row.jenisServis, option)"
+                                  @change="toggleServisOption(row, option, $event.target.checked)"
+                                />
+                                <label class="form-check-label small w-100 mb-0" :for="'checkEdit-' + idx + '-' + option" style="cursor: pointer;">
+                                  {{ option }}
+                                </label>
+                              </div>
+                            </li>
+                          </ul>
+                        </div>
                       </td>
                       <td>
                         <input
@@ -3246,6 +3274,35 @@ function handleRevertStatusServisModalHidden() {
   }
   pendingReopenStatusServisModal.value = false;
   revertStatusServisPassword.value = "";
+}
+
+// ── Dropdown helpers for multiple servis types ─────────────────────────────
+function getSelectedServisLabel(jenisServis) {
+  if (!jenisServis) return "Pilih...";
+  return jenisServis;
+}
+
+function isServisOptionChecked(jenisServis, option) {
+  if (!jenisServis) return false;
+  return jenisServis.split(",").map((s) => s.trim()).includes(option);
+}
+
+function toggleServisOption(row, option, isChecked) {
+  let selected = row.jenisServis ? row.jenisServis.split(",").map((s) => s.trim()) : [];
+  if (isChecked) {
+    if (!selected.includes(option)) {
+      selected.push(option);
+    }
+  } else {
+    selected = selected.filter((s) => s !== option);
+  }
+  
+  // Sort based on canon order in JENIS_SERVIS_OPTIONS
+  selected.sort((a, b) => {
+    return JENIS_SERVIS_OPTIONS.indexOf(a) - JENIS_SERVIS_OPTIONS.indexOf(b);
+  });
+  
+  row.jenisServis = selected.join(", ");
 }
 </script>
 
