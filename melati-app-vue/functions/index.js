@@ -1486,7 +1486,7 @@ function parseBarcodeCategoryAndType(code) {
   return { mainCat, subType };
 }
 
-async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "", defaultCategory = "") {
+async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "", defaultCategory = "", allowCategoryOverride = false) {
   const barcodeIds = barcodes.map(b => (typeof b === 'string' ? b : b.barcode).trim().toUpperCase());
   const barcodeRefs = barcodeIds.map(id => dbFloorRef.collection("barcodes").doc(id));
   
@@ -1504,12 +1504,18 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     const inputDetailType = typeof originalItem === 'object' ? originalItem.detailType : null;
     const inputCategory = typeof originalItem === 'object' ? originalItem.category : null;
     
+    let oldCategory = null;
+    let oldDetailType = null;
+    
     if (snap.exists) {
       exists = true;
       const data = snap.data();
-      category = data.category;
-      detailType = data.detailType;
+      oldCategory = data.category;
+      oldDetailType = data.detailType;
       resolvedOrigin = data.location || destination;
+      
+      category = allowCategoryOverride ? (inputCategory || defaultCategory || data.category) : data.category;
+      detailType = allowCategoryOverride ? (inputDetailType || defaultDetailType || data.detailType) : data.detailType;
       
       if (data.in_mutasi) {
         throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (sudah laku/mutasi).`);
@@ -1520,10 +1526,20 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       category = inputCategory || defaultCategory || parsed.mainCat;
       detailType = inputDetailType || defaultDetailType || parsed.subType;
       resolvedOrigin = destination; // Base registration
+      oldCategory = category;
+      oldDetailType = detailType;
     }
     
     targetLocations.add(resolvedOrigin);
-    barcodeDetails.push({ id, category, detailType, resolvedOrigin, exists });
+    barcodeDetails.push({ 
+      id, 
+      category, 
+      detailType, 
+      resolvedOrigin, 
+      exists,
+      oldCategory,
+      oldDetailType
+    });
   });
 
   // Step 2: Read all required stocks documents inside the transaction
@@ -1549,8 +1565,8 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
   };
 
   barcodeDetails.forEach((info) => {
-    if (info.resolvedOrigin !== destination) {
-      addChange(info.resolvedOrigin, info.category, info.detailType, -1);
+    if (info.resolvedOrigin !== destination || info.oldCategory !== info.category || info.oldDetailType !== info.detailType) {
+      addChange(info.resolvedOrigin, info.oldCategory, info.oldDetailType, -1);
       addChange(destination, info.category, info.detailType, 1);
     } else {
       addChange(destination, info.category, info.detailType, 1);
@@ -1638,7 +1654,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       if (diffQty !== 0) {
         const relevantBarcodes = barcodeDetails
           .filter(info => 
-            info.category === cat && 
+            (info.category === cat || info.oldCategory === cat) && 
             (info.resolvedOrigin === loc || destination === loc)
           )
           .map(info => info.id);
@@ -1811,7 +1827,8 @@ export const executeBarcodeMutation = onCall(
       pemindah, 
       notes = "",
       defaultDetailType = "",
-      category = ""
+      category = "",
+      allowCategoryOverride = false
     } = request.data || {};
 
     if (!Array.isArray(barcodes) || barcodes.length === 0) {
@@ -1824,7 +1841,7 @@ export const executeBarcodeMutation = onCall(
     const dbFloorRef = db.collection("floors").doc(floorId);
 
     await db.runTransaction(async (t) => {
-      await executeMutationLogic(t, dbFloorRef, barcodes, destination, pemindah, notes, origin || "any", defaultDetailType, category);
+      await executeMutationLogic(t, dbFloorRef, barcodes, destination, pemindah, notes, origin || "any", defaultDetailType, category, allowCategoryOverride);
     });
 
     return { success: true };
@@ -1845,7 +1862,8 @@ export const submitBarcodeMoveRequest = onCall(
       pemindah, 
       notes = "",
       defaultDetailType = "",
-      category = ""
+      category = "",
+      allowCategoryOverride = false
     } = request.data || {};
 
     if (!Array.isArray(barcodes) || barcodes.length === 0) {
@@ -1889,8 +1907,8 @@ export const submitBarcodeMoveRequest = onCall(
         }
         finalBarcodes.push({
           barcode: bc,
-          category: data.category,
-          detailType: data.detailType || null,
+          category: allowCategoryOverride ? (category || data.category) : data.category,
+          detailType: allowCategoryOverride ? (defaultDetailType || data.detailType || null) : data.detailType,
           origin: data.location || destination
         });
       } else {
@@ -1928,6 +1946,7 @@ export const submitBarcodeMoveRequest = onCall(
       status: "pending",
       notes,
       defaultDetailType,
+      allowCategoryOverride,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       processedAt: null,
       processedBy: ""
@@ -1979,7 +1998,9 @@ export const processBarcodeMoveRequest = onCall(
           reqData.pemindah, 
           reqData.notes || "Approved via queue", 
           reqData.origin || "any",
-          reqData.defaultDetailType || ""
+          reqData.defaultDetailType || "",
+          "",
+          reqData.allowCategoryOverride || false
         );
       }
 

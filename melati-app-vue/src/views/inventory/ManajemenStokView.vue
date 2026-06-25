@@ -47,6 +47,14 @@
             <i class="bi bi-qr-code-scan fs-6"></i>
             <span>Lacak Barang (Barcode)</span>
           </button>
+          <button
+            class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"
+            :class="{ 'active': mainTab === 'klipBarang' }"
+            @click="mainTab = 'klipBarang'"
+          >
+            <i class="bi bi-paperclip fs-6"></i>
+            <span>Klip Barcode</span>
+          </button>
         </div>
       </div>
 
@@ -379,6 +387,15 @@
             :staff-options="staffOptions"
           />
         </div>
+      </div>
+
+      <!-- Klip Barcode Content -->
+      <div v-else-if="mainTab === 'klipBarang'">
+        <ClipManager
+          :staff-options="staffOptions"
+          :cards="nonComputerCards"
+          :table-rows="tableRows"
+        />
       </div>
     </template>
 
@@ -976,6 +993,7 @@ import { useAuthStore } from "@/stores/auth";
 import MovementQueue from "@/components/inventory/barcode-tracking/MovementQueue.vue";
 import MutationLog from "@/components/inventory/barcode-tracking/MutationLog.vue";
 import StockOpname from "@/components/inventory/barcode-tracking/StockOpname.vue";
+import ClipManager from "@/components/inventory/barcode-tracking/ClipManager.vue";
 import {
   parseBarcodes,
   executeBarcodeMutation,
@@ -2425,9 +2443,14 @@ async function initDailySnapshots() {
   }
 }
 
+async function handleStockReload() {
+  await loadData({ force: true });
+}
+
 onMounted(async () => {
   await syncFloorScopedState();
   window.addEventListener("storage", handleStorageSync);
+  window.addEventListener("melati-stock-reload", handleStockReload);
   await initDailySnapshots();
 });
 
@@ -2444,6 +2467,7 @@ onUnmounted(() => {
   if (unsubSettings) unsubSettings();
   if (snapshotTimer) clearTimeout(snapshotTimer);
   window.removeEventListener("storage", handleStorageSync);
+  window.removeEventListener("melati-stock-reload", handleStockReload);
 });
 </script>
 
