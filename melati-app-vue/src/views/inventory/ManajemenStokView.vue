@@ -45,7 +45,7 @@
             @click="mainTab = 'lacakFisik'"
           >
             <i class="bi bi-qr-code-scan fs-6"></i>
-            <span>Lacak Barang (Barcode)</span>
+            <span>Lacak Barang</span>
           </button>
           <button
             class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"

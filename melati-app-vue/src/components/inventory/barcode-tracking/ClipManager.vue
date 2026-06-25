@@ -157,9 +157,9 @@
           <!-- STAGE 1: ADD BARCODES MASS-WISE (TEXTAREA) -->
           <div class="card border border-light shadow-xs rounded-3 mb-4 bg-light-subtle">
             <div class="card-header bg-white border-0 pt-3 pb-1">
-              <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-1.5">
+              <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
                 <i class="bi bi-plus-circle-fill text-success"></i>
-                <span>Input Barcode Massal</span>
+                <span>Input Barcode</span>
               </h6>
               <small class="text-muted">Masukkan barcode sekaligus (copy-paste / scan beruntun)</small>
             </div>
@@ -178,7 +178,7 @@
               </div>
               <div class="d-flex justify-content-end">
                 <button 
-                  class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-1.5 shadow-sm"
+                  class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
                   @click="addBarcodesToClip"
                   :disabled="saving || !barcodeTextInput.trim()"
                 >
@@ -193,7 +193,7 @@
           <!-- STAGE 2: BARCODES LIST TABLE WITH SYSTEM STATUS -->
           <div class="barcode-list-section">
             <div class="d-flex justify-content-between align-items-center mb-2.5">
-              <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-1.5">
+              <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
                 <i class="bi bi-list-task text-primary"></i>
                 <span>Daftar Barcode di Klip ({{ selectedClip.barcodes?.length || 0 }})</span>
               </h6>
@@ -302,7 +302,7 @@
                 </div>
                 <button 
                   type="submit"
-                  class="btn btn-primary rounded-pill px-4 py-2.5 fw-bold d-flex align-items-center gap-1.5 shadow"
+                  class="btn btn-primary rounded-pill px-4 py-2.5 fw-bold d-flex align-items-center gap-2 shadow"
                   :disabled="saving || !selectedClip.barcodes || selectedClip.barcodes.length === 0"
                 >
                   <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
