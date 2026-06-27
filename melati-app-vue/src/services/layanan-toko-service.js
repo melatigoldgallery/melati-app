@@ -1,39 +1,45 @@
-import { getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/config/firebase";
-import { floorDoc, scopeStoragePath } from "@/services/floor-scope";
-import { getActiveFloor } from "@/config/floor-config";
 import { DEFAULT_LAYANAN_TOKO } from "@/config/toko-defaults";
 
-function getLayananDoc(floorId = "") {
-  const activeFloor = floorId || getActiveFloor();
-  if (!activeFloor) {
-    throw new Error("Floor tidak aktif. Gagal memuat layanan toko.");
-  }
-  return floorDoc(db, "settings", "layananToko", activeFloor);
+function getLayananDoc() {
+  return doc(db, "settings", "layananToko");
 }
 
-export async function ensureLayananToko(floorId = "") {
-  const docRef = getLayananDoc(floorId);
+export async function ensureLayananToko() {
+  const docRef = getLayananDoc();
   const snap = await getDoc(docRef);
   if (snap.exists()) return;
 
+  // Seamless migration: try to read from L2 first because the newest/current data is there
+  let initialData = { ...DEFAULT_LAYANAN_TOKO };
+  try {
+    const legacyDocRef = doc(db, "floors", "L2", "settings", "layananToko");
+    const legacySnap = await getDoc(legacyDocRef);
+    if (legacySnap.exists()) {
+      initialData = legacySnap.data();
+    }
+  } catch (err) {
+    console.warn("Gagal migrasi data layanan dari L2:", err);
+  }
+
   const now = new Date().toISOString();
   await setDoc(docRef, {
-    ...DEFAULT_LAYANAN_TOKO,
+    ...initialData,
     lastUpdated: now,
     updatedBy: auth.currentUser?.email || "System (Initial)",
   });
 }
 
-export async function fetchLayananToko(floorId = "") {
-  await ensureLayananToko(floorId);
-  const snap = await getDoc(getLayananDoc(floorId));
+export async function fetchLayananToko() {
+  await ensureLayananToko();
+  const snap = await getDoc(getLayananDoc());
   return snap.exists() ? snap.data() : { ...DEFAULT_LAYANAN_TOKO };
 }
 
-export async function saveLayananToko(payload, updatedBy = "System", floorId = "") {
-  const docRef = getLayananDoc(floorId);
+export async function saveLayananToko(payload, updatedBy = "System") {
+  const docRef = getLayananDoc();
   const now = new Date().toISOString();
   await setDoc(docRef, {
     ongkosServis: payload.ongkosServis || [],
@@ -45,11 +51,11 @@ export async function saveLayananToko(payload, updatedBy = "System", floorId = "
   });
 }
 
-export async function uploadLayananImage(file, category, onProgress, floorId = "") {
+export async function uploadLayananImage(file, category, onProgress) {
   const cleanName = String(file.name || "image.jpg")
     .replace(/[^a-zA-Z0-9._-]/g, "_");
   const uniqueName = `${Date.now()}_${cleanName}`;
-  const path = scopeStoragePath(`layanan/${category}/${uniqueName}`, floorId);
+  const path = `layanan/${category}/${uniqueName}`;
   const fileRef = storageRef(storage, path);
 
   const task = uploadBytesResumable(fileRef, file);
