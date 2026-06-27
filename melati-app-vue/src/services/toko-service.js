@@ -1,48 +1,50 @@
-import { getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
-import { floorDoc } from "@/services/floor-scope";
-import { getActiveFloor } from "@/config/floor-config";
 import { DEFAULT_STORE_PROFILE, DEFAULT_STORE_SOP } from "@/config/toko-defaults";
 
-function getProfileDoc(floorId = "") {
-  const activeFloor = floorId || getActiveFloor();
-  if (!activeFloor) {
-    throw new Error("Floor tidak aktif. Gagal memuat profil toko.");
-  }
-  return floorDoc(db, "settings", "storeProfile", activeFloor);
+function getProfileDoc() {
+  return doc(db, "settings", "storeProfile");
 }
 
-function getSOPDoc(floorId = "") {
-  const activeFloor = floorId || getActiveFloor();
-  if (!activeFloor) {
-    throw new Error("Floor tidak aktif. Gagal memuat SOP toko.");
-  }
-  return floorDoc(db, "settings", "storeSOP", activeFloor);
+function getSOPDoc() {
+  return doc(db, "settings", "storeSOP");
 }
 
 // ── Profil Toko Services ───────────────────────────────────────────────────
 
-export async function ensureStoreProfile(floorId = "") {
-  const docRef = getProfileDoc(floorId);
+export async function ensureStoreProfile() {
+  const docRef = getProfileDoc();
   const snap = await getDoc(docRef);
   if (snap.exists()) return;
 
+  // Seamless migration: try to read from L2 first because the newest/current data is there
+  let initialData = { ...DEFAULT_STORE_PROFILE };
+  try {
+    const legacyDocRef = doc(db, "floors", "L2", "settings", "storeProfile");
+    const legacySnap = await getDoc(legacyDocRef);
+    if (legacySnap.exists()) {
+      initialData = legacySnap.data();
+    }
+  } catch (err) {
+    console.warn("Gagal migrasi data profil toko dari L2:", err);
+  }
+
   const now = new Date().toISOString();
   await setDoc(docRef, {
-    ...DEFAULT_STORE_PROFILE,
+    ...initialData,
     lastUpdated: now,
     updatedBy: auth.currentUser?.email || "System (Initial)",
   });
 }
 
-export async function fetchStoreProfile(floorId = "") {
-  await ensureStoreProfile(floorId);
-  const snap = await getDoc(getProfileDoc(floorId));
+export async function fetchStoreProfile() {
+  await ensureStoreProfile();
+  const snap = await getDoc(getProfileDoc());
   return snap.exists() ? snap.data() : { ...DEFAULT_STORE_PROFILE };
 }
 
-export async function saveStoreProfile(payload, updatedBy = "System", floorId = "") {
-  const docRef = getProfileDoc(floorId);
+export async function saveStoreProfile(payload, updatedBy = "System") {
+  const docRef = getProfileDoc();
   const now = new Date().toISOString();
   await setDoc(docRef, {
     about: payload.about || "",
@@ -57,27 +59,39 @@ export async function saveStoreProfile(payload, updatedBy = "System", floorId = 
 
 // ── SOP Services ───────────────────────────────────────────────────────────
 
-export async function ensureStoreSOP(floorId = "") {
-  const docRef = getSOPDoc(floorId);
+export async function ensureStoreSOP() {
+  const docRef = getSOPDoc();
   const snap = await getDoc(docRef);
   if (snap.exists()) return;
 
+  // Seamless migration: try to read from L2 first because the newest/current data is there
+  let initialData = { ...DEFAULT_STORE_SOP };
+  try {
+    const legacyDocRef = doc(db, "floors", "L2", "settings", "storeSOP");
+    const legacySnap = await getDoc(legacyDocRef);
+    if (legacySnap.exists()) {
+      initialData = legacySnap.data();
+    }
+  } catch (err) {
+    console.warn("Gagal migrasi data SOP toko dari L2:", err);
+  }
+
   const now = new Date().toISOString();
   await setDoc(docRef, {
-    ...DEFAULT_STORE_SOP,
+    ...initialData,
     lastUpdated: now,
     updatedBy: auth.currentUser?.email || "System (Initial)",
   });
 }
 
-export async function fetchStoreSOP(floorId = "") {
-  await ensureStoreSOP(floorId);
-  const snap = await getDoc(getSOPDoc(floorId));
+export async function fetchStoreSOP() {
+  await ensureStoreSOP();
+  const snap = await getDoc(getSOPDoc());
   return snap.exists() ? snap.data() : { ...DEFAULT_STORE_SOP };
 }
 
-export async function saveStoreSOP(payload, updatedBy = "System", floorId = "") {
-  const docRef = getSOPDoc(floorId);
+export async function saveStoreSOP(payload, updatedBy = "System") {
+  const docRef = getSOPDoc();
   const now = new Date().toISOString();
   await setDoc(docRef, {
     staffSOP: payload.staffSOP || "",
