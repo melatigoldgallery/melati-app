@@ -4,6 +4,8 @@ import informasiAudio from "@/public/audio/informasi.mp3?url";
 import antrianAudio from "@/public/audio/antrian.mp3?url";
 import informasiEndAudio from "@/public/audio/informasiEnd.mp3?url";
 import notifOnAudio from "@/public/audio/notifOn.mp3?url";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/config/firebase";
 
 const AUDIO_PATHS = {
   informasi: informasiAudio,
@@ -14,6 +16,7 @@ const AUDIO_PATHS = {
 
 let isAudioPlaying = false;
 let audioCtx = null;
+let currentTTSAudio = null;
 
 export function isAudioBusy() {
   return isAudioPlaying;
@@ -46,6 +49,13 @@ async function withDucking(estimatedDuration, playFn) {
 
 export function cancelAllAudio() {
   window.speechSynthesis.cancel();
+  if (currentTTSAudio) {
+    try {
+      currentTTSAudio.pause();
+      currentTTSAudio.src = "";
+    } catch (_) {}
+    currentTTSAudio = null;
+  }
   isAudioPlaying = false;
 }
 
@@ -60,7 +70,7 @@ function playAudio(audioPath) {
   });
 }
 
-function speak(text, rate = 0.85, pitch = 1.2) {
+function speakNativeFallback(text, rate = 0.85, pitch = 1.2) {
   if (!("speechSynthesis" in window)) {
     console.warn("Text-to-speech tidak didukung");
     return Promise.resolve();
@@ -87,6 +97,68 @@ function speak(text, rate = 0.85, pitch = 1.2) {
       window.speechSynthesis.speak(utterance);
     }, 0);
   });
+}
+
+function playGoogleTTS(text, rate = 0.85, pitch = 1.2) {
+  if (currentTTSAudio) {
+    try {
+      currentTTSAudio.pause();
+      currentTTSAudio.src = "";
+    } catch (_) {}
+    currentTTSAudio = null;
+  }
+
+  const provider = localStorage.getItem("google_tts_provider") || "translate";
+  const voiceName = localStorage.getItem("google_tts_voice_name") || "id-ID-Wavenet-A";
+  const googleTtsPitch = parseFloat(localStorage.getItem("google_tts_pitch") || "0.0");
+
+  const getSpeechTTSCallable = httpsCallable(functions, "getSpeechTTS");
+
+  return getSpeechTTSCallable({ text, provider, voiceName, pitch: googleTtsPitch })
+    .then((result) => {
+      const audioContent = result.data?.audioContent;
+      if (!audioContent) {
+        throw new Error("No audioContent in Cloud Function response");
+      }
+      
+      const base64Url = `data:audio/mp3;base64,${audioContent}`;
+      
+      return new Promise((resolve) => {
+        const audio = new Audio(base64Url);
+        audio.playbackRate = rate; // Set matching speed (rate)
+        currentTTSAudio = audio;
+
+        audio.addEventListener("ended", () => {
+          if (currentTTSAudio === audio) currentTTSAudio = null;
+          resolve();
+        }, { once: true });
+
+        audio.addEventListener("error", (err) => {
+          console.error("Google TTS audio error:", err);
+          if (currentTTSAudio === audio) currentTTSAudio = null;
+          resolve();
+        }, { once: true });
+
+        audio.play().catch((err) => {
+          console.error("Failed to play Google TTS audio element:", err);
+          if (currentTTSAudio === audio) currentTTSAudio = null;
+          resolve();
+        });
+      });
+    })
+    .catch((err) => {
+      console.error("Failed to get Google TTS from Cloud Function:", err);
+      // Fallback: outside Electron (Chrome), use native browser voice
+      const hasElectronAPI = typeof window !== "undefined" && window.electronAPI;
+      if (!hasElectronAPI) {
+        return speakNativeFallback(text, rate, pitch);
+      }
+      return Promise.resolve();
+    });
+}
+
+export function speak(text, rate = 0.85, pitch = 1.2) {
+  return playGoogleTTS(text, rate, pitch);
 }
 
 // Tombol "Informasi Tunggu"
@@ -180,33 +252,20 @@ export async function playQueueAnnouncement(queueNumber) {
     try {
       isAudioPlaying = true;
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "id-ID";
-      utterance.rate = 0.85;
-      utterance.pitch = 1.2;
-
-      const voices = window.speechSynthesis.getVoices();
-      const idVoice = voices.find((v) => v.lang.includes("id"));
-      if (idVoice) utterance.voice = idVoice;
-
       const openingAudio = new Audio(AUDIO_PATHS.antrian);
 
       await new Promise((resolve) => {
         openingAudio.addEventListener(
           "ended",
           () => {
-            window.speechSynthesis.speak(utterance);
-            utterance.onend = resolve;
-            utterance.onerror = () => {
-              resolve();
-            };
+            playGoogleTTS(text).then(resolve);
           },
           { once: true },
         );
 
         openingAudio.play().catch((err) => {
           console.error("Error playing opening audio:", err);
-          resolve();
+          playGoogleTTS(text).then(resolve);
         });
       });
 

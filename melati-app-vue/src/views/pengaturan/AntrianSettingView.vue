@@ -163,6 +163,67 @@
           </template>
         </div>
       </div>
+
+      <!-- Google Cloud TTS Settings Card -->
+      <div class="card settings-card mt-4">
+        <div class="settings-header p-3">
+          <h5 class="mb-0">
+            <i class="fas fa-microphone me-2"></i>
+            Konfigurasi Pengisi Suara Antrian (TTS)
+          </h5>
+        </div>
+        <div class="settings-body p-3 p-md-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Pilih Layanan TTS</label>
+              <select v-model="ttsForm.provider" class="form-select" @change="saveTtsSettings">
+                <option value="translate">Google Translate Gratis (Wanita - Default)</option>
+                <option value="google_cloud">Google Cloud Text-to-Speech (Berbayar - Kunci API)</option>
+              </select>
+            </div>
+            
+            <template v-if="ttsForm.provider === 'google_cloud'">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Jenis Suara (Bahasa Indonesia)</label>
+                <select v-model="ttsForm.voiceName" class="form-select" @change="saveTtsSettings">
+                  <option value="id-ID-Standard-A">id-ID-Standard-A (Wanita)</option>
+                  <option value="id-ID-Standard-D">id-ID-Standard-D (Wanita)</option>
+                  <option value="id-ID-Standard-B">id-ID-Standard-B (Pria)</option>
+                  <option value="id-ID-Standard-C">id-ID-Standard-C (Pria)</option>
+                  <option value="id-ID-Wavenet-A">id-ID-Wavenet-A (Wanita - Premium)</option>
+                  <option value="id-ID-Wavenet-D">id-ID-Wavenet-D (Wanita - Premium)</option>
+                  <option value="id-ID-Wavenet-B">id-ID-Wavenet-B (Pria - Premium)</option>
+                  <option value="id-ID-Wavenet-C">id-ID-Wavenet-C (Pria - Premium)</option>
+                  <option value="id-ID-Neural2-F">id-ID-Neural2-F (Wanita - Ultra Premium)</option>
+                  <option value="id-ID-Neural2-B">id-ID-Neural2-B (Pria - Ultra Premium)</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Pitch / Nada Suara ({{ ttsForm.pitch >= 0 ? '+' : '' }}{{ ttsForm.pitch }} Semitones)</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input
+                    v-model.number="ttsForm.pitch"
+                    type="range"
+                    min="-5.0"
+                    max="5.0"
+                    step="0.1"
+                    class="form-range flex-grow-1"
+                    @input="saveTtsSettings"
+                  />
+                  <button class="btn btn-outline-secondary btn-sm" @click="resetTtsPitch">Reset</button>
+                </div>
+                <small class="text-muted">Gunakan nilai positif (+) untuk membuat suara wanita/pria lebih melengking.</small>
+              </div>
+            </template>
+          </div>
+          <div class="d-flex justify-content-start mt-3">
+            <button class="btn btn-success" :disabled="previewing" @click="testTtsVoice">
+              <i class="fas fa-play me-2"></i>
+              Tes Suara Terpilih
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -170,6 +231,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import Swal from "sweetalert2";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/config/firebase";
 import { useAuthStore } from "@/stores/auth";
 import {
   DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS,
@@ -179,7 +242,7 @@ import {
   saveClosingAnnouncementSettings,
   subscribeClosingAnnouncementSettings,
 } from "@/services/antrian-closing-service";
-import { isAudioBusy, playClosingAnnouncement, primeAudioPlayback } from "@/services/audio-service";
+import { isAudioBusy, playClosingAnnouncement, primeAudioPlayback, speak } from "@/services/audio-service";
 
 const auth = useAuthStore();
 
@@ -187,6 +250,35 @@ const loading = ref(true);
 const saving = ref(false);
 const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
+
+// Google Cloud TTS Settings
+const ttsForm = reactive({
+  provider: localStorage.getItem("google_tts_provider") || "translate",
+  voiceName: localStorage.getItem("google_tts_voice_name") || "id-ID-Wavenet-A",
+  pitch: parseFloat(localStorage.getItem("google_tts_pitch") || "0.0"),
+});
+
+function saveTtsSettings() {
+  localStorage.setItem("google_tts_provider", ttsForm.provider);
+  localStorage.setItem("google_tts_voice_name", ttsForm.voiceName);
+  localStorage.setItem("google_tts_pitch", String(ttsForm.pitch));
+}
+
+function resetTtsPitch() {
+  ttsForm.pitch = 0.0;
+  saveTtsSettings();
+}
+
+async function testTtsVoice() {
+  if (isAudioBusy()) return;
+  try {
+    previewing.value = true;
+    primeAudioPlayback();
+    await speak("Satu dua tiga, tes suara pengumuman antrean toko emas melati.");
+  } finally {
+    previewing.value = false;
+  }
+}
 
 let unsubscribeSettings = null;
 
