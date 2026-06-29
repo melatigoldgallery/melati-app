@@ -4,6 +4,7 @@ const fs = require("fs");
 const { exec } = require("child_process");
 const Handlebars = require("handlebars");
 const bwipjs = require("bwip-js");
+const https = require("https");
 
 // Try to safely load the loudness module
 let loudness = null;
@@ -25,6 +26,277 @@ app.on("certificate-error", (event, webContents, url, error, certificate, callba
 
 let mainWindow = null;
 let hiddenPrintWindow = null;
+
+// Path for WASAPI per-process volume control DLL
+const dllPath = path.join(app.getPath("userData"), "AudioControl_v4.dll");
+
+// Function to generate and compile AudioControl.dll for Windows per-process audio ducking
+function ensureAudioControlDLL() {
+  if (process.platform !== "win32") return;
+  if (fs.existsSync(dllPath)) return;
+
+  fs.mkdirSync(path.dirname(dllPath), { recursive: true });
+
+  const csharpCode = `using System;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
+
+namespace AudioControl
+{
+    [Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioSessionEnumerator
+    {
+        [PreserveSig] int GetCount(out int count);
+        [PreserveSig] int GetSession(int sessionCount, out IAudioSessionControl session);
+    }
+
+    [Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioSessionManager2
+    {
+        [PreserveSig] int GetAudioSessionControl(ref Guid AudioSessionGuid, uint StreamFlags, out object SessionControl);
+        [PreserveSig] int GetSimpleAudioVolume(ref Guid AudioSessionGuid, uint StreamFlags, out object AudioVolume);
+        [PreserveSig] int GetSessionEnumerator(out IAudioSessionEnumerator SessionList);
+    }
+
+    [Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioSessionControl
+    {
+        [PreserveSig] int GetState(out uint state);
+        [PreserveSig] int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string displayName);
+        [PreserveSig] int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string displayName, ref Guid eventContext);
+        [PreserveSig] int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string iconPath);
+        [PreserveSig] int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string iconPath, ref Guid eventContext);
+        [PreserveSig] int GetGroupingParam(out Guid groupingParam);
+        [PreserveSig] int SetGroupingParam(ref Guid groupingParam, ref Guid eventContext);
+        [PreserveSig] int RegisterAudioSessionNotification(object client);
+        [PreserveSig] int UnregisterAudioSessionNotification(object client);
+    }
+
+    [Guid("BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioSessionControl2
+    {
+        [PreserveSig] int GetState(out uint state);
+        [PreserveSig] int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string displayName);
+        [PreserveSig] int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string displayName, ref Guid eventContext);
+        [PreserveSig] int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string iconPath);
+        [PreserveSig] int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string iconPath, ref Guid eventContext);
+        [PreserveSig] int GetGroupingParam(out Guid groupingParam);
+        [PreserveSig] int SetGroupingParam(ref Guid groupingParam, ref Guid eventContext);
+        [PreserveSig] int RegisterAudioSessionNotification(object client);
+        [PreserveSig] int UnregisterAudioSessionNotification(object client);
+        [PreserveSig] int GetSessionIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string sessionIdentifier);
+        [PreserveSig] int GetSessionInstanceIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string sessionInstanceIdentifier);
+        [PreserveSig] int GetProcessId(out uint processId);
+        [PreserveSig] int IsSystemSoundsSession();
+        [PreserveSig] int SetDuckingPreference(bool optOut);
+    }
+
+    [Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface ISimpleAudioVolume
+    {
+        [PreserveSig] int SetMasterVolume(float fLevel, ref Guid EventContext);
+        [PreserveSig] int GetMasterVolume(out float pfLevel);
+        [PreserveSig] int SetMute(bool bMute, ref Guid EventContext);
+        [PreserveSig] int GetMute(out bool pbMute);
+    }
+
+    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDevice
+    {
+        [PreserveSig] int Activate(ref Guid iid, int dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+    }
+
+    [Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDeviceCollection
+    {
+        [PreserveSig] int GetCount(out int count);
+        [PreserveSig] int Item(int deviceIndex, out IMMDevice device);
+    }
+
+    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDeviceEnumerator
+    {
+        [PreserveSig] int EnumAudioEndpoints(int dataFlow, int dwStateMask, out IMMDeviceCollection ppDevices);
+        [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppDevice);
+    }
+
+    public class VolumeController
+    {
+        private static Guid IID_IAudioSessionManager2 = new Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F");
+
+        public static void SetProcessVolume(string processName, float volume)
+        {
+            try
+            {
+                Type type = Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"));
+                IMMDeviceEnumerator enumerator = (IMMDeviceEnumerator)Activator.CreateInstance(type);
+                
+                IMMDeviceCollection collection;
+                int hr = enumerator.EnumAudioEndpoints(0, 1, out collection);
+                if (hr != 0 || collection == null) return;
+                
+                int deviceCount;
+                collection.GetCount(out deviceCount);
+                
+                for (int d = 0; d < deviceCount; d++)
+                {
+                    IMMDevice device;
+                    hr = collection.Item(d, out device);
+                    if (hr != 0 || device == null) continue;
+                    
+                    object o;
+                    hr = device.Activate(ref IID_IAudioSessionManager2, 1, IntPtr.Zero, out o);
+                    if (hr == 0 && o != null)
+                    {
+                        IAudioSessionManager2 manager = (IAudioSessionManager2)o;
+                        IAudioSessionEnumerator sessionEnumerator;
+                        hr = manager.GetSessionEnumerator(out sessionEnumerator);
+                        if (hr == 0 && sessionEnumerator != null)
+                        {
+                            int count;
+                            sessionEnumerator.GetCount(out count);
+                            for (int i = 0; i < count; i++)
+                            {
+                                IAudioSessionControl session;
+                                hr = sessionEnumerator.GetSession(i, out session);
+                                if (hr == 0 && session != null)
+                                {
+                                    IAudioSessionControl2 session2 = session as IAudioSessionControl2;
+                                    if (session2 != null)
+                                    {
+                                        uint pid;
+                                        session2.GetProcessId(out pid);
+                                        if (pid > 0)
+                                        {
+                                            try
+                                            {
+                                                Process proc = Process.GetProcessById((int)pid);
+                                                if (proc.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    ISimpleAudioVolume simpleVolume = (ISimpleAudioVolume)session;
+                                                    Guid guid = Guid.Empty;
+                                                    
+                                                    float currentVolume;
+                                                    simpleVolume.GetMasterVolume(out currentVolume);
+                                                    
+                                                    float step = 0.05f;
+                                                    int sleepTime = 15;
+                                                    
+                                                    if (currentVolume < volume)
+                                                    {
+                                                        for (float v = currentVolume; v <= volume; v += step)
+                                                        {
+                                                            simpleVolume.SetMasterVolume(v, ref guid);
+                                                            System.Threading.Thread.Sleep(sleepTime);
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        for (float v = currentVolume; v >= volume; v -= step)
+                                                        {
+                                                            simpleVolume.SetMasterVolume(v, ref guid);
+                                                            System.Threading.Thread.Sleep(sleepTime);
+                                                        }
+                                                    }
+                                                    simpleVolume.SetMasterVolume(volume, ref guid);
+                                                }
+                                            }
+                                            catch {}
+                                        }
+                                    }
+                                    Marshal.ReleaseComObject(session);
+                                }
+                            }
+                            Marshal.ReleaseComObject(sessionEnumerator);
+                        }
+                        Marshal.ReleaseComObject(manager);
+                    }
+                    Marshal.ReleaseComObject(device);
+                }
+                Marshal.ReleaseComObject(collection);
+                Marshal.ReleaseComObject(enumerator);
+            }
+            catch {}
+        }
+    }
+}`;
+
+  const tempCsPath = path.join(app.getPath("temp"), `AudioControl_${Date.now()}.cs`);
+  try {
+    fs.writeFileSync(tempCsPath, csharpCode, "utf8");
+
+    // PowerShell script content to compile C# code to DLL
+    const psScript = `
+$ErrorActionPreference = "Stop"
+try {
+    Add-Type -TypeDefinition (Get-Content -Path "${tempCsPath}" -Raw) -OutputAssembly "${dllPath}"
+    exit 0
+} catch {
+    Write-Error $_.Exception.Message
+    exit 1
+}
+`;
+    // Base64-encode to avoid all Windows quote/spacing escaping issues
+    const buffer = Buffer.from(psScript, "utf16le");
+    const base64 = buffer.toString("base64");
+    const command = `powershell -ExecutionPolicy Bypass -EncodedCommand ${base64}`;
+
+    exec(command, (err, stdout, stderr) => {
+      // Cleanup temp .cs file
+      try {
+        if (fs.existsSync(tempCsPath)) fs.unlinkSync(tempCsPath);
+      } catch (_) {}
+
+      if (err) {
+        console.error("Failed to compile AudioControl.dll:", stderr);
+      } else {
+        console.log("AudioControl.dll compiled successfully at:", dllPath);
+      }
+    });
+  } catch (err) {
+    console.error("Failed to compile AudioControl.dll on startup:", err);
+    try {
+      if (fs.existsSync(tempCsPath)) fs.unlinkSync(tempCsPath);
+    } catch (_) {}
+  }
+}
+
+// Function to adjust target browser volumes via PowerShell using the compiled DLL
+function setBrowsersVolume(volume) {
+  if (process.platform !== "win32") return;
+  if (!fs.existsSync(dllPath)) {
+    console.warn("AudioControl.dll not found, cannot set browser volumes.");
+    return;
+  }
+
+  // Kill previous active volume process if running, preventing race conditions
+  if (activeVolumeProcess) {
+    try {
+      activeVolumeProcess.kill();
+    } catch (_) {}
+    activeVolumeProcess = null;
+  }
+  
+  const browsers = ["chrome", "msedge", "firefox", "brave", "opera"];
+  
+  // Build volume control PowerShell script
+  let script = `Add-Type -Path "${dllPath}";\n`;
+  browsers.forEach(browser => {
+    script += `[AudioControl.VolumeController]::SetProcessVolume("${browser}", [float]${volume});\n`;
+  });
+  
+  // Base64-encode to execute cleanly without quoting errors
+  const buffer = Buffer.from(script, "utf16le");
+  const base64 = buffer.toString("base64");
+  const command = `powershell -ExecutionPolicy Bypass -EncodedCommand ${base64}`;
+  
+  activeVolumeProcess = exec(command, (err, stdout, stderr) => {
+    activeVolumeProcess = null;
+    if (err && !err.killed) {
+      console.error(`Failed to set browsers volume to ${volume}:`, stderr);
+    }
+  });
+}
 
 // Create main cashier window
 function createMainWindow() {
@@ -69,6 +341,7 @@ function createPrintWindow() {
 }
 
 app.whenReady().then(() => {
+  ensureAudioControlDLL();
   createMainWindow();
   createPrintWindow();
 
@@ -89,10 +362,12 @@ app.on("window-all-closed", () => {
 let originalVolume = null;
 let originalMute = null;
 let duckTimeout = null;
+let activeVolumeProcess = null;
 
 // Failsafe: Restore master volume when application is quitting
 app.on("will-quit", async () => {
   try {
+    setBrowsersVolume(1.0);
     if (loudness && originalVolume !== null) {
       await loudness.setVolume(originalVolume);
       await loudness.setMuted(originalMute);
@@ -285,38 +560,21 @@ ipcMain.handle("duck-audio", async (event, duration) => {
     throw new Error("Unauthorized IPC Call");
   }
   
-  if (!loudness) {
-    console.warn("Loudness library is not available. Skipping ducking.");
-    return { success: false, error: "Loudness library not loaded" };
-  }
-
   try {
     if (duckTimeout) {
       clearTimeout(duckTimeout);
       duckTimeout = null;
     }
 
-    if (originalVolume === null) {
-      originalVolume = await loudness.getVolume();
-      originalMute = await loudness.getMuted();
-    }
+    // Duck the external browsers (Chrome, Edge, etc.) to 10%
+    setBrowsersVolume(0.1);
 
-    // Set master volume to 30% if not already muted
-    if (!originalMute) {
-      await loudness.setVolume(30);
-    }
-
-    // Set timeout as fallback
-    duckTimeout = setTimeout(async () => {
+    // Set timeout as fallback to restore volume
+    duckTimeout = setTimeout(() => {
       try {
-        if (loudness && originalVolume !== null) {
-          await loudness.setVolume(originalVolume);
-          await loudness.setMuted(originalMute);
-          originalVolume = null;
-          originalMute = null;
-        }
+        setBrowsersVolume(1.0);
       } catch (err) {
-        console.error("Failed to restore volume in timeout:", err);
+        console.error("Failed to restore browser volume in timeout:", err);
       } finally {
         duckTimeout = null;
       }
@@ -334,27 +592,48 @@ ipcMain.handle("unduck-audio", async (event) => {
     throw new Error("Unauthorized IPC Call");
   }
 
-  if (!loudness) {
-    return { success: false, error: "Loudness library not loaded" };
-  }
-
   try {
     if (duckTimeout) {
       clearTimeout(duckTimeout);
       duckTimeout = null;
     }
 
-    if (originalVolume !== null) {
-      await loudness.setVolume(originalVolume);
-      await loudness.setMuted(originalMute);
-      originalVolume = null;
-      originalMute = null;
-    }
+    // Restore browser volume to 100%
+    setBrowsersVolume(1.0);
     return { success: true };
   } catch (err) {
     console.error("Failed to unduck audio:", err);
     return { success: false, error: err.message };
   }
+});
+
+ipcMain.handle("get-google-tts", async (event, text) => {
+  if (!validateOrigin(event.sender)) {
+    throw new Error("Unauthorized IPC Call");
+  }
+  return new Promise((resolve, reject) => {
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=id&client=tw-ob&q=${encodeURIComponent(text)}`;
+    const options = {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
+      }
+    };
+    https.get(url, options, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`Failed to fetch TTS: Status ${res.statusCode}`));
+        return;
+      }
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const buffer = Buffer.concat(chunks);
+        const base64 = buffer.toString("base64");
+        resolve(`data:audio/mp3;base64,${base64}`);
+      });
+    }).on("error", (err) => {
+      reject(err);
+    });
+  });
 });
 
 ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
@@ -499,30 +778,38 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
       createPrintWindow();
     }
 
-    await hiddenPrintWindow.loadURL(`file://${tempHTMLPath}`);
-
     // Wait for window to load and perform silent print
-    return new Promise((resolve) => {
-      hiddenPrintWindow.webContents.once("did-finish-load", () => {
-        hiddenPrintWindow.webContents.print({
-          silent: true,
-          printBackground: true,
-          deviceName: printerName,
-          copies: copiesCount
-        }, (success, failureReason) => {
+    const printPromise = new Promise((resolve) => {
+      hiddenPrintWindow.webContents.once("did-finish-load", async () => {
+        try {
+          // Loop to print multiple copies sequentially.
+          // This ensures drivers that ignore the copies parameter in silent mode still print the correct number of copies.
+          for (let i = 0; i < copiesCount; i++) {
+            if (i > 0) {
+              // Wait 1.5 seconds between print jobs to allow the printer spooler to release the device lock
+              await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500));
+            }
+            await hiddenPrintWindow.webContents.print({
+              silent: true,
+              printBackground: true,
+              deviceName: printerName,
+              copies: 1 // print 1 copy per job
+            });
+          }
+          resolve({ success: true });
+        } catch (err) {
+          resolve({ success: false, error: "Print failure: " + err.message });
+        } finally {
           // Cleanup temp file
           try {
             fs.unlinkSync(tempHTMLPath);
           } catch (_) {}
-
-          if (success) {
-            resolve({ success: true });
-          } else {
-            resolve({ success: false, error: "Print failure: " + failureReason });
-          }
-        });
+        }
       });
     });
+
+    await hiddenPrintWindow.loadURL(`file://${tempHTMLPath}`);
+    return printPromise;
 
   } catch (err) {
     console.error("Print job error:", err);
