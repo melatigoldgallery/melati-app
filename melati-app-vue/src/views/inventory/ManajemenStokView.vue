@@ -319,6 +319,9 @@
                     <p class="small mb-0">
                       Gunakan box fisik khusus yang disediakan (Stok Brankas, Admin, Belum Posting, dll.) guna mempermudah penataan dan pengecekan barang secara cepat.
                     </p>
+                    <div class="alert alert-info border border-info-subtle p-2 rounded-2 small mt-2 mb-0">
+                      <strong>💡 Info Penting:</strong> Hasil input shift pagi harus dihitung dan diletakkan sesuai boxnya (<strong>Stok Brankas</strong> atau <strong>Belum Posting</strong>). Pemisahan ini mempermudah pelacakan barang dan mencegah selisih stok saat pergantian shift.
+                    </div>
                   </div>
                 </div>
               </div>
@@ -331,7 +334,7 @@
                 Tolong Kerja Sama & Keterlibatannya 🔥
               </h6>
               <p class="small mb-0 text-primary-emphasis">
-                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien dan kita semua bisa <strong>pulang tepat waktu!</strong> 🚀
+                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien, akurat, dan kita semua bisa <strong>pulang tepat waktu!</strong> 🚀
               </p>
             </div>
           </div>
