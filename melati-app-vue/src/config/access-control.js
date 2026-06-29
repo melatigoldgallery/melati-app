@@ -114,6 +114,11 @@ export const PAGE_ACCESS_SECTIONS = [
         label: "Setting Manajemen Stok",
         route: "/pengaturan/manajemen-stok",
       },
+      {
+        key: "admin.printer",
+        label: "Setting Printer",
+        route: "/pengaturan/printer",
+      },
     ],
   },
 ];
@@ -146,6 +151,7 @@ const SENSITIVE_PAGE_KEYS = new Set([
   "admin.theme-appearance",
   "admin.maintenance",
   "admin.inventory-manajemen-stok",
+  "admin.printer",
 ]);
 
 const LEGACY_PERMISSION_TO_PAGE = {
@@ -196,6 +202,7 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "admin.maintenance": "admin.maintenance",
   "admin.setting-manajemen-stok": "admin.inventory-manajemen-stok",
   "admin.inventory-manajemen-stok": "admin.inventory-manajemen-stok",
+  "admin.printer": "admin.printer",
 };
 
 export function getDefaultPageAccess(pageKey, role = "staff") {

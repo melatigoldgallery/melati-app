@@ -22,6 +22,8 @@ import { ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL } 
 import { db, storage, auth } from "@/config/firebase";
 import { verifyStoredSecret } from "@/utils/security";
 import { floorDoc } from "@/services/floor-scope";
+import { printJob } from "@/utils/printHelper";
+
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -522,30 +524,14 @@ function normalizeServisPrintPayload(servisData) {
  */
 export async function printServisSlip(servisData) {
   const isCustom = servisData.jenisInput === "custom";
-  const endpoint = isCustom ? "/api/print/nota-custom" : "/api/print/nota-servis";
+  const type = isCustom ? "nota-custom" : "nota-servis";
   const payload = normalizeServisPrintPayload(servisData);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4000);
   try {
-    const res = await fetch(`${PRINT_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!res.ok) {
-      let detail = "";
-      try {
-        const body = await res.json();
-        detail = body?.error || body?.message || "";
-      } catch {
-        // ignore parse error
-      }
-      throw new Error(detail ? `Print service error: ${detail}` : `Print service error: ${res.status}`);
+    const res = await printJob(type, payload);
+    if (!res || !res.success) {
+      throw new Error("Print failed");
     }
   } catch (e) {
-    clearTimeout(timeout);
     throw e; // caller handles with SweetAlert
   }
 }

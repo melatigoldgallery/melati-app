@@ -19,6 +19,31 @@ export function isAudioBusy() {
   return isAudioPlaying;
 }
 
+// Helper to perform audio ducking in Electron environment
+async function withDucking(estimatedDuration, playFn) {
+  const hasElectronAPI = typeof window !== "undefined" && window.electronAPI;
+  
+  if (hasElectronAPI && typeof window.electronAPI.panggilAntreanDim === "function") {
+    try {
+      await window.electronAPI.panggilAntreanDim(estimatedDuration);
+    } catch (err) {
+      console.error("Failed to start audio ducking:", err);
+    }
+  }
+
+  try {
+    return await playFn();
+  } finally {
+    if (hasElectronAPI && typeof window.electronAPI.panggilAntreanUnduck === "function") {
+      try {
+        await window.electronAPI.panggilAntreanUnduck();
+      } catch (err) {
+        console.error("Failed to stop audio ducking:", err);
+      }
+    }
+  }
+}
+
 export function cancelAllAudio() {
   window.speechSynthesis.cancel();
   isAudioPlaying = false;
@@ -67,105 +92,132 @@ function speak(text, rate = 0.85, pitch = 1.2) {
 // Tombol "Informasi Tunggu"
 export async function playWaitMessageSequence() {
   if (isAudioPlaying) return false;
-  try {
-    isAudioPlaying = true;
-    await playAudio(AUDIO_PATHS.informasi);
-    await speak(
-      "Kepada Pelanggan Melati yang belum dilayani, kami mohon kesabarannya untuk menunggu pelayanan. Terima kasih atas perhatiannya",
-    );
-    await playAudio(AUDIO_PATHS.informasiEnd);
-    isAudioPlaying = false;
-    return true;
-  } catch (error) {
-    console.error("Error playing wait message:", error);
-    isAudioPlaying = false;
-    return false;
-  }
+
+  const text = "Kepada Pelanggan Melati yang belum dilayani, kami mohon kesabarannya untuk menunggu pelayanan. Terima kasih atas perhatiannya";
+  const textDuration = text.length * 80;
+  const introOutroDuration = 7000;
+  const totalDuration = introOutroDuration + textDuration + 1000;
+
+  return withDucking(totalDuration, async () => {
+    try {
+      isAudioPlaying = true;
+      await playAudio(AUDIO_PATHS.informasi);
+      await speak(text);
+      await playAudio(AUDIO_PATHS.informasiEnd);
+      isAudioPlaying = false;
+      return true;
+    } catch (error) {
+      console.error("Error playing wait message:", error);
+      isAudioPlaying = false;
+      return false;
+    }
+  });
 }
 
 // Tombol "Pengingat Antrian"
 export async function playTakeQueueMessage() {
   if (isAudioPlaying) return false;
-  try {
-    isAudioPlaying = true;
-    await playAudio(AUDIO_PATHS.informasi);
-    await speak(
-      "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian terlebih dahulu di tempat yang sudah disediakan. Terima kasih atas perhatiannya",
-    );
-    await playAudio(AUDIO_PATHS.informasiEnd);
-    isAudioPlaying = false;
-    return true;
-  } catch (error) {
-    console.error("Error playing take queue message:", error);
-    isAudioPlaying = false;
-    return false;
-  }
+
+  const text = "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian terlebih dahulu di tempat yang sudah disediakan. Terima kasih atas perhatiannya";
+  const textDuration = text.length * 80;
+  const introOutroDuration = 7000;
+  const totalDuration = introOutroDuration + textDuration + 1000;
+
+  return withDucking(totalDuration, async () => {
+    try {
+      isAudioPlaying = true;
+      await playAudio(AUDIO_PATHS.informasi);
+      await speak(text);
+      await playAudio(AUDIO_PATHS.informasiEnd);
+      isAudioPlaying = false;
+      return true;
+    } catch (error) {
+      console.error("Error playing take queue message:", error);
+      isAudioPlaying = false;
+      return false;
+    }
+  });
 }
 
 // Pengumuman penutupan toko
 export async function playClosingAnnouncement(message) {
   if (isAudioPlaying) return false;
-  try {
-    isAudioPlaying = true;
-    await playAudio(AUDIO_PATHS.informasi);
-    await speak(message, 0.75, 1.2);
-    await playAudio(AUDIO_PATHS.informasiEnd);
-    isAudioPlaying = false;
-    return true;
-  } catch (error) {
-    console.error("Error playing closing announcement:", error);
-    isAudioPlaying = false;
-    return false;
-  }
+
+  const text = String(message || "").trim();
+  const textDuration = text.length * 100;
+  const introOutroDuration = 7000;
+  const totalDuration = introOutroDuration + textDuration + 1000;
+
+  return withDucking(totalDuration, async () => {
+    try {
+      isAudioPlaying = true;
+      await playAudio(AUDIO_PATHS.informasi);
+      await speak(text, 0.75, 1.2);
+      await playAudio(AUDIO_PATHS.informasiEnd);
+      isAudioPlaying = false;
+      return true;
+    } catch (error) {
+      console.error("Error playing closing announcement:", error);
+      isAudioPlaying = false;
+      return false;
+    }
+  });
 }
 
 // Tombol "Panggil Nomor Antrian" — dengan audio prefix antrian.mp3 + TTS
 export async function playQueueAnnouncement(queueNumber) {
   if (isAudioPlaying) return false;
-  try {
-    isAudioPlaying = true;
 
-    const letter = queueNumber.charAt(0);
-    const numbers = queueNumber.substring(1);
-    const text = `Nomor antrian, ${letter}, ${numbers.split("").join("")}, silahkan angkat tangan`;
+  const letter = queueNumber.charAt(0);
+  const numbers = queueNumber.substring(1);
+  const text = `Nomor antrian, ${letter}, ${numbers.split("").join("")}, silahkan angkat tangan`;
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "id-ID";
-    utterance.rate = 0.85;
-    utterance.pitch = 1.2;
+  const textDuration = text.length * 80;
+  const openingDuration = 3500;
+  const totalDuration = openingDuration + textDuration + 1000;
 
-    const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find((v) => v.lang.includes("id"));
-    if (idVoice) utterance.voice = idVoice;
+  return withDucking(totalDuration, async () => {
+    try {
+      isAudioPlaying = true;
 
-    const openingAudio = new Audio(AUDIO_PATHS.antrian);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "id-ID";
+      utterance.rate = 0.85;
+      utterance.pitch = 1.2;
 
-    await new Promise((resolve) => {
-      openingAudio.addEventListener(
-        "ended",
-        () => {
-          window.speechSynthesis.speak(utterance);
-          utterance.onend = resolve;
-          utterance.onerror = () => {
-            resolve();
-          };
-        },
-        { once: true },
-      );
+      const voices = window.speechSynthesis.getVoices();
+      const idVoice = voices.find((v) => v.lang.includes("id"));
+      if (idVoice) utterance.voice = idVoice;
 
-      openingAudio.play().catch((err) => {
-        console.error("Error playing opening audio:", err);
-        resolve();
+      const openingAudio = new Audio(AUDIO_PATHS.antrian);
+
+      await new Promise((resolve) => {
+        openingAudio.addEventListener(
+          "ended",
+          () => {
+            window.speechSynthesis.speak(utterance);
+            utterance.onend = resolve;
+            utterance.onerror = () => {
+              resolve();
+            };
+          },
+          { once: true },
+        );
+
+        openingAudio.play().catch((err) => {
+          console.error("Error playing opening audio:", err);
+          resolve();
+        });
       });
-    });
 
-    isAudioPlaying = false;
-    return true;
-  } catch (error) {
-    console.error("Error announcing queue:", error);
-    isAudioPlaying = false;
-    return false;
-  }
+      isAudioPlaying = false;
+      return true;
+    } catch (error) {
+      console.error("Error announcing queue:", error);
+      isAudioPlaying = false;
+      return false;
+    }
+  });
 }
 
 // Prime AudioContext agar audio bisa diputar setelah interaksi user

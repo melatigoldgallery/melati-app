@@ -443,6 +443,7 @@ import { useAlert } from "@/composables/useAlert";
 import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import { getSafeAmount, resolveReprintReceiptPayment } from "@/utils/print-payment";
+import { printJob } from "@/utils/printHelper";
 
 const store = useAccessoriesStore();
 const authStore = useAuthStore();
@@ -949,25 +950,11 @@ function mapPrintItem(item) {
 }
 
 async function postPrintRequest(endpoint, data) {
-  const res = await fetch(`${PRINT_BASE}${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    let message = `Print gagal (${res.status})`;
-    try {
-      const errorBody = await res.json();
-      message = errorBody?.error || errorBody?.message || message;
-    } catch (_) {
-      // ignore parse error, keep fallback message
-    }
-    throw new Error(message);
+  const type = endpoint.replace("/api/print/", "");
+  const result = await printJob(type, data);
+  if (!result || !result.success) {
+    throw new Error(result?.error || "Print gagal");
   }
-
-  const result = await res.json();
-  if (!result.success) throw new Error(result.error || "Print gagal");
   return result;
 }
 
@@ -1022,11 +1009,14 @@ async function reprintTransaction(trx, type = "receipt") {
   printingType.value = type;
   printingTransactionId.value = trx?.id || null;
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 3000);
-    const health = await fetch(`${PRINT_BASE}/api/health`, { signal: ctrl.signal });
-    clearTimeout(t);
-    if (!health.ok) throw new Error("unhealthy");
+    const isElectronActive = typeof window !== "undefined" && window.electronAPI;
+    if (!isElectronActive) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 3000);
+      const health = await fetch(`${PRINT_BASE}/api/health`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!health.ok) throw new Error("unhealthy");
+    }
 
     const transactionType = (trx.jenisPenjualan ?? "").toUpperCase();
     const items = (trx.items ?? []).map(mapPrintItem);

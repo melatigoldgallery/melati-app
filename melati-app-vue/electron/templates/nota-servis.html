@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nota Servis</title>
+    <style>
+      @page {
+        size: 20cm 12.9cm landscape;
+        margin: 0mm;
+      }
+      body {
+        margin: 0;
+        padding: 0mm;
+        width: 20cm;
+        height: 12.9cm;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        position: relative;
+      }
+      .customer-info {
+        position: absolute;
+        top: 0.9cm;
+        left: 16.5cm;
+        text-align: left;
+        line-height: 1.9;
+        font-size: 12px;
+      }
+      .nota-table {
+        position: absolute;
+        top: 4.8cm;
+        left: 0.5cm;
+        right: -0.5cm;
+      }
+      .nota-total {
+        position: absolute;
+        top: 11.7cm;
+        left: 11.5cm;
+        display: flex;
+        align-items: left;
+        gap: 2px;
+        font-size: 12px;
+      }
+      .nota-total-label {
+        font-weight: 600;
+      }
+      .nota-total-value {
+        min-width: 90px;
+        text-align: right;
+        font-weight: 600;
+      }
+      .info-pengambilan {
+        position: absolute;
+        top: 11.5cm;
+        left: 1cm;
+        font-size: 12px;
+        font-weight: bold;
+        text-transform: uppercase;
+        text-decoration: underline;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      td {
+        padding: 2px 4px;
+        vertical-align: top;
+        font-size: 12px;
+        line-height: 1.2;
+      }
+      td:nth-child(1) {
+        width: 40px;
+        text-align: center;
+      }
+      td:nth-child(2) {
+        width: 200px;
+      }
+      td:nth-child(3) {
+        width: 50px;
+      }
+      td:nth-child(4) {
+        width: 50px;
+      }
+      td:nth-child(5) {
+        width: 40px;
+      }
+      td:nth-child(6) {
+        width: 140px;
+      }
+      .signature-section {
+        position: absolute;
+        top: 14.3cm;
+        left: 11cm;
+        width: 6.5cm;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+      }
+      .signature-customer {
+        text-align: right;
+      }
+      .signature-sales {
+        text-align: left;
+      }
+      .nota-catatan {
+        position: absolute;
+        top: 15.5cm;
+        left: 1cm;
+        right: 1cm;
+        font-size: 10px;
+        font-weight: normal;
+        line-height: 1.1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="customer-info">
+      <div>{{tanggal}}</div>
+      <div>± {{#if tanggalSelesai}}{{tanggalSelesai}}{{else}}{{tanggal}}{{/if}}</div>
+      <div>{{customerName}}</div>
+      <div style="line-height: 3">{{customerPhone}}</div>
+    </div>
+
+    <div class="nota-table">
+      <table>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{jumlah}} pcs</td>
+            <td>{{namaBarang}}{{#if jenisServis}} - {{jenisServis}}{{/if}} [{{statusLabel statusPembayaran}}]</td>
+            <td>{{berat}}</td>
+            <td>{{karat}}</td>
+            <td style="text-align: center">{{formatRupiah ongkos}}</td>
+            <td>{{#if rincianServis}}{{rincianServis}}{{else}}-{{/if}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="nota-total">
+      <span class="nota-total-label">Total:</span>
+      <span class="nota-total-value">{{formatRupiah totalOngkos}}</span>
+    </div>
+
+    <div class="info-pengambilan">
+      Note: Pengambilan barang servis atau custom
+      <br />
+      di lantai 1 dan tidak perlu antri
+    </div>
+
+    <div class="signature-section">
+      <div class="signature-customer">{{customerName}}</div>
+      <div class="signature-sales">{{salesName}}</div>
+    </div>
+
+    <div class="nota-catatan">
+      Catatan : Penurunan berat pasca pencucian/servis dapat terjadi karena pembersihan kotoran yang menempel
+    </div>
+  </body>
+</html>

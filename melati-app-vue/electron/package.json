@@ -1,0 +1,45 @@
+{
+  "name": "melati-electron-shell",
+  "version": "1.0.0",
+  "description": "Desktop shell for Melati App with native printing integration",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "bwip-js": "^4.2.0",
+    "handlebars": "^4.7.8",
+    "loudness": "^0.4.2"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.melatigoldgallery.melatiapp",
+    "productName": "Melati App",
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "templates/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/ico.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/loudness/**/*"
+    ]
+  }
+
+}

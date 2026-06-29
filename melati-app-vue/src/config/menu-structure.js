@@ -183,6 +183,12 @@ export const menuStructure = [
         pageKey: "admin.inventory-manajemen-stok",
         roles: ALL,
       },
+      {
+        label: "Setting Printer",
+        to: "/pengaturan/printer",
+        pageKey: "admin.printer",
+        roles: ALL,
+      },
     ],
   },
 ];

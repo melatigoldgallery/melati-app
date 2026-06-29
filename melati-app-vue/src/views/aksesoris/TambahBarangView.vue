@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3">
     <!-- Page Header -->
     <div class="page-header mb-3">
@@ -556,6 +556,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { getLocalPrinters, printJob } from "@/utils/printHelper";
 import {
   doc,
   getDocs,
@@ -606,15 +607,13 @@ let printModal = null;
 async function loadPrinters() {
   isLoadingPrinters.value = true;
   try {
-    const res = await fetch(`${PRINT_BASE}/api/printers`);
-    const data = await res.json();
-    if (res.ok && data?.success) {
-      printerOptions.value = Array.isArray(data.printers) ? data.printers : [];
-      selectedPrinter.value =
-        data?.config?.label || data?.config?.default || printerOptions.value.find((p) => p.isDefault)?.name || "";
-    }
+    const printers = await getLocalPrinters();
+    printerOptions.value = Array.isArray(printers) ? printers : [];
+    selectedPrinter.value =
+      localStorage.getItem("printer_label") ||
+      localStorage.getItem("user_default_printer") ||
+      printerOptions.value.find((p) => p.isDefault)?.name || "";
   } catch (e) {
-    // keep default empty so service can use configured label printer
     printerOptions.value = [];
   } finally {
     isLoadingPrinters.value = false;
@@ -674,26 +673,17 @@ async function printQr() {
   isPrinting.value = true;
   try {
     const payload = {
-      printer: selectedPrinter.value || undefined,
       labels: toPrint,
     };
-    // Use SBPL endpoint (10-50x faster, native SATO format, minimal resource usage)
-    const url = `${PRINT_BASE}/api/print/qr-sbpl`;
-    const controllerFetch = new AbortController();
-    const timeout = setTimeout(() => controllerFetch.abort(), 30000);
-    const respFetch = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controllerFetch.signal,
-    });
-    clearTimeout(timeout);
-    const resp = await respFetch.json().catch(() => null);
-    if (respFetch.ok && resp && resp.success) {
-      swal(`Job ${resp.jobID} - QR label (${resp.performance?.estimatedSpeed || "cepat"})`, "success");
+    if (selectedPrinter.value) {
+      localStorage.setItem("printer_label", selectedPrinter.value);
+    }
+    const resp = await printJob("qr-sbpl", payload);
+    if (resp && resp.success) {
+      swal("Job QR label terkirim", "success");
       printModal.hide();
     } else {
-      showError("Gagal print", (resp && resp.error) || `HTTP ${respFetch.status}`);
+      showError("Gagal print", resp?.error || "Gagal mencetak QR label");
     }
   } catch (e) {
     showError("Gagal print", e.message || e.toString());
