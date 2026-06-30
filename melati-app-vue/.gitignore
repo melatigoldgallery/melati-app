@@ -4,3 +4,8 @@ dist/
 .env.local
 .env.production
 !.env.production.example
+
+# Firebase
+.firebase/
+
+.vite/

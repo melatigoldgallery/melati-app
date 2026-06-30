@@ -730,30 +730,21 @@ async function resolveExportCategories() {
 }
 
 async function fetchLogsWithFallback(startDate, endDate) {
-  const collectionsToTry = ["dailyStockLogs", "daily_stock_logs"];
-  const merged = new Map();
-
-  for (const collectionName of collectionsToTry) {
-    try {
-      const logsQ = query(
-        floorCollection(db, collectionName, activeFloor.value),
-        where("date", ">=", startDate),
-        where("date", "<=", endDate),
-        orderBy("date", "desc"),
-      );
-      const logsSnap = await getDocs(logsQ);
-      logsSnap.docs.forEach((d) => {
-        const data = d.data() || {};
-        const dateKey = String(data.date || "");
-        const dedupeKey = `${dateKey}::${d.id}`;
-        if (!merged.has(dedupeKey)) merged.set(dedupeKey, { id: d.id, ...data });
-      });
-    } catch (_) {
-      // noop: continue to next fallback collection
-    }
+  try {
+    const logsQ = query(
+      floorCollection(db, "dailyStockLogs", activeFloor.value),
+      where("date", ">=", startDate),
+      where("date", "<=", endDate),
+      orderBy("date", "desc"),
+    );
+    const logsSnap = await getDocs(logsQ);
+    return logsSnap.docs.map((d) => {
+      const data = d.data() || {};
+      return { id: d.id, ...data };
+    });
+  } catch (_) {
+    return [];
   }
-
-  return [...merged.values()];
 }
 
 function groupLogsByMainCategory(logDocs, categories = MAIN_CATEGORIES) {

@@ -11,7 +11,7 @@ const db = admin.firestore();
 const WITA_OFFSET = "+08:00";
 const WITA_MS = 8 * 60 * 60 * 1000;
 const LOCK_TTL_MS = 10 * 60 * 1000;
-const ENABLE_GLOBAL_SNAPSHOT_COMPAT = true;
+const ENABLE_GLOBAL_SNAPSHOT_COMPAT = false;
 const SNAPSHOT_FLOORS = ["L1", "L2"];
 
 function sha256Hex(value) {
@@ -204,8 +204,10 @@ const MAINTENANCE_COLLECTION_ALIAS = new Map(
 
 const MAINTENANCE_COLLECTION_BY_KEY = new Map(MAINTENANCE_COLLECTION_CONFIG.map((cfg) => [cfg.key, cfg]));
 
-function buildMonthlyQueries(config, bounds) {
-  const colRef = db.collection(config.collection);
+function buildMonthlyQueries(config, bounds, floorId = null) {
+  const colRef = floorId
+    ? db.collection("floors").doc(floorId).collection(config.key === "dailystocklogs" ? "dailyStockLogs" : config.collection)
+    : db.collection(config.collection);
 
   switch (config.mode) {
     case "date-string":
@@ -235,8 +237,10 @@ function buildMonthlyQueries(config, bounds) {
   }
 }
 
-function buildLegacySnapshotDayQueries(config, bounds) {
-  const colRef = db.collection(config.collection);
+function buildLegacySnapshotDayQueries(config, bounds, floorId = null) {
+  const colRef = floorId
+    ? db.collection("floors").doc(floorId).collection(config.collection)
+    : db.collection(config.collection);
   const dayCount = new Date(Date.UTC(bounds.year, bounds.monthNum, 0)).getUTCDate();
   const queries = [];
 
@@ -304,6 +308,13 @@ export const maintenanceMonthlyCleanup = onCall(
       throw new HttpsError("permission-denied", "Anda tidak memiliki akses maintenance.");
     }
 
+    const floorId = String(request.data?.floorId || "")
+      .trim()
+      .toUpperCase();
+    if (!["L1", "L2"].includes(floorId)) {
+      throw new HttpsError("invalid-argument", "floorId harus L1 atau L2.");
+    }
+
     const action = String(request.data?.action || "dryRun");
     if (!["dryRun", "execute"].includes(action)) {
       throw new HttpsError("invalid-argument", "Action tidak valid.");
@@ -352,11 +363,11 @@ export const maintenanceMonthlyCleanup = onCall(
           continue;
         }
 
-        let queries = buildMonthlyQueries(cfg, bounds);
+        let queries = buildMonthlyQueries(cfg, bounds, floorId);
         let count = await countDocsForQueries(queries);
 
         if (cfg.mode === "snapshot-date" && count === 0) {
-          const legacyQueries = buildLegacySnapshotDayQueries(cfg, bounds);
+          const legacyQueries = buildLegacySnapshotDayQueries(cfg, bounds, floorId);
           const legacyCount = await countDocsForQueries(legacyQueries);
           if (legacyCount > 0) {
             queries = legacyQueries;
@@ -409,9 +420,10 @@ export const maintenanceMonthlyCleanup = onCall(
       }
     }
 
-    await db.collection("maintenanceLogs").add({
+    await db.collection("floors").doc(floorId).collection("maintenanceLogs").add({
       action,
       month,
+      floorId,
       callerUid: request.auth?.uid || "",
       callerRole: role,
       requestedCollections: uniqueKeys,
@@ -637,44 +649,7 @@ function shiftYmd(ymd, deltaDays) {
   return formatYmd(toWitaParts(shifted));
 }
 
-async function aggregateTransactionsUntil(endDate) {
-  const endTs = admin.firestore.Timestamp.fromDate(endDate);
-  const snap = await db.collection("stokAksesorisTransaksi").where("timestamp", "<=", endTs).get();
-
-  const map = new Map();
-  for (const docSnap of snap.docs) {
-    const tx = docSnap.data();
-    const kode = tx.kode;
-    if (!kode) continue;
-
-    if (!map.has(kode)) {
-      map.set(kode, 0);
-    }
-
-    const jumlah = Number(tx.jumlah || 0);
-
-    switch (tx.jenis) {
-      case "tambah":
-      case "stockAddition":
-      case "initialStock":
-        map.set(kode, map.get(kode) + jumlah);
-        break;
-      case "laku":
-      case "free":
-      case "gantiLock":
-      case "return":
-        map.set(kode, map.get(kode) - jumlah);
-        break;
-      case "adjustment":
-        map.set(kode, tx.stokSesudah || map.get(kode));
-        break;
-      default:
-        break;
-    }
-  }
-
-  return map;
-}
+// Removed unused aggregateTransactionsUntil function
 
 function resolveSnapshotScope(scope = "global", floorId = "") {
   const normalizedScope =
@@ -1047,17 +1022,18 @@ export const periodicEnsureYesterdaySnapshot = onSchedule(
   },
 );
 
-export const ensureYesterdaySnapshotOnFirstTxGlobal = onDocumentWritten(
-  {
-    document: "stokAksesorisTransaksi/{txId}",
-    region: "asia-southeast2",
-    memory: "256MiB",
-    retry: false,
-  },
-  async () => {
-    await ensureSnapshotForYesterdayByScope("firestore-write-fallback-global", "global", "");
-  },
-);
+// Deactivated global snapshot trigger since system is fully floor-based
+// export const ensureYesterdaySnapshotOnFirstTxGlobal = onDocumentWritten(
+//   {
+//     document: "stokAksesorisTransaksi/{txId}",
+//     region: "asia-southeast2",
+//     memory: "256MiB",
+//     retry: false,
+//   },
+//   async () => {
+//     await ensureSnapshotForYesterdayByScope("firestore-write-fallback-global", "global", "");
+//   },
+// );
 
 export const ensureYesterdaySnapshotOnFirstTxFloor = onDocumentWritten(
   {

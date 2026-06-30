@@ -175,17 +175,17 @@
         <div class="settings-body p-3 p-md-4">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Pilih Layanan TTS</label>
-              <select v-model="ttsForm.provider" class="form-select" @change="saveTtsSettings">
+              <label class="form-label fw-semibold">Pilih Layanan TTS (Semua Device)</label>
+              <select v-model="form.ttsProvider" class="form-select">
                 <option value="translate">Google Translate Gratis (Wanita - Default)</option>
                 <option value="google_cloud">Google Cloud Text-to-Speech (Berbayar - Kunci API)</option>
               </select>
             </div>
             
-            <template v-if="ttsForm.provider === 'google_cloud'">
+            <template v-if="form.ttsProvider === 'google_cloud'">
               <div class="col-md-6">
                 <label class="form-label fw-semibold">Jenis Suara (Bahasa Indonesia)</label>
-                <select v-model="ttsForm.voiceName" class="form-select" @change="saveTtsSettings">
+                <select v-model="form.ttsVoiceName" class="form-select">
                   <option value="id-ID-Standard-A">id-ID-Standard-A (Wanita)</option>
                   <option value="id-ID-Standard-D">id-ID-Standard-D (Wanita)</option>
                   <option value="id-ID-Standard-B">id-ID-Standard-B (Pria)</option>
@@ -199,20 +199,34 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label fw-semibold">Pitch / Nada Suara ({{ ttsForm.pitch >= 0 ? '+' : '' }}{{ ttsForm.pitch }} Semitones)</label>
+                <label class="form-label fw-semibold">Pitch / Nada Suara ({{ form.ttsPitch >= 0 ? '+' : '' }}{{ form.ttsPitch }} Semitones)</label>
                 <div class="d-flex align-items-center gap-2">
                   <input
-                    v-model.number="ttsForm.pitch"
+                    v-model.number="form.ttsPitch"
                     type="range"
                     min="-5.0"
                     max="5.0"
                     step="0.1"
                     class="form-range flex-grow-1"
-                    @input="saveTtsSettings"
                   />
                   <button class="btn btn-outline-secondary btn-sm" @click="resetTtsPitch">Reset</button>
                 </div>
                 <small class="text-muted">Gunakan nilai positif (+) untuk membuat suara wanita/pria lebih melengking.</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Kecepatan Pemanggilan / Rate ({{ form.ttsRate }}x)</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input
+                    v-model.number="form.ttsRate"
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.05"
+                    class="form-range flex-grow-1"
+                  />
+                  <button class="btn btn-outline-secondary btn-sm" @click="resetTtsRate">Reset</button>
+                </div>
+                <small class="text-muted">Gunakan nilai di bawah 1.0 untuk memperlambat tempo pemanggilan.</small>
               </div>
             </template>
           </div>
@@ -251,22 +265,12 @@ const saving = ref(false);
 const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
-// Google Cloud TTS Settings
-const ttsForm = reactive({
-  provider: localStorage.getItem("google_tts_provider") || "translate",
-  voiceName: localStorage.getItem("google_tts_voice_name") || "id-ID-Wavenet-A",
-  pitch: parseFloat(localStorage.getItem("google_tts_pitch") || "0.0"),
-});
-
-function saveTtsSettings() {
-  localStorage.setItem("google_tts_provider", ttsForm.provider);
-  localStorage.setItem("google_tts_voice_name", ttsForm.voiceName);
-  localStorage.setItem("google_tts_pitch", String(ttsForm.pitch));
+function resetTtsPitch() {
+  form.ttsPitch = 0.0;
 }
 
-function resetTtsPitch() {
-  ttsForm.pitch = 0.0;
-  saveTtsSettings();
+function resetTtsRate() {
+  form.ttsRate = 0.85;
 }
 
 async function testTtsVoice() {
@@ -274,7 +278,17 @@ async function testTtsVoice() {
   try {
     previewing.value = true;
     primeAudioPlayback();
-    await speak("Satu dua tiga, tes suara pengumuman antrean toko emas melati.");
+    await speak(
+      "Satu dua tiga, tes suara pengumuman antrean toko emas melati.",
+      null,
+      1.2,
+      {
+        provider: form.ttsProvider,
+        voiceName: form.ttsVoiceName,
+        pitch: form.ttsPitch,
+        rate: form.ttsRate
+      }
+    );
   } finally {
     previewing.value = false;
   }
@@ -300,6 +314,16 @@ function applySettings(payload = {}) {
   form.message = normalized.message;
   form.lastUpdated = normalized.lastUpdated;
   form.updatedBy = normalized.updatedBy;
+  form.ttsProvider = normalized.ttsProvider;
+  form.ttsVoiceName = normalized.ttsVoiceName;
+  form.ttsPitch = normalized.ttsPitch;
+  form.ttsRate = normalized.ttsRate;
+
+  // Sync settings page's local fallback storage immediately
+  localStorage.setItem("google_tts_provider", normalized.ttsProvider);
+  localStorage.setItem("google_tts_voice_name", normalized.ttsVoiceName);
+  localStorage.setItem("google_tts_pitch", String(normalized.ttsPitch));
+  localStorage.setItem("google_tts_rate", String(normalized.ttsRate));
 }
 
 function isValidTime(value) {
@@ -315,6 +339,10 @@ function getSavePayload() {
     reminderLimitMaxCalls: Number(form.reminderLimitMaxCalls),
     reminderLimitWindowSeconds: Number(form.reminderLimitWindowSeconds),
     message: String(form.message || "").trim(),
+    ttsProvider: form.ttsProvider,
+    ttsVoiceName: form.ttsVoiceName,
+    ttsPitch: Number(form.ttsPitch),
+    ttsRate: Number(form.ttsRate),
   };
 }
 

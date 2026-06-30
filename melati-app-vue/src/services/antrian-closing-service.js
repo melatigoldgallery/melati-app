@@ -13,6 +13,10 @@ export const DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS = Object.freeze({
     "Kepada pelanggan Melati, kami informasikan, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya",
   lastUpdated: null,
   updatedBy: "System",
+  ttsProvider: "translate",
+  ttsVoiceName: "id-ID-Wavenet-A",
+  ttsPitch: 0.0,
+  ttsRate: 0.85,
 });
 
 function getClosingSettingsDoc(floorId = "") {
@@ -64,6 +68,10 @@ export function normalizeClosingAnnouncementSettings(raw = {}) {
     message: normalizeMessage(raw.message),
     lastUpdated: raw.lastUpdated || null,
     updatedBy: raw.updatedBy || "System",
+    ttsProvider: raw.ttsProvider || DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS.ttsProvider,
+    ttsVoiceName: raw.ttsVoiceName || DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS.ttsVoiceName,
+    ttsPitch: typeof raw.ttsPitch === "number" ? raw.ttsPitch : DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS.ttsPitch,
+    ttsRate: typeof raw.ttsRate === "number" ? raw.ttsRate : DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS.ttsRate,
   };
 }
 

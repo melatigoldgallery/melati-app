@@ -25,7 +25,6 @@ app.on("certificate-error", (event, webContents, url, error, certificate, callba
 });
 
 let mainWindow = null;
-let hiddenPrintWindow = null;
 
 // Path for WASAPI per-process volume control DLL
 const dllPath = path.join(app.getPath("userData"), "AudioControl_v4.dll");
@@ -322,28 +321,14 @@ function createMainWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
-    if (hiddenPrintWindow) {
-      hiddenPrintWindow.close();
-      hiddenPrintWindow = null;
-    }
   });
 }
 
-// Create reusable persistent hidden window for HTML printing
-function createPrintWindow() {
-  hiddenPrintWindow = new BrowserWindow({
-    show: false,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-}
+
 
 app.whenReady().then(() => {
   ensureAudioControlDLL();
   createMainWindow();
-  createPrintWindow();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -454,6 +439,43 @@ async function generateQRDataUrl(value) {
     console.error("QR generation failed:", err);
     return "";
   }
+}
+
+/**
+ * Prints a single copy of an HTML file using a temporary, isolated BrowserWindow.
+ * Wraps the native callback-based webContents.print to block until the spooler accepts the job.
+ */
+function printHTMLSingle(htmlPath, printerName) {
+  return new Promise((resolve, reject) => {
+    const workerWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
+
+    workerWindow.webContents.once("did-finish-load", () => {
+      workerWindow.webContents.print({
+        silent: true,
+        printBackground: true,
+        deviceName: printerName,
+        copies: 1
+      }, (success, failureReason) => {
+        workerWindow.destroy();
+        if (success) {
+          resolve();
+        } else {
+          reject(new Error(failureReason || "Printer driver failed to accept job"));
+        }
+      });
+    });
+
+    workerWindow.loadURL(`file://${htmlPath}`).catch((err) => {
+      workerWindow.destroy();
+      reject(err);
+    });
+  });
 }
 
 // PowerShell Raw & Image Printer commands (compiled pure-JS without binary dependencies)
@@ -770,46 +792,29 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
     const compiledTemplate = Handlebars.compile(templateContent);
     const htmlString = compiledTemplate(dataForTemplate);
 
-    // Save to temp HTML file and load it in print window
-    const tempHTMLPath = path.join(app.getPath("temp"), `print_${Date.now()}.html`);
+    // Save to temp HTML file and load it in print window (with random suffix to avoid name collisions)
+    const randomSuffix = Math.random().toString(36).substring(2, 9);
+    const tempHTMLPath = path.join(app.getPath("temp"), `print_${Date.now()}_${randomSuffix}.html`);
     fs.writeFileSync(tempHTMLPath, htmlString, "utf-8");
 
-    if (!hiddenPrintWindow) {
-      createPrintWindow();
-    }
-
-    // Wait for window to load and perform silent print
-    const printPromise = new Promise((resolve) => {
-      hiddenPrintWindow.webContents.once("did-finish-load", async () => {
-        try {
-          // Loop to print multiple copies sequentially.
-          // This ensures drivers that ignore the copies parameter in silent mode still print the correct number of copies.
-          for (let i = 0; i < copiesCount; i++) {
-            if (i > 0) {
-              // Wait 1.5 seconds between print jobs to allow the printer spooler to release the device lock
-              await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500));
-            }
-            await hiddenPrintWindow.webContents.print({
-              silent: true,
-              printBackground: true,
-              deviceName: printerName,
-              copies: 1 // print 1 copy per job
-            });
-          }
-          resolve({ success: true });
-        } catch (err) {
-          resolve({ success: false, error: "Print failure: " + err.message });
-        } finally {
-          // Cleanup temp file
-          try {
-            fs.unlinkSync(tempHTMLPath);
-          } catch (_) {}
+    try {
+      for (let i = 0; i < copiesCount; i++) {
+        if (i > 0) {
+          // Wait 1.5 seconds between print jobs to allow the printer spooler to release the device lock
+          await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500));
         }
-      });
-    });
-
-    await hiddenPrintWindow.loadURL(`file://${tempHTMLPath}`);
-    return printPromise;
+        await printHTMLSingle(tempHTMLPath, printerName);
+      }
+      return { success: true };
+    } catch (err) {
+      console.error("Print job error:", err);
+      return { success: false, error: "Print failure: " + err.message };
+    } finally {
+      // Cleanup temp file
+      try {
+        fs.unlinkSync(tempHTMLPath);
+      } catch (_) {}
+    }
 
   } catch (err) {
     console.error("Print job error:", err);

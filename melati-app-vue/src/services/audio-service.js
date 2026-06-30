@@ -6,6 +6,8 @@ import informasiEndAudio from "@/public/audio/informasiEnd.mp3?url";
 import notifOnAudio from "@/public/audio/notifOn.mp3?url";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/config/firebase";
+import { subscribeClosingAnnouncementSettings } from "@/services/antrian-closing-service";
+import { requireActiveFloor } from "@/config/floor-config";
 
 const AUDIO_PATHS = {
   informasi: informasiAudio,
@@ -99,7 +101,52 @@ function speakNativeFallback(text, rate = 0.85, pitch = 1.2) {
   });
 }
 
-function playGoogleTTS(text, rate = 0.85, pitch = 1.2) {
+let ttsSettings = {
+  provider: localStorage.getItem("google_tts_provider") || "translate",
+  voiceName: localStorage.getItem("google_tts_voice_name") || "id-ID-Wavenet-A",
+  pitch: parseFloat(localStorage.getItem("google_tts_pitch") || "0.0"),
+  rate: parseFloat(localStorage.getItem("google_tts_rate") || "0.85"),
+  subscribedFloorId: null,
+};
+
+let ttsUnsubscribe = null;
+
+export function ensureTtsSubscription() {
+  let activeFloorId = "";
+  try {
+    activeFloorId = requireActiveFloor();
+  } catch (err) {
+    console.warn("Active floor not set yet, using fallback or cached settings:", err.message);
+    return;
+  }
+
+  if (ttsSettings.subscribedFloorId === activeFloorId) return;
+
+  if (ttsUnsubscribe) {
+    ttsUnsubscribe();
+    ttsUnsubscribe = null;
+  }
+
+  try {
+    ttsUnsubscribe = subscribeClosingAnnouncementSettings((settings) => {
+      ttsSettings.provider = settings.ttsProvider || "translate";
+      ttsSettings.voiceName = settings.ttsVoiceName || "id-ID-Wavenet-A";
+      ttsSettings.pitch = typeof settings.ttsPitch === "number" ? settings.ttsPitch : 0.0;
+      ttsSettings.rate = typeof settings.ttsRate === "number" ? settings.ttsRate : 0.85;
+
+      // Update fallback local storage
+      localStorage.setItem("google_tts_provider", ttsSettings.provider);
+      localStorage.setItem("google_tts_voice_name", ttsSettings.voiceName);
+      localStorage.setItem("google_tts_pitch", String(ttsSettings.pitch));
+      localStorage.setItem("google_tts_rate", String(ttsSettings.rate));
+    }, activeFloorId);
+    ttsSettings.subscribedFloorId = activeFloorId;
+  } catch (err) {
+    console.warn("Failed to subscribe to global TTS settings:", err);
+  }
+}
+
+function playGoogleTTS(text, rate = null, pitch = 1.2, ttsOptions = null) {
   if (currentTTSAudio) {
     try {
       currentTTSAudio.pause();
@@ -108,9 +155,11 @@ function playGoogleTTS(text, rate = 0.85, pitch = 1.2) {
     currentTTSAudio = null;
   }
 
-  const provider = localStorage.getItem("google_tts_provider") || "translate";
-  const voiceName = localStorage.getItem("google_tts_voice_name") || "id-ID-Wavenet-A";
-  const googleTtsPitch = parseFloat(localStorage.getItem("google_tts_pitch") || "0.0");
+  ensureTtsSubscription();
+  const provider = ttsOptions?.provider || ttsSettings.provider;
+  const voiceName = ttsOptions?.voiceName || ttsSettings.voiceName;
+  const googleTtsPitch = ttsOptions?.pitch !== undefined ? ttsOptions.pitch : ttsSettings.pitch;
+  const resolvedRate = ttsOptions?.rate !== undefined ? ttsOptions.rate : (rate !== null ? rate : ttsSettings.rate);
 
   const getSpeechTTSCallable = httpsCallable(functions, "getSpeechTTS");
 
@@ -125,7 +174,7 @@ function playGoogleTTS(text, rate = 0.85, pitch = 1.2) {
       
       return new Promise((resolve) => {
         const audio = new Audio(base64Url);
-        audio.playbackRate = rate; // Set matching speed (rate)
+        audio.playbackRate = resolvedRate; // Set matching speed (rate)
         currentTTSAudio = audio;
 
         audio.addEventListener("ended", () => {
@@ -157,8 +206,8 @@ function playGoogleTTS(text, rate = 0.85, pitch = 1.2) {
     });
 }
 
-export function speak(text, rate = 0.85, pitch = 1.2) {
-  return playGoogleTTS(text, rate, pitch);
+export function speak(text, rate = null, pitch = 1.2, ttsOptions = null) {
+  return playGoogleTTS(text, rate, pitch, ttsOptions);
 }
 
 // Tombol "Informasi Tunggu"
