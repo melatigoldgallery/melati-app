@@ -36,12 +36,6 @@
               <i v-else class="bi bi-eye me-2"></i>
               Tampilkan
             </button>
-
-            <button class="btn btn-warning" :disabled="saving || loading" @click="saveSnapshot">
-              <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
-              <i v-else class="bi bi-save me-2"></i>
-              Simpan Snapshot
-            </button>
           </div>
 
           <div class="col-md-4 text-end small text-muted">
@@ -74,7 +68,7 @@
                 <td colspan="6" class="text-center text-muted py-4">Pilih tanggal lalu klik Tampilkan</td>
               </tr>
 
-              <tr v-for="(cat, idx) in MAIN_CATEGORIES" v-else :key="cat">
+              <tr v-for="(cat, idx) in enabledMainCategories" v-else :key="cat">
                 <td class="text-center fw-bold text-muted">{{ idx + 1 }}</td>
                 <td class="fw-semibold">{{ cat }}</td>
                 <td class="text-center">
@@ -188,7 +182,7 @@
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Detail Per Warna</h5>
+            <h5 class="modal-title">{{ warnaModalTitle }}</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
@@ -243,13 +237,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { Modal } from "bootstrap";
 import { collection, getDoc, getDocs, orderBy, query, setDoc, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
 import { floorDoc, floorCollection } from "@/services/floor-scope";
 import { useAuthStore } from "@/stores/auth";
-import { db, functions } from "@/config/firebase";
+import { db } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { useWITA } from "@/composables/useWITA";
 import { MAIN_CATEGORIES, SUB_CATEGORIES, fetchAllStockData } from "@/services/inventory-service";
@@ -258,14 +251,62 @@ import { fetchInventorySettings } from "@/services/inventory-setting-service";
 const { toast, error: showError } = useAlert();
 const { todayStringWITA } = useWITA();
 
-const SUMMARY_CATEGORIES = SUB_CATEGORIES.map((sub) => sub.key);
+const SUMMARY_CATEGORIES = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.tableRows)) {
+    return dynamicSettings.value.tableRows.filter((row) => row.enabled).map((row) => row.key);
+  }
+  return SUB_CATEGORIES.map((sub) => sub.key);
+});
 
-const REVERSE_CATEGORY_MAPPING = Object.fromEntries(SUB_CATEGORIES.map((sub) => [sub.key, sub.label]));
+const REVERSE_CATEGORY_MAPPING = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.tableRows)) {
+    return Object.fromEntries(
+      dynamicSettings.value.tableRows.filter((row) => row.enabled).map((row) => [row.key, row.label])
+    );
+  }
+  return Object.fromEntries(SUB_CATEGORIES.map((sub) => [sub.key, sub.label]));
+});
 
-const COLOR_TYPES = ref(["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"]);
-const COLOR_LABELS = ref({ HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink", KUNING: "Kuning" });
-const HALA_TYPES = ref(["KA", "LA", "AN", "CA", "SA", "GA"]);
-const HALA_LABELS = ref({ KA: "Kalung", LA: "Liontin", AN: "Anting", CA: "Cincin", SA: "Giwang", GA: "Gelang" });
+const COLOR_TYPES = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.colorTypes)) {
+    return dynamicSettings.value.colorTypes.map((c) => c.key);
+  }
+  return ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"];
+});
+
+const COLOR_LABELS = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.colorTypes)) {
+    return Object.fromEntries(dynamicSettings.value.colorTypes.map((c) => [c.key, c.label]));
+  }
+  return { HIJAU: "Hijau", BIRU: "Biru", PUTIH: "Putih", PINK: "Pink", KUNING: "Kuning" };
+});
+
+const HALA_TYPES = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.halaTypes)) {
+    return dynamicSettings.value.halaTypes.map((h) => h.key);
+  }
+  return ["KA", "LA", "AN", "CA", "SA", "GA"];
+});
+
+const HALA_LABELS = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.halaTypes)) {
+    return Object.fromEntries(dynamicSettings.value.halaTypes.map((h) => [h.key, h.label]));
+  }
+  return { KA: "Kalung", LA: "Liontin", AN: "Anting", CA: "Cincin", SA: "Giwang", GA: "Gelang" };
+});
+
+const DEFAULT_SUB_LABELS = {
+  brankas: "Stok Brankas",
+  posting: "Belum Posting",
+  "barang-display": "Display",
+  "barang-rusak": "Rusak",
+  "batu-lepas": "Batu Lepas",
+  manual: "Manual",
+  admin: "Admin",
+  DP: "DP",
+  lainnya: "Lainnya",
+};
+
 const JEWELRY_TYPED_CATEGORIES = ["HALA & SDW", "KENDARI & EMAS BALI"];
 const LEGACY_LOG_TEXT_LIMIT = 30000;
 const SUMMARY_COLUMN_COLORS = {
@@ -281,8 +322,34 @@ const SUMMARY_COLUMN_COLORS = {
 };
 
 const loading = ref(false);
-const saving = ref(false);
 const exporting = ref(false);
+const dynamicSettings = ref(null);
+
+function getCardDetailMode(mainCat) {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.cards)) {
+    const card = dynamicSettings.value.cards.find(c => c.id === mainCat);
+    if (card) {
+      const mode = String(card.detailMode || "").trim().toLowerCase();
+      if (mode === "color" || mode === "hala" || mode === "default") return mode;
+      if (card.type === "color") return "color";
+      if (card.type === "hala") return "hala";
+      return "default";
+    }
+  }
+  // Fallback to static defaults
+  if (mainCat === "KALUNG" || mainCat === "LIONTIN") return "color";
+  if (["HALA & SDW", "KENDARI & EMAS BALI"].includes(mainCat)) return "hala";
+  return "default";
+}
+
+const enabledMainCategories = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.cards)) {
+    return dynamicSettings.value.cards
+      .filter((card) => card.enabled && card.showInSummary)
+      .map((card) => card.id);
+  }
+  return MAIN_CATEGORIES;
+});
 const savingWarna = ref(false);
 const selectedDate = ref(todayStringWITA());
 const reportData = ref(null);
@@ -302,6 +369,12 @@ const detailJenisTotal = ref(0);
 const showDetailEye = ref(false);
 const showEditAction = ref(false);
 const isTodaySelection = computed(() => selectedDate.value === todayKey.value);
+
+const warnaModalTitle = computed(() => {
+  if (warnaModalLabel.value === "Warna") return "Detail Per Warna";
+  if (warnaModalLabel.value === "Jenis") return "Detail Per Jenis Perhiasan";
+  return "Detail Rincian";
+});
 
 const activeDetailCat = ref("");
 const warnaEditable = ref(false);
@@ -349,7 +422,8 @@ function statusClass(status = "") {
 }
 
 function categoryUsesDetails(mainCat) {
-  return mainCat === "KALUNG" || mainCat === "LIONTIN" || JEWELRY_TYPED_CATEGORIES.includes(mainCat);
+  const mode = getCardDetailMode(mainCat);
+  return mode === "color" || mode === "hala";
 }
 
 function normalizeBreakdownNode(node = {}) {
@@ -387,9 +461,10 @@ function normalizeReport(rawData, dateKey) {
 
     const sourceBreakdown = rawData?.breakdown?.[mainCat] || {};
     normalized.breakdown[mainCat] = {};
-    SUMMARY_CATEGORIES.forEach((catKey) => {
-      const fallbackLabel = REVERSE_CATEGORY_MAPPING[catKey];
-      const node = sourceBreakdown[catKey] || sourceBreakdown[fallbackLabel] || {};
+    SUMMARY_CATEGORIES.value.forEach((catKey) => {
+      const fallbackLabel = REVERSE_CATEGORY_MAPPING.value[catKey];
+      const defaultLabel = DEFAULT_SUB_LABELS[catKey];
+      const node = sourceBreakdown[catKey] || sourceBreakdown[fallbackLabel] || sourceBreakdown[defaultLabel] || {};
       normalized.breakdown[mainCat][catKey] = normalizeBreakdownNode(node);
     });
   });
@@ -424,7 +499,10 @@ function computeCurrentSummarySnapshot(sourceStockData) {
     let totalAcrossAllDocs = 0;
     breakdown[mainCat] = {};
 
-    SUMMARY_CATEGORIES.forEach((catKey) => {
+    const detailMode = getCardDetailMode(mainCat);
+    const useDetails = detailMode === "color" || detailMode === "hala";
+
+    SUMMARY_CATEGORIES.value.forEach((catKey) => {
       const node = sourceStockData?.[catKey]?.[mainCat];
       if (!node) {
         breakdown[mainCat][catKey] = { total: 0 };
@@ -433,7 +511,7 @@ function computeCurrentSummarySnapshot(sourceStockData) {
 
       let total = 0;
       let details = null;
-      if (node.details && typeof node.details === "object") {
+      if (useDetails && node.details && typeof node.details === "object" && Object.keys(node.details).length > 0) {
         details = { ...node.details };
         total = Object.values(details).reduce((sum, val) => sum + toInt(val), 0);
       } else {
@@ -495,26 +573,6 @@ async function loadReport() {
   }
 }
 
-async function saveSnapshot() {
-  if (!selectedDate.value) return;
-  saving.value = true;
-  try {
-    const result = await saveSnapshotByDate(selectedDate.value, "laporan-stok-harian");
-    if (result?.created) {
-      toast("Snapshot berhasil disimpan via Cloud Function");
-    } else if (result?.reason === "locked") {
-      toast("Snapshot sedang diproses, silakan coba lagi sesaat");
-    } else {
-      toast("Snapshot sudah tersedia");
-    }
-    await loadReport();
-  } catch (err) {
-    showError("Gagal menyimpan snapshot", err?.message || "");
-  } finally {
-    saving.value = false;
-  }
-}
-
 function openDetailJenis(mainCat) {
   if (!reportData.value) return;
 
@@ -522,11 +580,11 @@ function openDetailJenis(mainCat) {
   showDetailEye.value = categoryUsesDetails(mainCat);
   showEditAction.value = selectedDate.value !== todayKey.value;
 
-  const rows = SUMMARY_CATEGORIES.map((catKey) => {
+  const rows = SUMMARY_CATEGORIES.value.map((catKey) => {
     const qty = toInt(reportData.value?.breakdown?.[mainCat]?.[catKey]?.total);
     return {
       catKey,
-      label: REVERSE_CATEGORY_MAPPING[catKey] || catKey,
+      label: REVERSE_CATEGORY_MAPPING.value[catKey] || catKey,
       qty,
     };
   });
@@ -549,21 +607,23 @@ function buildDetailRowsForCategory(mainCat, catKey, editable) {
     return [];
   }
 
-  if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
+  const detailMode = getCardDetailMode(mainCat);
+
+  if (detailMode === "color") {
     warnaModalLabel.value = "Warna";
     return COLOR_TYPES.value.map((type) => ({
       key: type,
-      label: COLOR_LABELS.value[type],
+      label: COLOR_LABELS.value[type] || type,
       value: toInt(hasDetail ? breakdownNode.details[type] : isToday ? liveDetails[type] : 0),
       editable,
     }));
   }
 
-  if (JEWELRY_TYPED_CATEGORIES.includes(mainCat)) {
+  if (detailMode === "hala") {
     warnaModalLabel.value = "Jenis";
     return HALA_TYPES.value.map((type) => ({
       key: type,
-      label: HALA_LABELS.value[type],
+      label: HALA_LABELS.value[type] || type,
       value: toInt(hasDetail ? breakdownNode.details[type] : isToday ? liveDetails[type] : 0),
       editable,
     }));
@@ -594,11 +654,8 @@ async function saveWarnaEdit() {
   savingWarna.value = true;
   try {
     const payload = { total: 0 };
-    if (
-      activeMainCat.value === "KALUNG" ||
-      activeMainCat.value === "LIONTIN" ||
-      JEWELRY_TYPED_CATEGORIES.includes(activeMainCat.value)
-    ) {
+    const detailMode = getCardDetailMode(activeMainCat.value);
+    if (detailMode === "color" || detailMode === "hala") {
       const details = {};
       let sum = 0;
       warnaRows.value.forEach((row) => {
@@ -614,7 +671,7 @@ async function saveWarnaEdit() {
 
     reportData.value.breakdown[activeMainCat.value][activeDetailCat.value] = payload;
 
-    const newMainTotal = SUMMARY_CATEGORIES.reduce((sum, catKey) => {
+    const newMainTotal = SUMMARY_CATEGORIES.value.reduce((sum, catKey) => {
       return sum + toInt(reportData.value.breakdown[activeMainCat.value][catKey]?.total);
     }, 0);
 
@@ -719,6 +776,10 @@ function normalizeExportCategoriesFromCards(cards = []) {
 }
 
 async function resolveExportCategories() {
+  if (dynamicSettings.value) {
+    const fromSettings = normalizeExportCategoriesFromCards(dynamicSettings.value.cards || []);
+    if (fromSettings.length) return fromSettings;
+  }
   try {
     const settings = await fetchInventorySettings(activeFloor.value);
     const fromSettings = normalizeExportCategoriesFromCards(settings?.cards || []);
@@ -748,7 +809,7 @@ async function fetchLogsWithFallback(startDate, endDate) {
 }
 
 function groupLogsByMainCategory(logDocs, categories = MAIN_CATEGORIES) {
-  const locations = [...SUMMARY_CATEGORIES];
+  const locations = [...SUMMARY_CATEGORIES.value];
   const categorySet = new Set(categories);
   const grouped = {};
   categories.forEach((cat) => {
@@ -853,7 +914,7 @@ function buildReportLookup(reports = [], categoryIds = []) {
       const item = rep?.items?.[cat] || {};
       const breakdown = rep?.breakdown?.[cat] || {};
       const breakdownTotals = {};
-      SUMMARY_CATEGORIES.forEach((catKey) => {
+      SUMMARY_CATEGORIES.value.forEach((catKey) => {
         breakdownTotals[catKey] = toInt(breakdown?.[catKey]?.total);
       });
       lookup.set(`${cat}::${dateKey}`, {
@@ -889,7 +950,7 @@ function buildCategoryRowsForExport(mainCat, groupedRows = [], reportDates = [],
     const base = { Tanggal: dateKey };
     const reportMeta = reportLookup.get(`${mainCat}::${dateKey}`) || {};
 
-    SUMMARY_CATEGORIES.forEach((catKey) => {
+    SUMMARY_CATEGORIES.value.forEach((catKey) => {
       const reportValue = toInt(reportMeta?.breakdownTotals?.[catKey]);
       base[catKey] = reportMeta?.hasReport ? reportValue : toInt(byDate.get(dateKey)?.[catKey]);
       base[`${catKey}_ket`] = safeCellText(byDate.get(dateKey)?.[`${catKey}_ket`] || "");
@@ -897,7 +958,7 @@ function buildCategoryRowsForExport(mainCat, groupedRows = [], reportDates = [],
 
     base.TOTAL = reportMeta?.hasReport
       ? toInt(reportMeta.total)
-      : SUMMARY_CATEGORIES.reduce((sum, catKey) => sum + toInt(base[catKey]), 0);
+      : SUMMARY_CATEGORIES.value.reduce((sum, catKey) => sum + toInt(base[catKey]), 0);
     base.KOMPUTER = reportMeta?.hasReport ? toInt(reportMeta.komputer) : "";
     base.STATUS = reportMeta?.hasReport ? reportMeta.status || "-" : "-";
     return base;
@@ -997,7 +1058,7 @@ async function handleExportDetailBulanan() {
 
     const summaryHeaders = [
       "Tanggal",
-      ...SUMMARY_CATEGORIES.map((key) => REVERSE_CATEGORY_MAPPING[key] || key),
+      ...SUMMARY_CATEGORIES.value.map((key) => REVERSE_CATEGORY_MAPPING.value[key] || key),
       "TOTAL",
       "Komputer",
       "Status",
@@ -1014,11 +1075,11 @@ async function handleExportDetailBulanan() {
       summaryWs.addRow(summaryHeaders);
       reports.forEach((rep) => {
         const b = rep.breakdown?.[mainCat] || {};
-        const total = SUMMARY_CATEGORIES.reduce((sum, key) => sum + toInt(b[key]?.total), 0);
+        const total = SUMMARY_CATEGORIES.value.reduce((sum, key) => sum + toInt(b[key]?.total), 0);
         const item = rep.items?.[mainCat] || {};
         const row = [
           rep.date,
-          ...SUMMARY_CATEGORIES.map((key) => toInt(b[key]?.total)),
+          ...SUMMARY_CATEGORIES.value.map((key) => toInt(b[key]?.total)),
           total,
           toInt(item.komputer),
           item.status || "-",
@@ -1034,7 +1095,7 @@ async function handleExportDetailBulanan() {
 
     const logHeaders = [
       "Tanggal",
-      ...SUMMARY_CATEGORIES.flatMap((cat) => [REVERSE_CATEGORY_MAPPING[cat], `${REVERSE_CATEGORY_MAPPING[cat]} Ket`]),
+      ...SUMMARY_CATEGORIES.value.flatMap((cat) => [REVERSE_CATEGORY_MAPPING.value[cat], `${REVERSE_CATEGORY_MAPPING.value[cat]} Ket`]),
       "TOTAL",
       "Komputer",
       "Status",
@@ -1058,7 +1119,7 @@ async function handleExportDetailBulanan() {
         rows.forEach((row) => {
           wsCat.addRow([
             row.Tanggal,
-            ...SUMMARY_CATEGORIES.flatMap((cat) => [toInt(row[cat]), safeCellText(row[`${cat}_ket`] || "")]),
+            ...SUMMARY_CATEGORIES.value.flatMap((cat) => [toInt(row[cat]), safeCellText(row[`${cat}_ket`] || "")]),
             toInt(row.TOTAL),
             row.KOMPUTER === "" ? "" : toInt(row.KOMPUTER),
             row.STATUS || "-",
@@ -1068,7 +1129,7 @@ async function handleExportDetailBulanan() {
 
       wsCat.getColumn(1).width = 14;
       let colCursor = 2;
-      SUMMARY_CATEGORIES.forEach((catKey) => {
+      SUMMARY_CATEGORIES.value.forEach((catKey) => {
         wsCat.getColumn(colCursor).width = 12;
         wsCat.getColumn(colCursor + 1).width = 36;
 
@@ -1084,7 +1145,7 @@ async function handleExportDetailBulanan() {
         colCursor += 2;
       });
 
-      const totalCol = 2 + SUMMARY_CATEGORIES.length * 2;
+      const totalCol = 2 + SUMMARY_CATEGORIES.value.length * 2;
       const komputerCol = totalCol + 1;
       const statusCol = totalCol + 2;
 
@@ -1122,24 +1183,17 @@ async function handleExportDetailBulanan() {
 async function loadDynamicSettings() {
   try {
     const settings = await fetchInventorySettings(activeFloor.value);
-    if (settings) {
-      if (Array.isArray(settings.colorTypes) && settings.colorTypes.length) {
-        COLOR_TYPES.value = settings.colorTypes.map(c => c.key);
-        const labels = {};
-        settings.colorTypes.forEach(c => { labels[c.key] = c.label; });
-        COLOR_LABELS.value = labels;
-      }
-      if (Array.isArray(settings.halaTypes) && settings.halaTypes.length) {
-        HALA_TYPES.value = settings.halaTypes.map(h => h.key);
-        const labels = {};
-        settings.halaTypes.forEach(h => { labels[h.key] = h.label; });
-        HALA_LABELS.value = labels;
-      }
-    }
+    dynamicSettings.value = settings;
   } catch (e) {
     console.error("Gagal load dynamic settings di laporan harian:", e);
   }
 }
+
+watch(activeFloor, async () => {
+  await loadDynamicSettings();
+  await getStockSnapshot({ force: true });
+  await loadReport();
+});
 
 onMounted(async () => {
   detailJenisModalInstance = new Modal(detailJenisModalEl.value);

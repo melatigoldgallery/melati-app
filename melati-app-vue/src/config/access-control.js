@@ -111,7 +111,7 @@ export const PAGE_ACCESS_SECTIONS = [
       },
       {
         key: "admin.inventory-manajemen-stok",
-        label: "Setting Manajemen Stok",
+        label: "Setting Inventory",
         route: "/pengaturan/manajemen-stok",
       },
       {

@@ -178,7 +178,7 @@ export const menuStructure = [
         roles: ALL,
       },
       {
-        label: "Setting Manajemen Stok",
+        label: "Setting Inventory",
         to: "/pengaturan/manajemen-stok",
         pageKey: "admin.inventory-manajemen-stok",
         roles: ALL,

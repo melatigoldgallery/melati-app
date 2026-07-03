@@ -99,19 +99,18 @@ export const TYPED_CATS = ["KALUNG", "LIONTIN"];
 /** Categories that use jewelry type sub-types (HALA, KENDARI) */
 export const HALA_CATS = ["HALA & SDW", "KENDARI & EMAS BALI"];
 export const KETERANGAN_OPTS = [
-  "restok",
-  "laku",
-  "dipajang",
-  "sudah posting",
-  "tutup toko",
-  "mutasi staff",
-  "barang rusak",
-  "batu lepas",
-  "kode bermasalah",
-  "mutasi",
-  "diperbaiki",
-  "salah update",
-  "custom",
+  "Restok",
+  "Laku",
+  "Dipajang",
+  "Sudah Posting",
+  "Wishlist Customer",
+  "Barang Rusak",
+  "Batu Lepas",
+  "Kode Bermasalah",
+  "Mutasi",
+  "Diperbaiki",
+  "Salah Update",
+  "Contoh Custom",
 ];
 
 const ALL_SUB_DOCS = [

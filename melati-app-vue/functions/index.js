@@ -825,6 +825,121 @@ function computeDailyStockReportsFromStockData(stockData = [], snapshotDateYmd =
   };
 }
 
+async function generateGoldDailyReport(floorId, dateYmd) {
+  const dbFloorRef = db.collection("floors").doc(floorId);
+  const stocksSnap = await dbFloorRef.collection("stocks").get();
+
+  const stockData = {};
+  stocksSnap.forEach((doc) => {
+    stockData[doc.id] = doc.data() || {};
+  });
+
+  const mainCategories = [
+    "KALUNG",
+    "LIONTIN",
+    "ANTING",
+    "CINCIN",
+    "HALA & SDW",
+    "GELANG",
+    "GIWANG",
+    "KENDARI & EMAS BALI",
+    "BERLIAN",
+  ];
+
+  const subCategories = [
+    "brankas",
+    "posting",
+    "barang-display",
+    "barang-rusak",
+    "batu-lepas",
+    "manual",
+    "admin",
+    "DP",
+    "lainnya",
+  ];
+
+  const subLabelMap = {
+    brankas: "Stok Brankas",
+    posting: "Belum Posting",
+    "barang-display": "Display",
+    "barang-rusak": "Rusak",
+    "batu-lepas": "Batu Lepas",
+    manual: "Manual",
+    admin: "Admin",
+    DP: "DP",
+    lainnya: "Lainnya",
+  };
+
+  const items = {};
+  const breakdown = {};
+
+  const settingsSnap = await dbFloorRef.collection("settings").doc("inventoryManajemen").get();
+  const settings = settingsSnap.exists ? settingsSnap.data() : null;
+
+  const getCardDetailMode = (id) => {
+    const card = settings?.cards?.find((c) => c.id === id);
+    if (card) {
+      const mode = String(card.detailMode || "").trim().toLowerCase();
+      if (mode === "color" || mode === "hala" || mode === "default") return mode;
+      if (card.type === "color") return "color";
+      if (card.type === "hala") return "hala";
+      return "default";
+    }
+    // Fallback
+    if (["KALUNG", "LIONTIN"].includes(id)) return "color";
+    if (["HALA & SDW", "KENDARI & EMAS BALI"].includes(id)) return "hala";
+    return "default";
+  };
+
+  mainCategories.forEach((mainCat) => {
+    const detailMode = getCardDetailMode(mainCat);
+    const useDetails = detailMode === "color" || detailMode === "hala";
+
+    let fisik = 0;
+    breakdown[mainCat] = {};
+
+    subCategories.forEach((subKey) => {
+      const item = stockData[subKey]?.[mainCat] || {};
+      const qty = parseInt(item.quantity, 10) || 0;
+      const details = item.details || null;
+
+      let subTotal = 0;
+      if (useDetails && details && Object.keys(details).length > 0) {
+        subTotal = Object.values(details).reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+      } else {
+        subTotal = qty;
+      }
+
+      fisik += subTotal;
+      breakdown[mainCat][subLabelMap[subKey] || subKey] = {
+        quantity: qty,
+        details: details,
+      };
+    });
+
+    const komputer = parseInt(stockData["stok-komputer"]?.[mainCat]?.quantity, 10) || 0;
+
+    let status = "Klop";
+    if (fisik < komputer) status = `Kurang ${komputer - fisik}`;
+    else if (fisik > komputer) status = `Lebih ${fisik - komputer}`;
+
+    items[mainCat] = { total: fisik, komputer, status };
+  });
+
+  const dateParts = dateYmd.split("-");
+  const dateKey = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`; // DD/MM/YYYY
+
+  return {
+    date: dateYmd,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    items,
+    breakdown,
+    createdBy: "cloud-function-scheduler",
+    version: "2.0",
+    snapshotDateKey: dateKey,
+  };
+}
+
 async function ensureSnapshotByDateYmdForScope({
   triggerSource = "manual-callable",
   scope = "global",
@@ -899,14 +1014,19 @@ async function ensureSnapshotByDateYmdForScope({
     const dailyReportsRef = scopeConfig.dailyReportsRef.doc(dateYmd);
     const dailyReportSnap = await dailyReportsRef.get();
     if (!dailyReportSnap.exists) {
-      await dailyReportsRef.set({
-        ...computeDailyStockReportsFromStockData(stockData, dateYmd),
-        snapshotDateKey: dateKey,
-        source: "snapshot-bridge",
-        triggerSource,
-        scopeKey: scopeConfig.scopeKey,
-        floorId: scopeConfig.floorId,
-      });
+      if (scope === "floor") {
+        const reportData = await generateGoldDailyReport(floorId, dateYmd);
+        await dailyReportsRef.set(reportData);
+      } else {
+        await dailyReportsRef.set({
+          ...computeDailyStockReportsFromStockData(stockData, dateYmd),
+          snapshotDateKey: dateKey,
+          source: "snapshot-bridge",
+          triggerSource,
+          scopeKey: scopeConfig.scopeKey,
+          floorId: scopeConfig.floorId,
+        });
+      }
     }
 
     logger.info("Daily snapshot created", {
@@ -1008,19 +1128,7 @@ export const scheduledCreateDailySnapshot = onSchedule(
   },
 );
 
-// Self-healing scheduler: ensures yesterday snapshot is recreated automatically
-// if it is missing (e.g., manually deleted) even when there are no transactions.
-export const periodicEnsureYesterdaySnapshot = onSchedule(
-  {
-    schedule: "5 * * * *",
-    timeZone: "Asia/Makassar",
-    region: "asia-southeast2",
-    memory: "256MiB",
-  },
-  async () => {
-    await ensureSnapshotsForAllScopes("periodic-scheduler");
-  },
-);
+// periodicEnsureYesterdaySnapshot scheduler removed to optimize Firestore resource usage.
 
 // Deactivated global snapshot trigger since system is fully floor-based
 // export const ensureYesterdaySnapshotOnFirstTxGlobal = onDocumentWritten(
@@ -2086,6 +2194,13 @@ export const deleteSingleBarcode = onCall(
 
     const dbFloorRef = db.collection("floors").doc(floorId);
     const barcodeRef = dbFloorRef.collection("barcodes").doc(barcodeId.trim().toUpperCase());
+    const historyRef = dbFloorRef.collection("barcodesHistory").doc(barcodeId.trim().toUpperCase());
+
+    const cleanBarcodeId = barcodeId.trim().toUpperCase();
+    const qSingle = dbFloorRef.collection("barcodeMutationLogs").where("barcode", "==", cleanBarcodeId);
+    const qBulk = dbFloorRef.collection("barcodeMutationLogs").where("barcodeIds", "array-contains", cleanBarcodeId);
+
+    const [snapSingle, snapBulk] = await Promise.all([qSingle.get(), qBulk.get()]);
 
     await db.runTransaction(async (t) => {
       const snap = await t.get(barcodeRef);
@@ -2142,6 +2257,37 @@ export const deleteSingleBarcode = onCall(
       // Perform writes
       t.set(stockRef, updatedStockData, { merge: true });
       t.delete(barcodeRef);
+      t.delete(historyRef);
+
+      // Clean up single mutation logs
+      snapSingle.docs.forEach((doc) => {
+        t.delete(doc.ref);
+      });
+
+      // Clean up bulk mutation logs
+      snapBulk.docs.forEach((doc) => {
+        const data = doc.data() || {};
+        const barcodeIds = Array.isArray(data.barcodeIds) ? data.barcodeIds.filter(id => id !== cleanBarcodeId) : [];
+        const barcodes = Array.isArray(data.barcodes) ? data.barcodes.filter(b => b.barcode !== cleanBarcodeId) : [];
+
+        if (barcodeIds.length === 0) {
+          t.delete(doc.ref);
+        } else {
+          const updateData = {
+            barcodeIds,
+            barcodes,
+          };
+          if (barcodeIds.length === 1) {
+            updateData.barcode = barcodes[0].barcode;
+            updateData.category = barcodes[0].category;
+            updateData.detailType = barcodes[0].detailType || null;
+            updateData.origin = barcodes[0].origin;
+          } else {
+            updateData.barcode = `GABUNGAN (${barcodeIds.length} BARANG)`;
+          }
+          t.update(doc.ref, updateData);
+        }
+      });
 
       // Write to dailyStockLogs
       const dateStr = formatYmd(toWitaParts(new Date()));

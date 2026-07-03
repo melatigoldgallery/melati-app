@@ -652,12 +652,15 @@
               </div>
               <div class="mb-2">
                 <label class="form-label small fw-bold text-secondary">Catatan / Keterangan</label>
-                <input
+                <select
                   v-model="barcodeForm.keterangan"
-                  type="text"
-                  class="form-control form-control-sm border-2 rounded-2"
-                  placeholder="Tulis catatan jika diperlukan..."
-                />
+                  class="form-select form-select-sm border-2 rounded-2"
+                >
+                  <option value="">-- Pilih Keterangan --</option>
+                  <option v-for="opt in KETERANGAN_OPTS" :key="`ket-opt-${opt}`" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
               </div>
               <div v-if="barcodeStatus" class="alert alert-info py-2 px-3 mt-3 small border-0 rounded-2 d-flex align-items-center gap-2">
                 <div class="spinner-border spinner-border-sm text-info" role="status" v-if="saving"></div>
@@ -2421,8 +2424,16 @@ function scheduleNextDailySnapshot() {
 }
 
 async function initDailySnapshots() {
+  const now = getNowWita();
+  const todayKey = formatDateKey(now);
+  const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
+
+  if (sessionStorage.getItem(cacheKey) === "true") {
+    scheduleNextDailySnapshot();
+    return;
+  }
+
   try {
-    const now = getNowWita();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const yesterdayKey = formatDateKey(yesterday);
     const yReport = await fetchDailyReport(yesterdayKey, auth.activeFloor);
@@ -2430,7 +2441,6 @@ async function initDailySnapshots() {
       await saveDailyReport(yesterdayKey, stockData.value, auth.activeFloor);
     }
 
-    const todayKey = formatDateKey(now);
     const today005 = new Date(now);
     today005.setHours(0, 5, 0, 0);
     if (now >= today005) {
@@ -2439,6 +2449,7 @@ async function initDailySnapshots() {
         await saveDailyReport(todayKey, stockData.value, auth.activeFloor);
       }
     }
+    sessionStorage.setItem(cacheKey, "true");
   } catch {
     // ignore bootstrap snapshot errors
   } finally {
@@ -2454,7 +2465,25 @@ onMounted(async () => {
   await syncFloorScopedState();
   window.addEventListener("storage", handleStorageSync);
   window.addEventListener("melati-stock-reload", handleStockReload);
-  await initDailySnapshots();
+
+  const now = getNowWita();
+  const todayKey = formatDateKey(now);
+  const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
+
+  if (sessionStorage.getItem(cacheKey) === "true") {
+    scheduleNextDailySnapshot();
+  } else {
+    const unwatch = watch(
+      stockData,
+      (newData) => {
+        if (newData && Object.keys(newData).length > 0) {
+          initDailySnapshots();
+          unwatch();
+        }
+      },
+      { immediate: true }
+    );
+  }
 });
 
 watch(
