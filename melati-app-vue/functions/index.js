@@ -1591,6 +1591,8 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     let oldCategory = null;
     let oldDetailType = null;
     
+    const parsed = parseBarcodeCategoryAndType(id);
+    
     if (snap.exists) {
       exists = true;
       const data = snap.data();
@@ -1598,15 +1600,14 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       oldDetailType = data.detailType;
       resolvedOrigin = data.location || destination;
       
-      category = allowCategoryOverride ? (inputCategory || defaultCategory || data.category) : data.category;
-      detailType = allowCategoryOverride ? (inputDetailType || defaultDetailType || data.detailType) : data.detailType;
+      category = allowCategoryOverride ? (inputCategory || defaultCategory || data.category) : (data.category || defaultCategory || parsed.mainCat);
+      detailType = allowCategoryOverride ? (inputDetailType || defaultDetailType || data.detailType) : (data.detailType || defaultDetailType || parsed.subType);
       
       if (data.in_mutasi) {
         throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (sudah laku/mutasi).`);
       }
     } else {
       exists = false;
-      const parsed = parseBarcodeCategoryAndType(id);
       category = inputCategory || defaultCategory || parsed.mainCat;
       detailType = inputDetailType || defaultDetailType || parsed.subType;
       resolvedOrigin = destination; // Base registration
@@ -2305,6 +2306,230 @@ export const deleteSingleBarcode = onCall(
           userName: "Supervisor",
           keterangan: `Hapus Barcode Satuan: ${barcodeId}`
         })
+      }, { merge: true });
+    });
+
+    return { success: true };
+  }
+);
+
+export const revertSingleBarcode = onCall(
+  { region: "asia-southeast2", memory: "256MiB", cors: true },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["supervisor", "admin"].includes(role)) {
+      throw new HttpsError("permission-denied", "Akses ditolak. Fitur ini hanya dapat dijalankan oleh Supervisor atau Admin.");
+    }
+
+    const { barcodeId, floorId = "L1" } = request.data || {};
+    if (!barcodeId) {
+      throw new HttpsError("invalid-argument", "barcodeId wajib diisi.");
+    }
+
+    const cleanBarcodeId = barcodeId.trim().toUpperCase();
+    const dbFloorRef = db.collection("floors").doc(floorId);
+    
+    // Ambil info barcode saat ini terlebih dahulu
+    const barcodeRef = dbFloorRef.collection("barcodes").doc(cleanBarcodeId);
+    const snapBarcode = await barcodeRef.get();
+    if (!snapBarcode.exists) {
+      throw new HttpsError("not-found", "Barcode tidak ditemukan.");
+    }
+    const barcodeData = snapBarcode.data();
+    const currentLoc = barcodeData.location;
+    const cat = barcodeData.category;
+    const detailType = barcodeData.detailType || null;
+
+    // Ambil log mutasi terbaru yang meletakkan barcode di lokasi saat ini
+    const qSingle = dbFloorRef.collection("barcodeMutationLogs").where("barcode", "==", cleanBarcodeId).where("destination", "==", currentLoc);
+    const qBulk = dbFloorRef.collection("barcodeMutationLogs").where("barcodeIds", "array-contains", cleanBarcodeId).where("destination", "==", currentLoc);
+    const [snapSingle, snapBulk] = await Promise.all([qSingle.get(), qBulk.get()]);
+
+    const allLogs = [];
+    snapSingle.docs.forEach(d => allLogs.push({ ref: d.ref, data: d.data() }));
+    snapBulk.docs.forEach(d => {
+      if (!allLogs.some(l => l.ref.id === d.id)) {
+        allLogs.push({ ref: d.ref, data: d.data() });
+      }
+    });
+
+    // Urutkan berdasarkan waktu mutasi terbaru
+    allLogs.sort((a, b) => {
+      const aTime = a.data.timestamp ? a.data.timestamp.toMillis() : 0;
+      const bTime = b.data.timestamp ? b.data.timestamp.toMillis() : 0;
+      return bTime - aTime;
+    });
+
+    let latestLog = allLogs[0] || null;
+    let foundOrigin = null;
+    if (latestLog) {
+      const bcEntry = Array.isArray(latestLog.data.barcodes) ? latestLog.data.barcodes.find(b => b.barcode === cleanBarcodeId) : null;
+      foundOrigin = bcEntry ? bcEntry.origin : (latestLog.data.origin || null);
+    }
+
+    const isRevert = foundOrigin && foundOrigin !== currentLoc;
+    const petugasName = role === "admin" ? "Admin" : "Supervisor";
+
+    await db.runTransaction(async (t) => {
+      // 1. Ambil semua data stok yang diperlukan di awal transaksi (Reads)
+      const currentStockRef = dbFloorRef.collection("stocks").doc(currentLoc);
+      const originStockRef = isRevert ? dbFloorRef.collection("stocks").doc(foundOrigin) : null;
+      
+      const reads = [t.get(currentStockRef)];
+      if (originStockRef) {
+        reads.push(t.get(originStockRef));
+      }
+      const snaps = await Promise.all(reads);
+      const currentStockSnap = snaps[0];
+      const originStockSnap = isRevert ? snaps[1] : null;
+
+      const currentStockData = currentStockSnap.exists ? currentStockSnap.data() : {};
+      const originStockData = (originStockSnap && originStockSnap.exists) ? originStockSnap.data() : {};
+
+      // 2. Lakukan perhitungan perubahan stok
+      // Selalu kurangi stok lokasi saat ini (-1)
+      const currentCatData = currentStockData[cat] || { quantity: 0, history: [] };
+      const currentQty = parseInt(currentCatData.quantity, 10) || 0;
+      const newCurrentQty = Math.max(0, currentQty - 1);
+      
+      const updatedCurrentCat = {
+        quantity: newCurrentQty,
+        lastUpdated: new Date().toISOString(),
+        history: Array.isArray(currentCatData.history) ? [...currentCatData.history] : []
+      };
+      
+      updatedCurrentCat.history.unshift({
+        date: new Date().toISOString(),
+        action: "Kurangi",
+        quantity: 1,
+        oldQuantity: currentQty,
+        newQuantity: newCurrentQty,
+        petugas: petugasName,
+        keterangan: isRevert 
+          ? `Pembatalan Mutasi Barcode ${cleanBarcodeId} kembali ke ${foundOrigin}`
+          : `Hapus Barcode Satuan (Batalkan): ${cleanBarcodeId}`
+      });
+      if (updatedCurrentCat.history.length > 10) updatedCurrentCat.history = updatedCurrentCat.history.slice(0, 10);
+      
+      if (detailType) {
+        const details = currentCatData.details || {};
+        const typeQty = parseInt(details[detailType], 10) || 0;
+        updatedCurrentCat.details = { ...details, [detailType]: Math.max(0, typeQty - 1) };
+      }
+
+      let originQty = 0;
+      let newOriginQty = 0;
+      let updatedOriginCat = null;
+
+      if (isRevert) {
+        // Tambahkan stok lokasi asal (+1)
+        const originCatData = originStockData[cat] || { quantity: 0, history: [] };
+        originQty = parseInt(originCatData.quantity, 10) || 0;
+        newOriginQty = originQty + 1;
+        
+        updatedOriginCat = {
+          quantity: newOriginQty,
+          lastUpdated: new Date().toISOString(),
+          history: Array.isArray(originCatData.history) ? [...originCatData.history] : []
+        };
+        
+        updatedOriginCat.history.unshift({
+          date: new Date().toISOString(),
+          action: "Tambah",
+          quantity: 1,
+          oldQuantity: originQty,
+          newQuantity: newOriginQty,
+          petugas: petugasName,
+          keterangan: `Pembatalan Mutasi Barcode ${cleanBarcodeId} kembali dari ${currentLoc}`
+        });
+        if (updatedOriginCat.history.length > 10) updatedOriginCat.history = updatedOriginCat.history.slice(0, 10);
+        
+        if (detailType) {
+          const details = originCatData.details || {};
+          const typeQty = parseInt(details[detailType], 10) || 0;
+          updatedOriginCat.details = { ...details, [detailType]: typeQty + 1 };
+        }
+      }
+
+      // 3. Eksekusi semua penulisan database (Writes)
+      // Update stok saat ini
+      t.set(currentStockRef, { ...currentStockData, [cat]: updatedCurrentCat }, { merge: true });
+
+      if (isRevert) {
+        // Update stok lokasi asal
+        t.set(originStockRef, { ...originStockData, [cat]: updatedOriginCat }, { merge: true });
+
+        // Kembalikan lokasi barcode ke origin
+        t.set(barcodeRef, {
+          location: foundOrigin,
+          in_display: foundOrigin === "barang-display",
+          in_mutasi: ["mutasi", "laku"].includes(foundOrigin),
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else {
+        // Hapus dokumen barcode dari active list & history (jika ada)
+        t.delete(barcodeRef);
+        t.delete(dbFloorRef.collection("barcodesHistory").doc(cleanBarcodeId));
+      }
+
+      // Bersihkan dokumen log mutasi lama
+      if (latestLog) {
+        const logData = latestLog.data;
+        const barcodeIds = Array.isArray(logData.barcodeIds) ? logData.barcodeIds.filter(id => id !== cleanBarcodeId) : [];
+        const barcodes = Array.isArray(logData.barcodes) ? logData.barcodes.filter(b => b.barcode !== cleanBarcodeId) : [];
+
+        if (barcodeIds.length === 0) {
+          t.delete(latestLog.ref);
+        } else {
+          const updateData = { barcodeIds, barcodes };
+          if (barcodeIds.length === 1) {
+            updateData.barcode = barcodes[0].barcode;
+            updateData.category = barcodes[0].category;
+            updateData.detailType = barcodes[0].detailType || null;
+            updateData.origin = barcodes[0].origin;
+          } else {
+            updateData.barcode = `GABUNGAN (${barcodeIds.length} BARANG)`;
+          }
+          t.update(latestLog.ref, updateData);
+        }
+      }
+
+      // Catat logs harian (dailyStockLogs)
+      const dateStr = formatYmd(toWitaParts(new Date()));
+      const dailyLogRef = dbFloorRef.collection("dailyStockLogs").doc(dateStr);
+      const dailyLogs = [
+        {
+          timestamp: admin.firestore.Timestamp.now(),
+          jenis: cat,
+          lokasi: currentLoc,
+          action: "kurangi",
+          before: currentQty,
+          after: newCurrentQty,
+          quantity: 1,
+          userName: petugasName,
+          keterangan: isRevert 
+            ? `Pembatalan Mutasi Barcode: ${cleanBarcodeId}`
+            : `Hapus Barcode Satuan (Batalkan): ${cleanBarcodeId}`
+        }
+      ];
+
+      if (isRevert) {
+        dailyLogs.push({
+          timestamp: admin.firestore.Timestamp.now(),
+          jenis: cat,
+          lokasi: foundOrigin,
+          action: "tambah",
+          before: originQty,
+          after: newOriginQty,
+          quantity: 1,
+          userName: petugasName,
+          keterangan: `Pembatalan Mutasi Barcode: ${cleanBarcodeId}`
+        });
+      }
+
+      t.set(dailyLogRef, {
+        date: dateStr,
+        logs: admin.firestore.FieldValue.arrayUnion(...dailyLogs)
       }, { merge: true });
     });
 

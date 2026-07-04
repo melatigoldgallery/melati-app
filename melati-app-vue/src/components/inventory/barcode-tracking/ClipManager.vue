@@ -172,8 +172,14 @@
                   placeholder="Paste list barcode di sini (pisahkan dengan spasi, enter, koma atau titik koma)..."
                   :disabled="saving"
                 ></textarea>
-                <div class="form-text text-muted small">
-                  Setiap barcode yang ditambahkan akan otomatis terdaftar/masuk ke kategori <strong>"Belum Posting"</strong> di sistem.
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                  <div class="form-text text-muted small mb-0">
+                    Setiap barcode yang ditambahkan akan otomatis terdaftar/masuk ke kategori <strong>"Belum Posting"</strong> di sistem.
+                  </div>
+                  <span v-if="barcodeInputCount > 0" class="badge bg-primary rounded-pill px-3 py-1.5 shadow-sm">
+                    <i class="bi bi-qr-code me-1"></i>
+                    {{ barcodeInputCount }} Barcode
+                  </span>
                 </div>
               </div>
               <div class="d-flex justify-content-end">
@@ -425,6 +431,9 @@ const activeCategoryFilter = ref("");
 
 // Barcode input and statuses
 const barcodeTextInput = ref("");
+const barcodeInputCount = computed(() => {
+  return parseBarcodes(barcodeTextInput.value).length;
+});
 const checkingStatus = ref(false);
 const barcodeStatuses = ref({}); // barcode -> { exists, location, category, detailType }
 
@@ -498,6 +507,32 @@ watch(() => selectedClip.value?.barcodes, (newBarcodes) => {
     triggerBarcodeVerification(newBarcodes);
   }
 }, { deep: true });
+
+// Watch for manual barcode input to count and detect duplicates
+let checkDuplicateTimeout = null;
+watch(barcodeTextInput, (newVal) => {
+  if (checkDuplicateTimeout) clearTimeout(checkDuplicateTimeout);
+  const parsed = parseBarcodes(newVal);
+  if (parsed.length === 0) return;
+
+  checkDuplicateTimeout = setTimeout(() => {
+    const seen = new Set();
+    const duplicates = [];
+    parsed.forEach((bc) => {
+      if (seen.has(bc)) {
+        duplicates.push(bc);
+      } else {
+        seen.add(bc);
+      }
+    });
+
+    if (duplicates.length > 0) {
+      toast(`Barcode ${duplicates[0]} sudah discan!`, "warning");
+      const uniqueParsed = [...seen];
+      barcodeTextInput.value = uniqueParsed.join("\n");
+    }
+  }, 600);
+});
 
 // dynamic prefixes helper
 function getPrefix(cardId) {

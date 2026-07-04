@@ -96,6 +96,12 @@ export async function deleteSingleBarcode({ barcodeId, floorId }) {
   return res.data;
 }
 
+export async function revertSingleBarcode({ barcodeId, floorId }) {
+  const callable = httpsCallable(functions, "revertSingleBarcode");
+  const res = await callable({ barcodeId, floorId });
+  return res.data;
+}
+
 export async function revertMutationLog({ logId, floorId }) {
   const callable = httpsCallable(functions, "revertMutationLog");
   const res = await callable({ logId, floorId });

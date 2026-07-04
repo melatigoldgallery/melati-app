@@ -202,12 +202,12 @@
                     <div class="min-w-0 text-start">
                       <h6 class="fw-bold mb-1 text-white">Tujuan Utama: Hitung Barang Lebih Efisien!</h6>
                       <p class="mb-0 text-white small text-wrap">
-                        Mempercepat proses hitung barang saat tutup toko. Dari estimasi awal <strong>1 jam</strong>, harapannya bisa selesai <strong>jauh lebih cepat</strong>.
+                        Mempercepat proses hitung barang saat tutup toko. Dari estimasi awal <strong>1 jam</strong>, harapannya bisa selesai <strong> lebih cepat</strong>.
                       </p> 
                     </div>
                   </div>
                   <div class="badge bg-white text-primary px-3 py-2 rounded-pill fw-bold shadow-sm flex-shrink-0 align-self-center">
-                    Target: 45 Menit Proses Hitung Selesai ⏱️
+                    45 Menit Proses Hitung Selesai ⏱️
                   </div>
                 </div>
               </div>
@@ -334,7 +334,7 @@
                 Tolong Kerja Sama & Keterlibatannya 🔥
               </h6>
               <p class="small mb-0 text-primary-emphasis">
-                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien, akurat, dan kita semua bisa <strong>pulang tepat waktu!</strong> 🚀
+                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien dan akurat 🚀
               </p>
             </div>
           </div>
@@ -922,7 +922,7 @@
                           <th class="ps-3 text-secondary fw-semibold small" style="width: 70px;">No</th>
                           <th class="text-secondary fw-semibold small">Barcode</th>
                           <th class="text-secondary fw-semibold small">Terakhir Update</th>
-                          <th v-if="isSupervisorOnly" class="pe-3 text-end text-secondary fw-semibold small" style="width: 90px;">Aksi</th>
+                          <th v-if="isSupervisorOrAdmin" class="pe-3 text-end text-secondary fw-semibold small" style="width: 90px;">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -948,16 +948,16 @@
                               {{ formatDate(b.lastUpdated) }}
                             </span>
                           </td>
-                          <td v-if="isSupervisorOnly" class="pe-3 text-end">
+                          <td v-if="isSupervisorOrAdmin" class="pe-3 text-end">
                             <button
                               type="button"
                               class="btn btn-outline-danger btn-xs px-2 py-0.5 rounded-pill transition-all d-inline-flex align-items-center gap-1 align-middle border-0"
-                              @click="handleDeleteBarcode(b.barcode)"
-                              :disabled="deletingBarcode === b.barcode"
+                              @click="handleRevertBarcode(b.barcode)"
+                              :disabled="revertingBarcode === b.barcode"
                             >
-                              <span v-if="deletingBarcode === b.barcode" class="spinner-border spinner-border-sm" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
-                              <i v-else class="bi bi-trash fs-7"></i>
-                              <span>Hapus</span>
+                              <span v-if="revertingBarcode === b.barcode" class="spinner-border spinner-border-sm" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
+                              <i v-else class="bi bi-arrow-counterclockwise fs-7"></i>
+                              <span>Batalkan</span>
                             </button>
                           </td>
                         </tr>
@@ -1011,7 +1011,8 @@ import {
   executeBarcodeMutation,
   submitBarcodeMoveRequest,
   checkBarcodesStatus,
-  deleteSingleBarcode
+  deleteSingleBarcode,
+  revertSingleBarcode
 } from "@/services/barcode-service";
 import {
   KETERANGAN_OPTS,
@@ -1181,7 +1182,7 @@ const hasTabs = computed(() => tabs.value.length > 0);
 const tableRows = computed(() => displaySettings.value.tableRows.filter((row) => row.enabled));
 const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
 const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
-const isSupervisorOnly = computed(() => auth.userRole?.toLowerCase() === "supervisor");
+const isSupervisorOrAdmin = computed(() => ["supervisor", "admin"].includes(auth.userRole?.toLowerCase()));
 const barcodeCount = computed(() => {
   return parseBarcodes(barcodeForm.value.barcodes).length;
 });
@@ -1803,31 +1804,31 @@ function openBarcodeRincianModal(mainCat, sub) {
   showModal("barcodeRincianModal");
 }
 
-const deletingBarcode = ref("");
-async function handleDeleteBarcode(barcodeId) {
+const revertingBarcode = ref("");
+async function handleRevertBarcode(barcodeId) {
   const result = await confirm({
-    title: "Hapus Barcode?",
-    text: `Apakah Anda yakin ingin menghapus barcode ${barcodeId} dari sistem secara permanen? Stok fisik akan disesuaikan otomatis.`,
-    icon: "warning",
+    title: "Batalkan Mutasi Barcode?",
+    text: `Mengembalikan barcode ${barcodeId} ke lokasi sebelumnya, atau menghapusnya jika belum ada lokasi sebelumnya. Lanjutkan?`,
+    icon: "question",
     showCancelButton: true,
-    confirmButtonText: "Ya, Hapus",
+    confirmButtonText: "Ya, Batalkan",
     cancelButtonText: "Batal"
   });
 
   if (!result.isConfirmed) return;
 
-  deletingBarcode.value = barcodeId;
+  revertingBarcode.value = barcodeId;
   try {
-    await deleteSingleBarcode({ barcodeId, floorId: auth.activeFloor });
-    toast(`Barcode ${barcodeId} berhasil dihapus.`);
+    await revertSingleBarcode({ barcodeId, floorId: auth.activeFloor });
+    toast(`Barcode ${barcodeId} berhasil dibatalkan/diubah.`);
     // Reload the current page of barcodes
     await loadBarcodePage(currentPage.value);
     // Reload stock summary and table data
     await loadData({ force: true });
   } catch (e) {
-    showError("Gagal menghapus barcode", e.message);
+    showError("Gagal membatalkan barcode", e.message);
   } finally {
-    deletingBarcode.value = "";
+    revertingBarcode.value = "";
   }
 }
 
