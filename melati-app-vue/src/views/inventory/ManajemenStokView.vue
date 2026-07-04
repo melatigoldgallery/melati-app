@@ -610,7 +610,13 @@
                   placeholder="Scan barcode satu-persatu atau paste list barcode di sini (pisahkan dengan spasi/enter)..."
                   required
                 ></textarea>
-                <div class="form-text text-muted small">Masukkan satu atau beberapa barcode sekaligus.</div>
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                  <div class="form-text text-muted small mb-0">Masukkan satu atau beberapa barcode sekaligus.</div>
+                  <span v-if="barcodeCount > 0" class="badge bg-primary rounded-pill px-3 py-1.5 shadow-sm">
+                    <i class="bi bi-qr-code me-1"></i>
+                    {{ barcodeCount }} Barcode
+                  </span>
+                </div>
               </div>
               <!-- Dropdown Klasifikasi Dinamis (Hanya muncul jika ada barcode BARU dan kategori butuh warna/jenis) -->
               <div v-if="currentDetailOptions.length > 0 && hasNewBarcode" class="mb-3">
@@ -1027,7 +1033,7 @@ import {
   subscribeInventorySettings,
 } from "@/services/inventory-setting-service";
 
-const { toast, error: showError, confirm } = useAlert();
+const { toast, error: showError, confirm, swal } = useAlert();
 const auth = useAuthStore();
 
 // Toggle untuk mengaktifkan antrian persetujuan mutasi (Movement Queue)
@@ -1130,6 +1136,7 @@ const barcodeForm = ref({
 const barcodeStatus = ref(null);
 const checkingBarcodes = ref(false);
 const hasNewBarcode = ref(false);
+const checkedBarcodesList = ref([]);
 
 const komputerForm = ref({
   mainCat: "",
@@ -1175,6 +1182,9 @@ const tableRows = computed(() => displaySettings.value.tableRows.filter((row) =>
 const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
 const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
 const isSupervisorOnly = computed(() => auth.userRole?.toLowerCase() === "supervisor");
+const barcodeCount = computed(() => {
+  return parseBarcodes(barcodeForm.value.barcodes).length;
+});
 const currentDetailOptions = computed(() => {
   const cat = barcodeForm.value.mainCat;
   const detailMode = getCardDetailMode(cat);
@@ -1509,14 +1519,14 @@ function applyLocalUpdate({ subDoc, mainCat, details = null, quantity = null }) 
   };
 }
 
-async function loadData({ force = false } = {}) {
-  loading.value = true;
+async function loadData({ force = false, silent = false } = {}) {
+  if (!silent) loading.value = true;
   try {
     if (!force) {
       const cacheData = readCache();
       if (cacheData) {
         stockData.value = cacheData;
-        loading.value = false;
+        if (!silent) loading.value = false;
         return;
       }
     }
@@ -1526,7 +1536,7 @@ async function loadData({ force = false } = {}) {
   } catch (e) {
     showError("Gagal memuat data stok", e.message);
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 }
 
@@ -2148,18 +2158,47 @@ watch(
     const parsed = parseBarcodes(newVal);
     if (parsed.length === 0) {
       hasNewBarcode.value = false;
+      checkedBarcodesList.value = [];
       return;
     }
 
     checkTimeout = setTimeout(async () => {
+      // 1. Deteksi duplikat di dalam input textarea (Client-side)
+      const seen = new Set();
+      const duplicates = [];
+      parsed.forEach((bc) => {
+        if (seen.has(bc)) {
+          duplicates.push(bc);
+        } else {
+          seen.add(bc);
+        }
+      });
+
+      if (duplicates.length > 0) {
+        swal(`Barcode ${duplicates[0]} sudah discan!`, "warning");
+        // Bersihkan otomatis duplikat dari textarea
+        const uniqueParsed = [...seen];
+        barcodeForm.value.barcodes = uniqueParsed.join("\n");
+        return; // Hentikan proses, biarkan watcher re-run dengan input yang bersih
+      }
+
+      // 2. Cek status database (Firestore)
       checkingBarcodes.value = true;
       try {
         const res = await checkBarcodesStatus(parsed, auth.activeFloor);
         if (res && Array.isArray(res.results)) {
-          // Jika ada minimal 1 barcode yang belum terdaftar di database
+          checkedBarcodesList.value = res.results;
           hasNewBarcode.value = res.results.some(item => !item.exists);
+
+          // 3. Deteksi jika barcode sudah ada di lokasi tujuan terpilih (Client-side menggunakan cache)
+          const dest = barcodeForm.value.destination;
+          const alreadyInDest = res.results.find(item => item.exists && item.location === dest);
+          if (alreadyInDest) {
+            swal(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(barcodeForm.value.mainCat, alreadyInDest.location)})`, "warning");
+          }
         } else {
           hasNewBarcode.value = false;
+          checkedBarcodesList.value = [];
         }
       } catch {
         hasNewBarcode.value = true; // Fallback aman
@@ -2181,6 +2220,12 @@ async function submitBarcodeUpdate() {
 
   const barcodesArray = parseBarcodes(barcodeForm.value.barcodes);
   if (barcodesArray.length === 0) return toast("Tidak ada barcode yang valid", "warning");
+
+  const dest = barcodeForm.value.destination;
+  const alreadyInDest = checkedBarcodesList.value.find(item => item.exists && item.location === dest);
+  if (alreadyInDest) {
+    return swal(`Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan`, "warning");
+  }
 
   saving.value = true;
   barcodeStatus.value = `Memproses ${barcodesArray.length} barcode...`;
@@ -2228,7 +2273,7 @@ async function submitBarcodeUpdate() {
       toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
     }
 
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("barcodeUpdateModal");
   } catch (e) {
     showError("Gagal memproses mutasi barcode", e.message);
@@ -2253,7 +2298,7 @@ async function submitSimpleUpdate() {
       keterangan: simpleForm.value.keterangan,
       floorId: auth.activeFloor,
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("simpleUpdateModal");
     toast("Stok berhasil diperbarui");
   } catch (e) {
@@ -2287,7 +2332,7 @@ async function submitTypedUpdate() {
       mainCat: typedForm.value.mainCat,
       details: { ...typedForm.value.details },
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("typedUpdateModal");
     toast(`Update ${typedForm.value.mainCat} berhasil`);
   } catch (e) {
@@ -2321,7 +2366,7 @@ async function submitHalaUpdate() {
       mainCat: halaForm.value.mainCat,
       details: { ...halaForm.value.details },
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("halaUpdateModal");
     toast(`Update ${halaForm.value.mainCat} berhasil`);
   } catch (e) {
@@ -2340,7 +2385,7 @@ async function submitKomputerUpdate() {
       newDetails: null,
       floorId: auth.activeFloor,
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("komputerUpdateModal");
     toast("Stok komputer diperbarui");
   } catch (e) {
@@ -2360,7 +2405,7 @@ async function submitKomputerColorUpdate() {
       detailType: komputerColorForm.value.detailType,
       floorId: auth.activeFloor,
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("komputerColorModal");
     toast("Stok komputer diperbarui");
   } catch (e) {

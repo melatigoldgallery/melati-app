@@ -191,6 +191,15 @@ export async function fetchAllStockData(floorId = "") {
   return result;
 }
 
+function parseTimestamp(val) {
+  if (!val) return 0;
+  if (typeof val.toDate === "function") return val.toDate().getTime();
+  if (val.seconds !== undefined) return val.seconds * 1000;
+  if (val instanceof Date) return val.getTime();
+  const parsed = Date.parse(val);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 export function mergeStockByLatest(localData = {}, incomingData = {}) {
   const merged = { ...localData };
   Object.keys(incomingData || {}).forEach((docId) => {
@@ -210,8 +219,8 @@ export function mergeStockByLatest(localData = {}, incomingData = {}) {
         return;
       }
 
-      const localTs = localNode.lastUpdated ? Date.parse(localNode.lastUpdated) : 0;
-      const incomingTs = incomingNode.lastUpdated ? Date.parse(incomingNode.lastUpdated) : 0;
+      const localTs = parseTimestamp(localNode.lastUpdated);
+      const incomingTs = parseTimestamp(incomingNode.lastUpdated);
       nextDoc[mainCat] = incomingTs >= localTs ? incomingNode : localNode;
     });
 
