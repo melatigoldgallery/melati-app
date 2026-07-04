@@ -108,7 +108,7 @@ export const KETERANGAN_OPTS = [
   "Batu Lepas",
   "Kode Bermasalah",
   "Mutasi",
-  "Diperbaiki",
+  "Keep Staff",
   "Salah Update",
   "Contoh Custom",
 ];

@@ -592,7 +592,7 @@
     <div class="modal fade" id="barcodeUpdateModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-3">
-          <form @submit.prevent="submitBarcodeUpdate">
+          <form @submit.prevent="submitBarcodeUpdate" @keydown.enter="handleBarcodeFormEnter">
             <div class="modal-header py-3 bg-primary text-white border-0">
               <h6 class="modal-title fw-bold">
                 <i class="bi bi-qr-code-scan me-2"></i>
@@ -2175,7 +2175,7 @@ watch(
       });
 
       if (duplicates.length > 0) {
-        swal(`Barcode ${duplicates[0]} sudah discan!`, "warning");
+        toast(`Barcode ${duplicates[0]} sudah discan!`, "warning");
         // Bersihkan otomatis duplikat dari textarea
         const uniqueParsed = [...seen];
         barcodeForm.value.barcodes = uniqueParsed.join("\n");
@@ -2194,7 +2194,19 @@ watch(
           const dest = barcodeForm.value.destination;
           const alreadyInDest = res.results.find(item => item.exists && item.location === dest);
           if (alreadyInDest) {
-            swal(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(barcodeForm.value.mainCat, alreadyInDest.location)})`, "warning");
+            toast(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(barcodeForm.value.mainCat, alreadyInDest.location)})`, "warning");
+            return;
+          }
+
+          // 4. Deteksi ketidakcocokan kategori (Contoh: terdaftar GELANG tapi di-scan di tab KALUNG)
+          const activeCategory = barcodeForm.value.mainCat;
+          const mismatchedItem = res.results.find(item => item.exists && item.category && item.category !== activeCategory);
+          if (mismatchedItem) {
+            toast(`Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory}). Barcode ini terdaftar sebagai ${mismatchedItem.category}!`, "warning");
+            // Bersihkan barcode yang tidak sesuai kategori dari input
+            const cleanParsed = parsed.filter(bc => bc !== mismatchedItem.barcode);
+            barcodeForm.value.barcodes = cleanParsed.join("\n");
+            return;
           }
         } else {
           hasNewBarcode.value = false;
@@ -2209,7 +2221,21 @@ watch(
   }
 );
 
+function handleBarcodeFormEnter(event) {
+  // Jika SweetAlert sedang terbuka, biarkan event Enter berjalan agar Swal bisa ditutup
+  if (document.querySelector(".swal2-container")) return;
+
+  // Izinkan Enter jika berada di dalam textarea untuk membuat baris baru
+  if (event.target.tagName === "TEXTAREA") return;
+  // Izinkan Enter jika fokus di tombol simpan (submit) untuk mengirim data
+  if (event.target.tagName === "BUTTON" && event.target.type !== "button") return;
+  
+  // Batalkan aksi default (mencegah submit otomatis atau memicu tombol Batal)
+  event.preventDefault();
+}
+
 async function submitBarcodeUpdate() {
+  if (document.querySelector(".swal2-container")) return;
   if (!barcodeForm.value.petugas.trim()) return toast("Petugas wajib diisi", "warning");
   if (!barcodeForm.value.destination) return toast("Lokasi tujuan wajib dipilih", "warning");
   if (!barcodeForm.value.barcodes.trim()) return toast("Barcode tidak boleh kosong", "warning");
@@ -2225,6 +2251,12 @@ async function submitBarcodeUpdate() {
   const alreadyInDest = checkedBarcodesList.value.find(item => item.exists && item.location === dest);
   if (alreadyInDest) {
     return swal(`Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan`, "warning");
+  }
+
+  const activeCategory = barcodeForm.value.mainCat;
+  const mismatchedItem = checkedBarcodesList.value.find(item => item.exists && item.category && item.category !== activeCategory);
+  if (mismatchedItem) {
+    return swal(`Gagal: Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory})`, "warning");
   }
 
   saving.value = true;
@@ -2511,6 +2543,15 @@ onMounted(async () => {
   window.addEventListener("storage", handleStorageSync);
   window.addEventListener("melati-stock-reload", handleStockReload);
 
+  // Auto-focus textarea saat modal update barcode dibuka
+  const modalEl = document.getElementById("barcodeUpdateModal");
+  if (modalEl) {
+    modalEl.addEventListener("shown.bs.modal", () => {
+      const textarea = modalEl.querySelector("textarea");
+      if (textarea) textarea.focus();
+    });
+  }
+
   const now = getNowWita();
   const todayKey = formatDateKey(now);
   const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
@@ -2518,16 +2559,19 @@ onMounted(async () => {
   if (sessionStorage.getItem(cacheKey) === "true") {
     scheduleNextDailySnapshot();
   } else {
-    const unwatch = watch(
-      stockData,
-      (newData) => {
-        if (newData && Object.keys(newData).length > 0) {
-          initDailySnapshots();
-          unwatch();
+    if (stockData.value && Object.keys(stockData.value).length > 0) {
+      initDailySnapshots();
+    } else {
+      const unwatch = watch(
+        stockData,
+        (newData) => {
+          if (newData && Object.keys(newData).length > 0) {
+            initDailySnapshots();
+            unwatch();
+          }
         }
-      },
-      { immediate: true }
-    );
+      );
+    }
   }
 });
 
