@@ -56,13 +56,13 @@
             <div v-if="activeTab === 'staff'" key="staff" class="tab-pane-content">
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white">
                 <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
-                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0">
+                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0 text-nowrap">
                     <i class="bi bi-journal-text text-gold"></i>
                     Tata Tertib & SOP Harian Staff
                   </h5>
                   <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
                     <!-- Search Input -->
-                    <div v-if="!editingState.staffSOP" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0" style="max-width: 250px;">
+                    <div v-if="!editingState.staffSOP" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0 search-input-container">
                       <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
                       <input
                         v-model="searchQuery"
@@ -77,11 +77,11 @@
                     <!-- Edit Button -->
                     <button
                       v-if="isSupervisor"
-                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center justify-content-center gap-1 rounded-pill text-nowrap w-100 w-md-auto"
+                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 rounded-pill text-nowrap btn-edit-responsive d-none d-md-flex"
                       @click="toggleEdit('staffSOP')"
                     >
                       <i :class="['bi', editingState.staffSOP ? 'bi-eye' : 'bi-pencil-square']"></i>
-                      {{ editingState.staffSOP ? 'Selesai Edit' : 'Edit Teks' }}
+                      {{ editingState.staffSOP ? 'Selesai Edit' : 'Edit' }}
                     </button>
                   </div>
                 </div>
@@ -107,13 +107,13 @@
             <div v-else-if="activeTab === 'gold'" key="gold" class="tab-pane-content">
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white">
                 <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
-                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0">
+                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0 text-nowrap">
                     <i class="bi bi-coin text-gold"></i>
                     Pengetahuan Dasar Perhiasan Emas
                   </h5>
                   <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
                     <!-- Search Input -->
-                    <div v-if="!editingState.goldKnowledge" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0" style="max-width: 250px;">
+                    <div v-if="!editingState.goldKnowledge" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0 search-input-container">
                       <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
                       <input
                         v-model="searchQuery"
@@ -128,11 +128,11 @@
                     <!-- Edit Button -->
                     <button
                       v-if="isSupervisor"
-                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center justify-content-center gap-1 rounded-pill text-nowrap w-100 w-md-auto"
+                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 rounded-pill text-nowrap btn-edit-responsive d-none d-md-flex"
                       @click="toggleEdit('goldKnowledge')"
                     >
                       <i :class="['bi', editingState.goldKnowledge ? 'bi-eye' : 'bi-pencil-square']"></i>
-                      {{ editingState.goldKnowledge ? 'Selesai Edit' : 'Edit Teks' }}
+                      {{ editingState.goldKnowledge ? 'Selesai Edit' : 'Edit' }}
                     </button>
                   </div>
                 </div>
@@ -159,13 +159,13 @@
               <!-- Diamond Knowledge Text Content (Structured Sub-Cards Grid) -->
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white shadow-sm">
                 <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
-                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0">
+                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0 text-nowrap">
                     <i class="bi bi-gem text-gold"></i>
-                    Pengetahuan Dasar Berlian & Perawatan
+                    Pengetahuan Dasar Berlian
                   </h5>
                   <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
                     <!-- Search Input -->
-                    <div v-if="!editingState.diamondKnowledge" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0" style="max-width: 250px;">
+                    <div v-if="!editingState.diamondKnowledge" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0 search-input-container">
                       <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
                       <input
                         v-model="searchQuery"
@@ -180,11 +180,11 @@
                     <!-- Edit Button -->
                     <button
                       v-if="isSupervisor"
-                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center justify-content-center gap-1 rounded-pill text-nowrap w-100 w-md-auto"
+                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 rounded-pill text-nowrap btn-edit-responsive d-none d-md-flex"
                       @click="toggleEdit('diamondKnowledge')"
                     >
                       <i :class="['bi', editingState.diamondKnowledge ? 'bi-eye' : 'bi-pencil-square']"></i>
-                      {{ editingState.diamondKnowledge ? 'Selesai Edit' : 'Edit Teks' }}
+                      {{ editingState.diamondKnowledge ? 'Selesai Edit' : 'Edit' }}
                     </button>
                   </div>
                 </div>
@@ -212,7 +212,6 @@
       <!-- Footer Info Last Update -->
       <div v-if="!loading && (meta.lastUpdated || meta.updatedBy)" class="card-footer bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small">
         <span>Terakhir diperbarui: <strong>{{ formatDateTime(meta.lastUpdated) }}</strong></span>
-        <span>Diperbarui oleh: <strong class="text-gold">{{ meta.updatedBy }}</strong></span>
       </div>
     </div>
   </div>
@@ -409,24 +408,6 @@ function parseStaffSOP(text, query = "") {
       
       const titleLine = lines[0] ? lines[0].trim() : "";
       if (!titleLine.startsWith("####")) {
-        const cleanIntro = block.replace(/#.*$/gm, "").replace(/---/g, "").trim();
-        if (isPart1 && cleanIntro) {
-          const introMatches = !q || cleanIntro.toLowerCase().includes(q);
-          if (introMatches) {
-            introHtml = `
-              <div class="col-12 mb-4">
-                <div class="section-intro-card p-3.5 rounded-4 border d-flex gap-3 align-items-center bg-light-gold border-left-gold border-gold-subtle shadow-sm">
-                  <div class="intro-icon-wrapper rounded-circle d-flex align-items-center justify-content-center bg-gold-light text-gold" style="width: 40px; height: 40px; flex-shrink: 0;">
-                    <i class="bi bi-info-circle-fill fs-5"></i>
-                  </div>
-                  <div class="text-secondary-emphasis leading-relaxed small text-justify mb-0">
-                    ${parseInnerMarkdown(cleanIntro)}
-                  </div>
-                </div>
-              </div>
-            `;
-          }
-        }
         return;
       }
       
@@ -465,8 +446,8 @@ function parseStaffSOP(text, query = "") {
       cards.push({
         title,
         html: `
-          <div class="sop-block-card p-4 rounded-4 shadow-sm border border-light bg-white position-relative overflow-hidden interactive-card ${borderClass}">
-            <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
+          <div class="sop-block-card p-2 rounded-4 shadow-sm border border-light bg-white position-relative overflow-hidden interactive-card ${borderClass}">
+            <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-light pb-2">
               <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
                 <i class="bi ${icon} fs-5"></i>
               </div>
@@ -579,7 +560,7 @@ function parseGoldKnowledge(text, query = "") {
     html += `
       <div class="col-md-12 col-lg-6">
         <div class="gold-block-card p-4 rounded-4 shadow-sm border border-light bg-white h-100 position-relative overflow-hidden interactive-card border-left-gold">
-          <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
+          <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-light pb-2">
             <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
               <i class="bi ${icon} fs-5"></i>
             </div>
@@ -717,7 +698,7 @@ function parseDiamondKnowledge(text, query = "") {
       totalMatches += sec1Matches;
       sec1Html = `
         <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card border-left-gold">
-          <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
+          <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-light pb-2">
             <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
               <i class="bi bi-gem text-gold fs-5"></i>
             </div>
@@ -743,8 +724,8 @@ function parseDiamondKnowledge(text, query = "") {
     if (q) totalMatches++;
 
     return `
-      <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card ${borderClass}">
-        <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
+      <div class="profile-section-card p-2 border rounded-4 bg-white interactive-card ${borderClass}">
+        <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-light pb-2">
           <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
             <i class="bi ${icon} fs-5"></i>
           </div>
@@ -907,6 +888,10 @@ onMounted(() => {
   outline: none !important;
   box-shadow: none !important;
   border-color: #aa7c11 !important;
+}
+
+.search-input-container {
+  max-width: 250px;
 }
 
 .text-gold,
@@ -1167,11 +1152,7 @@ onMounted(() => {
     font-size: 1.1rem !important;
   }
   
-  /* Outer block padding reductions */
-  :deep(.section-intro-card) {
-    padding: 1rem !important;
-    gap: 0.75rem !important;
-  }
+
   
   :deep(.sop-block-card),
   :deep(.gold-block-card) {
@@ -1186,6 +1167,17 @@ onMounted(() => {
   :deep(.table td) {
     padding: 0.5rem 0.75rem !important;
     font-size: 0.75rem !important;
+  }
+  
+  /* Mobile-only full-width buttons */
+  .btn-edit-responsive {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .search-input-container {
+    max-width: 100% !important;
+    width: 100% !important;
   }
 }
 </style>

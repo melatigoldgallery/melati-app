@@ -183,7 +183,7 @@
                 </div>
                 <!-- Form Petugas (Staff) Input Barcode -->
                 <div class="row g-3 align-items-end mt-0 pt-2 border-light-subtle">
-                  <div class="col-md-6 text-start">
+                  <div class="col-md-3 text-start">
                     <label class="form-label small fw-bold text-secondary mb-1">Petugas (Staff) <span class="text-danger">*</span></label>
                     <select v-model="inputPetugasName" class="form-select form-select-sm border-2 rounded-4 custom-select" required :disabled="saving">
                       <option value="">-- Pilih Staff --</option>
@@ -192,17 +192,17 @@
                       </option>
                     </select>
                   </div>
-              <div class="col-md-6 d-flex justify-content-end">
-                <button 
-                  class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
-                  @click="addBarcodesToClip"
-                  :disabled="saving || !barcodeTextInput.trim()"
-                >
-                  <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
-                  <i v-else class="bi bi-clipboard-plus"></i>
-                  <span>Tambah ke Klip & Daftarkan</span>
-                </button>
-              </div>
+                  <div class="col-md-6 d-flex justify-content-start">
+                    <button 
+                      class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
+                      @click="addBarcodesToClip"
+                      :disabled="saving || !barcodeTextInput.trim()"
+                    >
+                      <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
+                      <i v-else class="bi bi-clipboard-plus"></i>
+                      <span>Tambahkan Barcode</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -286,7 +286,7 @@
           </div>
           <form @submit.prevent="executeMoveData">
             <div class="row g-3 align-items-end">
-              <div class="col-md-5 text-start">
+              <div class="col-md-3 text-start">
                 <label class="form-label small fw-bold text-secondary mb-1">Petugas (Staff) <span class="text-danger">*</span></label>
                 <select v-model="petugasName" class="form-select form-select-sm border-2 rounded-4 custom-select" required :disabled="saving">
                   <option value="">-- Pilih Staff --</option>
@@ -295,7 +295,7 @@
                   </option>
                 </select>
               </div>
-              <div class="col-md-7 text-start">
+              <div class="col-md-3 text-start">
                 <label class="form-label small fw-bold text-secondary mb-1">Catatan Mutasi</label>
                 <input 
                   v-model="notesInput" 

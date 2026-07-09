@@ -72,11 +72,11 @@
                         </div>
                         <button
                           v-if="isSupervisor"
-                          class="btn btn-sm btn-gold-outline px-3 d-flex align-items-center justify-content-center gap-1 shadow-sm w-100 w-sm-auto"
+                          class="btn btn-sm btn-gold-outline px-3 d-flex align-items-center gap-1 shadow-sm btn-edit-responsive d-none d-md-flex"
                           @click="toggleEdit('about')"
                         >
                           <i :class="['bi', editingState.about ? 'bi-eye' : 'bi-pencil-square']"></i>
-                          {{ editingState.about ? 'Selesai Edit' : 'Edit Teks' }}
+                          {{ editingState.about ? 'Selesai' : 'Edit' }}
                         </button>
                       </div>
 
@@ -219,11 +219,11 @@
                   </h5>
                   <button
                     v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
+                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 d-none d-md-flex"
                     @click="toggleEdit('team')"
                   >
                     <i :class="['bi', editingState.team ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.team ? 'Selesai Edit' : 'Edit Teks' }}
+                    {{ editingState.team ? 'Selesai Edit' : 'Edit' }}
                   </button>
                 </div>
 
@@ -254,11 +254,11 @@
                   </h5>
                   <button
                     v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
+                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 d-none d-md-flex"
                     @click="toggleEdit('rightsAndObligations')"
                   >
                     <i :class="['bi', editingState.rightsAndObligations ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.rightsAndObligations ? 'Selesai Edit' : 'Edit Teks' }}
+                    {{ editingState.rightsAndObligations ? 'Selesai Edit' : 'Edit' }}
                   </button>
                 </div>
 
@@ -285,7 +285,6 @@
       <!-- Footer Info Last Update -->
       <div v-if="!loading && (meta.lastUpdated || meta.updatedBy)" class="card-footer bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small">
         <span>Terakhir diperbarui: <strong>{{ formatDateTime(meta.lastUpdated) }}</strong></span>
-        <span>Diperbarui oleh: <strong class="text-gold">{{ meta.updatedBy }}</strong></span>
       </div>
     </div>
   </div>
@@ -1131,6 +1130,12 @@ onMounted(() => {
     padding: 1rem !important;
     margin-bottom: 1rem !important;
     border-radius: 12px !important;
+  }
+  
+  /* Mobile-only full-width buttons */
+  .btn-edit-responsive {
+    width: 100% !important;
+    justify-content: center !important;
   }
 }
 </style>

@@ -165,8 +165,8 @@
 
                     <!-- Filter Dropdown -->
                     <div class="dropdown-bisa-container position-relative flex-grow-1" style="max-width: 160px;">
-                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between px-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenBisa = !isOpenBisa">
-                        <span class="text-capitalize text-truncate">{{ getJenisLabel(filterJenisBisa) || 'Semua Jenis' }}</span>
+                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between ps-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenBisa = !isOpenBisa">
+                        <span class="text-capitalize text-truncate d-inline-block" style="max-width: 80px;">{{ getJenisLabel(filterJenisBisa) || 'Semua Jenis' }}</span>
                       </button>
                       <transition name="dropdown-fade">
                         <ul v-if="isOpenBisa" class="custom-dropdown-menu shadow border-0 py-2 position-absolute start-0 mt-2 z-3 rounded-3 list-unstyled m-0">
@@ -211,7 +211,7 @@
                           <span class="small text-secondary">Belum ada foto</span>
                         </div>
                         <span class="badge bg-success position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-check2"></i> Bisa Diservis</span>
-                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-3 start-3 px-2 py-1 rounded text-capitalize small">Jenis: {{ item.jenis }}</span>
+                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-0 start-0 m-2 px-2 py-1 rounded text-capitalize image-overlay-badge">Jenis: {{ item.jenis }}</span>
                       </div>
                       <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
                         <div>
@@ -248,10 +248,10 @@
                         </div>
                       </div>
                       <div class="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
-                        <div>
+                        <div class="w-100 min-w-0">
                           <div class="d-flex justify-content-between align-items-start gap-1">
-                            <h6 class="fw-extrabold text-dark mb-1 text-truncate" style="font-size: 0.95rem;">{{ item.name }}</h6>
-                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0">
+                            <h6 class="fw-extrabold text-dark mb-1 text-wrap flex-grow-1 min-w-0" style="font-size: 0.95rem;">{{ item.name }}</h6>
+                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0 ms-auto">
                               <button class="btn btn-link text-primary p-0 border-0" @click="openEditBisaModal(item)" title="Edit">
                                 <i class="bi bi-pencil-square fs-6"></i>
                               </button>
@@ -330,8 +330,8 @@
 
                     <!-- Filter Dropdown -->
                     <div class="dropdown-tidakbisa-container position-relative flex-grow-1" style="max-width: 160px;">
-                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between px-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenTidakBisa = !isOpenTidakBisa">
-                        <span class="text-capitalize text-truncate">{{ getJenisLabel(filterJenisTidakBisa) || 'Semua Jenis' }}</span>
+                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between ps-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenTidakBisa = !isOpenTidakBisa">
+                        <span class="text-capitalize text-truncate d-inline-block" style="max-width: 80px;">{{ getJenisLabel(filterJenisTidakBisa) || 'Semua Jenis' }}</span>
                       </button>
                       <transition name="dropdown-fade">
                         <ul v-if="isOpenTidakBisa" class="custom-dropdown-menu shadow border-0 py-2 position-absolute start-0 mt-2 z-3 rounded-3 list-unstyled m-0">
@@ -375,9 +375,8 @@
                           <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
                           <span class="small text-secondary">Belum ada foto</span>
                         </div>
-                        <span class="badge bg-danger position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-exclamation-triangle"></i> Tidak Bisa Servis</span>
-                        <span v-if="item.kadar" class="badge bg-dark-glass position-absolute bottom-3 start-3 px-2 py-1 rounded small">Kadar: {{ item.kadar }}</span>
-                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-3 end-3 px-2 py-1 rounded text-capitalize small">Jenis: {{ item.jenis }}</span>
+                        <span v-if="item.kadar" class="badge bg-dark-glass position-absolute bottom-0 start-0 m-2 px-2 py-1 rounded image-overlay-badge"> {{ item.kadar }}</span>
+                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-0 end-0 m-2 px-2 py-1 rounded text-capitalize image-overlay-badge"> {{ item.jenis }}</span>
                       </div>
                       <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
                         <div>
@@ -408,10 +407,10 @@
                         </div>
                       </div>
                       <div class="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
-                        <div>
+                        <div class="w-100 min-w-0">
                           <div class="d-flex justify-content-between align-items-start gap-1">
-                            <h6 class="fw-extrabold text-dark mb-1 text-truncate" style="font-size: 0.95rem;">{{ item.name }}</h6>
-                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0">
+                            <h6 class="fw-extrabold text-dark mb-1 text-wrap flex-grow-1 min-w-0" style="font-size: 0.95rem;">{{ item.name }}</h6>
+                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0 ms-auto">
                               <button class="btn btn-link text-primary p-0 border-0" @click="openEditTidakBisaModal(item)" title="Edit">
                                 <i class="bi bi-pencil-square fs-6"></i>
                               </button>
@@ -424,7 +423,6 @@
                         </div>
                         <div class="d-flex justify-content-between align-items-end pt-1 border-top border-light-subtle">
                           <div>
-                            <span class="text-muted d-block" style="font-size: 0.7rem;">Kadar</span>
                             <span class="fw-bold text-danger small">{{ item.kadar || '-' }}</span>
                           </div>
                           <span v-if="item.jenis" class="badge bg-secondary-glass text-secondary text-capitalize px-2 py-1 rounded" style="font-size: 0.7rem;">{{ item.jenis }}</span>
@@ -565,7 +563,6 @@
       <!-- Footer Info Last Update -->
       <div v-if="!loading && (meta.lastUpdated || meta.updatedBy)" class="card-footer bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small">
         <span>Terakhir diperbarui: <strong>{{ formatDateTime(meta.lastUpdated) }}</strong></span>
-        <span>Diperbarui oleh: <strong class="text-gold">{{ meta.updatedBy }}</strong></span>
       </div>
     </div>
 
@@ -1574,6 +1571,17 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   backdrop-filter: blur(4px);
+}
+
+.image-overlay-badge {
+  font-size: 0.68rem !important;
+  font-weight: 600 !important;
+  padding: 0.2rem 0.4rem !important;
+  border-radius: 4px !important;
+  max-width: 44%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 /* Icons */

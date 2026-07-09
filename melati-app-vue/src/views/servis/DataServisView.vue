@@ -2961,19 +2961,35 @@ async function retryPrintServis() {
 function generateLabelBox(item) {
   const isCustom = item.jenisInput === "custom";
   const namaCustomer = item.namaCustomer || "N/A";
+  const salesName = item.namaSales || "-";
 
   if (isCustom) {
     const details = item.detailBarangCustom || [];
     const combinedItems = details.length
       ? details
-          .map((d) => {
-            let text = `${d.namaBarang || "-"}<br>B:${d.berat || "-"} P:${d.panjang || "-"} K:${d.kadar || "-"} W:${d.warna || "-"}`;
-            if (d.rincianServis?.trim()) text += `<br>${d.rincianServis}`;
-            return text;
+          .map((d, idx) => {
+            const num = `${idx + 1}. `;
+            const nama = d.namaBarang || "-";
+            const specs = `B:${d.berat || "-"} P:${d.panjang || "-"} K:${d.kadar || "-"} W:${d.warna || "-"}`;
+            const rincian = d.rincianServis?.trim() ? `, ${d.rincianServis.trim()}` : "";
+            return `${num}${nama} (${specs})${rincian}`;
           })
           .join("<br>")
       : "Data tidak tersedia";
-    return `<div class="print-service-box"><div class="print-customer-name">${namaCustomer}</div><div class="print-nama-brg">${combinedItems}</div><div class="print-status">CUSTOM</div></div>`;
+    const dpVal = getItemDP(item);
+    const ongkosVal = getItemOngkos(item);
+    const dpText = dpVal ? dpVal.toLocaleString("id-ID") : "0";
+    const ongkosText = ongkosVal ? ongkosVal.toLocaleString("id-ID") : "0";
+    const statusText = `CUSTOM DP:${dpText} O:${ongkosText}`;
+
+    return `<div class="print-service-box">
+      <div class="print-customer-name">${namaCustomer}</div>
+      <div class="print-nama-brg">${combinedItems}</div>
+      <div class="print-sales-status">
+        <span class="print-sales-name">S: ${salesName}</span>
+        <span class="print-status">${statusText}</span>
+      </div>
+    </div>`;
   } else {
     const details = (item.detailBarang || []).length
       ? item.detailBarang
@@ -2986,19 +3002,34 @@ function generateLabelBox(item) {
           },
         ];
     const uniqueStatuses = [...new Set(details.map((d) => d.statusPembayaran || "nominal"))];
-    const statusText =
+    const baseStatus =
       uniqueStatuses.length === 1
         ? statusPembayaranLabel(uniqueStatuses[0])
         : uniqueStatuses.map(statusPembayaranLabel).join(" / ");
+
+    const ongkosVal = getItemOngkos(item);
+    const priceText = ongkosVal ? ` Rp ${Number(ongkosVal).toLocaleString("id-ID")}` : " Rp 0";
+    const statusText = `${baseStatus}${priceText}`;
+
     const combinedItems = details
-      .map((d) => {
-        const rincian = d.rincianServis?.trim();
-        return rincian
-          ? `${d.namaBarang || "-"} - ${d.jenisServis || "-"} - ${rincian}`
-          : `${d.namaBarang || "-"} - ${d.jenisServis || "-"}`;
+      .map((d, idx) => {
+        const num = `${idx + 1}. `;
+        const nama = d.namaBarang || "-";
+        const kadarVal = d.karat || d.kadar;
+        const kadarText = kadarVal ? ` K:${kadarVal}` : "";
+        const jenis = d.jenisServis ? ` ${d.jenisServis}` : "";
+        const rincian = d.rincianServis?.trim() ? `, ${d.rincianServis.trim()}` : "";
+        return `${num}${nama}${kadarText}${jenis}${rincian}`;
       })
       .join("<br>");
-    return `<div class="print-service-box"><div class="print-customer-name">${namaCustomer}</div><div class="print-nama-brg">${combinedItems}</div><div class="print-status">${statusText}</div></div>`;
+    return `<div class="print-service-box">
+      <div class="print-customer-name">${namaCustomer}</div>
+      <div class="print-nama-brg">${combinedItems}</div>
+      <div class="print-sales-status">
+        <span class="print-sales-name">S: ${salesName}</span>
+        <span class="print-status">${statusText}</span>
+      </div>
+    </div>`;
   }
 }
 
@@ -3011,10 +3042,12 @@ function printLabel(items) {
     @page{size:A4;margin:1cm}
     body{font-family:Arial,sans-serif;margin:0;padding:0}
     .boxes-container{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:3mm}
-    .print-service-box{width:3.5cm;height:3.5cm;border:1px solid #000;padding:1.5mm;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;break-inside:avoid;overflow:hidden}
+    .print-service-box{width:3.5cm;min-height:3.5cm;height:auto;border:1px solid #000;padding:1.5mm;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;text-align:center;break-inside:avoid}
     .print-customer-name{font-size:8px;font-weight:bold;word-wrap:break-word;line-height:1.1;margin:0;padding:0}
-    .print-nama-brg{font-size:8px;font-weight:bold;word-wrap:break-word;word-break:break-word;line-height:1.1;overflow:hidden;margin:0;padding:0}
-    .print-status{font-size:7px;font-weight:bold;color:#202020;margin:0;padding:0}
+    .print-nama-brg{font-size:8px;font-weight:bold;word-wrap:break-word;word-break:break-word;line-height:1.1;overflow:hidden;margin:0;padding:0;text-align:left;flex-grow:1;width:100%;margin-top:1.5mm;margin-bottom:1.5mm}
+    .print-sales-status{display:flex;justify-content:space-between;font-size:7px;font-weight:bold;color:#202020;margin:0;padding:0;width:100%}
+    .print-sales-name{font-weight:bold}
+    .print-status{font-weight:bold}
   </style></head><body><div class="boxes-container">${boxes}</div></body></html>`);
   printWindow.document.close();
   printWindow.addEventListener("afterprint", () => setTimeout(() => printWindow.close(), 100));
