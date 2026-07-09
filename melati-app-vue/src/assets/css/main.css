@@ -47,7 +47,11 @@ body {
 /* Sidebar */
 .sidebar {
   width: 260px;
-  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 1000;
   background: linear-gradient(
     180deg,
     var(--theme-sidebar-start) 0%,
@@ -69,7 +73,18 @@ body {
 .main-content {
   flex: 1;
   min-width: 0;
+  margin-left: 260px;
   transition: margin-left 0.25s ease;
+}
+
+.sidebar.collapsed + .main-content {
+  margin-left: 60px;
+}
+
+@media (max-width: 767px) {
+  .main-content {
+    margin-left: 0 !important;
+  }
 }
 
 /* ─── Button overrides ───────────────────────────────────────────── */

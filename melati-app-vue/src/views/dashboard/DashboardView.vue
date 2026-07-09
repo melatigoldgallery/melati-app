@@ -177,7 +177,7 @@ const isL2Admin = computed(() => {
 });
 
 function resolveQuickLink(to) {
-  if (to !== "/antrian/display") return to;
+  if (to !== "/antrian/display" && to !== "/antrian/ambil") return to;
   return { path: to, query: { floor: activeFloor.value } };
 }
 

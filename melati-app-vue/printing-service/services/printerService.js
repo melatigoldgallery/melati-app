@@ -170,9 +170,75 @@ try {
     $printDoc.add_PrintPage({
         param($sender, $ev)
         try {
-            $font = New-Object System.Drawing.Font("Courier New", 8)
-            $text = [System.Text.Encoding]::ASCII.GetString($bytes)
-            $ev.Graphics.DrawString($text, $font, [System.Drawing.Brushes]::Black, 10, 10)
+            # Strip ESC/POS control sequences (including INIT ESC @) to prevent garbage characters
+            $rawText = [System.Text.Encoding]::ASCII.GetString($bytes)
+            $cleanText = $rawText -replace '\x1B@|\x1B.\x00|\x1B.\x01|\x1B.\x38|\x1B.\x30|\x1D.\x11|\x1D.\x00|\x1D.\x41.\x00', ''
+            $text = $cleanText -replace '[\x00-\x08\x0B-\x0C\x0E-\x1F]', ''
+            
+            $lines = $text -split "\`r?\`n"
+            $y = 10
+            
+            $centerFormat = New-Object System.Drawing.StringFormat
+            $centerFormat.Alignment = [System.Drawing.StringAlignment]::Center
+            
+            $leftFormat = New-Object System.Drawing.StringFormat
+            $leftFormat.Alignment = [System.Drawing.StringAlignment]::Near
+            
+            $printWidth = $ev.PageBounds.Width
+            if ($printWidth -lt 100) { $printWidth = 280 }
+            
+            $inCatatan = $false
+            foreach ($line in $lines) {
+                $trimmedLine = $line.Trim()
+                if ($trimmedLine.Length -eq 0 -and $line.Length -eq 0) {
+                    $y += 12
+                    continue
+                }
+                
+                # State machine to detect Catatan section block
+                if ($trimmedLine -like "*CATATAN:*" -or $trimmedLine -like "*NOTES:*") {
+                    $inCatatan = $true
+                }
+                
+                # Footer note centers, ending the Catatan block
+                if ($trimmedLine -like "*Harap menunggu*" -or $trimmedLine -like "*Please wait*") {
+                    $inCatatan = $false
+                }
+                
+                $fontFamily = "Courier New"
+                $fontSize = 8.5
+                $fontStyle = [System.Drawing.FontStyle]::Regular
+                
+                # Check for bold elements (Headers, Floor, Titles)
+                if ($trimmedLine -like "*M E L A T I*" -or $trimmedLine -like "*LANTAI*" -or $trimmedLine -like "*FLOOR*" -or $trimmedLine -like "*NOMOR ANTRIAN*" -or $trimmedLine -like "*YOUR QUEUE*") {
+                    $fontStyle = [System.Drawing.FontStyle]::Bold
+                    $fontSize = 10
+                }
+                
+                # Check for queue number
+                $isQueueNum = $trimmedLine -match "^[A-F][0-9]{2}$"
+                if ($isQueueNum) {
+                    $fontStyle = [System.Drawing.FontStyle]::Bold
+                    $fontSize = 24
+                }
+                
+                # Align everything to the left
+                $format = $leftFormat
+                $textToDraw = if ($inCatatan) { $line } else { $trimmedLine }
+                
+                # If we are drawing the closing divider, end the Catatan block after this line
+                if ($inCatatan -and $trimmedLine -eq "--------------------------------------") {
+                    $inCatatan = $false
+                }
+                
+                $lineFont = New-Object System.Drawing.Font($fontFamily, $fontSize, $fontStyle)
+                $lineHeight = if ($fontSize -eq 24) { 38 } else { 15 }
+                
+                $rect = New-Object System.Drawing.RectangleF(0, $y, $printWidth, $lineHeight)
+                $ev.Graphics.DrawString($textToDraw, $lineFont, [System.Drawing.Brushes]::Black, $rect, $format)
+                
+                $y += $lineHeight
+            }
             $ev.HasMorePages = $false
         } catch {
             Write-Host "Print page error: $_"

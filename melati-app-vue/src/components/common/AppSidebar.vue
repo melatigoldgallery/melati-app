@@ -97,7 +97,7 @@ const brandName = computed(() => (activeFloor.value === "L2" ? "Melati Gold Youn
 
 function resolveMenuLink(to) {
   if (typeof to !== "string") return to;
-  if (to !== "/antrian/display") return to;
+  if (to !== "/antrian/display" && to !== "/antrian/ambil") return to;
   return { path: to, query: { floor: activeFloor.value } };
 }
 
@@ -129,11 +129,12 @@ function toggleGroup(label) {
 
 <style scoped>
 .sidebar {
-  width: 220px;
-  position: sticky;
+  width: 260px;
+  position: fixed;
   top: 0;
-  align-self: flex-start;
+  left: 0;
   height: 100vh;
+  z-index: 1000;
   transition: width 0.25s ease;
   overflow-y: auto;
   overflow-x: hidden;

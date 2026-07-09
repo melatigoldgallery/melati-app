@@ -1,8 +1,11 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3">
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-bar-chart-line me-2 text-warning"></i>Analisis Antrian
+      <h4 class="fw-bold mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-line text-warning"></i>Analisis Antrian
+        <span class="badge bg-light text-dark border small" style="font-size: 0.8rem; font-weight: 500;">
+          Lantai {{ activeFloor }}
+        </span>
       </h4>
       <div class="d-flex gap-2">
         <select v-model="selectedYear" @change="loadAnalytics" class="form-select form-select-sm" style="width:auto">
@@ -89,8 +92,12 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useAlert } from "@/composables/useAlert";
+import { useAuthStore } from "@/stores/auth";
 import { fetchAnalyticsByMonth, resetAnalytics, LETTERS_MAP } from "@/services/antrian-service";
 import Chart from "chart.js/auto";
+
+const auth = useAuthStore();
+const activeFloor = computed(() => auth.activeFloor || "L1");
 
 const { error: showError, confirm } = useAlert();
 
@@ -131,10 +138,11 @@ const kpi = computed(() => {
 
 // ── Letter Distribution ────────────────────────────────────────────────────
 const letterDist = computed(() => {
-  const dist = { A: 0, B: 0, C: 0, D: 0 };
+  const dist = { J: 0, B: 0 };
   entries.value.forEach((e) => {
     const letter = e.queueNumber?.[0];
-    if (dist[letter] !== undefined) dist[letter]++;
+    if (["A", "B", "C"].includes(letter)) dist.B++;
+    else if (["D", "E", "F"].includes(letter)) dist.J++;
   });
   return dist;
 });
@@ -195,7 +203,7 @@ function buildCharts() {
 async function loadAnalytics() {
   loading.value = true;
   try {
-    entries.value = await fetchAnalyticsByMonth(selectedYear.value, selectedMonth.value);
+    entries.value = await fetchAnalyticsByMonth(selectedYear.value, selectedMonth.value, activeFloor.value);
     buildCharts();
   } catch (e) {
     showError("Gagal memuat analitik", e.message);
@@ -208,11 +216,15 @@ async function doResetAnalytics() {
   const r = await confirm({ title: "Reset Analitik?", text: `Hapus semua data analitik bulan ${monthName(selectedMonth.value)} ${selectedYear.value}?`, icon: "warning" });
   if (!r.isConfirmed) return;
   try {
-    await resetAnalytics(selectedYear.value, selectedMonth.value);
+    await resetAnalytics(selectedYear.value, selectedMonth.value, activeFloor.value);
     entries.value = [];
     buildCharts();
   } catch (e) { showError("Gagal reset", e.message); }
 }
+
+watch(activeFloor, () => {
+  loadAnalytics();
+});
 
 onMounted(loadAnalytics);
 onBeforeUnmount(() => { hourlyChart?.destroy(); dailyChart?.destroy(); });

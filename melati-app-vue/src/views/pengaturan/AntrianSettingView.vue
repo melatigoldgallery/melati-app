@@ -15,20 +15,21 @@
     </div>
 
     <div class="content-wrapper">
-      <div class="card settings-card">
-        <div class="settings-header p-3">
-          <h5 class="mb-0">
-            <i class="fas fa-bullhorn me-2"></i>
-            Konfigurasi Pengumuman Penutupan
-          </h5>
-        </div>
+      <div v-if="loading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+      </div>
 
-        <div class="settings-body p-3 p-md-4">
-          <div v-if="loading" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status"></div>
+      <template v-else>
+        <!-- Card 1: Konfigurasi Pengumuman Penutupan -->
+        <div class="card settings-card mb-4">
+          <div class="settings-header p-3 text-white">
+            <h5 class="mb-0 text-white">
+              <i class="fas fa-bullhorn me-2"></i>
+              Konfigurasi Pengumuman Penutupan
+            </h5>
           </div>
 
-          <template v-else>
+          <div class="settings-body p-3 p-md-4">
             <div class="row g-3 mb-3">
               <div class="col-12">
                 <div class="card border-0 shadow-sm">
@@ -145,30 +146,69 @@
               Oleh:
               <strong>{{ form.updatedBy || "-" }}</strong>
             </div>
-
-            <div class="d-flex flex-wrap gap-2">
-              <button class="btn btn-primary" :disabled="saving" @click="saveSettings">
-                <i class="fas fa-save me-2"></i>
-                {{ saving ? "Menyimpan..." : "Simpan Pengaturan" }}
-              </button>
-              <button class="btn btn-outline-secondary" :disabled="saving" @click="resetToDefault">
-                <i class="fas fa-undo me-2"></i>
-                Reset Default
-              </button>
-              <button class="btn btn-success" :disabled="previewing" @click="testPlay">
-                <i class="fas fa-play me-2"></i>
-                {{ previewing ? "Memutar..." : "Tes Play Sekarang" }}
-              </button>
-            </div>
-          </template>
+          </div>
         </div>
-      </div>
+
+        <!-- Card 2: Kuota Pelayanan Kasir Jual -->
+        <div class="card settings-card mb-4">
+          <div class="settings-header p-3 text-white">
+            <h5 class="mb-0 text-white">
+              <i class="fas fa-users-cog me-2"></i>
+              Kuota Pelayanan Customer (Lantai: {{ auth.activeFloor || 'L1' }})
+            </h5>
+          </div>
+          <div class="settings-body p-3 p-md-4">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Kuota Shift Pagi</label>
+                <input
+                  v-model.number="quotaForm.morningJualQuota"
+                  type="number"
+                  min="1"
+                  max="10"
+                  class="form-control"
+                />
+                <small class="text-muted">Jumlah default staff Jual untuk shift pagi.</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Kuota Shift Sore</label>
+                <input
+                  v-model.number="quotaForm.afternoonJualQuota"
+                  type="number"
+                  min="1"
+                  max="10"
+                  class="form-control"
+                />
+                <small class="text-muted">Jumlah default staff Jual untuk shift sore.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <!-- Actions -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          <button class="btn btn-primary" :disabled="saving" @click="saveSettings">
+            <i class="fas fa-save me-2"></i>
+            {{ saving ? "Menyimpan..." : "Simpan Pengaturan" }}
+          </button>
+          <button class="btn btn-outline-secondary" :disabled="saving" @click="resetToDefault">
+            <i class="fas fa-undo me-2"></i>
+            Reset Default
+          </button>
+          <button class="btn btn-success" :disabled="previewing" @click="testPlay">
+            <i class="fas fa-play me-2"></i>
+            {{ previewing ? "Memutar..." : "Tes Play Sekarang" }}
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Swal from "sweetalert2";
 import { useAuthStore } from "@/stores/auth";
 import {
@@ -179,6 +219,10 @@ import {
   saveClosingAnnouncementSettings,
   subscribeClosingAnnouncementSettings,
 } from "@/services/antrian-closing-service";
+import {
+  fetchQueueQuotaSettings,
+  saveQueueQuotaSettings,
+} from "@/services/antrian-service";
 import { isAudioBusy, playClosingAnnouncement, primeAudioPlayback } from "@/services/audio-service";
 
 const auth = useAuthStore();
@@ -187,6 +231,8 @@ const loading = ref(true);
 const saving = ref(false);
 const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
+
+const quotaForm = reactive({ morningJualQuota: 2, afternoonJualQuota: 3 });
 
 let unsubscribeSettings = null;
 
@@ -224,6 +270,18 @@ function getSavePayload() {
     reminderLimitWindowSeconds: Number(form.reminderLimitWindowSeconds),
     message: String(form.message || "").trim(),
   };
+}
+
+async function loadAllSettings() {
+  try {
+    const floorId = auth.activeFloor || "L1";
+
+    const quotaData = await fetchQueueQuotaSettings(floorId);
+    quotaForm.morningJualQuota = quotaData.morningJualQuota || 2;
+    quotaForm.afternoonJualQuota = quotaData.afternoonJualQuota || 3;
+  } catch (error) {
+    console.error("Failed to load floor-scoped settings", error);
+  }
 }
 
 async function saveSettings() {
@@ -284,14 +342,25 @@ async function saveSettings() {
 
   try {
     saving.value = true;
+    
+    const floorId = auth.activeFloor || "L1";
+    // Save Closing Announcement settings
     await saveClosingAnnouncementSettings(
       payload,
       auth.user?.email || auth.user?.username || auth.userRole || "System",
+      floorId
     );
+
+    // Save Quota settings
+    await saveQueueQuotaSettings(floorId, {
+      morningJualQuota: Number(quotaForm.morningJualQuota) || 2,
+      afternoonJualQuota: Number(quotaForm.afternoonJualQuota) || 3
+    });
+
     await Swal.fire({
       icon: "success",
       title: "Berhasil",
-      text: "Pengaturan penutupan antrian berhasil disimpan.",
+      text: "Seluruh pengaturan antrian berhasil disimpan.",
       timer: 1600,
       showConfirmButton: false,
     });
@@ -319,6 +388,9 @@ async function resetToDefault() {
   if (!result.isConfirmed) return;
 
   applySettings(DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS);
+  
+  quotaForm.morningJualQuota = 2;
+  quotaForm.afternoonJualQuota = 3;
 }
 
 async function testPlay() {
@@ -358,19 +430,42 @@ async function testPlay() {
 
 onMounted(async () => {
   try {
-    await ensureClosingAnnouncementSettings();
-    const data = await fetchClosingAnnouncementSettings();
+    const floorId = auth.activeFloor || "L1";
+    await ensureClosingAnnouncementSettings(floorId);
+    const data = await fetchClosingAnnouncementSettings(floorId);
     applySettings(data);
 
     unsubscribeSettings = subscribeClosingAnnouncementSettings((liveData) => {
       applySettings(liveData);
-    });
+    }, floorId);
+
+    await loadAllSettings();
   } catch (error) {
     console.error(error);
     await Swal.fire({ icon: "error", title: "Gagal Memuat", text: "Pengaturan penutupan antrian gagal dimuat." });
   } finally {
     loading.value = false;
   }
+});
+
+watch(() => auth.activeFloor, async (newFloor) => {
+  if (!newFloor) return;
+  loading.value = true;
+  await loadAllSettings();
+  
+  if (unsubscribeSettings) unsubscribeSettings();
+  try {
+    await ensureClosingAnnouncementSettings(newFloor);
+    const data = await fetchClosingAnnouncementSettings(newFloor);
+    applySettings(data);
+
+    unsubscribeSettings = subscribeClosingAnnouncementSettings((liveData) => {
+      applySettings(liveData);
+    }, newFloor);
+  } catch (error) {
+    console.error("Failed to re-subscribe closing settings on floor change", error);
+  }
+  loading.value = false;
 });
 
 onUnmounted(() => {
@@ -387,7 +482,7 @@ onUnmounted(() => {
 }
 
 .settings-header {
-  background: linear-gradient(135deg, #eaf2ff 0%, #878787 100%);
+  background: linear-gradient(135deg, #9d7e2d 0%, #3a2c1c 100%);
 }
 
 .settings-body {

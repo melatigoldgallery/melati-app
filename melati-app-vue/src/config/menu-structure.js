@@ -40,6 +40,7 @@ export const menuStructure = [
     children: [
       { label: "Admin Antrian", to: "/antrian/admin", pageKey: "antrian.admin", roles: ALL },
       { label: "Display Antrian", to: "/antrian/display", pageKey: "antrian.display", roles: ALL },
+      { label: "Ambil Antrian", to: "/antrian/ambil", pageKey: "antrian.ambil", roles: ALL },
       { label: "Laporan Antrian", to: "/antrian/laporan", pageKey: "antrian.laporan", roles: ALL },
     ],
   },

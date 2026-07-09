@@ -150,6 +150,120 @@ class ESCPOSService {
   }
 
   /**
+   * Generate queue ticket formatted with ESC/POS large font commands
+   * @param {Object} data - Queue ticket data
+   * @returns {string} Queue ticket commands
+   */
+  generateQueueCommands(data) {
+    const {
+      queueNumber = "",
+      queueType = "",
+      dateStr = "",
+      timeStr = "",
+      floor = "L1",
+      lang = "id",
+    } = data;
+
+    const isEn = lang === "en";
+    const width = 38; // Character width for 76mm paper
+
+    // Helper function to left-align text
+    const leftAlignText = (text) => {
+      return text + "\n";
+    };
+
+    // ESC/POS command shortcuts (Safe basic select mode)
+    const ESC = "\x1B";
+    const INIT = ESC + "@";
+
+    const TEXT_LARGE_BOLD = ESC + "!\x38"; // Double height + Double width + Bold
+    const TEXT_NORMAL = ESC + "!\x00";
+    const BOLD_ON = ESC + "E\x01";
+    const BOLD_OFF = ESC + "E\x00";
+
+    let output = "";
+
+    // 1. Initialize
+    output += INIT;
+
+    // 2. Header
+    output += leftAlignText("==================================");
+    output += BOLD_ON + leftAlignText("M E L A T I   G O L D   S H O P") + BOLD_OFF;
+    output += leftAlignText("==================================");
+    output += "\n";
+
+    // 3. Floor Display
+    let floorLabel = "";
+    if (floor === "L2") {
+      floorLabel = isEn ? "* * 2ND FLOOR * *" : "* * LANTAI 2 * *";
+    } else {
+      floorLabel = isEn ? "* * 1ST FLOOR * *" : "* * LANTAI 1 * *";
+    }
+    output += BOLD_ON + leftAlignText(floorLabel) + BOLD_OFF;
+    output += "\n";
+
+    // 4. Ticket Title
+    const titleLabel = isEn ? "YOUR QUEUE NUMBER" : "NOMOR ANTRIAN ANDA";
+    output += BOLD_ON + leftAlignText(titleLabel) + BOLD_OFF;
+    output += "\n";
+
+    // 5. Large Queue Number (Regular text scaled with ESC/POS command)
+    output += leftAlignText("--------------------------------");
+    output += TEXT_LARGE_BOLD + leftAlignText(queueNumber).trimEnd() + "\n" + TEXT_NORMAL;
+    output += leftAlignText("--------------------------------");
+    output += "\n";
+
+    // 6. Queue Type
+    let displayQueueType = queueType;
+    if (isEn) {
+      if (queueType.toLowerCase().includes("jual")) {
+        displayQueueType = "Sell Jewelry";
+      } else if (queueType.toLowerCase().includes("beli")) {
+        displayQueueType = "Buy / Trade-In";
+      }
+    }
+    output += leftAlignText(displayQueueType.toUpperCase());
+
+    const timeLabel = isEn ? "Time" : "Waktu";
+    output += leftAlignText(timeLabel + ": " + dateStr + " " + timeStr);
+    output += "\n";
+
+    // 7. Notes (Left aligned for standard paragraph formatting)
+    output += "--------------------------------------\n";
+    if (isEn) {
+      output += "NOTES:\n";
+      output += "- If your queue is missed by more than\n";
+      output += "  10 numbers, please take a new one\n";
+      output += "- If it is less than 10 numbers, please\n";
+      output += "  confirm with staff to be called next\n";
+    } else {
+      output += "CATATAN:\n";
+      output += "- Jika antrian terlewat melebihi 10\n";
+      output += "  nomor antrian maka ambil antrian baru\n";
+      output += "- Jika belum melebihi 10 nomor silakan\n";
+      output += "  konfirmasi ke staff untuk dipanggil\n";
+      output += "  di antrian selanjutnya\n";
+    }
+    output += "--------------------------------------\n\n";
+
+    // 8. Footer (Left-aligned, under notes section)
+    if (isEn) {
+      output += leftAlignText("Please wait for your queue");
+      output += leftAlignText("number to be called.");
+      output += leftAlignText("Thank you for your visit.");
+    } else {
+      output += leftAlignText("Harap menunggu nomor antrian");
+      output += leftAlignText("anda dipanggil.");
+      output += leftAlignText("Terima kasih atas kunjungan Anda.");
+    }
+
+    // 9. Space spacing to push ticket through tear-off bar
+    output += "\n\n\n\n\n\n";
+
+    return output;
+  }
+
+  /**
    * Format rupiah currency
    * @param {number} angka - Amount
    * @returns {string} Formatted currency

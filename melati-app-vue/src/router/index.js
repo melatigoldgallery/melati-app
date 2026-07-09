@@ -18,6 +18,7 @@ const TambahStaffView = () => import("@/views/absensi/TambahPenggunaView.vue");
 const AdminAntrianView = () => import("@/views/antrian/AdminAntrianView.vue");
 const DisplayAntrianView = () => import("@/views/antrian/DisplayAntrianView.vue");
 const LaporanAntrianView = () => import("@/views/antrian/LaporanAntrianView.vue");
+const AmbilAntrianView = () => import("@/views/antrian/AmbilAntrianView.vue");
 
 // Servis
 const InputServisView = () => import("@/views/servis/InputServisView.vue");
@@ -72,6 +73,7 @@ const routes = [
 
   // Display-only (no sidebar, no login)
   { path: "/antrian/display", component: DisplayAntrianView, meta: { layout: "blank", public: true } },
+  { path: "/antrian/ambil", component: AmbilAntrianView, meta: { layout: "blank", public: true } },
   { path: "/promosi/display", component: DisplayPromosiView, meta: { layout: "blank", public: true } },
 
   // Dashboard

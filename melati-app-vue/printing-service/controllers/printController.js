@@ -375,6 +375,71 @@ class PrintController {
       });
     }
   }
+
+  /**
+   * Print queue ticket (with queue)
+   */
+  async printQueue(req, res) {
+    try {
+      const queueData = req.body;
+      const { queueNumber, queueType } = queueData;
+
+      if (!queueNumber || !queueType) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: queueNumber, queueType",
+        });
+      }
+
+      logger.info(`Queue ticket print request: ${queueNumber} (${queueType})`);
+
+      // Get thermal printer
+      const printerName = printerService.getPrinterForType("receipt");
+
+      // Check if printer is available
+      const isAvailable = await printerService.isPrinterAvailable(printerName);
+      if (!isAvailable) {
+        return res.status(404).json({
+          success: false,
+          error: `Printer not found: ${printerName}`,
+        });
+      }
+
+      // Generate ESC/POS commands
+      const commands = escposService.generateQueueCommands(queueData);
+
+      // Add to queue (returns jobID immediately)
+      const jobID = printQueue.addJob(
+        printerName,
+        async () => {
+          return await printerService.printRaw(printerName, commands);
+        },
+        {
+          type: "queue",
+          queueNumber: queueNumber,
+        },
+      );
+
+      // Get queue status
+      const queueStatus = printQueue.getQueueStatus(printerName);
+
+      logger.info(`✅ Queue ticket job ${jobID} queued for ${printerName}`);
+
+      res.json({
+        success: true,
+        jobID: jobID,
+        printer: printerName,
+        queueStatus: queueStatus,
+        message: "Queue ticket queued for printing",
+      });
+    } catch (error) {
+      logger.error("Print queue ticket error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new PrintController();

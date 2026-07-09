@@ -24,6 +24,7 @@ export const PAGE_ACCESS_SECTIONS = [
       { key: "antrian.admin", label: "Admin Antrian", route: "/antrian/admin" },
       { key: "antrian.display", label: "Display Antrian", route: "/antrian/display" },
       { key: "antrian.laporan", label: "Laporan Antrian", route: "/antrian/laporan" },
+      { key: "antrian.ambil", label: "Ambil Antrian", route: "/antrian/ambil" },
     ],
   },
   {

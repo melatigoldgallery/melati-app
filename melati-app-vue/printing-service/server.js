@@ -152,6 +152,9 @@ app.post("/api/print/receipt", printController.printReceipt.bind(printController
 // Print invoice endpoint
 app.post("/api/print/invoice", printController.printInvoice.bind(printController));
 
+// Print queue ticket endpoint
+app.post("/api/print/queue", printController.printQueue.bind(printController));
+
 // Print nota servis endpoint
 app.post("/api/print/nota-servis", servisPrintController.printNotaServis.bind(servisPrintController));
 
