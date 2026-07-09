@@ -64,6 +64,7 @@ const AntrianClosingSettingView = () => import("@/views/pengaturan/AntrianSettin
 const TemaWarnaView = () => import("@/views/pengaturan/TemaWarnaView.vue");
 const MaintenanceView = () => import("@/views/pengaturan/MaintenanceView.vue");
 const PengaturanManajemenStokView = () => import("@/views/pengaturan/PengaturanManajemenStokView.vue");
+const PrinterSettingView = () => import("@/views/pengaturan/PrinterSettingView.vue");
 
 // ─── Route definitions ────────────────────────────────────────────────────────
 const routes = [
@@ -251,6 +252,11 @@ const routes = [
     path: "/pengaturan/antrian-penutupan",
     component: AntrianClosingSettingView,
     meta: { requiresAuth: true, pageKey: "admin.antrian-closing" },
+  },
+  {
+    path: "/pengaturan/printer",
+    component: PrinterSettingView,
+    meta: { requiresAuth: true, pageKey: "admin.printer" },
   },
   {
     path: "/pengaturan/tema-warna",

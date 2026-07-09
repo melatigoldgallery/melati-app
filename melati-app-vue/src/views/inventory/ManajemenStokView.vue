@@ -202,12 +202,12 @@
                     <div class="min-w-0 text-start">
                       <h6 class="fw-bold mb-1 text-white">Tujuan Utama: Hitung Barang Lebih Efisien!</h6>
                       <p class="mb-0 text-white small text-wrap">
-                        Mempercepat proses hitung barang saat tutup toko. Dari estimasi awal <strong>1 jam</strong>, harapannya bisa selesai <strong>jauh lebih cepat</strong>.
+                        Mempercepat proses hitung barang saat tutup toko. Dari estimasi awal <strong>1 jam</strong>, harapannya bisa selesai <strong> lebih cepat</strong>.
                       </p> 
                     </div>
                   </div>
                   <div class="badge bg-white text-primary px-3 py-2 rounded-pill fw-bold shadow-sm flex-shrink-0 align-self-center">
-                    Target: 45 Menit Proses Hitung Selesai ⏱️
+                    45 Menit Proses Hitung Selesai ⏱️
                   </div>
                 </div>
               </div>
@@ -319,6 +319,9 @@
                     <p class="small mb-0">
                       Gunakan box fisik khusus yang disediakan (Stok Brankas, Admin, Belum Posting, dll.) guna mempermudah penataan dan pengecekan barang secara cepat.
                     </p>
+                    <div class="alert alert-info border border-info-subtle p-2 rounded-2 small mt-2 mb-0">
+                      <strong>💡 Info Penting:</strong> Hasil input shift pagi harus dihitung dan diletakkan sesuai boxnya (<strong>Stok Brankas</strong> atau <strong>Belum Posting</strong>). Pemisahan ini mempermudah pelacakan barang dan mencegah selisih stok saat pergantian shift.
+                    </div>
                   </div>
                 </div>
               </div>
@@ -331,7 +334,7 @@
                 Tolong Kerja Sama & Keterlibatannya 🔥
               </h6>
               <p class="small mb-0 text-primary-emphasis">
-                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien dan kita semua bisa <strong>pulang tepat waktu!</strong> 🚀
+                Kedisiplinan kita melakukan update barcode saat pemindahan barang adalah kunci agar proses hitung barang saat closing lebih efisien dan akurat 🚀
               </p>
             </div>
           </div>
@@ -589,7 +592,7 @@
     <div class="modal fade" id="barcodeUpdateModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-3">
-          <form @submit.prevent="submitBarcodeUpdate">
+          <form @submit.prevent="submitBarcodeUpdate" @keydown.enter="handleBarcodeFormEnter">
             <div class="modal-header py-3 bg-primary text-white border-0">
               <h6 class="modal-title fw-bold">
                 <i class="bi bi-qr-code-scan me-2"></i>
@@ -607,7 +610,13 @@
                   placeholder="Scan barcode satu-persatu atau paste list barcode di sini (pisahkan dengan spasi/enter)..."
                   required
                 ></textarea>
-                <div class="form-text text-muted small">Masukkan satu atau beberapa barcode sekaligus.</div>
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                  <div class="form-text text-muted small mb-0">Masukkan satu atau beberapa barcode sekaligus.</div>
+                  <span v-if="barcodeCount > 0" class="badge bg-primary rounded-pill px-3 py-1.5 shadow-sm">
+                    <i class="bi bi-qr-code me-1"></i>
+                    {{ barcodeCount }} Barcode
+                  </span>
+                </div>
               </div>
               <!-- Dropdown Klasifikasi Dinamis (Hanya muncul jika ada barcode BARU dan kategori butuh warna/jenis) -->
               <div v-if="currentDetailOptions.length > 0 && hasNewBarcode" class="mb-3">
@@ -649,12 +658,15 @@
               </div>
               <div class="mb-2">
                 <label class="form-label small fw-bold text-secondary">Catatan / Keterangan</label>
-                <input
+                <select
                   v-model="barcodeForm.keterangan"
-                  type="text"
-                  class="form-control form-control-sm border-2 rounded-2"
-                  placeholder="Tulis catatan jika diperlukan..."
-                />
+                  class="form-select form-select-sm border-2 rounded-2"
+                >
+                  <option value="">-- Pilih Keterangan --</option>
+                  <option v-for="opt in KETERANGAN_OPTS" :key="`ket-opt-${opt}`" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
               </div>
               <div v-if="barcodeStatus" class="alert alert-info py-2 px-3 mt-3 small border-0 rounded-2 d-flex align-items-center gap-2">
                 <div class="spinner-border spinner-border-sm text-info" role="status" v-if="saving"></div>
@@ -910,7 +922,7 @@
                           <th class="ps-3 text-secondary fw-semibold small" style="width: 70px;">No</th>
                           <th class="text-secondary fw-semibold small">Barcode</th>
                           <th class="text-secondary fw-semibold small">Terakhir Update</th>
-                          <th v-if="isSupervisorOnly" class="pe-3 text-end text-secondary fw-semibold small" style="width: 90px;">Aksi</th>
+                          <th v-if="isSupervisorOrAdmin" class="pe-3 text-end text-secondary fw-semibold small" style="width: 90px;">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -936,16 +948,16 @@
                               {{ formatDate(b.lastUpdated) }}
                             </span>
                           </td>
-                          <td v-if="isSupervisorOnly" class="pe-3 text-end">
+                          <td v-if="isSupervisorOrAdmin" class="pe-3 text-end">
                             <button
                               type="button"
                               class="btn btn-outline-danger btn-xs px-2 py-0.5 rounded-pill transition-all d-inline-flex align-items-center gap-1 align-middle border-0"
-                              @click="handleDeleteBarcode(b.barcode)"
-                              :disabled="deletingBarcode === b.barcode"
+                              @click="handleRevertBarcode(b.barcode)"
+                              :disabled="revertingBarcode === b.barcode"
                             >
-                              <span v-if="deletingBarcode === b.barcode" class="spinner-border spinner-border-sm" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
-                              <i v-else class="bi bi-trash fs-7"></i>
-                              <span>Hapus</span>
+                              <span v-if="revertingBarcode === b.barcode" class="spinner-border spinner-border-sm" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
+                              <i v-else class="bi bi-arrow-counterclockwise fs-7"></i>
+                              <span>Batalkan</span>
                             </button>
                           </td>
                         </tr>
@@ -999,7 +1011,8 @@ import {
   executeBarcodeMutation,
   submitBarcodeMoveRequest,
   checkBarcodesStatus,
-  deleteSingleBarcode
+  deleteSingleBarcode,
+  revertSingleBarcode
 } from "@/services/barcode-service";
 import {
   KETERANGAN_OPTS,
@@ -1021,7 +1034,7 @@ import {
   subscribeInventorySettings,
 } from "@/services/inventory-setting-service";
 
-const { toast, error: showError, confirm } = useAlert();
+const { toast, error: showError, confirm, swal } = useAlert();
 const auth = useAuthStore();
 
 // Toggle untuk mengaktifkan antrian persetujuan mutasi (Movement Queue)
@@ -1124,6 +1137,7 @@ const barcodeForm = ref({
 const barcodeStatus = ref(null);
 const checkingBarcodes = ref(false);
 const hasNewBarcode = ref(false);
+const checkedBarcodesList = ref([]);
 
 const komputerForm = ref({
   mainCat: "",
@@ -1168,7 +1182,10 @@ const hasTabs = computed(() => tabs.value.length > 0);
 const tableRows = computed(() => displaySettings.value.tableRows.filter((row) => row.enabled));
 const isComputerTab = computed(() => getCardType(activeTab.value) === "computer");
 const showRincianColumn = computed(() => isColorType(activeTab.value) || isHalaType(activeTab.value));
-const isSupervisorOnly = computed(() => auth.userRole?.toLowerCase() === "supervisor");
+const isSupervisorOrAdmin = computed(() => ["supervisor", "admin"].includes(auth.userRole?.toLowerCase()));
+const barcodeCount = computed(() => {
+  return parseBarcodes(barcodeForm.value.barcodes).length;
+});
 const currentDetailOptions = computed(() => {
   const cat = barcodeForm.value.mainCat;
   const detailMode = getCardDetailMode(cat);
@@ -1232,7 +1249,7 @@ const summary = computed(() => {
   const out = {};
   nonComputerCards.value.forEach((card) => {
     const cat = card.id;
-    const fisik = calcFisikTotal(stockData.value, cat, tableRows.value);
+    const fisik = calcFisikTotal(stockData.value, cat, tableRows.value, getCardDetailMode(cat));
     const komputer = toInt(stockData.value["stok-komputer"]?.[cat]?.quantity);
     out[cat] = {
       fisik,
@@ -1503,14 +1520,14 @@ function applyLocalUpdate({ subDoc, mainCat, details = null, quantity = null }) 
   };
 }
 
-async function loadData({ force = false } = {}) {
-  loading.value = true;
+async function loadData({ force = false, silent = false } = {}) {
+  if (!silent) loading.value = true;
   try {
     if (!force) {
       const cacheData = readCache();
       if (cacheData) {
         stockData.value = cacheData;
-        loading.value = false;
+        if (!silent) loading.value = false;
         return;
       }
     }
@@ -1520,7 +1537,7 @@ async function loadData({ force = false } = {}) {
   } catch (e) {
     showError("Gagal memuat data stok", e.message);
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 }
 
@@ -1787,31 +1804,31 @@ function openBarcodeRincianModal(mainCat, sub) {
   showModal("barcodeRincianModal");
 }
 
-const deletingBarcode = ref("");
-async function handleDeleteBarcode(barcodeId) {
+const revertingBarcode = ref("");
+async function handleRevertBarcode(barcodeId) {
   const result = await confirm({
-    title: "Hapus Barcode?",
-    text: `Apakah Anda yakin ingin menghapus barcode ${barcodeId} dari sistem secara permanen? Stok fisik akan disesuaikan otomatis.`,
-    icon: "warning",
+    title: "Batalkan Mutasi Barcode?",
+    text: `Mengembalikan barcode ${barcodeId} ke lokasi sebelumnya, atau menghapusnya jika belum ada lokasi sebelumnya. Lanjutkan?`,
+    icon: "question",
     showCancelButton: true,
-    confirmButtonText: "Ya, Hapus",
+    confirmButtonText: "Ya, Batalkan",
     cancelButtonText: "Batal"
   });
 
   if (!result.isConfirmed) return;
 
-  deletingBarcode.value = barcodeId;
+  revertingBarcode.value = barcodeId;
   try {
-    await deleteSingleBarcode({ barcodeId, floorId: auth.activeFloor });
-    toast(`Barcode ${barcodeId} berhasil dihapus.`);
+    await revertSingleBarcode({ barcodeId, floorId: auth.activeFloor });
+    toast(`Barcode ${barcodeId} berhasil dibatalkan/diubah.`);
     // Reload the current page of barcodes
     await loadBarcodePage(currentPage.value);
     // Reload stock summary and table data
     await loadData({ force: true });
   } catch (e) {
-    showError("Gagal menghapus barcode", e.message);
+    showError("Gagal membatalkan barcode", e.message);
   } finally {
-    deletingBarcode.value = "";
+    revertingBarcode.value = "";
   }
 }
 
@@ -2142,18 +2159,59 @@ watch(
     const parsed = parseBarcodes(newVal);
     if (parsed.length === 0) {
       hasNewBarcode.value = false;
+      checkedBarcodesList.value = [];
       return;
     }
 
     checkTimeout = setTimeout(async () => {
+      // 1. Deteksi duplikat di dalam input textarea (Client-side)
+      const seen = new Set();
+      const duplicates = [];
+      parsed.forEach((bc) => {
+        if (seen.has(bc)) {
+          duplicates.push(bc);
+        } else {
+          seen.add(bc);
+        }
+      });
+
+      if (duplicates.length > 0) {
+        toast(`Barcode ${duplicates[0]} sudah discan!`, "warning");
+        // Bersihkan otomatis duplikat dari textarea
+        const uniqueParsed = [...seen];
+        barcodeForm.value.barcodes = uniqueParsed.join("\n");
+        return; // Hentikan proses, biarkan watcher re-run dengan input yang bersih
+      }
+
+      // 2. Cek status database (Firestore)
       checkingBarcodes.value = true;
       try {
         const res = await checkBarcodesStatus(parsed, auth.activeFloor);
         if (res && Array.isArray(res.results)) {
-          // Jika ada minimal 1 barcode yang belum terdaftar di database
+          checkedBarcodesList.value = res.results;
           hasNewBarcode.value = res.results.some(item => !item.exists);
+
+          // 3. Deteksi jika barcode sudah ada di lokasi tujuan terpilih (Client-side menggunakan cache)
+          const dest = barcodeForm.value.destination;
+          const alreadyInDest = res.results.find(item => item.exists && item.location === dest);
+          if (alreadyInDest) {
+            toast(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(barcodeForm.value.mainCat, alreadyInDest.location)})`, "warning");
+            return;
+          }
+
+          // 4. Deteksi ketidakcocokan kategori (Contoh: terdaftar GELANG tapi di-scan di tab KALUNG)
+          const activeCategory = barcodeForm.value.mainCat;
+          const mismatchedItem = res.results.find(item => item.exists && item.category && item.category !== activeCategory);
+          if (mismatchedItem) {
+            toast(`Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory}). Barcode ini terdaftar sebagai ${mismatchedItem.category}!`, "warning");
+            // Bersihkan barcode yang tidak sesuai kategori dari input
+            const cleanParsed = parsed.filter(bc => bc !== mismatchedItem.barcode);
+            barcodeForm.value.barcodes = cleanParsed.join("\n");
+            return;
+          }
         } else {
           hasNewBarcode.value = false;
+          checkedBarcodesList.value = [];
         }
       } catch {
         hasNewBarcode.value = true; // Fallback aman
@@ -2164,7 +2222,21 @@ watch(
   }
 );
 
+function handleBarcodeFormEnter(event) {
+  // Jika SweetAlert sedang terbuka, biarkan event Enter berjalan agar Swal bisa ditutup
+  if (document.querySelector(".swal2-container")) return;
+
+  // Izinkan Enter jika berada di dalam textarea untuk membuat baris baru
+  if (event.target.tagName === "TEXTAREA") return;
+  // Izinkan Enter jika fokus di tombol simpan (submit) untuk mengirim data
+  if (event.target.tagName === "BUTTON" && event.target.type !== "button") return;
+  
+  // Batalkan aksi default (mencegah submit otomatis atau memicu tombol Batal)
+  event.preventDefault();
+}
+
 async function submitBarcodeUpdate() {
+  if (document.querySelector(".swal2-container")) return;
   if (!barcodeForm.value.petugas.trim()) return toast("Petugas wajib diisi", "warning");
   if (!barcodeForm.value.destination) return toast("Lokasi tujuan wajib dipilih", "warning");
   if (!barcodeForm.value.barcodes.trim()) return toast("Barcode tidak boleh kosong", "warning");
@@ -2175,6 +2247,18 @@ async function submitBarcodeUpdate() {
 
   const barcodesArray = parseBarcodes(barcodeForm.value.barcodes);
   if (barcodesArray.length === 0) return toast("Tidak ada barcode yang valid", "warning");
+
+  const dest = barcodeForm.value.destination;
+  const alreadyInDest = checkedBarcodesList.value.find(item => item.exists && item.location === dest);
+  if (alreadyInDest) {
+    return swal(`Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan`, "warning");
+  }
+
+  const activeCategory = barcodeForm.value.mainCat;
+  const mismatchedItem = checkedBarcodesList.value.find(item => item.exists && item.category && item.category !== activeCategory);
+  if (mismatchedItem) {
+    return swal(`Gagal: Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory})`, "warning");
+  }
 
   saving.value = true;
   barcodeStatus.value = `Memproses ${barcodesArray.length} barcode...`;
@@ -2222,7 +2306,7 @@ async function submitBarcodeUpdate() {
       toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
     }
 
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("barcodeUpdateModal");
   } catch (e) {
     showError("Gagal memproses mutasi barcode", e.message);
@@ -2247,7 +2331,7 @@ async function submitSimpleUpdate() {
       keterangan: simpleForm.value.keterangan,
       floorId: auth.activeFloor,
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("simpleUpdateModal");
     toast("Stok berhasil diperbarui");
   } catch (e) {
@@ -2281,7 +2365,7 @@ async function submitTypedUpdate() {
       mainCat: typedForm.value.mainCat,
       details: { ...typedForm.value.details },
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("typedUpdateModal");
     toast(`Update ${typedForm.value.mainCat} berhasil`);
   } catch (e) {
@@ -2315,7 +2399,7 @@ async function submitHalaUpdate() {
       mainCat: halaForm.value.mainCat,
       details: { ...halaForm.value.details },
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("halaUpdateModal");
     toast(`Update ${halaForm.value.mainCat} berhasil`);
   } catch (e) {
@@ -2334,7 +2418,7 @@ async function submitKomputerUpdate() {
       newDetails: null,
       floorId: auth.activeFloor,
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("komputerUpdateModal");
     toast("Stok komputer diperbarui");
   } catch (e) {
@@ -2354,7 +2438,7 @@ async function submitKomputerColorUpdate() {
       detailType: komputerColorForm.value.detailType,
       floorId: auth.activeFloor,
     });
-    await loadData({ force: true });
+    await loadData({ force: true, silent: true });
     closeModal("komputerColorModal");
     toast("Stok komputer diperbarui");
   } catch (e) {
@@ -2418,8 +2502,16 @@ function scheduleNextDailySnapshot() {
 }
 
 async function initDailySnapshots() {
+  const now = getNowWita();
+  const todayKey = formatDateKey(now);
+  const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
+
+  if (sessionStorage.getItem(cacheKey) === "true") {
+    scheduleNextDailySnapshot();
+    return;
+  }
+
   try {
-    const now = getNowWita();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const yesterdayKey = formatDateKey(yesterday);
     const yReport = await fetchDailyReport(yesterdayKey, auth.activeFloor);
@@ -2427,7 +2519,6 @@ async function initDailySnapshots() {
       await saveDailyReport(yesterdayKey, stockData.value, auth.activeFloor);
     }
 
-    const todayKey = formatDateKey(now);
     const today005 = new Date(now);
     today005.setHours(0, 5, 0, 0);
     if (now >= today005) {
@@ -2436,6 +2527,7 @@ async function initDailySnapshots() {
         await saveDailyReport(todayKey, stockData.value, auth.activeFloor);
       }
     }
+    sessionStorage.setItem(cacheKey, "true");
   } catch {
     // ignore bootstrap snapshot errors
   } finally {
@@ -2451,7 +2543,37 @@ onMounted(async () => {
   await syncFloorScopedState();
   window.addEventListener("storage", handleStorageSync);
   window.addEventListener("melati-stock-reload", handleStockReload);
-  await initDailySnapshots();
+
+  // Auto-focus textarea saat modal update barcode dibuka
+  const modalEl = document.getElementById("barcodeUpdateModal");
+  if (modalEl) {
+    modalEl.addEventListener("shown.bs.modal", () => {
+      const textarea = modalEl.querySelector("textarea");
+      if (textarea) textarea.focus();
+    });
+  }
+
+  const now = getNowWita();
+  const todayKey = formatDateKey(now);
+  const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
+
+  if (sessionStorage.getItem(cacheKey) === "true") {
+    scheduleNextDailySnapshot();
+  } else {
+    if (stockData.value && Object.keys(stockData.value).length > 0) {
+      initDailySnapshots();
+    } else {
+      const unwatch = watch(
+        stockData,
+        (newData) => {
+          if (newData && Object.keys(newData).length > 0) {
+            initDailySnapshots();
+            unwatch();
+          }
+        }
+      );
+    }
+  }
 });
 
 watch(

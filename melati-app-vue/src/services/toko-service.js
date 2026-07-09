@@ -15,32 +15,43 @@ function getSOPDoc() {
 export async function ensureStoreProfile() {
   const docRef = getProfileDoc();
   const snap = await getDoc(docRef);
-  if (snap.exists()) return;
 
-  // Seamless migration: try to read from L2 first because the newest/current data is there
+  // If global document exists and was already migrated/initialized, return it immediately
+  if (snap.exists() && snap.data().migratedFromL2) {
+    return snap.data();
+  }
+
+  // Seamless migration: try to read from L2 first to migrate it to global
   let initialData = { ...DEFAULT_STORE_PROFILE };
+  let migrated = false;
   try {
     const legacyDocRef = doc(db, "floors", "L2", "settings", "storeProfile");
     const legacySnap = await getDoc(legacyDocRef);
     if (legacySnap.exists()) {
       initialData = legacySnap.data();
+      migrated = true;
     }
   } catch (err) {
     console.warn("Gagal migrasi data profil toko dari L2:", err);
   }
 
   const now = new Date().toISOString();
-  await setDoc(docRef, {
+  const finalData = {
     ...initialData,
+    migratedFromL2: true,
     lastUpdated: now,
-    updatedBy: auth.currentUser?.email || "System (Initial)",
-  });
+    updatedBy: auth.currentUser?.email || "System (Initial/Migration)",
+  };
+
+  await setDoc(docRef, finalData);
+  if (migrated) {
+    console.log("Sukses migrasi data profil toko dari L2 ke Global");
+  }
+  return finalData;
 }
 
 export async function fetchStoreProfile() {
-  await ensureStoreProfile();
-  const snap = await getDoc(getProfileDoc());
-  return snap.exists() ? snap.data() : { ...DEFAULT_STORE_PROFILE };
+  return await ensureStoreProfile();
 }
 
 export async function saveStoreProfile(payload, updatedBy = "System") {
@@ -52,6 +63,7 @@ export async function saveStoreProfile(payload, updatedBy = "System") {
     values: payload.values || "",
     team: payload.team || "",
     rightsAndObligations: payload.rightsAndObligations || "",
+    migratedFromL2: true,
     lastUpdated: now,
     updatedBy: updatedBy || auth.currentUser?.email || "System",
   });
@@ -62,32 +74,43 @@ export async function saveStoreProfile(payload, updatedBy = "System") {
 export async function ensureStoreSOP() {
   const docRef = getSOPDoc();
   const snap = await getDoc(docRef);
-  if (snap.exists()) return;
 
-  // Seamless migration: try to read from L2 first because the newest/current data is there
+  // If global document exists and was already migrated/initialized, return it immediately
+  if (snap.exists() && snap.data().migratedFromL2) {
+    return snap.data();
+  }
+
+  // Seamless migration: try to read from L2 first to migrate it to global
   let initialData = { ...DEFAULT_STORE_SOP };
+  let migrated = false;
   try {
     const legacyDocRef = doc(db, "floors", "L2", "settings", "storeSOP");
     const legacySnap = await getDoc(legacyDocRef);
     if (legacySnap.exists()) {
       initialData = legacySnap.data();
+      migrated = true;
     }
   } catch (err) {
     console.warn("Gagal migrasi data SOP toko dari L2:", err);
   }
 
   const now = new Date().toISOString();
-  await setDoc(docRef, {
+  const finalData = {
     ...initialData,
+    migratedFromL2: true,
     lastUpdated: now,
-    updatedBy: auth.currentUser?.email || "System (Initial)",
-  });
+    updatedBy: auth.currentUser?.email || "System (Initial/Migration)",
+  };
+
+  await setDoc(docRef, finalData);
+  if (migrated) {
+    console.log("Sukses migrasi data SOP toko dari L2 ke Global");
+  }
+  return finalData;
 }
 
 export async function fetchStoreSOP() {
-  await ensureStoreSOP();
-  const snap = await getDoc(getSOPDoc());
-  return snap.exists() ? snap.data() : { ...DEFAULT_STORE_SOP };
+  return await ensureStoreSOP();
 }
 
 export async function saveStoreSOP(payload, updatedBy = "System") {
@@ -97,6 +120,7 @@ export async function saveStoreSOP(payload, updatedBy = "System") {
     staffSOP: payload.staffSOP || "",
     goldKnowledge: payload.goldKnowledge || "",
     diamondKnowledge: payload.diamondKnowledge || "",
+    migratedFromL2: true,
     lastUpdated: now,
     updatedBy: updatedBy || auth.currentUser?.email || "System",
   });

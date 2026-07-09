@@ -11,7 +11,7 @@ const db = admin.firestore();
 const WITA_OFFSET = "+08:00";
 const WITA_MS = 8 * 60 * 60 * 1000;
 const LOCK_TTL_MS = 10 * 60 * 1000;
-const ENABLE_GLOBAL_SNAPSHOT_COMPAT = true;
+const ENABLE_GLOBAL_SNAPSHOT_COMPAT = false;
 const SNAPSHOT_FLOORS = ["L1", "L2"];
 
 function sha256Hex(value) {
@@ -204,8 +204,10 @@ const MAINTENANCE_COLLECTION_ALIAS = new Map(
 
 const MAINTENANCE_COLLECTION_BY_KEY = new Map(MAINTENANCE_COLLECTION_CONFIG.map((cfg) => [cfg.key, cfg]));
 
-function buildMonthlyQueries(config, bounds) {
-  const colRef = db.collection(config.collection);
+function buildMonthlyQueries(config, bounds, floorId = null) {
+  const colRef = floorId
+    ? db.collection("floors").doc(floorId).collection(config.key === "dailystocklogs" ? "dailyStockLogs" : config.collection)
+    : db.collection(config.collection);
 
   switch (config.mode) {
     case "date-string":
@@ -235,8 +237,10 @@ function buildMonthlyQueries(config, bounds) {
   }
 }
 
-function buildLegacySnapshotDayQueries(config, bounds) {
-  const colRef = db.collection(config.collection);
+function buildLegacySnapshotDayQueries(config, bounds, floorId = null) {
+  const colRef = floorId
+    ? db.collection("floors").doc(floorId).collection(config.collection)
+    : db.collection(config.collection);
   const dayCount = new Date(Date.UTC(bounds.year, bounds.monthNum, 0)).getUTCDate();
   const queries = [];
 
@@ -304,6 +308,13 @@ export const maintenanceMonthlyCleanup = onCall(
       throw new HttpsError("permission-denied", "Anda tidak memiliki akses maintenance.");
     }
 
+    const floorId = String(request.data?.floorId || "")
+      .trim()
+      .toUpperCase();
+    if (!["L1", "L2"].includes(floorId)) {
+      throw new HttpsError("invalid-argument", "floorId harus L1 atau L2.");
+    }
+
     const action = String(request.data?.action || "dryRun");
     if (!["dryRun", "execute"].includes(action)) {
       throw new HttpsError("invalid-argument", "Action tidak valid.");
@@ -352,11 +363,11 @@ export const maintenanceMonthlyCleanup = onCall(
           continue;
         }
 
-        let queries = buildMonthlyQueries(cfg, bounds);
+        let queries = buildMonthlyQueries(cfg, bounds, floorId);
         let count = await countDocsForQueries(queries);
 
         if (cfg.mode === "snapshot-date" && count === 0) {
-          const legacyQueries = buildLegacySnapshotDayQueries(cfg, bounds);
+          const legacyQueries = buildLegacySnapshotDayQueries(cfg, bounds, floorId);
           const legacyCount = await countDocsForQueries(legacyQueries);
           if (legacyCount > 0) {
             queries = legacyQueries;
@@ -409,9 +420,10 @@ export const maintenanceMonthlyCleanup = onCall(
       }
     }
 
-    await db.collection("maintenanceLogs").add({
+    await db.collection("floors").doc(floorId).collection("maintenanceLogs").add({
       action,
       month,
+      floorId,
       callerUid: request.auth?.uid || "",
       callerRole: role,
       requestedCollections: uniqueKeys,
@@ -637,44 +649,7 @@ function shiftYmd(ymd, deltaDays) {
   return formatYmd(toWitaParts(shifted));
 }
 
-async function aggregateTransactionsUntil(endDate) {
-  const endTs = admin.firestore.Timestamp.fromDate(endDate);
-  const snap = await db.collection("stokAksesorisTransaksi").where("timestamp", "<=", endTs).get();
-
-  const map = new Map();
-  for (const docSnap of snap.docs) {
-    const tx = docSnap.data();
-    const kode = tx.kode;
-    if (!kode) continue;
-
-    if (!map.has(kode)) {
-      map.set(kode, 0);
-    }
-
-    const jumlah = Number(tx.jumlah || 0);
-
-    switch (tx.jenis) {
-      case "tambah":
-      case "stockAddition":
-      case "initialStock":
-        map.set(kode, map.get(kode) + jumlah);
-        break;
-      case "laku":
-      case "free":
-      case "gantiLock":
-      case "return":
-        map.set(kode, map.get(kode) - jumlah);
-        break;
-      case "adjustment":
-        map.set(kode, tx.stokSesudah || map.get(kode));
-        break;
-      default:
-        break;
-    }
-  }
-
-  return map;
-}
+// Removed unused aggregateTransactionsUntil function
 
 function resolveSnapshotScope(scope = "global", floorId = "") {
   const normalizedScope =
@@ -850,6 +825,121 @@ function computeDailyStockReportsFromStockData(stockData = [], snapshotDateYmd =
   };
 }
 
+async function generateGoldDailyReport(floorId, dateYmd) {
+  const dbFloorRef = db.collection("floors").doc(floorId);
+  const stocksSnap = await dbFloorRef.collection("stocks").get();
+
+  const stockData = {};
+  stocksSnap.forEach((doc) => {
+    stockData[doc.id] = doc.data() || {};
+  });
+
+  const mainCategories = [
+    "KALUNG",
+    "LIONTIN",
+    "ANTING",
+    "CINCIN",
+    "HALA & SDW",
+    "GELANG",
+    "GIWANG",
+    "KENDARI & EMAS BALI",
+    "BERLIAN",
+  ];
+
+  const subCategories = [
+    "brankas",
+    "posting",
+    "barang-display",
+    "barang-rusak",
+    "batu-lepas",
+    "manual",
+    "admin",
+    "DP",
+    "lainnya",
+  ];
+
+  const subLabelMap = {
+    brankas: "Stok Brankas",
+    posting: "Belum Posting",
+    "barang-display": "Display",
+    "barang-rusak": "Rusak",
+    "batu-lepas": "Batu Lepas",
+    manual: "Manual",
+    admin: "Admin",
+    DP: "DP",
+    lainnya: "Lainnya",
+  };
+
+  const items = {};
+  const breakdown = {};
+
+  const settingsSnap = await dbFloorRef.collection("settings").doc("inventoryManajemen").get();
+  const settings = settingsSnap.exists ? settingsSnap.data() : null;
+
+  const getCardDetailMode = (id) => {
+    const card = settings?.cards?.find((c) => c.id === id);
+    if (card) {
+      const mode = String(card.detailMode || "").trim().toLowerCase();
+      if (mode === "color" || mode === "hala" || mode === "default") return mode;
+      if (card.type === "color") return "color";
+      if (card.type === "hala") return "hala";
+      return "default";
+    }
+    // Fallback
+    if (["KALUNG", "LIONTIN"].includes(id)) return "color";
+    if (["HALA & SDW", "KENDARI & EMAS BALI"].includes(id)) return "hala";
+    return "default";
+  };
+
+  mainCategories.forEach((mainCat) => {
+    const detailMode = getCardDetailMode(mainCat);
+    const useDetails = detailMode === "color" || detailMode === "hala";
+
+    let fisik = 0;
+    breakdown[mainCat] = {};
+
+    subCategories.forEach((subKey) => {
+      const item = stockData[subKey]?.[mainCat] || {};
+      const qty = parseInt(item.quantity, 10) || 0;
+      const details = item.details || null;
+
+      let subTotal = 0;
+      if (useDetails && details && Object.keys(details).length > 0) {
+        subTotal = Object.values(details).reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+      } else {
+        subTotal = qty;
+      }
+
+      fisik += subTotal;
+      breakdown[mainCat][subLabelMap[subKey] || subKey] = {
+        quantity: qty,
+        details: details,
+      };
+    });
+
+    const komputer = parseInt(stockData["stok-komputer"]?.[mainCat]?.quantity, 10) || 0;
+
+    let status = "Klop";
+    if (fisik < komputer) status = `Kurang ${komputer - fisik}`;
+    else if (fisik > komputer) status = `Lebih ${fisik - komputer}`;
+
+    items[mainCat] = { total: fisik, komputer, status };
+  });
+
+  const dateParts = dateYmd.split("-");
+  const dateKey = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`; // DD/MM/YYYY
+
+  return {
+    date: dateYmd,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    items,
+    breakdown,
+    createdBy: "cloud-function-scheduler",
+    version: "2.0",
+    snapshotDateKey: dateKey,
+  };
+}
+
 async function ensureSnapshotByDateYmdForScope({
   triggerSource = "manual-callable",
   scope = "global",
@@ -924,14 +1014,19 @@ async function ensureSnapshotByDateYmdForScope({
     const dailyReportsRef = scopeConfig.dailyReportsRef.doc(dateYmd);
     const dailyReportSnap = await dailyReportsRef.get();
     if (!dailyReportSnap.exists) {
-      await dailyReportsRef.set({
-        ...computeDailyStockReportsFromStockData(stockData, dateYmd),
-        snapshotDateKey: dateKey,
-        source: "snapshot-bridge",
-        triggerSource,
-        scopeKey: scopeConfig.scopeKey,
-        floorId: scopeConfig.floorId,
-      });
+      if (scope === "floor") {
+        const reportData = await generateGoldDailyReport(floorId, dateYmd);
+        await dailyReportsRef.set(reportData);
+      } else {
+        await dailyReportsRef.set({
+          ...computeDailyStockReportsFromStockData(stockData, dateYmd),
+          snapshotDateKey: dateKey,
+          source: "snapshot-bridge",
+          triggerSource,
+          scopeKey: scopeConfig.scopeKey,
+          floorId: scopeConfig.floorId,
+        });
+      }
     }
 
     logger.info("Daily snapshot created", {
@@ -1033,31 +1128,20 @@ export const scheduledCreateDailySnapshot = onSchedule(
   },
 );
 
-// Self-healing scheduler: ensures yesterday snapshot is recreated automatically
-// if it is missing (e.g., manually deleted) even when there are no transactions.
-export const periodicEnsureYesterdaySnapshot = onSchedule(
-  {
-    schedule: "5 * * * *",
-    timeZone: "Asia/Makassar",
-    region: "asia-southeast2",
-    memory: "256MiB",
-  },
-  async () => {
-    await ensureSnapshotsForAllScopes("periodic-scheduler");
-  },
-);
+// periodicEnsureYesterdaySnapshot scheduler removed to optimize Firestore resource usage.
 
-export const ensureYesterdaySnapshotOnFirstTxGlobal = onDocumentWritten(
-  {
-    document: "stokAksesorisTransaksi/{txId}",
-    region: "asia-southeast2",
-    memory: "256MiB",
-    retry: false,
-  },
-  async () => {
-    await ensureSnapshotForYesterdayByScope("firestore-write-fallback-global", "global", "");
-  },
-);
+// Deactivated global snapshot trigger since system is fully floor-based
+// export const ensureYesterdaySnapshotOnFirstTxGlobal = onDocumentWritten(
+//   {
+//     document: "stokAksesorisTransaksi/{txId}",
+//     region: "asia-southeast2",
+//     memory: "256MiB",
+//     retry: false,
+//   },
+//   async () => {
+//     await ensureSnapshotForYesterdayByScope("firestore-write-fallback-global", "global", "");
+//   },
+// );
 
 export const ensureYesterdaySnapshotOnFirstTxFloor = onDocumentWritten(
   {
@@ -1507,6 +1591,8 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     let oldCategory = null;
     let oldDetailType = null;
     
+    const parsed = parseBarcodeCategoryAndType(id);
+    
     if (snap.exists) {
       exists = true;
       const data = snap.data();
@@ -1514,15 +1600,14 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       oldDetailType = data.detailType;
       resolvedOrigin = data.location || destination;
       
-      category = allowCategoryOverride ? (inputCategory || defaultCategory || data.category) : data.category;
-      detailType = allowCategoryOverride ? (inputDetailType || defaultDetailType || data.detailType) : data.detailType;
+      category = allowCategoryOverride ? (inputCategory || defaultCategory || data.category) : (data.category || defaultCategory || parsed.mainCat);
+      detailType = allowCategoryOverride ? (inputDetailType || defaultDetailType || data.detailType) : (data.detailType || defaultDetailType || parsed.subType);
       
       if (data.in_mutasi) {
         throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (sudah laku/mutasi).`);
       }
     } else {
       exists = false;
-      const parsed = parseBarcodeCategoryAndType(id);
       category = inputCategory || defaultCategory || parsed.mainCat;
       detailType = inputDetailType || defaultDetailType || parsed.subType;
       resolvedOrigin = destination; // Base registration
@@ -2110,6 +2195,13 @@ export const deleteSingleBarcode = onCall(
 
     const dbFloorRef = db.collection("floors").doc(floorId);
     const barcodeRef = dbFloorRef.collection("barcodes").doc(barcodeId.trim().toUpperCase());
+    const historyRef = dbFloorRef.collection("barcodesHistory").doc(barcodeId.trim().toUpperCase());
+
+    const cleanBarcodeId = barcodeId.trim().toUpperCase();
+    const qSingle = dbFloorRef.collection("barcodeMutationLogs").where("barcode", "==", cleanBarcodeId);
+    const qBulk = dbFloorRef.collection("barcodeMutationLogs").where("barcodeIds", "array-contains", cleanBarcodeId);
+
+    const [snapSingle, snapBulk] = await Promise.all([qSingle.get(), qBulk.get()]);
 
     await db.runTransaction(async (t) => {
       const snap = await t.get(barcodeRef);
@@ -2166,6 +2258,37 @@ export const deleteSingleBarcode = onCall(
       // Perform writes
       t.set(stockRef, updatedStockData, { merge: true });
       t.delete(barcodeRef);
+      t.delete(historyRef);
+
+      // Clean up single mutation logs
+      snapSingle.docs.forEach((doc) => {
+        t.delete(doc.ref);
+      });
+
+      // Clean up bulk mutation logs
+      snapBulk.docs.forEach((doc) => {
+        const data = doc.data() || {};
+        const barcodeIds = Array.isArray(data.barcodeIds) ? data.barcodeIds.filter(id => id !== cleanBarcodeId) : [];
+        const barcodes = Array.isArray(data.barcodes) ? data.barcodes.filter(b => b.barcode !== cleanBarcodeId) : [];
+
+        if (barcodeIds.length === 0) {
+          t.delete(doc.ref);
+        } else {
+          const updateData = {
+            barcodeIds,
+            barcodes,
+          };
+          if (barcodeIds.length === 1) {
+            updateData.barcode = barcodes[0].barcode;
+            updateData.category = barcodes[0].category;
+            updateData.detailType = barcodes[0].detailType || null;
+            updateData.origin = barcodes[0].origin;
+          } else {
+            updateData.barcode = `GABUNGAN (${barcodeIds.length} BARANG)`;
+          }
+          t.update(doc.ref, updateData);
+        }
+      });
 
       // Write to dailyStockLogs
       const dateStr = formatYmd(toWitaParts(new Date()));
@@ -2183,6 +2306,230 @@ export const deleteSingleBarcode = onCall(
           userName: "Supervisor",
           keterangan: `Hapus Barcode Satuan: ${barcodeId}`
         })
+      }, { merge: true });
+    });
+
+    return { success: true };
+  }
+);
+
+export const revertSingleBarcode = onCall(
+  { region: "asia-southeast2", memory: "256MiB", cors: true },
+  async (request) => {
+    const role = await resolveCallerRole(request);
+    if (!["supervisor", "admin"].includes(role)) {
+      throw new HttpsError("permission-denied", "Akses ditolak. Fitur ini hanya dapat dijalankan oleh Supervisor atau Admin.");
+    }
+
+    const { barcodeId, floorId = "L1" } = request.data || {};
+    if (!barcodeId) {
+      throw new HttpsError("invalid-argument", "barcodeId wajib diisi.");
+    }
+
+    const cleanBarcodeId = barcodeId.trim().toUpperCase();
+    const dbFloorRef = db.collection("floors").doc(floorId);
+    
+    // Ambil info barcode saat ini terlebih dahulu
+    const barcodeRef = dbFloorRef.collection("barcodes").doc(cleanBarcodeId);
+    const snapBarcode = await barcodeRef.get();
+    if (!snapBarcode.exists) {
+      throw new HttpsError("not-found", "Barcode tidak ditemukan.");
+    }
+    const barcodeData = snapBarcode.data();
+    const currentLoc = barcodeData.location;
+    const cat = barcodeData.category;
+    const detailType = barcodeData.detailType || null;
+
+    // Ambil log mutasi terbaru yang meletakkan barcode di lokasi saat ini
+    const qSingle = dbFloorRef.collection("barcodeMutationLogs").where("barcode", "==", cleanBarcodeId).where("destination", "==", currentLoc);
+    const qBulk = dbFloorRef.collection("barcodeMutationLogs").where("barcodeIds", "array-contains", cleanBarcodeId).where("destination", "==", currentLoc);
+    const [snapSingle, snapBulk] = await Promise.all([qSingle.get(), qBulk.get()]);
+
+    const allLogs = [];
+    snapSingle.docs.forEach(d => allLogs.push({ ref: d.ref, data: d.data() }));
+    snapBulk.docs.forEach(d => {
+      if (!allLogs.some(l => l.ref.id === d.id)) {
+        allLogs.push({ ref: d.ref, data: d.data() });
+      }
+    });
+
+    // Urutkan berdasarkan waktu mutasi terbaru
+    allLogs.sort((a, b) => {
+      const aTime = a.data.timestamp ? a.data.timestamp.toMillis() : 0;
+      const bTime = b.data.timestamp ? b.data.timestamp.toMillis() : 0;
+      return bTime - aTime;
+    });
+
+    let latestLog = allLogs[0] || null;
+    let foundOrigin = null;
+    if (latestLog) {
+      const bcEntry = Array.isArray(latestLog.data.barcodes) ? latestLog.data.barcodes.find(b => b.barcode === cleanBarcodeId) : null;
+      foundOrigin = bcEntry ? bcEntry.origin : (latestLog.data.origin || null);
+    }
+
+    const isRevert = foundOrigin && foundOrigin !== currentLoc;
+    const petugasName = role === "admin" ? "Admin" : "Supervisor";
+
+    await db.runTransaction(async (t) => {
+      // 1. Ambil semua data stok yang diperlukan di awal transaksi (Reads)
+      const currentStockRef = dbFloorRef.collection("stocks").doc(currentLoc);
+      const originStockRef = isRevert ? dbFloorRef.collection("stocks").doc(foundOrigin) : null;
+      
+      const reads = [t.get(currentStockRef)];
+      if (originStockRef) {
+        reads.push(t.get(originStockRef));
+      }
+      const snaps = await Promise.all(reads);
+      const currentStockSnap = snaps[0];
+      const originStockSnap = isRevert ? snaps[1] : null;
+
+      const currentStockData = currentStockSnap.exists ? currentStockSnap.data() : {};
+      const originStockData = (originStockSnap && originStockSnap.exists) ? originStockSnap.data() : {};
+
+      // 2. Lakukan perhitungan perubahan stok
+      // Selalu kurangi stok lokasi saat ini (-1)
+      const currentCatData = currentStockData[cat] || { quantity: 0, history: [] };
+      const currentQty = parseInt(currentCatData.quantity, 10) || 0;
+      const newCurrentQty = Math.max(0, currentQty - 1);
+      
+      const updatedCurrentCat = {
+        quantity: newCurrentQty,
+        lastUpdated: new Date().toISOString(),
+        history: Array.isArray(currentCatData.history) ? [...currentCatData.history] : []
+      };
+      
+      updatedCurrentCat.history.unshift({
+        date: new Date().toISOString(),
+        action: "Kurangi",
+        quantity: 1,
+        oldQuantity: currentQty,
+        newQuantity: newCurrentQty,
+        petugas: petugasName,
+        keterangan: isRevert 
+          ? `Pembatalan Mutasi Barcode ${cleanBarcodeId} kembali ke ${foundOrigin}`
+          : `Hapus Barcode Satuan (Batalkan): ${cleanBarcodeId}`
+      });
+      if (updatedCurrentCat.history.length > 10) updatedCurrentCat.history = updatedCurrentCat.history.slice(0, 10);
+      
+      if (detailType) {
+        const details = currentCatData.details || {};
+        const typeQty = parseInt(details[detailType], 10) || 0;
+        updatedCurrentCat.details = { ...details, [detailType]: Math.max(0, typeQty - 1) };
+      }
+
+      let originQty = 0;
+      let newOriginQty = 0;
+      let updatedOriginCat = null;
+
+      if (isRevert) {
+        // Tambahkan stok lokasi asal (+1)
+        const originCatData = originStockData[cat] || { quantity: 0, history: [] };
+        originQty = parseInt(originCatData.quantity, 10) || 0;
+        newOriginQty = originQty + 1;
+        
+        updatedOriginCat = {
+          quantity: newOriginQty,
+          lastUpdated: new Date().toISOString(),
+          history: Array.isArray(originCatData.history) ? [...originCatData.history] : []
+        };
+        
+        updatedOriginCat.history.unshift({
+          date: new Date().toISOString(),
+          action: "Tambah",
+          quantity: 1,
+          oldQuantity: originQty,
+          newQuantity: newOriginQty,
+          petugas: petugasName,
+          keterangan: `Pembatalan Mutasi Barcode ${cleanBarcodeId} kembali dari ${currentLoc}`
+        });
+        if (updatedOriginCat.history.length > 10) updatedOriginCat.history = updatedOriginCat.history.slice(0, 10);
+        
+        if (detailType) {
+          const details = originCatData.details || {};
+          const typeQty = parseInt(details[detailType], 10) || 0;
+          updatedOriginCat.details = { ...details, [detailType]: typeQty + 1 };
+        }
+      }
+
+      // 3. Eksekusi semua penulisan database (Writes)
+      // Update stok saat ini
+      t.set(currentStockRef, { ...currentStockData, [cat]: updatedCurrentCat }, { merge: true });
+
+      if (isRevert) {
+        // Update stok lokasi asal
+        t.set(originStockRef, { ...originStockData, [cat]: updatedOriginCat }, { merge: true });
+
+        // Kembalikan lokasi barcode ke origin
+        t.set(barcodeRef, {
+          location: foundOrigin,
+          in_display: foundOrigin === "barang-display",
+          in_mutasi: ["mutasi", "laku"].includes(foundOrigin),
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else {
+        // Hapus dokumen barcode dari active list & history (jika ada)
+        t.delete(barcodeRef);
+        t.delete(dbFloorRef.collection("barcodesHistory").doc(cleanBarcodeId));
+      }
+
+      // Bersihkan dokumen log mutasi lama
+      if (latestLog) {
+        const logData = latestLog.data;
+        const barcodeIds = Array.isArray(logData.barcodeIds) ? logData.barcodeIds.filter(id => id !== cleanBarcodeId) : [];
+        const barcodes = Array.isArray(logData.barcodes) ? logData.barcodes.filter(b => b.barcode !== cleanBarcodeId) : [];
+
+        if (barcodeIds.length === 0) {
+          t.delete(latestLog.ref);
+        } else {
+          const updateData = { barcodeIds, barcodes };
+          if (barcodeIds.length === 1) {
+            updateData.barcode = barcodes[0].barcode;
+            updateData.category = barcodes[0].category;
+            updateData.detailType = barcodes[0].detailType || null;
+            updateData.origin = barcodes[0].origin;
+          } else {
+            updateData.barcode = `GABUNGAN (${barcodeIds.length} BARANG)`;
+          }
+          t.update(latestLog.ref, updateData);
+        }
+      }
+
+      // Catat logs harian (dailyStockLogs)
+      const dateStr = formatYmd(toWitaParts(new Date()));
+      const dailyLogRef = dbFloorRef.collection("dailyStockLogs").doc(dateStr);
+      const dailyLogs = [
+        {
+          timestamp: admin.firestore.Timestamp.now(),
+          jenis: cat,
+          lokasi: currentLoc,
+          action: "kurangi",
+          before: currentQty,
+          after: newCurrentQty,
+          quantity: 1,
+          userName: petugasName,
+          keterangan: isRevert 
+            ? `Pembatalan Mutasi Barcode: ${cleanBarcodeId}`
+            : `Hapus Barcode Satuan (Batalkan): ${cleanBarcodeId}`
+        }
+      ];
+
+      if (isRevert) {
+        dailyLogs.push({
+          timestamp: admin.firestore.Timestamp.now(),
+          jenis: cat,
+          lokasi: foundOrigin,
+          action: "tambah",
+          before: originQty,
+          after: newOriginQty,
+          quantity: 1,
+          userName: petugasName,
+          keterangan: `Pembatalan Mutasi Barcode: ${cleanBarcodeId}`
+        });
+      }
+
+      t.set(dailyLogRef, {
+        date: dateStr,
+        logs: admin.firestore.FieldValue.arrayUnion(...dailyLogs)
       }, { merge: true });
     });
 
@@ -2374,4 +2721,83 @@ export const revertMutationLog = onCall(
     return { success: true };
   }
 );
+
+export const getSpeechTTS = onCall({ region: "asia-southeast2" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Request must be authenticated.");
+  }
+
+  const { text, provider, voiceName, pitch } = request.data || {};
+  if (!text) {
+    throw new HttpsError("invalid-argument", "Text parameter is required.");
+  }
+
+  try {
+    // Read API Key from private Firestore document
+    const docRef = db.collection("settings").doc("googleTTS");
+    const snap = await docRef.get();
+    
+    let apiKey = "";
+    if (snap.exists) {
+      apiKey = snap.data().apiKey || "";
+    }
+
+    if (provider === "google_cloud") {
+      if (!apiKey) {
+        throw new HttpsError("failed-precondition", "Google Cloud TTS API Key is not configured on the server. Please add it to Firestore under settings/googleTTS.");
+      }
+
+      const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+      const payload = {
+        input: { text },
+        voice: {
+          languageCode: "id-ID",
+          name: voiceName || "id-ID-Wavenet-A",
+          ssmlGender: (voiceName || "").includes("-B") || (voiceName || "").includes("-C") ? "MALE" : "FEMALE"
+        },
+        audioConfig: {
+          audioEncoding: "MP3",
+          pitch: typeof pitch === "number" ? pitch : 0.0
+        }
+      };
+
+      const originalReferer = request.rawRequest?.headers?.referer || "https://melatigold.web.app/";
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Referer": originalReferer
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Google Cloud TTS API error: ${response.status} - ${errorText}`);
+      }
+
+      const json = await response.json();
+      return { success: true, audioContent: json.audioContent };
+    } else {
+      // Default: free Translate TTS
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=id&client=tw-ob&q=${encodeURIComponent(text)}`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Translate TTS failed with status ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      return { success: true, audioContent: base64 };
+    }
+  } catch (err) {
+    logger.error("Failed to generate TTS:", err);
+    throw new HttpsError("internal", err.message || "Failed to generate TTS.");
+  }
+});
 

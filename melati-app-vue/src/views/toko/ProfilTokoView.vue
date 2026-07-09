@@ -16,7 +16,7 @@
       </div>
 
       <!-- Info Role Alert Banner -->
-      <div class="badge-role-info shadow-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill">
+      <div class="badge-role-info shadow-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill d-none d-md-flex">
         <i :class="isSupervisor ? 'bi-shield-check text-success' : 'bi-info-circle text-primary'"></i>
         <span class="small fw-semibold text-secondary">
           Role: <span class="text-uppercase text-dark font-monospace">{{ auth.userRole || 'staff' }}</span>
@@ -26,17 +26,19 @@
 
     <!-- Tab Navigation -->
     <div class="card border-0 shadow-sm mb-4 overflow-hidden rounded-4">
-      <div class="card-body p-2 bg-light rounded-top d-flex gap-2 flex-wrap border-bottom">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all"
-          :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
-          @click="activeTab = tab.id"
-        >
-          <i :class="['bi', tab.icon]"></i>
-          {{ tab.label }}
-        </button>
+      <div class="card-body p-2 bg-light rounded-top border-bottom overflow-hidden">
+        <div class="tabs-scrollable">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all text-nowrap"
+            :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
+            @click="activeTab = tab.id"
+          >
+            <i :class="['bi', tab.icon]"></i>
+            {{ tab.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Main Content Area with Smooth Transitions -->
@@ -58,7 +60,7 @@
                   <div class="store-hero-banner p-4 p-md-5 rounded-4 mb-2 position-relative overflow-hidden shadow border border-gold-subtle text-white">
                     <div class="overlay-glass"></div>
                     <div class="position-relative z-index-2">
-                      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+                      <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-sm-between gap-3 mb-4">
                         <div class="d-flex align-items-center gap-3">
                           <div class="brand-logo-circle bg-gold-gradient d-flex align-items-center justify-content-center rounded-circle shadow">
                             <i class="bi bi-gem text-white fs-4"></i>
@@ -70,11 +72,11 @@
                         </div>
                         <button
                           v-if="isSupervisor"
-                          class="btn btn-sm btn-gold-outline px-3 d-flex align-items-center gap-1 shadow-sm"
+                          class="btn btn-sm btn-gold-outline px-3 d-flex align-items-center gap-1 shadow-sm btn-edit-responsive d-none d-md-flex"
                           @click="toggleEdit('about')"
                         >
                           <i :class="['bi', editingState.about ? 'bi-eye' : 'bi-pencil-square']"></i>
-                          {{ editingState.about ? 'Selesai Edit' : 'Edit Teks' }}
+                          {{ editingState.about ? 'Selesai' : 'Edit' }}
                         </button>
                       </div>
 
@@ -217,11 +219,11 @@
                   </h5>
                   <button
                     v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
+                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 d-none d-md-flex"
                     @click="toggleEdit('team')"
                   >
                     <i :class="['bi', editingState.team ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.team ? 'Selesai Edit' : 'Edit Teks' }}
+                    {{ editingState.team ? 'Selesai Edit' : 'Edit' }}
                   </button>
                 </div>
 
@@ -252,11 +254,11 @@
                   </h5>
                   <button
                     v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
+                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 d-none d-md-flex"
                     @click="toggleEdit('rightsAndObligations')"
                   >
                     <i :class="['bi', editingState.rightsAndObligations ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.rightsAndObligations ? 'Selesai Edit' : 'Edit Teks' }}
+                    {{ editingState.rightsAndObligations ? 'Selesai Edit' : 'Edit' }}
                   </button>
                 </div>
 
@@ -283,7 +285,6 @@
       <!-- Footer Info Last Update -->
       <div v-if="!loading && (meta.lastUpdated || meta.updatedBy)" class="card-footer bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small">
         <span>Terakhir diperbarui: <strong>{{ formatDateTime(meta.lastUpdated) }}</strong></span>
-        <span>Diperbarui oleh: <strong class="text-gold">{{ meta.updatedBy }}</strong></span>
       </div>
     </div>
   </div>
@@ -1019,5 +1020,122 @@ onMounted(() => {
 
 :deep(p.leading-relaxed) {
   line-height: 1.75;
+}
+
+/* Scrollable tabs navigation on mobile */
+.tabs-scrollable {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  padding-bottom: 2px;
+}
+.tabs-scrollable::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+@media (max-width: 575.98px) {
+  /* Header spacing */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  .badge-role-info {
+    align-self: flex-start;
+  }
+  .page-title {
+    font-size: 1.4rem !important;
+  }
+  
+  /* Tabs padding */
+  .tab-btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
+  
+  /* Main Container Card body padding */
+  .card-body.p-4 {
+    padding: 1.25rem !important;
+  }
+  
+  /* Store Hero Banner */
+  .store-hero-banner {
+    padding: 1.5rem 1.25rem !important;
+  }
+  .brand-logo-circle {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .brand-logo-circle i {
+    font-size: 1.15rem !important;
+  }
+  .store-hero-banner h2 {
+    font-size: 1.4rem !important;
+  }
+  .store-intro-text {
+    font-size: 0.92rem !important;
+    line-height: 1.6 !important;
+  }
+  
+  /* Info Pill Cards inside Store Hero Banner */
+  .info-pill-card {
+    padding: 0.75rem 1rem !important;
+  }
+  .info-pill-card .icon-circle {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .info-pill-card .icon-circle i {
+    font-size: 0.95rem !important;
+  }
+  
+  /* Profile Section Cards (Mission & Values) */
+  .profile-section-card {
+    padding: 1.25rem !important;
+  }
+  .profile-section-card h5 {
+    font-size: 1.1rem !important;
+  }
+  .content-preview {
+    font-size: 0.88rem !important;
+    line-height: 1.65 !important;
+  }
+  
+  /* Tab 2: Team Responsibilities Cards */
+  :deep(.team-card) {
+    padding: 1.25rem !important;
+  }
+  :deep(.team-card-badge) {
+    width: 38px !important;
+    height: 38px !important;
+    margin-bottom: 0.75rem !important;
+  }
+  :deep(.team-card-badge i) {
+    font-size: 1.15rem !important;
+  }
+  
+  /* Tab 3: Rights & Obligations Column Cards */
+  :deep(.rights-column-card),
+  :deep(.obligations-column-card) {
+    padding: 1.25rem !important;
+  }
+  :deep(.rights-column-card .mb-4),
+  :deep(.obligations-column-card .mb-4) {
+    margin-bottom: 1.25rem !important;
+  }
+  :deep(.border-left-highlight) {
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: 12px !important;
+  }
+  
+  /* Mobile-only full-width buttons */
+  .btn-edit-responsive {
+    width: 100% !important;
+    justify-content: center !important;
+  }
 }
 </style>

@@ -99,19 +99,19 @@ export const TYPED_CATS = ["KALUNG", "LIONTIN"];
 /** Categories that use jewelry type sub-types (HALA, KENDARI) */
 export const HALA_CATS = ["HALA & SDW", "KENDARI & EMAS BALI"];
 export const KETERANGAN_OPTS = [
-  "restok",
-  "laku",
-  "dipajang",
-  "sudah posting",
-  "tutup toko",
-  "mutasi staff",
-  "barang rusak",
-  "batu lepas",
-  "kode bermasalah",
-  "mutasi",
-  "diperbaiki",
-  "salah update",
-  "custom",
+  "Restok",
+  "Laku",
+  "Dipajang",
+  "Sudah Posting",
+  "Wishlist Customer",
+  "Barang Rusak",
+  "Batu Lepas",
+  "Kode Bermasalah",
+  "Mutasi",
+  "Keep Staff",
+  "Salah Update",
+  "Contoh Custom",
+  "Owner",
 ];
 
 const ALL_SUB_DOCS = [
@@ -192,6 +192,15 @@ export async function fetchAllStockData(floorId = "") {
   return result;
 }
 
+function parseTimestamp(val) {
+  if (!val) return 0;
+  if (typeof val.toDate === "function") return val.toDate().getTime();
+  if (val.seconds !== undefined) return val.seconds * 1000;
+  if (val instanceof Date) return val.getTime();
+  const parsed = Date.parse(val);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 export function mergeStockByLatest(localData = {}, incomingData = {}) {
   const merged = { ...localData };
   Object.keys(incomingData || {}).forEach((docId) => {
@@ -211,8 +220,8 @@ export function mergeStockByLatest(localData = {}, incomingData = {}) {
         return;
       }
 
-      const localTs = localNode.lastUpdated ? Date.parse(localNode.lastUpdated) : 0;
-      const incomingTs = incomingNode.lastUpdated ? Date.parse(incomingNode.lastUpdated) : 0;
+      const localTs = parseTimestamp(localNode.lastUpdated);
+      const incomingTs = parseTimestamp(incomingNode.lastUpdated);
       nextDoc[mainCat] = incomingTs >= localTs ? incomingNode : localNode;
     });
 
@@ -513,11 +522,17 @@ export async function saveDailyReport(dateStr, stockData, floorId = "") {
     lainnya: "Lainnya",
   };
 
+  const settings = await fetchInventorySettings(floorId);
+  const getCardDetailMode = (id) => {
+    const card = settings?.cards?.find((c) => c.id === id);
+    return card?.detailMode || "default";
+  };
+
   const items = {};
   const breakdown = {};
 
   MAIN_CATEGORIES.forEach((mainCat) => {
-    const fisik = calcFisikTotal(stockData, mainCat);
+    const fisik = calcFisikTotal(stockData, mainCat, SUB_CATEGORIES, getCardDetailMode(mainCat));
     const komputer = parseInt(stockData["stok-komputer"]?.[mainCat]?.quantity) || 0;
     const { label: status } = getStockStatus(fisik, komputer);
     items[mainCat] = { total: fisik, komputer, status };

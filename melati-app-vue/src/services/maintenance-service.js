@@ -69,10 +69,10 @@ async function callMaintenance(payload) {
   return res?.data || {};
 }
 
-export async function maintenanceDryRun(month, collections) {
-  return callMaintenance({ action: "dryRun", month, collections });
+export async function maintenanceDryRun(month, collections, floorId) {
+  return callMaintenance({ action: "dryRun", month, collections, floorId });
 }
 
-export async function maintenanceExecute(month, collections) {
-  return callMaintenance({ action: "execute", month, collections });
+export async function maintenanceExecute(month, collections, floorId) {
+  return callMaintenance({ action: "execute", month, collections, floorId });
 }

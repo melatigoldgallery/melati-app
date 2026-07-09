@@ -12,7 +12,7 @@
             <small class="text-muted">Kelola grup klip untuk mutasi massal</small>
           </div>
           <button 
-            class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm hover-lift"
+            class="btn btn-success btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm hover-lift"
             @click="openCreateModal"
           >
             <i class="bi bi-plus-lg me-1"></i>
@@ -44,7 +44,7 @@
               <div class="d-flex gap-1.5 overflow-auto pb-1 scrollable-pills">
                 <button 
                   class="btn btn-xs rounded-pill px-3 transition-all fw-semibold"
-                  :class="activeCategoryFilter === '' ? 'btn-primary shadow-sm' : 'btn-outline-secondary'"
+                  :class="activeCategoryFilter === '' ? 'btn-success shadow-sm' : 'btn-outline-secondary'"
                   @click="activeCategoryFilter = ''"
                 >
                   Semua
@@ -53,7 +53,7 @@
                   v-for="card in dynamicCards" 
                   :key="card.id"
                   class="btn btn-xs rounded-pill px-3 transition-all fw-semibold text-nowrap"
-                  :class="activeCategoryFilter === getPrefix(card.id) ? 'btn-primary shadow-sm' : 'btn-outline-secondary'"
+                  :class="activeCategoryFilter === getPrefix(card.id) ? 'btn-success shadow-sm' : 'btn-outline-secondary'"
                   @click="activeCategoryFilter = getPrefix(card.id)"
                   :title="card.label"
                 >
@@ -96,7 +96,7 @@
                 </small>
               </div>
               <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                <span class="badge rounded-pill bg-primary px-2.5 py-1 text-white fw-bold fs-7 shadow-sm">
+                <span class="badge rounded-pill bg-secondary px-2.5 py-1 text-white fw-bold fs-7 shadow-sm">
                   {{ clip.barcodes?.length || 0 }} Barcode
                 </span>
                 <i class="bi bi-chevron-right text-muted opacity-50"></i>
@@ -134,7 +134,7 @@
             </div>
             <div class="d-flex gap-2">
               <button 
-                class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5 transition-all"
+                class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 transition-all"
                 @click="renameSelectedClip"
                 :disabled="saving"
               >
@@ -142,7 +142,7 @@
                 <span>Ganti Nama</span>
               </button>
               <button 
-                class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5 transition-all"
+                class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 transition-all"
                 @click="deleteSelectedClip"
                 :disabled="saving"
               >
@@ -172,20 +172,38 @@
                   placeholder="Paste list barcode di sini (pisahkan dengan spasi, enter, koma atau titik koma)..."
                   :disabled="saving"
                 ></textarea>
-                <div class="form-text text-muted small">
-                  Setiap barcode yang ditambahkan akan otomatis terdaftar/masuk ke kategori <strong>"Belum Posting"</strong> di sistem.
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                  <div class="form-text text-muted small mb-0">
+                    Setiap barcode yang ditambahkan akan otomatis masuk ke kategori <strong>"Belum Posting"</strong> di sistem.
+                  </div>
+                  <span v-if="barcodeInputCount > 0" class="badge bg-primary rounded-pill px-3 py-1.5 shadow-sm">
+                    <i class="bi bi-qr-code me-1"></i>
+                    {{ barcodeInputCount }} Barcode
+                  </span>
                 </div>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button 
-                  class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
-                  @click="addBarcodesToClip"
-                  :disabled="saving || !barcodeTextInput.trim()"
-                >
-                  <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
-                  <i v-else class="bi bi-clipboard-plus"></i>
-                  <span>Tambah ke Klip & Daftarkan</span>
-                </button>
+                <!-- Form Petugas (Staff) Input Barcode -->
+                <div class="row g-3 align-items-end mt-0 pt-2 border-light-subtle">
+                  <div class="col-md-3 text-start">
+                    <label class="form-label small fw-bold text-secondary mb-1">Petugas (Staff) <span class="text-danger">*</span></label>
+                    <select v-model="inputPetugasName" class="form-select form-select-sm border-2 rounded-4 custom-select" required :disabled="saving">
+                      <option value="">-- Pilih Staff --</option>
+                      <option v-for="staff in staffOptions" :key="`clip-input-staff-${staff}`" :value="staff">
+                        {{ staff }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 d-flex justify-content-start">
+                    <button 
+                      class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
+                      @click="addBarcodesToClip"
+                      :disabled="saving || !barcodeTextInput.trim()"
+                    >
+                      <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
+                      <i v-else class="bi bi-clipboard-plus"></i>
+                      <span>Tambahkan Barcode</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -268,21 +286,21 @@
           </div>
           <form @submit.prevent="executeMoveData">
             <div class="row g-3 align-items-end">
-              <div class="col-md-5 text-start">
+              <div class="col-md-3 text-start">
                 <label class="form-label small fw-bold text-secondary mb-1">Petugas (Staff) <span class="text-danger">*</span></label>
-                <select v-model="petugasName" class="form-select form-select-sm border-2 rounded-2 custom-select" required :disabled="saving">
+                <select v-model="petugasName" class="form-select form-select-sm border-2 rounded-4 custom-select" required :disabled="saving">
                   <option value="">-- Pilih Staff --</option>
                   <option v-for="staff in staffOptions" :key="`clip-staff-${staff}`" :value="staff">
                     {{ staff }}
                   </option>
                 </select>
               </div>
-              <div class="col-md-7 text-start">
+              <div class="col-md-3 text-start">
                 <label class="form-label small fw-bold text-secondary mb-1">Catatan Mutasi</label>
                 <input 
                   v-model="notesInput" 
                   type="text" 
-                  class="form-control form-control-sm border-2 rounded-2" 
+                  class="form-control form-control-sm border-2 rounded-4" 
                   placeholder="Catatan tambahan..." 
                   :disabled="saving"
                 />
@@ -320,7 +338,7 @@
     <div class="modal fade" id="createClipModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-          <div class="modal-header py-3 bg-primary text-white border-0">
+          <div class="modal-header py-3 bg-success text-white border-0">
             <h6 class="modal-title fw-bold">
               <i class="bi bi-paperclip me-1.5"></i>
               Buat Klip Baru
@@ -425,11 +443,15 @@ const activeCategoryFilter = ref("");
 
 // Barcode input and statuses
 const barcodeTextInput = ref("");
+const barcodeInputCount = computed(() => {
+  return parseBarcodes(barcodeTextInput.value).length;
+});
 const checkingStatus = ref(false);
 const barcodeStatuses = ref({}); // barcode -> { exists, location, category, detailType }
 
 // Mutation Action Form
 const petugasName = ref("");
+const inputPetugasName = ref("");
 const notesInput = ref("");
 const autoDeleteClip = ref(true);
 
@@ -498,6 +520,32 @@ watch(() => selectedClip.value?.barcodes, (newBarcodes) => {
     triggerBarcodeVerification(newBarcodes);
   }
 }, { deep: true });
+
+// Watch for manual barcode input to count and detect duplicates
+let checkDuplicateTimeout = null;
+watch(barcodeTextInput, (newVal) => {
+  if (checkDuplicateTimeout) clearTimeout(checkDuplicateTimeout);
+  const parsed = parseBarcodes(newVal);
+  if (parsed.length === 0) return;
+
+  checkDuplicateTimeout = setTimeout(() => {
+    const seen = new Set();
+    const duplicates = [];
+    parsed.forEach((bc) => {
+      if (seen.has(bc)) {
+        duplicates.push(bc);
+      } else {
+        seen.add(bc);
+      }
+    });
+
+    if (duplicates.length > 0) {
+      toast(`Barcode ${duplicates[0]} sudah discan!`, "warning");
+      const uniqueParsed = [...seen];
+      barcodeTextInput.value = uniqueParsed.join("\n");
+    }
+  }, 600);
+});
 
 // dynamic prefixes helper
 function getPrefix(cardId) {
@@ -645,6 +693,10 @@ async function addBarcodesToClip() {
   const parsed = parseBarcodes(barcodeTextInput.value);
   if (parsed.length === 0) return toast("Tidak ada barcode valid", "warning");
 
+  if (!inputPetugasName.value) {
+    return toast("Silakan pilih petugas terlebih dahulu", "warning");
+  }
+
   saving.value = true;
   try {
     const currentList = selectedClip.value.barcodes || [];
@@ -673,7 +725,7 @@ async function addBarcodesToClip() {
       barcodes: addedList,
       origin: "",
       destination: belumPostingKey.value,
-      pemindah: auth.user?.displayName || auth.user?.username || "System (Klip)",
+      pemindah: inputPetugasName.value,
       notes: `Registrasi Klip: ${selectedClip.value.code}`,
       floorId: auth.activeFloor,
       defaultDetailType,
@@ -683,6 +735,7 @@ async function addBarcodesToClip() {
 
     // Trigger state reload in parent stock page to sync aggregates
     triggerParentReload();
+    inputPetugasName.value = "";
   } catch (e) {
     showError("Gagal menambahkan barcode ke klip", e.message);
   } finally {
@@ -751,7 +804,7 @@ async function editSingleBarcode(oldBarcode) {
       barcodes: [cleanNewBarcode],
       origin: "",
       destination: belumPostingKey.value,
-      pemindah: auth.user?.displayName || auth.user?.username || "System (Klip)",
+      pemindah: inputPetugasName.value || auth.user?.displayName || auth.user?.username || "System (Klip)",
       notes: `Registrasi Ubah Kode Klip: ${selectedClip.value.code}`,
       floorId: auth.activeFloor,
       defaultDetailType,

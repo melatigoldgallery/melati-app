@@ -203,6 +203,81 @@
           </button>
         </div>
       </template>
+
+      <!-- Google Cloud TTS Settings Card -->
+      <div class="card settings-card mt-4">
+        <div class="settings-header p-3">
+          <h5 class="mb-0">
+            <i class="fas fa-microphone me-2"></i>
+            Konfigurasi Pengisi Suara Antrian (TTS)
+          </h5>
+        </div>
+        <div class="settings-body p-3 p-md-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Pilih Layanan TTS (Semua Device)</label>
+              <select v-model="form.ttsProvider" class="form-select">
+                <option value="translate">Google Translate Gratis (Wanita - Default)</option>
+                <option value="google_cloud">Google Cloud Text-to-Speech (Berbayar - Kunci API)</option>
+              </select>
+            </div>
+            
+            <template v-if="form.ttsProvider === 'google_cloud'">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Jenis Suara (Bahasa Indonesia)</label>
+                <select v-model="form.ttsVoiceName" class="form-select">
+                  <option value="id-ID-Standard-A">id-ID-Standard-A (Wanita)</option>
+                  <option value="id-ID-Standard-D">id-ID-Standard-D (Wanita)</option>
+                  <option value="id-ID-Standard-B">id-ID-Standard-B (Pria)</option>
+                  <option value="id-ID-Standard-C">id-ID-Standard-C (Pria)</option>
+                  <option value="id-ID-Wavenet-A">id-ID-Wavenet-A (Wanita - Premium)</option>
+                  <option value="id-ID-Wavenet-D">id-ID-Wavenet-D (Wanita - Premium)</option>
+                  <option value="id-ID-Wavenet-B">id-ID-Wavenet-B (Pria - Premium)</option>
+                  <option value="id-ID-Wavenet-C">id-ID-Wavenet-C (Pria - Premium)</option>
+                  <option value="id-ID-Neural2-F">id-ID-Neural2-F (Wanita - Ultra Premium)</option>
+                  <option value="id-ID-Neural2-B">id-ID-Neural2-B (Pria - Ultra Premium)</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Pitch / Nada Suara ({{ form.ttsPitch >= 0 ? '+' : '' }}{{ form.ttsPitch }} Semitones)</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input
+                    v-model.number="form.ttsPitch"
+                    type="range"
+                    min="-5.0"
+                    max="5.0"
+                    step="0.1"
+                    class="form-range flex-grow-1"
+                  />
+                  <button class="btn btn-outline-secondary btn-sm" @click="resetTtsPitch">Reset</button>
+                </div>
+                <small class="text-muted">Gunakan nilai positif (+) untuk membuat suara wanita/pria lebih melengking.</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Kecepatan Pemanggilan / Rate ({{ form.ttsRate }}x)</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input
+                    v-model.number="form.ttsRate"
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.05"
+                    class="form-range flex-grow-1"
+                  />
+                  <button class="btn btn-outline-secondary btn-sm" @click="resetTtsRate">Reset</button>
+                </div>
+                <small class="text-muted">Gunakan nilai di bawah 1.0 untuk memperlambat tempo pemanggilan.</small>
+              </div>
+            </template>
+          </div>
+          <div class="d-flex justify-content-start mt-3">
+            <button class="btn btn-success" :disabled="previewing" @click="testTtsVoice">
+              <i class="fas fa-play me-2"></i>
+              Tes Suara Terpilih
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -210,6 +285,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Swal from "sweetalert2";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/config/firebase";
 import { useAuthStore } from "@/stores/auth";
 import {
   DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS,
@@ -223,7 +300,7 @@ import {
   fetchQueueQuotaSettings,
   saveQueueQuotaSettings,
 } from "@/services/antrian-service";
-import { isAudioBusy, playClosingAnnouncement, primeAudioPlayback } from "@/services/audio-service";
+import { isAudioBusy, playClosingAnnouncement, primeAudioPlayback, speak } from "@/services/audio-service";
 
 const auth = useAuthStore();
 
@@ -233,6 +310,35 @@ const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
 const quotaForm = reactive({ morningJualQuota: 2, afternoonJualQuota: 3 });
+
+function resetTtsPitch() {
+  form.ttsPitch = 0.0;
+}
+
+function resetTtsRate() {
+  form.ttsRate = 0.85;
+}
+
+async function testTtsVoice() {
+  if (isAudioBusy()) return;
+  try {
+    previewing.value = true;
+    primeAudioPlayback();
+    await speak(
+      "Satu dua tiga, tes suara pengumuman antrean toko emas melati.",
+      null,
+      1.2,
+      {
+        provider: form.ttsProvider,
+        voiceName: form.ttsVoiceName,
+        pitch: form.ttsPitch,
+        rate: form.ttsRate
+      }
+    );
+  } finally {
+    previewing.value = false;
+  }
+}
 
 let unsubscribeSettings = null;
 
@@ -254,6 +360,16 @@ function applySettings(payload = {}) {
   form.message = normalized.message;
   form.lastUpdated = normalized.lastUpdated;
   form.updatedBy = normalized.updatedBy;
+  form.ttsProvider = normalized.ttsProvider;
+  form.ttsVoiceName = normalized.ttsVoiceName;
+  form.ttsPitch = normalized.ttsPitch;
+  form.ttsRate = normalized.ttsRate;
+
+  // Sync settings page's local fallback storage immediately
+  localStorage.setItem("google_tts_provider", normalized.ttsProvider);
+  localStorage.setItem("google_tts_voice_name", normalized.ttsVoiceName);
+  localStorage.setItem("google_tts_pitch", String(normalized.ttsPitch));
+  localStorage.setItem("google_tts_rate", String(normalized.ttsRate));
 }
 
 function isValidTime(value) {
@@ -269,6 +385,10 @@ function getSavePayload() {
     reminderLimitMaxCalls: Number(form.reminderLimitMaxCalls),
     reminderLimitWindowSeconds: Number(form.reminderLimitWindowSeconds),
     message: String(form.message || "").trim(),
+    ttsProvider: form.ttsProvider,
+    ttsVoiceName: form.ttsVoiceName,
+    ttsPitch: Number(form.ttsPitch),
+    ttsRate: Number(form.ttsRate),
   };
 }
 

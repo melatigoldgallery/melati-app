@@ -166,6 +166,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useAlert } from "@/composables/useAlert";
+import { useAuthStore } from "@/stores/auth";
 import {
   MAINTENANCE_COLLECTIONS,
   getDefaultMaintenanceSelection,
@@ -174,6 +175,8 @@ import {
 } from "@/services/maintenance-service";
 
 const { confirm, error: showError, toast, success } = useAlert();
+const authStore = useAuthStore();
+const activeFloor = computed(() => authStore.activeFloor || "L1");
 
 const collectionOptions = MAINTENANCE_COLLECTIONS;
 const selectedMonth = ref(getPreviousMonth());
@@ -234,7 +237,7 @@ async function runDryRun() {
 
   try {
     runningDryRun.value = true;
-    analysisResult.value = await maintenanceDryRun(selectedMonth.value, selectedCollections.value);
+    analysisResult.value = await maintenanceDryRun(selectedMonth.value, selectedCollections.value, activeFloor.value);
     confirmText.value = "";
     toast("Analisa selesai", "success");
   } catch (e) {
@@ -256,7 +259,7 @@ async function runExecute() {
 
   try {
     runningDelete.value = true;
-    analysisResult.value = await maintenanceExecute(selectedMonth.value, selectedCollections.value);
+    analysisResult.value = await maintenanceExecute(selectedMonth.value, selectedCollections.value, activeFloor.value);
     await success(`Penghapusan selesai. Total terhapus: ${analysisResult.value.totalDeleted || 0}`);
   } catch (e) {
     showError("Penghapusan gagal", e.message || "Terjadi kesalahan.");

@@ -298,6 +298,7 @@ const PERMISSION_GROUPS = {
     { key: "tema-warna", label: "Tema Warna" },
     { key: "maintenance", label: "Maintenance" },
     { key: "setting-manajemen-stok", label: "Setting Manajemen Stok" },
+    { key: "printer", label: "Setting Printer" },
   ],
 };
 
@@ -344,6 +345,7 @@ const PERMISSION_TO_PAGE = {
   "admin.tema-warna": "admin.theme-appearance",
   "admin.maintenance": "admin.maintenance",
   "admin.setting-manajemen-stok": "admin.inventory-manajemen-stok",
+  "admin.printer": "admin.printer",
 };
 
 function defaultPermissions() {
