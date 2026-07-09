@@ -82,6 +82,18 @@
             </div>
           </div>
 
+          <div class="remember-me-wrap">
+            <label class="remember-me-label" for="rememberMe">
+              <input
+                id="rememberMe"
+                v-model="rememberMe"
+                type="checkbox"
+                class="remember-me-checkbox"
+              />
+              <span>Ingat Saya</span>
+            </label>
+          </div>
+
           <div v-if="errorMsg" class="error-box" role="alert" aria-live="polite">
             <i class="bi bi-exclamation-circle"></i>
             <span>{{ errorMsg }}</span>
@@ -101,7 +113,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { getFloorLabel, normalizeFloorId } from "@/config/floor-config";
@@ -120,6 +132,34 @@ const effectiveFloor = computed(() => selectedFloor.value || "L1");
 const brandName = computed(() => (effectiveFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop"));
 const brandRibbonText = computed(() => (effectiveFloor.value === "L2" ? "MELATI YOUNG" : "MELATI GOLD"));
 
+const rememberMe = ref(false);
+
+const b64Encode = (str) => {
+  try {
+    return btoa(str);
+  } catch {
+    return str;
+  }
+};
+
+const b64Decode = (str) => {
+  try {
+    return atob(str);
+  } catch {
+    return str;
+  }
+};
+
+onMounted(() => {
+  const remember = localStorage.getItem("remember_me") === "true";
+  rememberMe.value = remember;
+  if (remember) {
+    form.value.identifier = localStorage.getItem("remembered_identifier") || "";
+    const savedPw = localStorage.getItem("remembered_password") || "";
+    form.value.password = savedPw ? b64Decode(savedPw) : "";
+  }
+});
+
 function selectFloor(floorId) {
   selectedFloor.value = normalizeFloorId(floorId);
   errorMsg.value = "";
@@ -130,6 +170,17 @@ async function handleLogin() {
   loading.value = true;
   try {
     await auth.login(form.value.identifier, form.value.password, selectedFloor.value);
+    
+    if (rememberMe.value) {
+      localStorage.setItem("remember_me", "true");
+      localStorage.setItem("remembered_identifier", form.value.identifier);
+      localStorage.setItem("remembered_password", b64Encode(form.value.password));
+    } else {
+      localStorage.removeItem("remember_me");
+      localStorage.removeItem("remembered_identifier");
+      localStorage.removeItem("remembered_password");
+    }
+
     const redirect = route.query.redirect || "/dashboard";
     router.push(redirect);
   } catch (err) {
@@ -532,5 +583,32 @@ function mapFirebaseError(code) {
   .brand-title {
     font-size: 1.6rem;
   }
+}
+
+.remember-me-wrap {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.remember-me-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember-me-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid #cad2df;
+  cursor: pointer;
+  accent-color: var(--gold-secondary);
 }
 </style>

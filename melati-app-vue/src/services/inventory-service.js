@@ -111,6 +111,7 @@ export const KETERANGAN_OPTS = [
   "Keep Staff",
   "Salah Update",
   "Contoh Custom",
+  "Owner",
 ];
 
 const ALL_SUB_DOCS = [

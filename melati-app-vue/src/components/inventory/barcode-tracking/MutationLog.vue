@@ -155,20 +155,33 @@
       <div class="modal fade" id="bulkDetailModal" tabindex="-1" aria-hidden="true" ref="bulkDetailModalRef">
         <div class="modal-dialog modal-dialog-centered modal-lg">
           <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-            <div class="modal-header py-3 bg-primary text-white border-0">
-              <h6 class="modal-title fw-bold">
+            <div class="modal-header py-3 bg-primary text-white border-0 d-flex justify-content-between align-items-center">
+              <h6 class="modal-title fw-bold mb-0">
                 <i class="bi bi-list-check me-2"></i>
                 Detail Perpindahan Gabungan ({{ selectedLog?.barcodes?.length || 0 }} Barang)
               </h6>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4 bg-light-subtle">
+            <div class="modal-body bg-light-subtle">
               <div v-if="selectedLog" class="mb-3">
-                <div class="row g-2 mb-3 bg-light p-2 rounded-2 small text-muted">
-                  <div class="col-6"><strong>Waktu:</strong> {{ formatDate(selectedLog.timestamp) }}</div>
-                  <div class="col-6"><strong>Petugas:</strong> {{ selectedLog.pemindah }}</div>
-                  <div class="col-6"><strong>Tujuan:</strong> {{ getSubDocLabel(selectedLog.destination) }}</div>
-                  <div class="col-12" v-if="selectedLog.notes"><strong>Catatan:</strong> {{ selectedLog.notes }}</div>
+                <div class="row g-2 mb-3 bg-light rounded-2 small">
+                  <div class="col-3"><strong>Waktu:</strong> {{ formatDate(selectedLog.timestamp) }}</div>
+                  <div class="col-2"><strong>Petugas:</strong> {{ selectedLog.pemindah }}</div>
+                  <div class="col-2"><strong>Tujuan:</strong> {{ getSubDocLabel(selectedLog.destination) }}</div>
+                  <div class="col-2" v-if="selectedLog.notes"><strong>Catatan:</strong> {{ selectedLog.notes }}</div>
+                  <div class="col-3 d-flex align-items-center justify-content-end">
+                    <button 
+                      type="button" 
+                      class="btn btn-primary btn-sm rounded-pill px-2 py-1 d-flex align-items-center gap-2"
+                      style="font-size: 0.8rem;"
+                      @click="copyAllBarcodes"
+                      :disabled="!selectedLog?.barcodes?.length"
+                    >
+                      <i class="bi" :class="copiedAll ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
+                      <span>{{ copiedAll ? 'Copied' : 'Copy All' }}</span>
+                    </button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
                 </div>
 
                 <div class="table-responsive border border-light rounded-4 shadow-sm bg-white custom-scrollbar" style="max-height: 350px; overflow-y: auto;">
@@ -218,11 +231,7 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer py-2 border-0 bg-light-subtle">
-              <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">
-                Tutup
-              </button>
-            </div>
+
           </div>
         </div>
       </div>
@@ -328,6 +337,23 @@ const searchedBarcode = ref("");
 const isSearchMode = ref(false);
 
 const selectedLog = ref(null);
+const copiedAll = ref(false);
+
+async function copyAllBarcodes() {
+  if (!selectedLog.value?.barcodes) return;
+  const barcodeList = selectedLog.value.barcodes.map(b => b.barcode).join("\n");
+  try {
+    await navigator.clipboard.writeText(barcodeList);
+    copiedAll.value = true;
+    toast("Semua barcode berhasil disalin ke clipboard", "success");
+    setTimeout(() => {
+      copiedAll.value = false;
+    }, 2000);
+  } catch (err) {
+    showError("Gagal menyalin barcode", err.message);
+  }
+}
+
 const detailPage = ref(1);
 const detailPageSize = 10;
 const bulkDetailModalRef = ref(null);

@@ -10,32 +10,43 @@ function getLayananDoc() {
 export async function ensureLayananToko() {
   const docRef = getLayananDoc();
   const snap = await getDoc(docRef);
-  if (snap.exists()) return;
 
-  // Seamless migration: try to read from L2 first because the newest/current data is there
+  // If global document exists and was already migrated/initialized, return it immediately
+  if (snap.exists() && snap.data().migratedFromL2) {
+    return snap.data();
+  }
+
+  // Seamless migration: try to read from L2 first to migrate it to global
   let initialData = { ...DEFAULT_LAYANAN_TOKO };
+  let migrated = false;
   try {
     const legacyDocRef = doc(db, "floors", "L2", "settings", "layananToko");
     const legacySnap = await getDoc(legacyDocRef);
     if (legacySnap.exists()) {
       initialData = legacySnap.data();
+      migrated = true;
     }
   } catch (err) {
     console.warn("Gagal migrasi data layanan dari L2:", err);
   }
 
   const now = new Date().toISOString();
-  await setDoc(docRef, {
+  const finalData = {
     ...initialData,
+    migratedFromL2: true,
     lastUpdated: now,
-    updatedBy: auth.currentUser?.email || "System (Initial)",
-  });
+    updatedBy: auth.currentUser?.email || "System (Initial/Migration)",
+  };
+
+  await setDoc(docRef, finalData);
+  if (migrated) {
+    console.log("Sukses migrasi data layanan toko dari L2 ke Global");
+  }
+  return finalData;
 }
 
 export async function fetchLayananToko() {
-  await ensureLayananToko();
-  const snap = await getDoc(getLayananDoc());
-  return snap.exists() ? snap.data() : { ...DEFAULT_LAYANAN_TOKO };
+  return await ensureLayananToko();
 }
 
 export async function saveLayananToko(payload, updatedBy = "System") {
@@ -46,6 +57,7 @@ export async function saveLayananToko(payload, updatedBy = "System") {
     barangBisaServis: payload.barangBisaServis || [],
     barangTidakBisaServis: payload.barangTidakBisaServis || [],
     hargaAksesoris: payload.hargaAksesoris || [],
+    migratedFromL2: true,
     lastUpdated: now,
     updatedBy: updatedBy || auth.currentUser?.email || "System",
   });

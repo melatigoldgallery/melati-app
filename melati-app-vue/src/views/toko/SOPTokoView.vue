@@ -16,7 +16,7 @@
       </div>
 
       <!-- Info Role Alert Banner -->
-      <div class="badge-role-info shadow-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill">
+      <div class="badge-role-info shadow-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill d-none d-md-flex">
         <i :class="isSupervisor ? 'bi-shield-check text-success' : 'bi-info-circle text-primary'"></i>
         <span class="small fw-semibold text-secondary">
           Role: <span class="text-uppercase text-dark font-monospace">{{ auth.userRole || 'staff' }}</span>
@@ -26,21 +26,23 @@
 
     <!-- Tab Navigation -->
     <div class="card border-0 shadow-sm mb-4 overflow-hidden rounded-4">
-      <div class="card-body p-2 bg-light rounded-top d-flex gap-2 flex-wrap border-bottom">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all"
-          :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
-          @click="activeTab = tab.id"
-        >
-          <i :class="['bi', tab.icon]"></i>
-          {{ tab.label }}
-        </button>
+      <div class="card-body p-2 bg-light rounded-top border-bottom overflow-hidden">
+        <div class="tabs-scrollable">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all text-nowrap"
+            :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
+            @click="activeTab = tab.id"
+          >
+            <i :class="['bi', tab.icon]"></i>
+            {{ tab.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Main Content Area with Smooth Transitions -->
-      <div class="card-body p-4 bg-white rounded-bottom">
+      <div class="card-body p-0 bg-white rounded-bottom">
         <div v-if="loading" class="text-center py-5">
           <div class="spinner-border text-gold text-center d-block mx-auto mb-3" role="status" style="width: 3rem; height: 3rem">
             <span class="visually-hidden">Loading...</span>
@@ -53,19 +55,35 @@
             <!-- TAB 1: TATA TERTIB & SOP STAFF -->
             <div v-if="activeTab === 'staff'" key="staff" class="tab-pane-content">
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white">
-                <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-2">
-                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2">
+                <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
+                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0">
                     <i class="bi bi-journal-text text-gold"></i>
                     Tata Tertib & SOP Harian Staff
                   </h5>
-                  <button
-                    v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
-                    @click="toggleEdit('staffSOP')"
-                  >
-                    <i :class="['bi', editingState.staffSOP ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.staffSOP ? 'Selesai Edit' : 'Edit Teks' }}
-                  </button>
+                  <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
+                    <!-- Search Input -->
+                    <div v-if="!editingState.staffSOP" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0" style="max-width: 250px;">
+                      <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                      <input
+                        v-model="searchQuery"
+                        type="text"
+                        class="form-control border-start-0 ps-2 form-control-sm border-gold-subtle rounded-end-pill pe-5 search-input-custom"
+                        placeholder="Cari Topik..."
+                      />
+                      <button v-if="searchQuery" class="btn btn-link text-muted border-0 p-1 px-2 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQuery = ''">
+                        <i class="bi bi-x fs-6"></i>
+                      </button>
+                    </div>
+                    <!-- Edit Button -->
+                    <button
+                      v-if="isSupervisor"
+                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center justify-content-center gap-1 rounded-pill text-nowrap w-100 w-md-auto"
+                      @click="toggleEdit('staffSOP')"
+                    >
+                      <i :class="['bi', editingState.staffSOP ? 'bi-eye' : 'bi-pencil-square']"></i>
+                      {{ editingState.staffSOP ? 'Selesai Edit' : 'Edit Teks' }}
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Text Area Editor (Supervisor) -->
@@ -88,19 +106,35 @@
             <!-- TAB 2: PANDUAN EMAS -->
             <div v-else-if="activeTab === 'gold'" key="gold" class="tab-pane-content">
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white">
-                <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-2">
-                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2">
+                <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
+                  <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0">
                     <i class="bi bi-coin text-gold"></i>
                     Pengetahuan Dasar Perhiasan Emas
                   </h5>
-                  <button
-                    v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
-                    @click="toggleEdit('goldKnowledge')"
-                  >
-                    <i :class="['bi', editingState.goldKnowledge ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.goldKnowledge ? 'Selesai Edit' : 'Edit Teks' }}
-                  </button>
+                  <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
+                    <!-- Search Input -->
+                    <div v-if="!editingState.goldKnowledge" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0" style="max-width: 250px;">
+                      <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                      <input
+                        v-model="searchQuery"
+                        type="text"
+                        class="form-control border-start-0 ps-2 form-control-sm border-gold-subtle rounded-end-pill pe-5 search-input-custom"
+                        placeholder="Cari Topik..."
+                      />
+                      <button v-if="searchQuery" class="btn btn-link text-muted border-0 p-1 px-2.5 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQuery = ''">
+                        <i class="bi bi-x fs-6"></i>
+                      </button>
+                    </div>
+                    <!-- Edit Button -->
+                    <button
+                      v-if="isSupervisor"
+                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center justify-content-center gap-1 rounded-pill text-nowrap w-100 w-md-auto"
+                      @click="toggleEdit('goldKnowledge')"
+                    >
+                      <i :class="['bi', editingState.goldKnowledge ? 'bi-eye' : 'bi-pencil-square']"></i>
+                      {{ editingState.goldKnowledge ? 'Selesai Edit' : 'Edit Teks' }}
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Text Area Editor (Supervisor) -->
@@ -124,19 +158,35 @@
             <div v-else-if="activeTab === 'diamond'" key="diamond" class="tab-pane-content">
               <!-- Diamond Knowledge Text Content (Structured Sub-Cards Grid) -->
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white shadow-sm">
-                <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-2">
+                <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
                   <h5 class="fw-extrabold text-dark d-flex align-items-center gap-2 mb-0">
                     <i class="bi bi-gem text-gold"></i>
                     Pengetahuan Dasar Berlian & Perawatan
                   </h5>
-                  <button
-                    v-if="isSupervisor"
-                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1"
-                    @click="toggleEdit('diamondKnowledge')"
-                  >
-                    <i :class="['bi', editingState.diamondKnowledge ? 'bi-eye' : 'bi-pencil-square']"></i>
-                    {{ editingState.diamondKnowledge ? 'Selesai Edit' : 'Edit Teks' }}
-                  </button>
+                  <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
+                    <!-- Search Input -->
+                    <div v-if="!editingState.diamondKnowledge" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0" style="max-width: 250px;">
+                      <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                      <input
+                        v-model="searchQuery"
+                        type="text"
+                        class="form-control border-start-0 ps-2 form-control-sm border-gold-subtle rounded-end-pill pe-5 search-input-custom"
+                        placeholder="Cari Topik..."
+                      />
+                      <button v-if="searchQuery" class="btn btn-link text-muted border-0 p-1 px-2.5 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQuery = ''">
+                        <i class="bi bi-x fs-6"></i>
+                      </button>
+                    </div>
+                    <!-- Edit Button -->
+                    <button
+                      v-if="isSupervisor"
+                      class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center justify-content-center gap-1 rounded-pill text-nowrap w-100 w-md-auto"
+                      @click="toggleEdit('diamondKnowledge')"
+                    >
+                      <i :class="['bi', editingState.diamondKnowledge ? 'bi-eye' : 'bi-pencil-square']"></i>
+                      {{ editingState.diamondKnowledge ? 'Selesai Edit' : 'Edit Teks' }}
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Text Area Editor (Supervisor) -->
@@ -169,7 +219,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, reactive, computed, onMounted, watch } from "vue";
 import Swal from "sweetalert2";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
@@ -182,6 +232,11 @@ const { error: showError } = useAlert();
 const loading = ref(true);
 const saving = ref(false);
 const activeTab = ref("staff");
+const searchQuery = ref("");
+
+watch(activeTab, () => {
+  searchQuery.value = "";
+});
 
 const tabs = [
   { id: "staff", label: "Tata Tertib & SOP Staff", icon: "bi-journal-text" },
@@ -334,13 +389,15 @@ function parseInnerMarkdown(text) {
 }
 
 // Smart Parser for Staff SOP Cards Grid
-function parseStaffSOP(text) {
+function parseStaffSOP(text, query = "") {
   if (!text) return "";
   
   const parts = text.split(/### BAGIAN 2: SOP ALUR KERJA HARIAN/i);
   const part1Raw = parts[0] || "";
   const part2Raw = parts[1] || "";
   
+  const q = String(query).trim().toLowerCase();
+
   const parsePartToHTML = (rawText, isPart1 = true) => {
     const blocks = rawText.split(/[\r\n]+(?=####(?![#]))/);
     let introHtml = "";
@@ -354,18 +411,21 @@ function parseStaffSOP(text) {
       if (!titleLine.startsWith("####")) {
         const cleanIntro = block.replace(/#.*$/gm, "").replace(/---/g, "").trim();
         if (isPart1 && cleanIntro) {
-          introHtml = `
-            <div class="col-12 mb-4">
-              <div class="section-intro-card p-3.5 rounded-4 border d-flex gap-3 align-items-center bg-light-gold border-left-gold border-gold-subtle shadow-sm">
-                <div class="intro-icon-wrapper rounded-circle d-flex align-items-center justify-content-center bg-gold-light text-gold" style="width: 40px; height: 40px; flex-shrink: 0;">
-                  <i class="bi bi-info-circle-fill fs-5"></i>
-                </div>
-                <div class="text-secondary-emphasis leading-relaxed small text-justify mb-0">
-                  ${parseInnerMarkdown(cleanIntro)}
+          const introMatches = !q || cleanIntro.toLowerCase().includes(q);
+          if (introMatches) {
+            introHtml = `
+              <div class="col-12 mb-4">
+                <div class="section-intro-card p-3.5 rounded-4 border d-flex gap-3 align-items-center bg-light-gold border-left-gold border-gold-subtle shadow-sm">
+                  <div class="intro-icon-wrapper rounded-circle d-flex align-items-center justify-content-center bg-gold-light text-gold" style="width: 40px; height: 40px; flex-shrink: 0;">
+                    <i class="bi bi-info-circle-fill fs-5"></i>
+                  </div>
+                  <div class="text-secondary-emphasis leading-relaxed small text-justify mb-0">
+                    ${parseInnerMarkdown(cleanIntro)}
+                  </div>
                 </div>
               </div>
-            </div>
-          `;
+            `;
+          }
         }
         return;
       }
@@ -373,6 +433,10 @@ function parseStaffSOP(text) {
       const title = titleLine.replace(/^####\s*(?:📌\s*)?/, "").trim();
       const contentLines = lines.slice(1).join("\n");
       
+      if (q && !title.toLowerCase().includes(q) && !contentLines.toLowerCase().includes(q)) {
+        return;
+      }
+
       let icon = "bi-journal-check";
       let borderClass = "border-left-gold";
       if (title.toLowerCase().includes("kedisiplinan") || title.toLowerCase().includes("kehadiran")) {
@@ -398,42 +462,51 @@ function parseStaffSOP(text) {
         icon = "bi-lock-fill text-secondary";
         borderClass = "border-left-secondary";
       }
-      
-      cards.push(`
-        <div class="sop-block-card p-4 rounded-4 shadow-sm border border-light bg-white position-relative overflow-hidden interactive-card ${borderClass}">
-          <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
-            <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
-              <i class="bi ${icon} fs-5"></i>
+      cards.push({
+        title,
+        html: `
+          <div class="sop-block-card p-4 rounded-4 shadow-sm border border-light bg-white position-relative overflow-hidden interactive-card ${borderClass}">
+            <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
+              <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
+                <i class="bi ${icon} fs-5"></i>
+              </div>
+              <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">${title}</h5>
             </div>
-            <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">${title}</h5>
+            <div class="sop-card-body small text-secondary-emphasis lh-relaxed">
+              ${parseInnerMarkdown(contentLines)}
+            </div>
           </div>
-          <div class="sop-card-body small text-secondary-emphasis lh-relaxed">
-            ${parseInnerMarkdown(contentLines)}
-          </div>
-        </div>
-      `);
+        `
+      });
     });
     
+    if (cards.length === 0 && !introHtml) {
+      return q ? `<div class="col-12 py-4 text-center text-muted small"><i class="bi bi-search me-1.5"></i>Tidak ada topik yang cocok dengan pencarian "${query}"</div>` : "";
+    }
+
     const col1Cards = [];
     const col2Cards = [];
     
-    if (isPart1) {
-      cards.forEach((card, idx) => {
-        if (idx === 0 || idx === 2) {
-          col1Cards.push(card);
-        } else {
-          col2Cards.push(card);
+    cards.forEach((card) => {
+      const titleLower = card.title.toLowerCase();
+      let col = 1;
+      
+      if (isPart1) {
+        if (titleLower.startsWith("d.") || titleLower.startsWith("e.")) {
+          col = 2;
         }
-      });
-    } else {
-      cards.forEach((card, idx) => {
-        if (idx === 0 || idx === 2 || idx === 3 || idx === 4) {
-          col1Cards.push(card);
-        } else {
-          col2Cards.push(card);
+      } else {
+        if (titleLower.startsWith("c.") || titleLower.startsWith("d.") || titleLower.startsWith("e.")) {
+          col = 2;
         }
-      });
-    }
+      }
+      
+      if (col === 1) {
+        col1Cards.push(card.html);
+      } else {
+        col2Cards.push(card.html);
+      }
+    });
     
     return `
       ${introHtml}
@@ -468,14 +541,16 @@ function parseStaffSOP(text) {
 }
 
 // Smart Parser for Gold Knowledge Card Grid
-function parseGoldKnowledge(text) {
+function parseGoldKnowledge(text, query = "") {
   if (!text) return "";
   
   const cleanText = text.replace(/📌.*$/gm, "").trim();
   const blocks = cleanText.split(/[\r\n]+(?=\s*\d+\.\s+)/);
   
+  const q = String(query).trim().toLowerCase();
   let html = '<div class="row g-4">';
-  
+  let matchCount = 0;
+
   blocks.forEach((block, index) => {
     const lines = block.trim().split(/\r?\n/);
     if (lines.length === 0) return;
@@ -484,6 +559,12 @@ function parseGoldKnowledge(text) {
     const title = titleLine.replace(/^\d+\.\s+/, "").trim();
     const contentLines = lines.slice(1).join("\n");
     
+    if (q && !title.toLowerCase().includes(q) && !contentLines.toLowerCase().includes(q)) {
+      return;
+    }
+
+    matchCount++;
+
     const icons = [
       "bi-patch-check-fill text-warning",        // 1. Jenis Kadar SNI
       "bi-info-circle-fill text-gold",          // 2. Perbedaan Emas
@@ -512,17 +593,22 @@ function parseGoldKnowledge(text) {
     `;
   });
   
+  if (matchCount === 0) {
+    html += `<div class="col-12 py-4 text-center text-muted small"><i class="bi bi-search me-1.5"></i>Tidak ada topik yang cocok dengan pencarian "${query}"</div>`;
+  }
+
   html += '</div>';
   return html;
 }
 
 // Smart Parser for Diamond 4C Cards & Tables
-function parseDiamondKnowledge(text) {
+function parseDiamondKnowledge(text, query = "") {
   if (!text) return "";
   
   const cleanText = text.replace(/📌.*$/gm, "").trim();
   const sections = cleanText.split(/[\r\n]+(?=\s*[1-9]️⃣\s*)/);
   
+  const q = String(query).trim().toLowerCase();
   let html = "";
   
   let introTextHtml = "";
@@ -542,12 +628,23 @@ function parseDiamondKnowledge(text) {
     } else if (trimmed.startsWith("4️⃣") || trimmed.includes("Perawatan Berlian")) {
       sec4 = trimmed;
     } else if (trimmed && !sec1 && !sec2 && !sec3 && !sec4) {
-      // It's the intro text before the first section
-      introTextHtml = `<p class="text-secondary-emphasis mb-4 small leading-relaxed text-justify">${parseInnerMarkdown(trimmed)}</p>`;
+      introTextHtml = trimmed;
     }
   });
 
-  // ── SECTION 1: 4C (Column 1 Content) ──────────────────────────────────────
+  let totalMatches = 0;
+
+  // Render intro if query matches or empty
+  let renderedIntroHtml = "";
+  if (introTextHtml) {
+    const introMatches = !q || introTextHtml.toLowerCase().includes(q);
+    if (introMatches) {
+      renderedIntroHtml = `<p class="text-secondary-emphasis mb-4 small leading-relaxed text-justify">${parseInnerMarkdown(introTextHtml)}</p>`;
+      if (q) totalMatches++;
+    }
+  }
+
+  // ── SECTION 1: 4C ──────────────────────────────────────
   let sec1Html = "";
   if (sec1) {
     const lines = sec1.trim().split(/\r?\n/);
@@ -556,6 +653,7 @@ function parseDiamondKnowledge(text) {
     const subSecs = contentRaw.split(/[\r\n]+(?=\s*[A-Z]\.\s+)/);
     
     const subCards = [];
+    let sec1Matches = 0;
     
     subSecs.forEach((sub) => {
       const subLines = sub.trim().split(/\r?\n/);
@@ -565,7 +663,11 @@ function parseDiamondKnowledge(text) {
       
       if (!/^[A-Z]\.\s+/.test(subTitleLine)) {
         if (sub.trim()) {
-          subCards.push(`<p class="text-secondary-emphasis mb-3 small leading-relaxed text-justify">${parseInnerMarkdown(sub)}</p>`);
+          const partMatches = !q || sub.toLowerCase().includes(q);
+          if (partMatches) {
+            subCards.push(`<p class="text-secondary-emphasis mb-3 small leading-relaxed text-justify">${parseInnerMarkdown(sub)}</p>`);
+            if (q) sec1Matches++;
+          }
         }
         return;
       }
@@ -573,6 +675,11 @@ function parseDiamondKnowledge(text) {
       const subTitle = subTitleLine.replace(/^[A-Z]\.\s+/, "").trim();
       const subContent = subLines.slice(1).join("\n");
       
+      const itemMatches = !q || subTitle.toLowerCase().includes(q) || subContent.toLowerCase().includes(q);
+      if (!itemMatches) return;
+      
+      if (q) sec1Matches++;
+
       let subIcon = "bi-gem";
       const lowerTitle = subTitle.toLowerCase();
       if (lowerTitle.includes("carat") || lowerTitle.includes("karat")) {
@@ -601,33 +708,45 @@ function parseDiamondKnowledge(text) {
       subCards.push(cardHtml);
     });
     
-    sec1Html = `
-      <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card border-left-gold">
-        <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
-          <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
-            <i class="bi bi-gem text-gold fs-5"></i>
+    const sectionTitleMatches = q && sectionTitle.toLowerCase().includes(q);
+    if (sectionTitleMatches) {
+      sec1Matches++;
+    }
+
+    if (!q || sec1Matches > 0) {
+      totalMatches += sec1Matches;
+      sec1Html = `
+        <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card border-left-gold">
+          <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
+            <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
+              <i class="bi bi-gem text-gold fs-5"></i>
+            </div>
+            <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">1️⃣ ${sectionTitle}</h5>
           </div>
-          <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">1️⃣ ${sectionTitle}</h5>
+          <div class="sop-card-body">
+            ${subCards.join("\n")}
+          </div>
         </div>
-        <div class="sop-card-body">
-          ${subCards.join("\n")}
-        </div>
-      </div>
-    `;
+      `;
+    }
   }
   
-  // ── SECTION 2: Berlian di Melati Gold Shop ──────────────────────────────
-  let sec2Html = "";
-  if (sec2) {
-    const lines = sec2.trim().split(/\r?\n/);
-    const sectionTitle = lines[0] ? lines[0].trim() : "2️⃣ Berlian di Melati Gold Shop";
+  const renderSection = (secText, titleDefault, icon, borderClass) => {
+    if (!secText) return "";
+    const lines = secText.trim().split(/\r?\n/);
+    const sectionTitle = lines[0] ? lines[0].trim() : titleDefault;
     const contentRaw = lines.slice(1).join("\n");
     
-    sec2Html = `
-      <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card border-left-primary">
+    const matches = !q || sectionTitle.toLowerCase().includes(q) || contentRaw.toLowerCase().includes(q);
+    if (!matches) return "";
+    
+    if (q) totalMatches++;
+
+    return `
+      <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card ${borderClass}">
         <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
           <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
-            <i class="bi bi-shop-window text-primary fs-5"></i>
+            <i class="bi ${icon} fs-5"></i>
           </div>
           <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">${sectionTitle}</h5>
         </div>
@@ -636,54 +755,18 @@ function parseDiamondKnowledge(text) {
         </div>
       </div>
     `;
+  };
+
+  const sec2Html = renderSection(sec2, "2️⃣ Berlian di Melati Gold Shop", "bi-shop-window text-primary", "border-left-primary");
+  const sec3Html = renderSection(sec3, "3️⃣ Sistem Buyback (Penjualan Kembali) Berlian", "bi-arrow-left-right text-success", "border-left-success");
+  const sec4Html = renderSection(sec4, "4️⃣ Perawatan Berlian Agar Tetap Berkilau", "bi-stars text-info", "border-left-info");
+
+  if (q && totalMatches === 0) {
+    return `<div class="py-5 text-center text-muted small"><i class="bi bi-search me-1.5"></i>Tidak ada topik yang cocok dengan pencarian "${query}"</div>`;
   }
-  
-  // ── SECTION 3: Sistem Buyback ───────────────────────────────────────────
-  let sec3Html = "";
-  if (sec3) {
-    const lines = sec3.trim().split(/\r?\n/);
-    const sectionTitle = lines[0] ? lines[0].trim() : "3️⃣ Sistem Buyback (Penjualan Kembali) Berlian";
-    const contentRaw = lines.slice(1).join("\n");
-    
-    sec3Html = `
-      <div class="profile-section-card p-4 border rounded-4 bg-light-gold border-gold-subtle interactive-card border-left-success">
-        <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
-          <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
-            <i class="bi bi-arrow-left-right text-success fs-5"></i>
-          </div>
-          <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">${sectionTitle}</h5>
-        </div>
-        <div class="sop-card-body small text-secondary-emphasis lh-relaxed">
-          ${parseInnerMarkdown(contentRaw)}
-        </div>
-      </div>
-    `;
-  }
-  
-  // ── SECTION 4: Perawatan Berlian ─────────────────────────────────────────
-  let sec4Html = "";
-  if (sec4) {
-    const lines = sec4.trim().split(/\r?\n/);
-    const sectionTitle = lines[0] ? lines[0].trim() : "4️⃣ Perawatan Berlian Agar Tetap Berkilau";
-    const contentRaw = lines.slice(1).join("\n");
-    
-    sec4Html = `
-      <div class="profile-section-card p-4 border rounded-4 bg-white interactive-card border-left-info">
-        <div class="d-flex align-items-center gap-2.5 mb-3 border-bottom border-light pb-2">
-          <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
-            <i class="bi bi-stars text-info fs-5"></i>
-          </div>
-          <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">${sectionTitle}</h5>
-        </div>
-        <div class="sop-card-body small text-secondary-emphasis lh-relaxed">
-          ${parseInnerMarkdown(contentRaw)}
-        </div>
-      </div>
-    `;
-  }
-  // Layout in two columns (Left: Section 1, Right: Section 2, Section 3, and Section 4 stacked)
+
   html += `
-    ${introTextHtml}
+    ${renderedIntroHtml}
     <div class="row g-4 mb-4">
       <div class="col-md-6 d-flex flex-column gap-4">
         ${sec1Html}
@@ -699,10 +782,27 @@ function parseDiamondKnowledge(text) {
   return html;
 }
 
+// Helper to highlight matching search query in HTML content safely
+function highlightText(html, query) {
+  if (!html || !query || !query.trim()) return html;
+  
+  const q = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const regex = new RegExp(`(${q})`, 'gi');
+  const parts = html.split(/(<[^>]+>)/);
+  
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] && !parts[i].startsWith('<')) {
+      parts[i] = parts[i].replace(regex, '<mark style="background-color: #ffd54f; color: #000; padding: 1px 4px; border-radius: 4px; font-weight: bold;">$1</mark>');
+    }
+  }
+  
+  return parts.join('');
+}
+
 // Parsed HTML Computeds
-const parsedStaffSOP = computed(() => parseStaffSOP(sopData.value.staffSOP));
-const parsedGoldKnowledge = computed(() => parseGoldKnowledge(sopData.value.goldKnowledge));
-const parsedDiamondKnowledge = computed(() => parseDiamondKnowledge(sopData.value.diamondKnowledge));
+const parsedStaffSOP = computed(() => highlightText(parseStaffSOP(sopData.value.staffSOP, searchQuery.value), searchQuery.value));
+const parsedGoldKnowledge = computed(() => highlightText(parseGoldKnowledge(sopData.value.goldKnowledge, searchQuery.value), searchQuery.value));
+const parsedDiamondKnowledge = computed(() => highlightText(parseDiamondKnowledge(sopData.value.diamondKnowledge, searchQuery.value), searchQuery.value));
 
 // Load data
 async function loadSOP() {
@@ -803,6 +903,12 @@ onMounted(() => {
 
 <style scoped>
 /* Gold & Gradient Theming */
+.search-input-custom:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #aa7c11 !important;
+}
+
 .text-gold,
 :deep(.text-gold) {
   color: #aa7c11;
@@ -1012,5 +1118,74 @@ onMounted(() => {
 .tab-fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* Scrollable tabs navigation on mobile */
+.tabs-scrollable {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  padding-bottom: 2px;
+}
+.tabs-scrollable::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+@media (max-width: 575.98px) {
+  /* Header spacing */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  .badge-role-info {
+    align-self: flex-start;
+  }
+  .page-title {
+    font-size: 1.4rem !important;
+  }
+  
+  /* Tabs padding */
+  .tab-btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
+  
+  /* Main Container Card body padding */
+  .card-body.p-4 {
+    padding: 1.25rem !important;
+  }
+  
+  /* SOP Section Cards */
+  .profile-section-card {
+    padding: 1.25rem !important;
+  }
+  .profile-section-card h5 {
+    font-size: 1.1rem !important;
+  }
+  
+  /* Outer block padding reductions */
+  :deep(.section-intro-card) {
+    padding: 1rem !important;
+    gap: 0.75rem !important;
+  }
+  
+  :deep(.sop-block-card),
+  :deep(.gold-block-card) {
+    padding: 1.25rem !important;
+  }
+  :deep(.sop-card-body) {
+    font-size: 0.88rem !important;
+  }
+  
+  /* Embedded tables optimizations */
+  :deep(.table th),
+  :deep(.table td) {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
 }
 </style>

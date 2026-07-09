@@ -16,7 +16,7 @@
       </div>
 
       <!-- Role Info Badge -->
-      <div class="badge-role-info shadow-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill">
+      <div class="badge-role-info shadow-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill d-none d-md-flex">
         <i :class="canEdit ? 'bi-shield-check text-success' : 'bi-info-circle text-primary'"></i>
         <span class="small fw-semibold text-secondary">
           Role: <span class="text-uppercase text-dark font-monospace">{{ auth.userRole || 'staff' }}</span>
@@ -27,17 +27,19 @@
     <!-- Main Container Card -->
     <div class="card border-0 shadow-sm mb-4 overflow-hidden rounded-4">
       <!-- Tabs Navigation -->
-      <div class="card-body p-2 bg-light rounded-top d-flex gap-2 flex-wrap border-bottom">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all"
-          :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
-          @click="activeTab = tab.id"
-        >
-          <i :class="['bi', tab.icon]"></i>
-          {{ tab.label }}
-        </button>
+      <div class="card-body p-2 bg-light rounded-top border-bottom overflow-hidden">
+        <div class="tabs-scrollable">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all text-nowrap"
+            :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
+            @click="activeTab = tab.id"
+          >
+            <i :class="['bi', tab.icon]"></i>
+            {{ tab.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Content Area -->
@@ -53,21 +55,37 @@
           <transition name="tab-fade" mode="out-in">
             <!-- TAB 1: ONGKOS SERVIS -->
             <div v-if="activeTab === 'ongkos'" key="ongkos" class="tab-pane-content">
-              <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
                 <div>
                   <h5 class="fw-extrabold text-dark mb-1">
                     <i class="bi bi-tag-fill text-gold me-2"></i>Ongkos Servis
                   </h5>
                   <p class="text-muted small mb-0">Daftar tarif pengerjaan servis barang perhiasan di toko, jika ragu langsung konfirmasi ke tukang.</p>
                 </div>
-                <button v-if="canEdit" class="btn btn-gold px-3 d-flex align-items-center gap-2" @click="openAddOngkosModal">
-                  <i class="bi bi-plus-circle"></i> Tambah Tarif
-                </button>
+                <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end">
+                  <!-- Search Input -->
+                  <div class="input-group position-relative shadow-sm rounded-pill flex-grow-1 flex-md-grow-0" style="max-width: 240px; height: 36px;">
+                    <span class="input-group-text bg-white border-0 text-muted rounded-start-pill py-1"><i class="bi bi-search small"></i></span>
+                    <input
+                      v-model="searchQueryOngkos"
+                      type="text"
+                      class="form-control border-0 ps-1 rounded-end-pill pe-5 search-input-custom bg-white py-1"
+                      style="height: 36px; font-size: 0.85rem;"
+                      placeholder="Cari Layanan..."
+                    />
+                    <button v-if="searchQueryOngkos" class="btn btn-link text-muted border-0 p-1 px-2 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQueryOngkos = ''">
+                      <i class="bi bi-x fs-6"></i>
+                    </button>
+                  </div>
+                  <button v-if="canEdit" class="btn btn-gold btn-sm px-3 d-flex align-items-center justify-content-center gap-2 text-nowrap" style="height: 36px;" @click="openAddOngkosModal">
+                    <i class="bi bi-plus-circle"></i> Tambah Tarif
+                  </button>
+                </div>
               </div>
 
               <!-- Service Cost Cards Grid -->
-              <div class="row g-3">
-                <div v-for="item in data.ongkosServis" :key="item.id" class="col-sm-6 col-md-4 col-lg-3">
+              <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3">
+                <div v-for="item in paginatedOngkos" :key="item.id" class="col">
                   <div class="card service-cost-card h-100 border-0 p-3 shadow-sm rounded-3 interactive-card position-relative d-flex flex-column justify-content-between">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                       <span class="service-icon-bg d-flex align-items-center justify-content-center rounded-circle">
@@ -91,23 +109,64 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Pagination Ongkos -->
+              <div v-if="totalPagesOngkos > 1" class="d-flex justify-content-center mt-4">
+                <nav aria-label="Page navigation">
+                  <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item" :class="{ disabled: currentPageOngkos === 1 }">
+                      <a class="page-link" href="#" @click.prevent="currentPageOngkos--">
+                        <i class="bi bi-chevron-left"></i>
+                      </a>
+                    </li>
+                    <li
+                      v-for="page in totalPagesOngkos"
+                      :key="page"
+                      class="page-item"
+                      :class="{ active: currentPageOngkos === page }"
+                    >
+                      <a class="page-link" href="#" @click.prevent="currentPageOngkos = page">{{ page }}</a>
+                    </li>
+                    <li class="page-item" :class="{ disabled: currentPageOngkos === totalPagesOngkos }">
+                      <a class="page-link" href="#" @click.prevent="currentPageOngkos++">
+                        <i class="bi bi-chevron-right"></i>
+                      </a>
+                    </li>
+                  </ul>
+                </nav>
+              </div>
             </div>
 
             <!-- TAB 2: BARANG BISA DISERVIS -->
             <div v-else-if="activeTab === 'bisa'" key="bisa" class="tab-pane-content">
-              <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
                 <div>
                   <h5 class="fw-extrabold text-dark mb-1">
                     <i class="bi bi-check-circle-fill text-success me-2"></i>Barang Bisa Diservis
                   </h5>
                   <p class="text-muted small mb-0">Contoh jenis kerusakan barang perhiasan yang dapat diterima beserta perkiraan biayanya.</p>
                 </div>
-                <div class="d-flex align-items-center gap-3 flex-wrap">
-                  <div class="d-flex align-items-center gap-2 dropdown-bisa-container position-relative">
-                    <span class="small text-secondary fw-bold text-nowrap"><i class="bi bi-filter"></i> Filter Jenis:</span>
-                    <div class="position-relative">
-                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between px-3 gap-2" style="width: 140px; height: 38px; text-align: left;" @click.stop="isOpenBisa = !isOpenBisa">
-                        <span class="text-capitalize">{{ getJenisLabel(filterJenisBisa) || 'Semua Jenis' }}</span>
+                <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 w-100 w-md-auto justify-content-md-end">
+                  <div class="d-flex gap-2 flex-grow-1 flex-md-grow-0">
+                    <!-- Search Input -->
+                    <div class="input-group position-relative shadow-sm rounded-pill flex-grow-1" style="max-width: 240px; height: 38px;">
+                      <span class="input-group-text bg-white border-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                      <input
+                        v-model="searchQueryBisa"
+                        type="text"
+                        class="form-control border-0 ps-1 rounded-end-pill pe-5 search-input-custom bg-white"
+                        style="height: 38px; font-size: 0.9rem;"
+                        placeholder="Cari barang..."
+                      />
+                      <button v-if="searchQueryBisa" class="btn btn-link text-muted border-0 p-1 px-2.5 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQueryBisa = ''">
+                        <i class="bi bi-x fs-5"></i>
+                      </button>
+                    </div>
+
+                    <!-- Filter Dropdown -->
+                    <div class="dropdown-bisa-container position-relative flex-grow-1" style="max-width: 160px;">
+                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between px-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenBisa = !isOpenBisa">
+                        <span class="text-capitalize text-truncate">{{ getJenisLabel(filterJenisBisa) || 'Semua Jenis' }}</span>
                       </button>
                       <transition name="dropdown-fade">
                         <ul v-if="isOpenBisa" class="custom-dropdown-menu shadow border-0 py-2 position-absolute start-0 mt-2 z-3 rounded-3 list-unstyled m-0">
@@ -119,70 +178,160 @@
                       </transition>
                     </div>
                   </div>
-                  <button v-if="canEdit" class="btn btn-gold px-3 d-flex align-items-center gap-2" style="height: 38px" @click="openAddBisaModal">
+                  <button v-if="canEdit" class="btn btn-gold btn-add-responsive px-3 d-flex align-items-center gap-2" style="height: 38px" @click="openAddBisaModal">
                     <i class="bi bi-plus-circle"></i> Tambah Informasi
                   </button>
                 </div>
               </div>
 
-              <!-- Repairable Cards Grid -->
-              <div v-if="filteredBisa.length" class="row g-4">
-                <div v-for="item in filteredBisa" :key="item.id" class="col-md-6 col-lg-4">
-                  <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
-                    <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center">
-                      <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
-                      <div v-else class="text-center text-muted p-5">
-                        <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
-                        <span class="small text-secondary">Belum ada foto</span>
-                      </div>
-                      <span class="badge bg-success position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-check2"></i> Bisa Diservis</span>
-                      <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-3 start-3 px-2 py-1 rounded text-capitalize small">Jenis: {{ item.jenis }}</span>
-                    </div>
-                    <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
-                      <div>
-                        <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
-                        <p class="text-secondary small mb-3">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
-                      </div>
-                      <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
-                        <div>
-                          <span class="text-muted small d-block">Estimasi Ongkos</span>
-                          <span class="fw-bold text-gold">{{ item.cost || '-' }}</span>
+              <!-- Case 1: Belum ada data di database -->
+              <div v-if="!data.barangBisaServis?.length" class="text-center py-5 border rounded-4 bg-light shadow-sm">
+                <i class="bi bi-info-circle fs-1 text-gold-subtle d-block mb-3"></i>
+                <h6 class="fw-bold text-secondary">Belum ada data informasi barang bisa servis</h6>
+                <p class="text-muted small mb-0">Klik tombol "Tambah Informasi" untuk menambahkan data baru.</p>
+              </div>
+
+              <!-- Case 2: Ada data, tapi tidak cocok dengan filter pencarian -->
+              <div v-else-if="!filteredBisa.length" class="text-center py-5 border rounded-4 bg-light shadow-sm">
+                <i class="bi bi-search fs-1 text-gold-subtle d-block mb-3"></i>
+                <h6 class="fw-bold text-secondary">Tidak ada data barang untuk jenis "{{ getJenisLabel(filterJenisBisa) }}"</h6>
+                <p class="text-muted small mb-0">Coba pilih filter jenis lainnya.</p>
+              </div>
+
+              <!-- Case 3: Grid Loop -->
+              <template v-else>
+                <!-- Desktop view (hidden on mobile) -->
+                <div class="d-none d-sm-flex row row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+                  <div v-for="item in paginatedBisa" :key="item.id" class="col">
+                    <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
+                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
+                        <div v-else class="text-center text-muted p-5">
+                          <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
+                          <span class="small text-secondary">Belum ada foto</span>
                         </div>
-                        <div v-if="canEdit" class="d-flex gap-2">
-                          <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="openEditBisaModal(item)" title="Edit">
-                            <i class="bi bi-pencil-fill small"></i>
-                          </button>
-                          <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="deleteBisaItem(item)" title="Hapus">
-                            <i class="bi bi-trash-fill small"></i>
-                          </button>
+                        <span class="badge bg-success position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-check2"></i> Bisa Diservis</span>
+                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-3 start-3 px-2 py-1 rounded text-capitalize small">Jenis: {{ item.jenis }}</span>
+                      </div>
+                      <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
+                        <div>
+                          <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
+                          <p class="text-secondary small mb-3">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
+                        </div>
+                        <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
+                          <div>
+                            <span class="text-muted small d-block">Estimasi Ongkos</span>
+                            <span class="fw-bold text-gold">{{ item.cost || '-' }}</span>
+                          </div>
+                          <div v-if="canEdit" class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="openEditBisaModal(item)" title="Edit">
+                              <i class="bi bi-pencil-fill small"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="deleteBisaItem(item)" title="Hapus">
+                              <i class="bi bi-trash-fill small"></i>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div v-else class="text-center py-5 border rounded-4 bg-light shadow-sm">
-                <i class="bi bi-search fs-1 text-gold-subtle d-block mb-3"></i>
-                <h6 class="fw-bold text-secondary">Tidak ada data barang untuk jenis "{{ filterJenisBisa }}"</h6>
-                <p class="text-muted small mb-0">Coba pilih filter jenis lainnya atau tambah data baru.</p>
-              </div>
+
+                <!-- Mobile view (hidden on desktop) -->
+                <div class="d-flex d-sm-none flex-column gap-3">
+                  <div v-for="item in paginatedBisa" :key="item.id" class="card repair-card-mobile border-0 shadow-sm rounded-4 overflow-hidden p-3 position-relative">
+                    <div class="d-flex gap-3">
+                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" style="width: 85px; height: 85px;">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="w-100 h-100 object-fit-cover" />
+                        <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                          <i class="bi bi-image fs-4 text-gold-subtle"></i>
+                        </div>
+                      </div>
+                      <div class="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
+                        <div>
+                          <div class="d-flex justify-content-between align-items-start gap-1">
+                            <h6 class="fw-extrabold text-dark mb-1 text-truncate" style="font-size: 0.95rem;">{{ item.name }}</h6>
+                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0">
+                              <button class="btn btn-link text-primary p-0 border-0" @click="openEditBisaModal(item)" title="Edit">
+                                <i class="bi bi-pencil-square fs-6"></i>
+                              </button>
+                              <button class="btn btn-link text-danger p-0 border-0 ms-2" @click="deleteBisaItem(item)" title="Hapus">
+                                <i class="bi bi-trash fs-6"></i>
+                              </button>
+                            </div>
+                          </div>
+                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3;">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-end pt-1 border-top border-light-subtle">
+                          <div>
+                            <span class="text-muted d-block" style="font-size: 0.7rem;">Estimasi Ongkos</span>
+                            <span class="fw-bold text-gold small">{{ item.cost || '-' }}</span>
+                          </div>
+                          <span v-if="item.jenis" class="badge bg-gold-light text-gold text-capitalize px-2 py-1 rounded" style="font-size: 0.7rem;">{{ item.jenis }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pagination Bisa -->
+                <div v-if="totalPagesBisa > 1" class="d-flex justify-content-center mt-4">
+                  <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                      <li class="page-item" :class="{ disabled: currentPageBisa === 1 }">
+                        <a class="page-link" href="#" @click.prevent="currentPageBisa--">
+                          <i class="bi bi-chevron-left"></i>
+                        </a>
+                      </li>
+                      <li
+                        v-for="page in totalPagesBisa"
+                        :key="page"
+                        class="page-item"
+                        :class="{ active: currentPageBisa === page }"
+                      >
+                        <a class="page-link" href="#" @click.prevent="currentPageBisa = page">{{ page }}</a>
+                      </li>
+                      <li class="page-item" :class="{ disabled: currentPageBisa === totalPagesBisa }">
+                        <a class="page-link" href="#" @click.prevent="currentPageBisa++">
+                          <i class="bi bi-chevron-right"></i>
+                        </a>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              </template>
             </div>
 
             <!-- TAB 3: BARANG TIDAK BISA DISERVIS -->
             <div v-else-if="activeTab === 'tidak_bisa'" key="tidak_bisa" class="tab-pane-content">
-              <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
                 <div>
                   <h5 class="fw-extrabold text-dark mb-1">
                     <i class="bi bi-x-circle-fill text-danger me-2"></i>Barang Tidak Bisa Diservis
                   </h5>
                   <p class="text-muted small mb-0">Daftar material atau jenis perhiasan yang tidak bisa diterima untuk servis demi menghindari kerusakan permanen.</p>
                 </div>
-                <div class="d-flex align-items-center gap-3 flex-wrap">
-                  <div class="d-flex align-items-center gap-2 dropdown-tidakbisa-container position-relative">
-                    <span class="small text-secondary fw-bold text-nowrap"><i class="bi bi-filter"></i> Filter Jenis:</span>
-                    <div class="position-relative">
-                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between px-3 gap-2" style="width: 140px; height: 38px; text-align: left;" @click.stop="isOpenTidakBisa = !isOpenTidakBisa">
-                        <span class="text-capitalize">{{ getJenisLabel(filterJenisTidakBisa) || 'Semua Jenis' }}</span>
+                <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 w-100 w-md-auto justify-content-md-end">
+                  <div class="d-flex gap-2 flex-grow-1 flex-md-grow-0">
+                    <!-- Search Input -->
+                    <div class="input-group position-relative shadow-sm rounded-pill flex-grow-1" style="max-width: 240px; height: 38px;">
+                      <span class="input-group-text bg-white border-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                      <input
+                        v-model="searchQueryTidakBisa"
+                        type="text"
+                        class="form-control border-0 ps-1 rounded-end-pill pe-5 search-input-custom bg-white"
+                        style="height: 38px; font-size: 0.9rem;"
+                        placeholder="Cari barang..."
+                      />
+                      <button v-if="searchQueryTidakBisa" class="btn btn-link text-muted border-0 p-1 px-2.5 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQueryTidakBisa = ''">
+                        <i class="bi bi-x fs-5"></i>
+                      </button>
+                    </div>
+
+                    <!-- Filter Dropdown -->
+                    <div class="dropdown-tidakbisa-container position-relative flex-grow-1" style="max-width: 160px;">
+                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between px-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenTidakBisa = !isOpenTidakBisa">
+                        <span class="text-capitalize text-truncate">{{ getJenisLabel(filterJenisTidakBisa) || 'Semua Jenis' }}</span>
                       </button>
                       <transition name="dropdown-fade">
                         <ul v-if="isOpenTidakBisa" class="custom-dropdown-menu shadow border-0 py-2 position-absolute start-0 mt-2 z-3 rounded-3 list-unstyled m-0">
@@ -194,66 +343,141 @@
                       </transition>
                     </div>
                   </div>
-                  <button v-if="canEdit" class="btn btn-gold px-3 d-flex align-items-center gap-2" style="height: 38px" @click="openAddTidakBisaModal">
+                  <button v-if="canEdit" class="btn btn-gold btn-add-responsive px-3 d-flex align-items-center gap-2" style="height: 38px" @click="openAddTidakBisaModal">
                     <i class="bi bi-plus-circle"></i> Tambah Informasi
                   </button>
                 </div>
               </div>
 
-              <!-- Non-Repairable Cards Grid -->
-              <div v-if="filteredTidakBisa.length" class="row g-4">
-                <div v-for="item in filteredTidakBisa" :key="item.id" class="col-md-6 col-lg-4">
-                  <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
-                    <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center">
-                      <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
-                      <div v-else class="text-center text-muted p-5">
-                        <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
-                        <span class="small text-secondary">Belum ada foto</span>
+              <!-- Case 1: Belum ada data di database -->
+              <div v-if="!data.barangTidakBisaServis?.length" class="text-center py-5 border rounded-4 bg-light shadow-sm">
+                <i class="bi bi-info-circle fs-1 text-gold-subtle d-block mb-3"></i>
+                <h6 class="fw-bold text-secondary">Belum ada data informasi barang tidak bisa servis</h6>
+                <p class="text-muted small mb-0">Klik tombol "Tambah Informasi" untuk menambahkan data baru.</p>
+              </div>
+
+              <!-- Case 2: Ada data, tapi tidak cocok dengan filter pencarian -->
+              <div v-else-if="!filteredTidakBisa.length" class="text-center py-5 border rounded-4 bg-light shadow-sm">
+                <i class="bi bi-search fs-1 text-gold-subtle d-block mb-3"></i>
+                <h6 class="fw-bold text-secondary">Tidak ada data barang untuk jenis "{{ getJenisLabel(filterJenisTidakBisa) }}"</h6>
+                <p class="text-muted small mb-0">Coba pilih filter jenis lainnya.</p>
+              </div>
+
+              <!-- Case 3: Grid Loop -->
+              <template v-else>
+                <!-- Desktop view (hidden on mobile) -->
+                <div class="d-none d-sm-flex row row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+                  <div v-for="item in paginatedTidakBisa" :key="item.id" class="col">
+                    <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
+                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
+                        <div v-else class="text-center text-muted p-5">
+                          <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
+                          <span class="small text-secondary">Belum ada foto</span>
+                        </div>
+                        <span class="badge bg-danger position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-exclamation-triangle"></i> Tidak Bisa Servis</span>
+                        <span v-if="item.kadar" class="badge bg-dark-glass position-absolute bottom-3 start-3 px-2 py-1 rounded small">Kadar: {{ item.kadar }}</span>
+                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-3 end-3 px-2 py-1 rounded text-capitalize small">Jenis: {{ item.jenis }}</span>
                       </div>
-                      <span class="badge bg-danger position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-exclamation-triangle"></i> Tidak Bisa Servis</span>
-                      <span v-if="item.kadar" class="badge bg-dark-glass position-absolute bottom-3 start-3 px-2 py-1 rounded small">Kadar: {{ item.kadar }}</span>
-                      <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-3 end-3 px-2 py-1 rounded text-capitalize small">Jenis: {{ item.jenis }}</span>
-                    </div>
-                    <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
-                      <div>
-                        <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
-                        <p class="text-secondary small mb-3">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
-                      </div>
-                      <div v-if="canEdit" class="pt-3 border-top border-light d-flex justify-content-end align-items-center gap-2">
-                        <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="openEditTidakBisaModal(item)" title="Edit">
-                          <i class="bi bi-pencil-fill small"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="deleteTidakBisaItem(item)" title="Hapus">
-                          <i class="bi bi-trash-fill small"></i>
-                        </button>
+                      <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
+                        <div>
+                          <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
+                          <p class="text-secondary small mb-3">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
+                        </div>
+                        <div v-if="canEdit" class="pt-3 border-top border-light d-flex justify-content-end align-items-center gap-2">
+                          <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="openEditTidakBisaModal(item)" title="Edit">
+                            <i class="bi bi-pencil-fill small"></i>
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="deleteTidakBisaItem(item)" title="Hapus">
+                            <i class="bi bi-trash-fill small"></i>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div v-else class="text-center py-5 border rounded-4 bg-light shadow-sm">
-                <i class="bi bi-search fs-1 text-gold-subtle d-block mb-3"></i>
-                <h6 class="fw-bold text-secondary">Tidak ada data barang untuk jenis "{{ filterJenisTidakBisa }}"</h6>
-                <p class="text-muted small mb-0">Coba pilih filter jenis lainnya atau tambah data baru.</p>
-              </div>
+
+                <!-- Mobile view (hidden on desktop) -->
+                <div class="d-flex d-sm-none flex-column gap-3">
+                  <div v-for="item in paginatedTidakBisa" :key="item.id" class="card repair-card-mobile border-0 shadow-sm rounded-4 overflow-hidden p-3 position-relative">
+                    <div class="d-flex gap-3">
+                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" style="width: 85px; height: 85px;">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="w-100 h-100 object-fit-cover" />
+                        <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                          <i class="bi bi-image fs-4 text-gold-subtle"></i>
+                        </div>
+                      </div>
+                      <div class="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
+                        <div>
+                          <div class="d-flex justify-content-between align-items-start gap-1">
+                            <h6 class="fw-extrabold text-dark mb-1 text-truncate" style="font-size: 0.95rem;">{{ item.name }}</h6>
+                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0">
+                              <button class="btn btn-link text-primary p-0 border-0" @click="openEditTidakBisaModal(item)" title="Edit">
+                                <i class="bi bi-pencil-square fs-6"></i>
+                              </button>
+                              <button class="btn btn-link text-danger p-0 border-0 ms-2" @click="deleteTidakBisaItem(item)" title="Hapus">
+                                <i class="bi bi-trash fs-6"></i>
+                              </button>
+                            </div>
+                          </div>
+                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3;">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-end pt-1 border-top border-light-subtle">
+                          <div>
+                            <span class="text-muted d-block" style="font-size: 0.7rem;">Kadar</span>
+                            <span class="fw-bold text-danger small">{{ item.kadar || '-' }}</span>
+                          </div>
+                          <span v-if="item.jenis" class="badge bg-secondary-glass text-secondary text-capitalize px-2 py-1 rounded" style="font-size: 0.7rem;">{{ item.jenis }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pagination Tidak Bisa -->
+                <div v-if="totalPagesTidakBisa > 1" class="d-flex justify-content-center mt-4">
+                  <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                      <li class="page-item" :class="{ disabled: currentPageTidakBisa === 1 }">
+                        <a class="page-link" href="#" @click.prevent="currentPageTidakBisa--">
+                          <i class="bi bi-chevron-left"></i>
+                        </a>
+                      </li>
+                      <li
+                        v-for="page in totalPagesTidakBisa"
+                        :key="page"
+                        class="page-item"
+                        :class="{ active: currentPageTidakBisa === page }"
+                      >
+                        <a class="page-link" href="#" @click.prevent="currentPageTidakBisa = page">{{ page }}</a>
+                      </li>
+                      <li class="page-item" :class="{ disabled: currentPageTidakBisa === totalPagesTidakBisa }">
+                        <a class="page-link" href="#" @click.prevent="currentPageTidakBisa++">
+                          <i class="bi bi-chevron-right"></i>
+                        </a>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              </template>
             </div>
 
             <!-- TAB 4: HARGA AKSESORIS -->
             <div v-else-if="activeTab === 'aksesoris'" key="aksesoris" class="tab-pane-content">
-              <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
                 <div>
                   <h5 class="fw-extrabold text-dark mb-1">
                     <i class="bi bi-gem text-gold me-2"></i>Harga Aksesoris per Gram / Pcs
                   </h5>
                   <p class="text-muted small mb-0">Daftar harga jual kelengkapan aksesoris perhiasan pendukung.</p>
                 </div>
-                <button v-if="canEdit" class="btn btn-gold px-3 d-flex align-items-center gap-2" @click="openAddAksesorisModal">
+                <button v-if="canEdit" class="btn btn-gold btn-add-responsive px-3 d-flex align-items-center gap-2" @click="openAddAksesorisModal">
                   <i class="bi bi-plus-circle"></i> Tambah Aksesoris
                 </button>
               </div>
 
-              <!-- Accessories Table / List -->
-              <div class="card border-0 shadow-sm rounded-4 overflow-hidden border border-light">
+              <!-- Accessories Table (Desktop view) -->
+              <div class="d-none d-sm-block card border-0 shadow-sm rounded-4 overflow-hidden border border-light">
                 <div class="table-responsive">
                   <table class="table table-hover align-middle mb-0 custom-accessories-table">
                     <thead class="bg-light">
@@ -296,6 +520,41 @@
                       </tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <!-- Accessories List (Mobile view) -->
+              <div class="d-block d-sm-none d-flex flex-column gap-3">
+                <div v-for="item in data.hargaAksesoris" :key="item.id" class="card border-0 shadow-sm p-3 rounded-4 interactive-card position-relative border border-light">
+                  <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-light">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="aks-icon-circle bg-gold-light d-flex align-items-center justify-content-center rounded-circle">
+                        <i class="bi bi-gift text-gold"></i>
+                      </span>
+                      <span class="fw-bold text-dark" style="font-size: 0.95rem;">{{ item.name }}</span>
+                    </div>
+                    <div v-if="canEdit" class="d-flex gap-2">
+                      <button class="btn btn-sm btn-outline-primary rounded-circle p-1.5 d-flex align-items-center justify-content-center" style="width: 28px; height: 28px" @click="openEditAksesorisModal(item)">
+                        <i class="bi bi-pencil-fill" style="font-size: 0.75rem;"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger rounded-circle p-1.5 d-flex align-items-center justify-content-center" style="width: 28px; height: 28px" @click="deleteAksesorisItem(item.id)">
+                        <i class="bi bi-trash-fill" style="font-size: 0.75rem;"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <span class="text-muted d-block" style="font-size: 0.72rem;">Harga</span>
+                      <span class="fw-extrabold text-gold" style="font-size: 0.95rem;">Rp {{ formatNumber(item.pricePerGram) }}</span>
+                    </div>
+                    <div class="col-6 text-end">
+                      <span class="text-muted d-block" style="font-size: 0.72rem;">Keterangan</span>
+                      <span class="text-secondary small">{{ item.notes || '-' }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="!data.hargaAksesoris?.length" class="text-center py-4 text-muted border rounded-4 bg-light shadow-sm">
+                  Belum ada data aksesoris.
                 </div>
               </div>
             </div>
@@ -517,7 +776,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { Modal } from "bootstrap";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
@@ -563,6 +822,9 @@ const canEdit = computed(() => ["supervisor", "hrd", "admin", "admin_custom"].in
 // Filter & Categories Options
 const filterJenisBisa = ref("");
 const filterJenisTidakBisa = ref("");
+const searchQueryOngkos = ref("");
+const searchQueryBisa = ref("");
+const searchQueryTidakBisa = ref("");
 const isOpenBisa = ref(false);
 const isOpenTidakBisa = ref(false);
 const isOpenFormBisa = ref(false);
@@ -578,10 +840,18 @@ const jenisOptions = [
 ];
 
 const filteredBisa = computed(() => {
-  if (!filterJenisBisa.value) return data.value.barangBisaServis;
-  return data.value.barangBisaServis.filter(
-    (item) => item.jenis === filterJenisBisa.value
-  );
+  let list = data.value.barangBisaServis || [];
+  if (filterJenisBisa.value) {
+    list = list.filter(item => item.jenis === filterJenisBisa.value);
+  }
+  if (searchQueryBisa.value.trim()) {
+    const q = searchQueryBisa.value.toLowerCase().trim();
+    list = list.filter(item => 
+      item.name.toLowerCase().includes(q) || 
+      (item.description && item.description.toLowerCase().includes(q))
+    );
+  }
+  return list;
 });
 
 function getJenisLabel(value) {
@@ -593,11 +863,13 @@ function getJenisLabel(value) {
 function selectJenisBisa(val) {
   filterJenisBisa.value = val;
   isOpenBisa.value = false;
+  currentPageBisa.value = 1;
 }
 
 function selectJenisTidakBisa(val) {
   filterJenisTidakBisa.value = val;
   isOpenTidakBisa.value = false;
+  currentPageTidakBisa.value = 1;
 }
 
 function selectFormBisa(val) {
@@ -633,10 +905,86 @@ function handleDocumentClick(e) {
 
 
 const filteredTidakBisa = computed(() => {
-  if (!filterJenisTidakBisa.value) return data.value.barangTidakBisaServis;
-  return data.value.barangTidakBisaServis.filter(
-    (item) => item.jenis === filterJenisTidakBisa.value
-  );
+  let list = data.value.barangTidakBisaServis || [];
+  if (filterJenisTidakBisa.value) {
+    list = list.filter(item => item.jenis === filterJenisTidakBisa.value);
+  }
+  if (searchQueryTidakBisa.value.trim()) {
+    const q = searchQueryTidakBisa.value.toLowerCase().trim();
+    list = list.filter(item => 
+      item.name.toLowerCase().includes(q) || 
+      (item.reason && item.reason.toLowerCase().includes(q))
+    );
+  }
+  return list;
+});
+
+// Pagination States
+const currentPageOngkos = ref(1);
+const itemsPerPageOngkos = 15;
+
+const currentPageBisa = ref(1);
+const itemsPerPageBisa = 12;
+
+const currentPageTidakBisa = ref(1);
+const itemsPerPageTidakBisa = 12;
+
+const filteredOngkos = computed(() => {
+  if (!searchQueryOngkos.value.trim()) return data.value.ongkosServis || [];
+  const q = searchQueryOngkos.value.toLowerCase().trim();
+  return (data.value.ongkosServis || []).filter(item => item.name.toLowerCase().includes(q));
+});
+
+const paginatedOngkos = computed(() => {
+  const start = (currentPageOngkos.value - 1) * itemsPerPageOngkos;
+  const end = start + itemsPerPageOngkos;
+  return filteredOngkos.value.slice(start, end);
+});
+
+const totalPagesOngkos = computed(() => {
+  return Math.ceil(filteredOngkos.value.length / itemsPerPageOngkos) || 1;
+});
+
+const paginatedBisa = computed(() => {
+  const start = (currentPageBisa.value - 1) * itemsPerPageBisa;
+  const end = start + itemsPerPageBisa;
+  return filteredBisa.value.slice(start, end);
+});
+
+const totalPagesBisa = computed(() => {
+  return Math.ceil(filteredBisa.value.length / itemsPerPageBisa) || 1;
+});
+
+const paginatedTidakBisa = computed(() => {
+  const start = (currentPageTidakBisa.value - 1) * itemsPerPageTidakBisa;
+  const end = start + itemsPerPageTidakBisa;
+  return filteredTidakBisa.value.slice(start, end);
+});
+
+const totalPagesTidakBisa = computed(() => {
+  return Math.ceil(filteredTidakBisa.value.length / itemsPerPageTidakBisa) || 1;
+});
+
+// Reset active pages when tab changes
+watch(activeTab, () => {
+  currentPageOngkos.value = 1;
+  currentPageBisa.value = 1;
+  currentPageTidakBisa.value = 1;
+  searchQueryOngkos.value = "";
+  searchQueryBisa.value = "";
+  searchQueryTidakBisa.value = "";
+});
+
+watch(searchQueryOngkos, () => {
+  currentPageOngkos.value = 1;
+});
+
+watch(searchQueryBisa, () => {
+  currentPageBisa.value = 1;
+});
+
+watch(searchQueryTidakBisa, () => {
+  currentPageTidakBisa.value = 1;
 });
 
 // Modal refs & editing states
@@ -1342,5 +1690,121 @@ onUnmounted(() => {
 .dropdown-fade-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+/* Custom Premium Pagination Styling */
+:deep(.pagination .page-item.active .page-link) {
+  background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%) !important;
+  border-color: #aa7c11 !important;
+  color: #fff !important;
+  font-weight: bold;
+}
+:deep(.pagination .page-link) {
+  color: #aa7c11;
+  border-color: #e9ecef;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
+}
+:deep(.pagination .page-link:hover) {
+  background-color: rgba(170, 124, 17, 0.08);
+  border-color: #aa7c11;
+  color: #aa7c11;
+}
+:deep(.pagination .page-item.disabled .page-link) {
+  color: #6c757d;
+  background-color: #f8f9fa;
+  border-color: #e9ecef;
+}
+
+.search-input-custom:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #aa7c11 !important;
+}
+
+/* Scrollable tabs on mobile */
+.tabs-scrollable {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  padding-bottom: 2px;
+}
+.tabs-scrollable::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Mobile repair cards */
+.repair-card-mobile {
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
+}
+.repair-card-mobile:hover {
+  border-color: rgba(170, 124, 17, 0.2) !important;
+}
+.repair-image-wrapper-mobile {
+  background-color: #fcfbfa;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bg-secondary-glass {
+  background: rgba(108, 117, 125, 0.12);
+  color: #5a6268;
+}
+
+@media (max-width: 575.98px) {
+  /* Header spacing */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  .badge-role-info {
+    align-self: flex-start;
+  }
+  .page-title {
+    font-size: 1.4rem !important;
+  }
+
+  /* Ongkos card size reduction */
+  .service-cost-card {
+    padding: 0.75rem !important;
+  }
+  .service-name {
+    font-size: 0.78rem !important;
+  }
+  .service-cost {
+    font-size: 0.92rem !important;
+  }
+  .service-icon-bg {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  
+  /* Main Container Card body padding */
+  .card-body.p-4 {
+    padding: 1.25rem !important;
+  }
+  
+  /* Tabs padding */
+  .tab-btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
+  
+  /* Mobile-only full-width buttons */
+  .btn-add-responsive {
+    width: 100% !important;
+    justify-content: center !important;
+  }
 }
 </style>
