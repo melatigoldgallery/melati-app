@@ -350,6 +350,13 @@ const enabledMainCategories = computed(() => {
   }
   return MAIN_CATEGORIES;
 });
+
+const activeMainCategories = computed(() => {
+  if (dynamicSettings.value && Array.isArray(dynamicSettings.value.cards)) {
+    return dynamicSettings.value.cards.filter((card) => card.enabled).map((card) => card.id);
+  }
+  return MAIN_CATEGORIES;
+});
 const savingWarna = ref(false);
 const selectedDate = ref(todayStringWITA());
 const reportData = ref(null);
@@ -451,7 +458,7 @@ function normalizeReport(rawData, dateKey) {
     breakdown: {},
   };
 
-  MAIN_CATEGORIES.forEach((mainCat) => {
+  activeMainCategories.value.forEach((mainCat) => {
     const item = rawData?.items?.[mainCat] || { total: 0, komputer: 0, status: "-" };
     normalized.items[mainCat] = {
       total: toInt(item.total),
@@ -495,7 +502,7 @@ function computeCurrentSummarySnapshot(sourceStockData) {
   const items = {};
   const breakdown = {};
 
-  MAIN_CATEGORIES.forEach((mainCat) => {
+  activeMainCategories.value.forEach((mainCat) => {
     let totalAcrossAllDocs = 0;
     breakdown[mainCat] = {};
 
@@ -611,9 +618,23 @@ function buildDetailRowsForCategory(mainCat, catKey, editable) {
 
   if (detailMode === "color") {
     warnaModalLabel.value = "Warna";
-    return COLOR_TYPES.value.map((type) => ({
+    const baseTypes = [...COLOR_TYPES.value];
+    if (hasDetail && breakdownNode.details) {
+      Object.keys(breakdownNode.details).forEach((k) => {
+        if (toInt(breakdownNode.details[k]) > 0 && !baseTypes.includes(k)) {
+          baseTypes.push(k);
+        }
+      });
+    } else if (isToday && liveDetails) {
+      Object.keys(liveDetails).forEach((k) => {
+        if (toInt(liveDetails[k]) > 0 && !baseTypes.includes(k)) {
+          baseTypes.push(k);
+        }
+      });
+    }
+    return baseTypes.map((type) => ({
       key: type,
-      label: COLOR_LABELS.value[type] || type,
+      label: COLOR_LABELS.value[type] || `${type} (Lainnya)`,
       value: toInt(hasDetail ? breakdownNode.details[type] : isToday ? liveDetails[type] : 0),
       editable,
     }));
@@ -621,9 +642,23 @@ function buildDetailRowsForCategory(mainCat, catKey, editable) {
 
   if (detailMode === "hala") {
     warnaModalLabel.value = "Jenis";
-    return HALA_TYPES.value.map((type) => ({
+    const baseTypes = [...HALA_TYPES.value];
+    if (hasDetail && breakdownNode.details) {
+      Object.keys(breakdownNode.details).forEach((k) => {
+        if (toInt(breakdownNode.details[k]) > 0 && !baseTypes.includes(k)) {
+          baseTypes.push(k);
+        }
+      });
+    } else if (isToday && liveDetails) {
+      Object.keys(liveDetails).forEach((k) => {
+        if (toInt(liveDetails[k]) > 0 && !baseTypes.includes(k)) {
+          baseTypes.push(k);
+        }
+      });
+    }
+    return baseTypes.map((type) => ({
       key: type,
-      label: HALA_LABELS.value[type] || type,
+      label: HALA_LABELS.value[type] || `${type} (Lainnya)`,
       value: toInt(hasDetail ? breakdownNode.details[type] : isToday ? liveDetails[type] : 0),
       editable,
     }));
@@ -808,7 +843,7 @@ async function fetchLogsWithFallback(startDate, endDate) {
   }
 }
 
-function groupLogsByMainCategory(logDocs, categories = MAIN_CATEGORIES) {
+function groupLogsByMainCategory(logDocs, categories = activeMainCategories.value) {
   const locations = [...SUMMARY_CATEGORIES.value];
   const categorySet = new Set(categories);
   const grouped = {};

@@ -13,11 +13,12 @@ import {
   setDoc,
   arrayUnion,
   Timestamp,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
 import { floorCollection, floorDoc } from "./floor-scope";
-import { getCachedSettings } from "./inventory-setting-service";
+import { getCachedSettings, fetchInventorySettings } from "./inventory-setting-service";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -335,8 +336,22 @@ export async function updateStockItem({
   if (newDetails != null && detailTypes) {
     const oldDetails = sanitizeDetails(detailTypes, existing.details || {});
     const nextDetails = sanitizeDetails(detailTypes, newDetails);
+    
+    if (existing.details) {
+      Object.keys(existing.details).forEach((k) => {
+        if (nextDetails[k] === undefined) {
+          nextDetails[k] = deleteField();
+        }
+      });
+    }
+
     updated.details = nextDetails;
-    updated.quantity = totalFromDetails(nextDetails);
+    
+    updated.quantity = Object.keys(nextDetails).reduce((sum, k) => {
+      if (nextDetails[k] === deleteField()) return sum;
+      return sum + toInt(nextDetails[k]);
+    }, 0);
+
     detailChanges = detailTypes
       .map((type) => {
         const oldQty = toInt(oldDetails[type]);
@@ -427,8 +442,21 @@ export async function updateKomputerStock({ mainCat, newQuantity, newDetails = n
   const detailTypes = resolveDetailTypes(mainCat, detailType);
   if (detailTypes && newDetails) {
     const details = sanitizeDetails(detailTypes, newDetails);
+    
+    if (existing.details) {
+      Object.keys(existing.details).forEach((k) => {
+        if (details[k] === undefined) {
+          details[k] = deleteField();
+        }
+      });
+    }
+
     next.details = details;
-    next.quantity = totalFromDetails(details);
+    
+    next.quantity = Object.keys(details).reduce((sum, k) => {
+      if (details[k] === deleteField()) return sum;
+      return sum + toInt(details[k]);
+    }, 0);
   } else if (detailTypes && existing.details) {
     next.details = sanitizeDetails(detailTypes, existing.details);
     next.quantity = totalFromDetails(next.details);
@@ -508,21 +536,39 @@ export async function fetchDailyReport(dateStr, floorId = "") {
  * @param {string} dateStr  - YYYY-MM-DD
  * @param {Object} stockData - result of fetchAllStockData()
  * @param {string} [floorId] - Floor ID; uses active floor if not provided
+ * @param {Object} [settingsObj] - Already fetched settings object to avoid Firestore read
  */
-export async function saveDailyReport(dateStr, stockData, floorId = "") {
-  const SUB_LABEL_MAP = {
-    brankas: "Stok Brankas",
-    posting: "Belum Posting",
-    "barang-display": "Display",
-    "barang-rusak": "Rusak",
-    "batu-lepas": "Batu Lepas",
-    manual: "Manual",
-    admin: "Admin",
-    DP: "DP",
-    lainnya: "Lainnya",
-  };
+export async function saveDailyReport(dateStr, stockData, floorId = "", settingsObj = null) {
+  const settings = settingsObj || await fetchInventorySettings(floorId);
 
-  const settings = await fetchInventorySettings(floorId);
+  const mainCategories = settings && Array.isArray(settings.cards)
+    ? settings.cards.filter((c) => c.enabled).map((c) => c.id)
+    : MAIN_CATEGORIES;
+
+  const subCategories = settings && Array.isArray(settings.tableRows)
+    ? settings.tableRows.filter((r) => r.enabled)
+    : SUB_CATEGORIES;
+
+  const subLabelMap = {};
+  if (settings && Array.isArray(settings.tableRows)) {
+    settings.tableRows.forEach((r) => {
+      subLabelMap[r.key] = r.label;
+    });
+  } else {
+    const defaultLabels = {
+      brankas: "Stok Brankas",
+      posting: "Belum Posting",
+      "barang-display": "Display",
+      "barang-rusak": "Rusak",
+      "batu-lepas": "Batu Lepas",
+      manual: "Manual",
+      admin: "Admin",
+      DP: "DP",
+      lainnya: "Lainnya",
+    };
+    Object.assign(subLabelMap, defaultLabels);
+  }
+
   const getCardDetailMode = (id) => {
     const card = settings?.cards?.find((c) => c.id === id);
     return card?.detailMode || "default";
@@ -531,15 +577,15 @@ export async function saveDailyReport(dateStr, stockData, floorId = "") {
   const items = {};
   const breakdown = {};
 
-  MAIN_CATEGORIES.forEach((mainCat) => {
-    const fisik = calcFisikTotal(stockData, mainCat, SUB_CATEGORIES, getCardDetailMode(mainCat));
-    const komputer = parseInt(stockData["stok-komputer"]?.[mainCat]?.quantity) || 0;
+  mainCategories.forEach((mainCat) => {
+    const fisik = calcFisikTotal(stockData, mainCat, subCategories, getCardDetailMode(mainCat));
+    const komputer = parseInt(stockData["stok-komputer"]?.[mainCat]?.quantity, 10) || 0;
     const { label: status } = getStockStatus(fisik, komputer);
     items[mainCat] = { total: fisik, komputer, status };
     breakdown[mainCat] = {};
-    SUB_CATEGORIES.forEach((sub) => {
+    subCategories.forEach((sub) => {
       const item = stockData[sub.key]?.[mainCat];
-      breakdown[mainCat][SUB_LABEL_MAP[sub.key] || sub.key] = {
+      breakdown[mainCat][subLabelMap[sub.key] || sub.key] = {
         quantity: item?.quantity || 0,
         details: item?.details || null,
       };
@@ -554,3 +600,68 @@ export async function saveDailyReport(dateStr, stockData, floorId = "") {
     breakdown,
   });
 }
+
+export async function cleanupDeletedDetailTypes({
+  deletedColors = [],
+  deletedHalas = [],
+  floorId = "",
+  currentStockData = {},
+}) {
+  if (deletedColors.length === 0 && deletedHalas.length === 0) return;
+
+  for (const subDoc of Object.keys(currentStockData)) {
+    const docData = currentStockData[subDoc];
+    if (!docData) continue;
+
+    let docChanged = false;
+    const updatedDocData = {};
+
+    for (const mainCat of Object.keys(docData)) {
+      const item = docData[mainCat];
+      if (item && item.details) {
+        let itemChanged = false;
+        const nextDetails = { ...item.details };
+        const keysToDelete = [];
+
+        deletedColors.forEach((col) => {
+          if (nextDetails[col] !== undefined) {
+            keysToDelete.push(col);
+            itemChanged = true;
+          }
+        });
+
+        deletedHalas.forEach((hala) => {
+          if (nextDetails[hala] !== undefined) {
+            keysToDelete.push(hala);
+            itemChanged = true;
+          }
+        });
+
+        if (itemChanged) {
+          const nextQty = Object.keys(nextDetails).reduce((sum, k) => {
+            if (keysToDelete.includes(k)) return sum;
+            return sum + (parseInt(nextDetails[k], 10) || 0);
+          }, 0);
+
+          keysToDelete.forEach((key) => {
+            nextDetails[key] = deleteField();
+          });
+
+          updatedDocData[mainCat] = {
+            ...item,
+            details: nextDetails,
+            quantity: nextQty,
+            lastUpdated: new Date().toISOString(),
+          };
+          docChanged = true;
+        }
+      }
+    }
+
+    if (docChanged) {
+      const ref = floorDoc(db, "stocks", subDoc, floorId);
+      await setDoc(ref, updatedDocData, { merge: true });
+    }
+  }
+}
+
