@@ -834,47 +834,56 @@ async function generateGoldDailyReport(floorId, dateYmd) {
     stockData[doc.id] = doc.data() || {};
   });
 
-  const mainCategories = [
-    "KALUNG",
-    "LIONTIN",
-    "ANTING",
-    "CINCIN",
-    "HALA & SDW",
-    "GELANG",
-    "GIWANG",
-    "KENDARI & EMAS BALI",
-    "BERLIAN",
-  ];
-
-  const subCategories = [
-    "brankas",
-    "posting",
-    "barang-display",
-    "barang-rusak",
-    "batu-lepas",
-    "manual",
-    "admin",
-    "DP",
-    "lainnya",
-  ];
-
-  const subLabelMap = {
-    brankas: "Stok Brankas",
-    posting: "Belum Posting",
-    "barang-display": "Display",
-    "barang-rusak": "Rusak",
-    "batu-lepas": "Batu Lepas",
-    manual: "Manual",
-    admin: "Admin",
-    DP: "DP",
-    lainnya: "Lainnya",
-  };
-
-  const items = {};
-  const breakdown = {};
-
   const settingsSnap = await dbFloorRef.collection("settings").doc("inventoryManajemen").get();
   const settings = settingsSnap.exists ? settingsSnap.data() : null;
+
+  const mainCategories = settings && Array.isArray(settings.cards)
+    ? settings.cards.filter((c) => c.enabled).map((c) => c.id)
+    : [
+        "KALUNG",
+        "LIONTIN",
+        "ANTING",
+        "CINCIN",
+        "HALA & SDW",
+        "GELANG",
+        "GIWANG",
+        "KENDARI & EMAS BALI",
+        "BERLIAN",
+      ];
+
+  const subCategories = settings && Array.isArray(settings.tableRows)
+    ? settings.tableRows.filter((r) => r.enabled).map((r) => r.key)
+    : [
+        "brankas",
+        "posting",
+        "barang-display",
+        "barang-rusak",
+        "batu-lepas",
+        "manual",
+        "admin",
+        "DP",
+        "lainnya",
+      ];
+
+  const subLabelMap = {};
+  if (settings && Array.isArray(settings.tableRows)) {
+    settings.tableRows.forEach((r) => {
+      subLabelMap[r.key] = r.label;
+    });
+  } else {
+    const defaultLabels = {
+      brankas: "Stok Brankas",
+      posting: "Belum Posting",
+      "barang-display": "Display",
+      "barang-rusak": "Rusak",
+      "batu-lepas": "Batu Lepas",
+      manual: "Manual",
+      admin: "Admin",
+      DP: "DP",
+      lainnya: "Lainnya",
+    };
+    Object.assign(subLabelMap, defaultLabels);
+  }
 
   const getCardDetailMode = (id) => {
     const card = settings?.cards?.find((c) => c.id === id);
@@ -890,6 +899,9 @@ async function generateGoldDailyReport(floorId, dateYmd) {
     if (["HALA & SDW", "KENDARI & EMAS BALI"].includes(id)) return "hala";
     return "default";
   };
+
+  const items = {};
+  const breakdown = {};
 
   mainCategories.forEach((mainCat) => {
     const detailMode = getCardDetailMode(mainCat);

@@ -3042,9 +3042,9 @@ function printLabel(items) {
     @page{size:A4;margin:1cm}
     body{font-family:Arial,sans-serif;margin:0;padding:0}
     .boxes-container{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:3mm}
-    .print-service-box{width:3.5cm;min-height:3.5cm;height:auto;border:1px solid #000;padding:1.5mm;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;text-align:center;break-inside:avoid}
+    .print-service-box{width:3.5cm;min-height:3.5cm;height:auto;border:1px solid #000;padding:1.5mm;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;break-inside:avoid}
     .print-customer-name{font-size:8px;font-weight:bold;word-wrap:break-word;line-height:1.1;margin:0;padding:0}
-    .print-nama-brg{font-size:8px;font-weight:bold;word-wrap:break-word;word-break:break-word;line-height:1.1;overflow:hidden;margin:0;padding:0;text-align:left;flex-grow:1;width:100%;margin-top:1.5mm;margin-bottom:1.5mm}
+    .print-nama-brg{font-size:8px;font-weight:bold;word-wrap:break-word;word-break:break-word;line-height:1.1;overflow:hidden;margin:0;padding:0;text-align:left;width:100%;margin-top:1.5mm;margin-bottom:1.5mm}
     .print-sales-status{display:flex;justify-content:space-between;font-size:7px;font-weight:bold;color:#202020;margin:0;padding:0;width:100%}
     .print-sales-name{font-weight:bold}
     .print-status{font-weight:bold}

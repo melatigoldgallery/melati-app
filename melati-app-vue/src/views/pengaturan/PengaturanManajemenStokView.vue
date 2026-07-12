@@ -506,7 +506,7 @@ import {
   normalizeInventorySettings,
   saveInventorySettings,
 } from "@/services/inventory-setting-service";
-import { fetchAllStockData } from "@/services/inventory-service";
+import { fetchAllStockData, cleanupDeletedDetailTypes } from "@/services/inventory-service";
 
 const auth = useAuthStore();
 const { toast, error: showError, confirm } = useAlert();
@@ -877,6 +877,12 @@ async function saveSettings() {
       auth.user?.email || auth.user?.username || auth.userRole || "System",
       auth.activeFloor,
     );
+    await cleanupDeletedDetailTypes({
+      deletedColors,
+      deletedHalas,
+      floorId: auth.activeFloor,
+      currentStockData: stockData.value,
+    });
     toast("Pengaturan manajemen stok berhasil disimpan");
     await loadSettings();
   } catch (e) {

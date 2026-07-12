@@ -2492,7 +2492,7 @@ function scheduleNextDailySnapshot() {
   const delay = target.getTime() - now.getTime();
   snapshotTimer = setTimeout(async () => {
     try {
-      await saveDailyReport(formatDateKey(getNowWita()), stockData.value, auth.activeFloor);
+      await saveDailyReport(formatDateKey(getNowWita()), stockData.value, auth.activeFloor, displaySettings.value);
     } catch {
       // ignore snapshot runtime errors
     } finally {
@@ -2516,7 +2516,7 @@ async function initDailySnapshots() {
     const yesterdayKey = formatDateKey(yesterday);
     const yReport = await fetchDailyReport(yesterdayKey, auth.activeFloor);
     if (yReport.source === "none") {
-      await saveDailyReport(yesterdayKey, stockData.value, auth.activeFloor);
+      await saveDailyReport(yesterdayKey, stockData.value, auth.activeFloor, displaySettings.value);
     }
 
     const today005 = new Date(now);
@@ -2524,7 +2524,7 @@ async function initDailySnapshots() {
     if (now >= today005) {
       const tReport = await fetchDailyReport(todayKey, auth.activeFloor);
       if (tReport.source === "none") {
-        await saveDailyReport(todayKey, stockData.value, auth.activeFloor);
+        await saveDailyReport(todayKey, stockData.value, auth.activeFloor, displaySettings.value);
       }
     }
     sessionStorage.setItem(cacheKey, "true");

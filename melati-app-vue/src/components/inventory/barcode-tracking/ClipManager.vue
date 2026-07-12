@@ -504,13 +504,13 @@ const filteredClips = computed(() => {
 
 // Watcher to load default note when selected clip changes
 watch(selectedClip, (newClip) => {
+  barcodeStatuses.value = {}; // Clear status cache to force fresh verification!
   if (newClip) {
     notesInput.value = `Mutasi Klip ${newClip.code}`;
     // Verify barcode statuses
     triggerBarcodeVerification(newClip.barcodes || []);
   } else {
     notesInput.value = "";
-    barcodeStatuses.value = {};
   }
 });
 
@@ -591,6 +591,7 @@ function triggerBarcodeVerification(barcodesArray) {
   
   verifyTimeout = setTimeout(async () => {
     checkingStatus.value = true;
+    const currentClipId = selectedClip.value?.id;
     try {
       const statuses = { ...barcodeStatuses.value };
       const missingStatusList = barcodesArray.filter(bc => !statuses[bc]);
@@ -639,10 +640,25 @@ function triggerBarcodeVerification(barcodesArray) {
         }
         barcodeStatuses.value = statuses;
       }
+
+      // Auto cleanup: if a barcode exists in the database but its location is not 'belum-posting',
+      // remove it from the clip document.
+      const movedBarcodes = barcodesArray.filter(bc => {
+        const status = statuses[bc];
+        return status && status.exists && status.location !== belumPostingKey.value;
+      });
+
+      if (movedBarcodes.length > 0 && selectedClip.value && selectedClip.value.id === currentClipId) {
+        const cleanList = barcodesArray.filter(bc => !movedBarcodes.includes(bc));
+        await updateClip(auth.activeFloor, currentClipId, { barcodes: cleanList });
+        toast(`${movedBarcodes.length} barcode otomatis dihapus dari klip karena sudah berada di lokasi lain.`, "warning");
+      }
     } catch (e) {
       console.error("Barcode verification error:", e);
     } finally {
-      checkingStatus.value = false;
+      if (selectedClip.value && selectedClip.value.id === currentClipId) {
+        checkingStatus.value = false;
+      }
     }
   }, 300);
 }
@@ -711,12 +727,7 @@ async function addBarcodesToClip() {
 
     const nextList = [...currentList, ...addedList];
 
-    // Save clip document with updated list
-    await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
-    toast(`Berhasil menambahkan ${addedList.length} barcode ke klip.`);
-    barcodeTextInput.value = "";
-
-    // Automatically register added barcodes to "Belum Posting"
+    // Automatically register added barcodes to "Belum Posting" first
     const category = selectedClip.value.category || "KALUNG"; // Fallback to KALUNG for legacy docs
     const defaultDetailType = getFallbackDetailType(category, addedList[0]);
     
@@ -732,6 +743,11 @@ async function addBarcodesToClip() {
       category: category,
       allowCategoryOverride: true,
     });
+
+    // Save clip document with updated list
+    await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
+    toast(`Berhasil menambahkan ${addedList.length} barcode ke klip.`);
+    barcodeTextInput.value = "";
 
     // Trigger state reload in parent stock page to sync aggregates
     triggerParentReload();
@@ -793,10 +809,7 @@ async function editSingleBarcode(oldBarcode) {
 
   saving.value = true;
   try {
-    const nextList = (selectedClip.value.barcodes || []).map(b => b === oldBarcode ? cleanNewBarcode : b);
-    await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
-    
-    // Automatically register the edited barcode in "Belum Posting"
+    // Automatically register the edited barcode in "Belum Posting" first
     const category = selectedClip.value.category || "KALUNG";
     const defaultDetailType = getFallbackDetailType(category, cleanNewBarcode);
     
@@ -811,6 +824,9 @@ async function editSingleBarcode(oldBarcode) {
       category: category,
       allowCategoryOverride: true,
     });
+
+    const nextList = (selectedClip.value.barcodes || []).map(b => b === oldBarcode ? cleanNewBarcode : b);
+    await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
 
     toast("Barcode berhasil diubah.");
     triggerParentReload();
@@ -909,11 +925,51 @@ async function executeMoveData() {
     // Hardcode ENABLE_MUTATION_QUEUE logic (default false)
     const shouldProcessDirectly = isSupervisor || true;
 
+    // Real-time verification of barcodes' statuses to filter out moved ones
+    const barcodesToCheck = selectedClip.value.barcodes || [];
+    const res = await checkBarcodesStatus(barcodesToCheck, auth.activeFloor);
+    const statuses = {};
+    if (res && Array.isArray(res.results)) {
+      res.results.forEach((item) => {
+        statuses[item.barcode] = {
+          exists: item.exists,
+          location: item.location || (item.exists ? "Ada" : "Belum Terdaftar"),
+        };
+      });
+    }
+
+    const barcodesToMutate = [];
+    const barcodesToRemove = [];
+
+    barcodesToCheck.forEach((bc) => {
+      const status = statuses[bc];
+      if (status && status.exists) {
+        if (status.location === belumPostingKey.value) {
+          barcodesToMutate.push(bc);
+        } else {
+          barcodesToRemove.push(bc);
+        }
+      } else {
+        barcodesToMutate.push(bc); // Keep if not found/registered to handle naturally in mutation
+      }
+    });
+
+    if (barcodesToRemove.length > 0) {
+      const cleanList = barcodesToCheck.filter(bc => !barcodesToRemove.includes(bc));
+      await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: cleanList });
+      toast(`${barcodesToRemove.length} barcode otomatis dihapus dari klip karena sudah berada di lokasi lain.`, "warning");
+      
+      if (barcodesToMutate.length === 0) {
+        saving.value = false;
+        return;
+      }
+    }
+
     // Chunking logic (max 200 barcodes per transaction)
     const chunks = [];
     const chunkSize = 200;
-    for (let i = 0; i < selectedClip.value.barcodes.length; i += chunkSize) {
-      chunks.push(selectedClip.value.barcodes.slice(i, i + chunkSize));
+    for (let i = 0; i < barcodesToMutate.length; i += chunkSize) {
+      chunks.push(barcodesToMutate.slice(i, i + chunkSize));
     }
 
     for (let i = 0; i < chunks.length; i++) {
