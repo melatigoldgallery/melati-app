@@ -82,7 +82,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="log in logs" :key="log.id" :class="{ 'table-danger-subtle': isStopLocation(log.destination) }" class="log-row">
+              <tr v-for="log in paginatedLogs" :key="log.id" :class="{ 'table-danger-subtle': isStopLocation(log.destination) }" class="log-row">
                 <td class="ps-3 text-muted small">
                   {{ formatDate(log.timestamp) }}
                 </td>
@@ -144,8 +144,64 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination Controls -->
+        <div v-if="totalPages > 1" class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-light-subtle">
+          <div class="small text-muted">
+            Menampilkan <strong>{{ (currentPage - 1) * pageSize + 1 }}</strong> - 
+            <strong>{{ Math.min(currentPage * pageSize, logs.length) }}</strong> dari 
+            <strong>{{ logs.length }}</strong> riwayat mutasi.
+          </div>
+          <nav aria-label="Page navigation">
+            <ul class="pagination pagination-sm mb-0 align-items-center gap-1">
+              <!-- Previous Button -->
+              <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                <button 
+                  type="button" 
+                  class="page-link rounded-circle d-flex align-items-center justify-content-center p-0 border-0" 
+                  style="width: 32px; height: 32px;"
+                  @click="currentPage--"
+                  :disabled="currentPage === 1"
+                >
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+              </li>
+
+              <!-- Page Number Buttons -->
+              <li 
+                v-for="p in totalPages" 
+                :key="p" 
+                class="page-item" 
+                :class="{ active: currentPage === p }"
+              >
+                <button 
+                  type="button" 
+                  class="page-link rounded-circle d-flex align-items-center justify-content-center p-0 border-0" 
+                  style="width: 32px; height: 32px; font-weight: 600;"
+                  @click="currentPage = p"
+                >
+                  {{ p }}
+                </button>
+              </li>
+
+              <!-- Next Button -->
+              <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                <button 
+                  type="button" 
+                  class="page-link rounded-circle d-flex align-items-center justify-content-center p-0 border-0" 
+                  style="width: 32px; height: 32px;"
+                  @click="currentPage++"
+                  :disabled="currentPage === totalPages"
+                >
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+
         <div v-if="!isSearchMode" class="text-center py-2 border-top bg-light">
-          <small class="text-muted">Menampilkan maks. 50 riwayat mutasi terbaru.</small>
+          <small class="text-muted">Menampilkan maks. 100 riwayat mutasi terbaru.</small>
         </div>
       </div>
     </div>
@@ -354,6 +410,18 @@ async function copyAllBarcodes() {
   }
 }
 
+const currentPage = ref(1);
+const pageSize = ref(20);
+
+const totalPages = computed(() => {
+  return Math.ceil(logs.value.length / pageSize.value);
+});
+
+const paginatedLogs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return logs.value.slice(start, start + pageSize.value);
+});
+
 const detailPage = ref(1);
 const detailPageSize = 10;
 const bulkDetailModalRef = ref(null);
@@ -453,6 +521,7 @@ let unsubLogs = null;
 async function loadLogs() {
   loading.value = true;
   isSearchMode.value = false;
+  currentPage.value = 1;
   
   if (unsubLogs) unsubLogs();
   
@@ -460,7 +529,7 @@ async function loadLogs() {
     const q = query(
       collection(db, "floors", auth.activeFloor, "barcodeMutationLogs"),
       orderBy("timestamp", "desc"),
-      limit(50)
+      limit(100)
     );
     
     unsubLogs = onSnapshot(q, (snaps) => {
@@ -485,6 +554,7 @@ onUnmounted(() => {
 
 async function handleSearch() {
   const queryVal = searchQuery.value.trim().toUpperCase();
+  currentPage.value = 1;
   if (!queryVal) {
     await loadLogs();
     return;
