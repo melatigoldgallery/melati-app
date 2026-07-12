@@ -42,7 +42,7 @@
         <!-- Column 1: Jual Perhiasan -->
         <div class="col-12 col-lg-6">
           <div class="section-title text-center mb-3">
-            <h2>JUAL EMAS</h2>
+            <h2>JUAL EMAS / SERVIS</h2>
           </div>
           <div class="row g-2 justify-content-center align-items-stretch">
             <!-- Current Queue Card -->
@@ -177,7 +177,10 @@ const isBeliEmpty = computed(() => {
 
 // Computed displays for Jual
 const jualCurrentDisplay = computed(() => {
-  if (isJualEmpty.value) return "-";
+  if (isJualEmpty.value) {
+    if (jualState.value.lastNumber === 0) return "D01";
+    return "-";
+  }
   const { currentLetter, currentNumber } = jualState.value;
   const letters = ["D", "E"];
   const letter = letters[currentLetter ?? 0] || "D";
@@ -209,7 +212,10 @@ const showJualMissed = computed(() => jualState.value.missedQueue.filter(v => v)
 
 // Computed displays for Beli
 const beliCurrentDisplay = computed(() => {
-  if (isBeliEmpty.value) return "-";
+  if (isBeliEmpty.value) {
+    if (beliState.value.lastNumber === 0) return "A01";
+    return "-";
+  }
   const { currentLetter, currentNumber } = beliState.value;
   const letters = ["A", "B", "C"];
   const letter = letters[currentLetter ?? 0] || "A";

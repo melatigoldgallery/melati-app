@@ -394,7 +394,7 @@ class PrintController {
       logger.info(`Queue ticket print request: ${queueNumber} (${queueType})`);
 
       // Get thermal printer
-      const printerName = printerService.getPrinterForType("receipt");
+      const printerName = printerService.getPrinterForType("queue");
 
       // Check if printer is available
       const isAvailable = await printerService.isPrinterAvailable(printerName);

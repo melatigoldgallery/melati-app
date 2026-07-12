@@ -44,13 +44,20 @@ class PrinterService {
 
   /**
    * Get printer name for specific type
-   * @param {string} type - 'receipt' or 'invoice'
+   * @param {string} type - 'receipt', 'invoice', 'label' or 'queue'
    * @returns {string} Printer name
    */
   getPrinterForType(type) {
     try {
       const config = this.readPrinterConfig();
-      const printerName = config[type] || this.defaultPrinter;
+      let printerName = config[type];
+
+      // Fallback khusus untuk antrian
+      if (!printerName && type === "queue") {
+        printerName = config["receipt"] || this.defaultPrinter;
+      } else if (!printerName) {
+        printerName = this.defaultPrinter;
+      }
 
       if (!printerName) {
         throw new Error("No printer configured for type: " + type);

@@ -1,12 +1,15 @@
 <template>
   <div class="kiosk-page">
-    <!-- Blur Orbs for modern glassmorphic background -->
-    <div class="blur-circle gold-blur"></div>
-    <div class="blur-circle dark-blur"></div>
+    <!-- Background Wrapper to prevent horizontal overflow -->
+    <div class="kiosk-background-wrapper">
+      <!-- Blur Orbs for modern glassmorphic background -->
+      <div class="blur-circle gold-blur"></div>
+      <div class="blur-circle dark-blur"></div>
 
-    <!-- Decorative Elements -->
-    <div class="gold-decoration top-left"></div>
-    <div class="gold-decoration bottom-right"></div>
+      <!-- Decorative Elements -->
+      <div class="gold-decoration top-left"></div>
+      <div class="gold-decoration bottom-right"></div>
+    </div>
 
     <div class="kiosk-container container-fluid d-flex flex-column justify-content-between py-4">
       <!-- Header -->
@@ -34,7 +37,7 @@
         </div>
         
         <!-- Language Toggle (Mobile) -->
-        <div class="lang-toggle-wrapper d-block d-md-none mb-3">
+        <div class="lang-toggle-wrapper d-none d-md-none mb-3">
           <div class="lang-toggle-pill d-inline-flex">
             <button 
               type="button"
@@ -59,15 +62,15 @@
           <img src="/img/Melati.jfif" alt="Logo" class="logo gold-shimmer" />
           <h1 class="brand-name">{{ brandName }}</h1>
         </div>
-        <p class="subtitle text-muted mt-2">{{ t('subtitle') }}</p>
+        <p class="subtitle text-muted mt-2 d-none d-md-block" v-html="t('subtitle')"></p>
       </header>
 
       <!-- Main Options -->
       <main class="container my-auto animate-slide-up">
-        <div class="row justify-content-center g-4">
+        <div class="row justify-content-center g-3 g-md-4">
           <!-- Option Jual -->
           <div class="col-12 col-md-5 d-flex align-items-stretch">
-            <button class="kiosk-card w-100 text-center" @click="takeQueue('jual')" :disabled="loading">
+            <div class="kiosk-card w-100 text-center">
               <div class="card-icon-wrapper">
                 <i class="fas fa-hand-holding-usd"></i>
               </div>
@@ -77,16 +80,16 @@
                 <span class="next-ticket-label">{{ t('queueLabel') }}</span>
                 <div class="next-ticket-number">{{ nextJualNumber }}</div>
               </div>
-              <div class="btn-action">
+              <button class="btn-action" @click="takeQueue('jual')" :disabled="loading">
                 <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
-              </div>
-            </button>
+              </button>
+            </div>
           </div>
 
           <!-- Option Beli -->
           <div class="col-12 col-md-5 d-flex align-items-stretch">
-            <button class="kiosk-card w-100 text-center" @click="takeQueue('beli')" :disabled="loading">
+            <div class="kiosk-card w-100 text-center">
               <div class="card-icon-wrapper buy-wrapper">
                 <i class="fas fa-shopping-bag"></i>
               </div>
@@ -96,11 +99,11 @@
                 <span class="next-ticket-label">{{ t('queueLabel') }}</span>
                 <div class="next-ticket-number">{{ nextBeliNumber }}</div>
               </div>
-              <div class="btn-action">
+              <button class="btn-action" @click="takeQueue('beli')" :disabled="loading">
                 <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
-              </div>
-            </button>
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -122,7 +125,7 @@
           <div class="ticket-number my-4">{{ newTicketNumber }}</div>
           <p class="modal-category text-uppercase fw-bold">{{ newTicketType === 'jual' ? t('jualTitle') : t('beliTitle') }}</p>
           
-          <div class="alert alert-warning mt-4 text-start small border-0 shadow-sm">
+          <div v-if="isElectronApp" class="alert alert-warning mt-4 text-start small border-0 shadow-sm">
             <div class="d-flex align-items-center gap-2 mb-2">
               <i class="fas fa-info-circle text-warning fs-5"></i>
               <strong>{{ t('infoPrint') }}</strong>
@@ -156,6 +159,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
 import { addCustomerQueue, subscribeQueue, padNumber } from "@/services/antrian-service";
+import { isElectron, printJob } from "@/utils/printHelper";
 
 const route = useRoute();
 const activeFloor = computed(() => {
@@ -189,9 +193,9 @@ const currentLang = ref("id");
 const t = (key) => {
   const dictionary = {
     id: {
-      subtitle: "Selamat Datang di Toko Kami. Silakan ambil nomor antrian Anda.",
-      jualTitle: "JUAL PERHIASAN",
-      jualDesc: "Untuk pelanggan yang ingin menjual perhiasan emas.",
+      subtitle: "Selamat datang! Silakan ambil nomor antrian Anda.<br />Sembari menunggu nomor dipanggil, silakan melihat-lihat koleksi perhiasan cantik kami.",
+      jualTitle: "JUAL / SERVIS",
+      jualDesc: "Untuk pelanggan yang ingin menjual emas atau melakukan servis perhiasan.",
       beliTitle: "BELI / TUKAR TAMBAH",
       beliDesc: "Untuk pelanggan yang ingin membeli atau menukar tambah perhiasan.",
       takeQueue: "Ambil Antrian",
@@ -204,9 +208,9 @@ const t = (key) => {
       statusError: "Printer tidak aktif / offline. Silakan foto atau catat nomor antrian di atas."
     },
     en: {
-      subtitle: "Welcome to Our Store. Please take your queue number.",
-      jualTitle: "SELL JEWELRY",
-      jualDesc: "For customers who want to sell gold/gemstone jewelry.",
+      subtitle: "Welcome! Please take your queue number.<br />While waiting for your turn, feel free to browse our beautiful jewelry collections.",
+      jualTitle: "SELL / SERVICE",
+      jualDesc: "For customers who want to sell gold or request jewelry services.",
       beliTitle: "BUY / TRADE-IN",
       beliDesc: "For customers who want to buy or trade-in jewelry.",
       takeQueue: "Take Ticket",
@@ -267,7 +271,10 @@ function subscribeToQueue() {
   });
 }
 
+const isElectronApp = ref(false);
+
 onMounted(() => {
+  isElectronApp.value = isElectron();
   subscribeToQueue();
 });
 
@@ -337,29 +344,27 @@ async function takeQueue(type) {
       second: "2-digit"
     });
 
-    const res = await fetch(`${PRINT_BASE}/api/print/queue`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
+    if (isElectronApp.value) {
+      const printRes = await printJob("queue", {
         queueNumber: ticketNum,
-        queueType: type === "jual" ? "Jual Perhiasan" : "Beli / Tukar Tambah",
+        queueType: type === "jual" ? "Jual / Servis" : "Beli / Tukar Tambah",
         dateStr,
         timeStr,
         floor: activeFloor.value,
         lang: currentLang.value
-      })
-    });
+      });
 
-    if (res.ok) {
-      printStatus.value = "success";
+      if (printRes && printRes.success) {
+        printStatus.value = "success";
+      } else {
+        printStatus.value = "error";
+      }
     } else {
-      printStatus.value = "error";
+      printStatus.value = "success"; // Silent success for UI countdown / flow
     }
   } catch (err) {
     console.error("Failed to take queue or print:", err);
-    printStatus.value = "error";
+    printStatus.value = isElectronApp.value ? "error" : "success";
   } finally {
     loading.value = false;
   }
@@ -379,7 +384,7 @@ function closeSuccess() {
   background-color: #f9f5eb;
   color: #3a2c1c;
   height: 100vh;
-  width: 100vw;
+  width: 100%;
   position: fixed;
   top: 0;
   left: 0;
@@ -391,6 +396,17 @@ function closeSuccess() {
   height: 100%;
   position: relative;
   z-index: 10;
+}
+
+.kiosk-background-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Blur Orbs for background depth */
@@ -477,20 +493,16 @@ function closeSuccess() {
   padding: 3.5rem 3rem;
   box-shadow: 0 12px 35px rgba(58, 44, 28, 0.05);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
-.kiosk-card:hover:not(:disabled) {
+.kiosk-card:hover {
   transform: translateY(-10px);
   box-shadow: 0 25px 50px rgba(184, 152, 7, 0.16);
   border-color: rgba(212, 175, 55, 0.65);
   background: rgba(255, 255, 255, 0.9);
-}
-.kiosk-card:active {
-  transform: scale(0.98);
 }
 .card-icon-wrapper {
   display: flex;
@@ -538,11 +550,20 @@ function closeSuccess() {
   margin-top: auto;
   width: 90%;
   max-width: 250px;
+  border: none;
+  cursor: pointer;
 }
 .kiosk-card:hover .btn-action {
   background: linear-gradient(135deg, #f9d776, #9d7e2d);
   color: white;
   box-shadow: 0 8px 16px rgba(157, 126, 45, 0.28);
+}
+.btn-action:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.btn-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .gold-border {
@@ -666,12 +687,121 @@ function closeSuccess() {
   }
 }
 
-@media (max-width: 768px) {
-  .brand-name {
-    font-size: 2.2rem;
+@media (max-width: 767px) {
+  .kiosk-page {
+    height: auto !important;
+    min-height: 100vh;
+    position: relative !important;
+    overflow: visible !important;
+    scroll-behavior: smooth;
   }
+
+  .kiosk-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+    min-height: 100vh;
+    height: auto !important;
+    justify-content: flex-start !important;
+  }
+  
+  .brand-name {
+    font-size: clamp(1.6rem, 7vw, 2.2rem);
+  }
+  
+  .logo {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .subtitle {
+    font-size: clamp(0.85rem, 3.5vw, 1.05rem);
+    line-height: 1.45;
+    margin-top: 0.25rem !important;
+    padding: 0 1rem;
+  }
+  
+  main.container {
+    margin-top: 1.5rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+  
   .kiosk-card {
-    padding: 2.5rem !important;
+    padding: 2rem 1.5rem !important;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(58, 44, 28, 0.04);
+  }
+  
+  .card-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    font-size: 1.6rem;
+    border-radius: 14px;
+    margin-bottom: 1rem;
+    box-shadow: 0 6px 12px rgba(157, 126, 45, 0.15);
+  }
+  
+  .card-title {
+    font-size: 1.35rem;
+    white-space: normal;
+  }
+  
+  .card-desc {
+    display: block !important;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin-top: 0.5rem !important;
+    padding: 0 0.5rem;
+  }
+  
+  .next-ticket-container {
+    margin: 1rem 0;
+    padding: 0.6rem 1rem;
+    border-radius: 14px;
+    width: 100%;
+  }
+  
+  .next-ticket-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+  }
+  
+  .next-ticket-number {
+    font-size: clamp(2rem, 8vw, 2.6rem);
+    margin-top: 0.1rem;
+  }
+  
+  .btn-action {
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 250px;
+    margin-top: auto;
+  }
+
+  .kiosk-modal {
+    padding: 2.5rem 1.5rem !important;
+    border-radius: 20px;
+    width: 95%;
+  }
+  
+  .success-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem !important;
+  }
+  
+  .modal-label {
+    font-size: 1rem;
+  }
+  
+  .ticket-number {
+    font-size: clamp(3.5rem, 15vw, 4.5rem);
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  .modal-category {
+    font-size: 1.1rem;
   }
 }
 
@@ -704,7 +834,7 @@ function closeSuccess() {
 .next-ticket-number {
   font-family: "Playfair Display", serif;
   font-weight: 800;
-  font-size: 3.5rem;
+  font-size: 5.5rem;
   color: #9d7e2d;
   line-height: 1.1;
   margin-top: 0.25rem;
@@ -750,5 +880,9 @@ header.position-relative {
   header.position-relative {
     padding-top: 0;
   }
+
+.next-ticket-number {
+  font-size:3rem ;
+}
 }
 </style>

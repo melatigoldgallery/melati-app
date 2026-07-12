@@ -21,8 +21,8 @@ export const LETTERS_MAP = {
   A: "Beli / Tukar (A)",
   B: "Beli / Tukar (B)",
   C: "Beli / Tukar (C)",
-  D: "Jual Perhiasan (D)",
-  E: "Jual Perhiasan (E)",
+  D: "Jual / Servis (D)",
+  E: "Jual / Servis (E)",
 };
 
 function queueRef(floorId = "") {

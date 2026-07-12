@@ -83,7 +83,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2">
-                <h6 class="card-title mb-0">Nomor Beli Saat Ini</h6>
+                <h6 class="card-title mb-0 text-dark">Nomor Beli Saat Ini</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display current-number mb-3">{{ beliCurrentQueueStr }}</div>
@@ -116,7 +116,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2 text-white">
-                <h6 class="card-title mb-0">Terlewat (Beli)</h6>
+                <h6 class="card-title mb-0 text-dark">Terlewat (Beli)</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display current-number mb-3">{{ beliMissedDisplay }}</div>
@@ -140,7 +140,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2">
-                <h6 class="card-title mb-0">Skip List (Beli)</h6>
+                <h6 class="card-title mb-0 text-dark">Skip List (Beli)</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display list-display mb-2">{{ beliSkipDisplay }}</div>
@@ -155,7 +155,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2">
-                <h6 class="card-title mb-0">Tertunda (Beli)</h6>
+                <h6 class="card-title mb-0 text-dark">Tertunda (Beli)</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display list-display mb-3">{{ beliDelayedDisplay }}</div>
@@ -170,14 +170,14 @@
         </div>
       </div>
 
-      <!-- Kolom Kanan: JUAL PERHIASAN -->
+      <!-- Kolom Kanan: JUAL / SERVIS -->
       <div class="col-xl-6 col-12 ps-xl-4">
         <!-- Summary Card -->
         <div class="card summary-card summary-card-jual text-center mb-3 border-0">
           <div class="card-body py-3">
             <div class="fw-bold text-muted mb-1" style="font-size: 1.35rem; font-family: 'Playfair Display', serif; letter-spacing: 0.5px;">
               <i class="fas fa-hand-holding-usd me-1"></i>
-              JUAL PERHIASAN (D-E)
+              JUAL / SERVIS (D-E)
             </div>
             <div class="summary-label text-muted small mb-1" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px;">BELUM DILAYANI</div>
             <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedJualCount }} <span class="summary-unit">orang</span></div>
@@ -189,7 +189,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2">
-                <h6 class="card-title mb-0">Nomor Jual Saat Ini</h6>
+                <h6 class="card-title mb-0 text-dark">Nomor Jual Saat Ini</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display current-number mb-3">{{ jualCurrentQueueStr }}</div>
@@ -222,7 +222,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2 text-white">
-                <h6 class="card-title mb-0">Terlewat (Jual)</h6>
+                <h6 class="card-title mb-0 text-dark">Terlewat (Jual)</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display current-number mb-3">{{ jualMissedDisplay }}</div>
@@ -246,7 +246,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2">
-                <h6 class="card-title mb-0">Skip List (Jual)</h6>
+                <h6 class="card-title mb-0 text-dark">Skip List (Jual)</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display list-display mb-2">{{ jualSkipDisplay }}</div>
@@ -261,7 +261,7 @@
           <div class="col-md-6">
             <div class="card queue-card">
               <div class="card-header d-flex justify-content-center p-2">
-                <h6 class="card-title mb-0">Tertunda (Jual)</h6>
+                <h6 class="card-title mb-0 text-dark">Tertunda (Jual)</h6>
               </div>
               <div class="card-body">
                 <div class="queue-display list-display mb-3">{{ jualDelayedDisplay }}</div>
@@ -437,7 +437,7 @@
               Anda akan melewati nomor antrian tertentu.
             </div>
             <p>
-              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual Perhiasan (D-E)' : 'Beli / Tukar Tambah (A-C)' }}</strong>
+              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual / Servis (D-E)' : 'Beli / Tukar Tambah (A-C)' }}</strong>
             </p>
             <div class="mb-3">
               <label class="form-label">Pilih Huruf Antrian</label>
@@ -490,7 +490,7 @@
               Anda akan mengatur nomor antrian aktif saat ini secara manual.
             </div>
             <p>
-              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual Perhiasan (D-E)' : 'Beli / Tukar Tambah (A-C)' }}</strong>
+              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual / Servis (D-E)' : 'Beli / Tukar Tambah (A-C)' }}</strong>
             </p>
             <div class="mb-3">
               <label class="form-label">Pilih Huruf Antrian</label>
@@ -919,7 +919,10 @@ const unservedJualCount = computed(() => {
 
 // Display helpers for Beli
 const beliCurrentQueueStr = computed(() => {
-  if (isBeliEmpty.value) return "-";
+  if (isBeliEmpty.value) {
+    if (state.value.beli.lastNumber === 0) return "A01";
+    return "-";
+  }
   const q = state.value.beli;
   const letters = ["A", "B", "C"];
   return formatQueue(letters[q.currentLetter] || "A", q.currentNumber);
@@ -945,7 +948,10 @@ const beliSkipDisplay = computed(() => (state.value.beli.skipList.length ? state
 
 // Display helpers for Jual
 const jualCurrentQueueStr = computed(() => {
-  if (isJualEmpty.value) return "-";
+  if (isJualEmpty.value) {
+    if (state.value.jual.lastNumber === 0) return "D01";
+    return "-";
+  }
   const q = state.value.jual;
   const letters = ["D", "E"];
   return formatQueue(letters[q.currentLetter] || "D", q.currentNumber);

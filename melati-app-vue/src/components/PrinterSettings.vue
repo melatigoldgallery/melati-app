@@ -130,6 +130,29 @@
               </div>
             </div>
           </div>
+
+          <!-- Queue Printer -->
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="queuePrinter" class="form-label fw-bold text-secondary small">Printer Tiket Antrian (Thermal)</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-secondary">
+                  <i class="bi bi-ticket-perforated"></i>
+                </span>
+                <select 
+                  id="queuePrinter" 
+                  v-model="printers.queue" 
+                  @change="savePrinter('printer_queue', printers.queue)"
+                  class="form-select border-start-0 ps-0"
+                >
+                  <option value="">-- Gunakan Printer Kasir / Default --</option>
+                  <option v-for="p in printerList" :key="p.name" :value="p.name">
+                    {{ p.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Testing Section -->
@@ -161,6 +184,14 @@
               Simulasi Label QR
             </button>
             <button 
+              @click="testPrint('queue')" 
+              class="btn btn-outline-warning btn-sm rounded-pill d-flex align-items-center"
+              :disabled="isTesting || !isElectronApp"
+            >
+              <i class="bi bi-ticket-perforated me-1"></i>
+              Simulasi Tiket Antrian (Thermal)
+            </button>
+            <button 
               @click="refreshPrinters" 
               class="btn btn-light btn-sm rounded-pill text-secondary ms-auto"
               :disabled="isTesting"
@@ -189,7 +220,8 @@ const printers = reactive({
   default: "",
   receipt: "",
   invoice: "",
-  label: ""
+  label: "",
+  queue: ""
 });
 
 // Memuat daftar printer dan preferensi local storage
@@ -203,6 +235,7 @@ async function refreshPrinters() {
     printers.receipt = localStorage.getItem("printer_receipt") || "";
     printers.invoice = localStorage.getItem("printer_invoice") || "";
     printers.label = localStorage.getItem("printer_label") || "";
+    printers.queue = localStorage.getItem("printer_queue") || "";
 
     // Set fallback default jika di sistem ada printer default dan local storage masih kosong
     if (!printers.default) {
@@ -279,6 +312,15 @@ async function testPrint(type) {
       labels: [
         { kode: "M3-2606-A1", nama: "Cincin Uji 2g", kadar: "70%", berat: "2.0", qty: 1 }
       ]
+    };
+  } else if (type === "queue") {
+    payload = {
+      queueNumber: "A001",
+      queueType: "Beli / Tukar Tambah",
+      dateStr: new Date().toLocaleDateString("id-ID"),
+      timeStr: new Date().toLocaleTimeString("id-ID"),
+      floor: "L1",
+      lang: "id"
     };
   }
 

@@ -39,7 +39,9 @@ export function getTargetPrinter(type) {
   if (typeof localStorage === "undefined") return "";
   
   // Ambil setting khusus tipe printer, atau fallback ke default printer
-  if (type === "receipt") {
+  if (type === "queue") {
+    return localStorage.getItem("printer_queue") || localStorage.getItem("printer_receipt") || localStorage.getItem("user_default_printer") || "";
+  } else if (type === "receipt") {
     return localStorage.getItem("printer_receipt") || localStorage.getItem("user_default_printer") || "";
   } else if (type === "qr-sbpl" || type === "qr-silver") {
     return localStorage.getItem("printer_label") || localStorage.getItem("user_default_printer") || "";
@@ -96,7 +98,7 @@ export async function printJob(type, payload) {
     console.warn("Koneksi ke print service lokal gagal/timeout:", err.message);
     
     // Jalur 3: Browser Print Dialog Fallback (Khusus dokumen visual seperti invoice/nota)
-    if (type !== "receipt" && type !== "qr-sbpl" && type !== "qr-silver") {
+    if (type !== "receipt" && type !== "qr-sbpl" && type !== "qr-silver" && type !== "queue") {
       console.log("[Print Helper] Mencetak menggunakan browser print fallback...");
       triggerBrowserPrint(type, payload);
       return { success: true, method: "BROWSER_PRINT" };

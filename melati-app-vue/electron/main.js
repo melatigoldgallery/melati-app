@@ -675,6 +675,12 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
       return { success: true };
     }
 
+    if (type === "queue") {
+      const rawText = generateQueueText(payload);
+      await printRawPowerShell(printerName, rawText);
+      return { success: true };
+    }
+
     // 2. Graphic HTML templates via hidden window
     let templateName = "";
     let dataForTemplate = { ...payload };
@@ -946,3 +952,96 @@ function generateReceiptText(data) {
 
   return output;
 }
+
+// Simple plain text printer renderer for queue ticket
+function generateQueueText(data) {
+  const {
+    queueNumber = "",
+    queueType = "",
+    dateStr = "",
+    timeStr = "",
+    floor = "L1",
+    lang = "id",
+  } = data;
+
+  const isEn = lang === "en";
+  const width = 38;
+
+  const centerText = (text) => {
+    const padding = Math.max(0, Math.floor((width - text.length) / 2));
+    return " ".repeat(padding) + text + "\n";
+  };
+
+  const leftAlignText = (text) => text + "\n";
+
+  const ESC = "\x1B";
+  const INIT = ESC + "@";
+  const TEXT_LARGE_BOLD = ESC + "!\x38";
+  const TEXT_NORMAL = ESC + "!\x00";
+  const BOLD_ON = ESC + "E\x01";
+  const BOLD_OFF = ESC + "E\x00";
+
+  let output = INIT;
+  output += leftAlignText("==================================");
+  output += BOLD_ON + centerText(floor === "L2" ? "MELATI GOLD YOUNG" : "MELATI GOLD SHOP") + BOLD_OFF;
+  output += leftAlignText("==================================");
+  output += "\n";
+
+  let floorLabel = floor === "L2"
+    ? (isEn ? "* * 2ND FLOOR * *" : "* * LANTAI 2 * *")
+    : (isEn ? "* * 1ST FLOOR * *" : "* * LANTAI 1 * *");
+  output += BOLD_ON + centerText(floorLabel) + BOLD_OFF;
+  output += "\n";
+
+  const titleLabel = isEn ? "YOUR QUEUE NUMBER" : "NOMOR ANTRIAN ANDA";
+  output += BOLD_ON + centerText(titleLabel) + BOLD_OFF;
+  output += "\n";
+
+  output += leftAlignText("--------------------------------");
+  output += TEXT_LARGE_BOLD + centerText(queueNumber).trimEnd() + "\n" + TEXT_NORMAL;
+  output += leftAlignText("--------------------------------");
+  output += "\n";
+
+  let displayQueueType = queueType;
+  if (isEn) {
+    if (queueType.toLowerCase().includes("jual")) displayQueueType = "Sell / Service";
+    else if (queueType.toLowerCase().includes("beli")) displayQueueType = "Buy / Trade-In";
+  }
+  output += centerText(displayQueueType.toUpperCase());
+
+  const timeLabel = isEn ? "Time" : "Waktu";
+  output += centerText(timeLabel + ": " + dateStr + " " + timeStr);
+  output += "\n";
+
+  output += "--------------------------------------\n";
+  if (isEn) {
+    output += "NOTES:\n";
+    output += "- If your queue is missed by more than\n";
+    output += "  10 numbers, please take a new one\n";
+    output += "- If it is less than 10 numbers, please\n";
+    output += "  confirm with staff to be called next\n";
+  } else {
+    output += "CATATAN:\n";
+    output += "- Jika antrian terlewat melebihi 10\n";
+    output += "  nomor antrian maka ambil antrian baru\n";
+    output += "- Jika belum melebihi 10 nomor silakan\n";
+    output += "  konfirmasi ke staff untuk dipanggil\n";
+    output += "  di antrian selanjutnya\n";
+  }
+  output += "--------------------------------------\n\n";
+
+  if (isEn) {
+    output += centerText("Please wait for your queue");
+    output += centerText("number to be called.");
+    output += centerText("Thank you for your visit.");
+  } else {
+    output += centerText("Harap menunggu nomor antrian");
+    output += centerText("anda dipanggil.");
+    output += centerText("Terima kasih atas kunjungan Anda.");
+  }
+
+  output += "\n\n\n\n\n";
+  output += "\x1DV\x41\x00"; // Full Cut command
+  return output;
+}
+
