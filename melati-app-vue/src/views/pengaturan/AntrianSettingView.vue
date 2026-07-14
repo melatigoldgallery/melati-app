@@ -15,269 +15,321 @@
     </div>
 
     <div class="content-wrapper">
-      <div v-if="loading" class="text-center py-5">
+      <div v-if="loading" class="d-flex flex-column align-items-center justify-content-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
+        <p class="text-muted mt-2 small">Memuat pengaturan antrean...</p>
       </div>
 
       <template v-else>
-        <!-- Card 1: Konfigurasi Pengumuman Penutupan -->
-        <div class="card settings-card mb-4">
-          <div class="settings-header p-3 text-white">
-            <h5 class="mb-0 text-white">
-              <i class="fas fa-bullhorn me-2"></i>
-              Konfigurasi Pengumuman Penutupan
-            </h5>
-          </div>
 
-          <div class="settings-body p-3 p-md-4">
-            <div class="row g-3 mb-3">
-              <div class="col-12">
-                <div class="card border-0 shadow-sm">
-                  <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="row g-4">
+          <!-- Kolom Kiri: Mode Antrean & Pengumuman Penutupan (col-lg-8) -->
+          <div class="col-lg-8 col-12">
+            <!-- Card 1: Konfigurasi Mode Antrean -->
+            <div class="card settings-card mb-4 border-0">
+              <div class="settings-header p-3 text-white">
+                <h5 class="mb-0 text-white">
+                  <i class="fas fa-toggle-on me-2"></i>
+                  Mode Sistem Antrean (Lantai: {{ auth.activeFloor || 'L1' }})
+                </h5>
+              </div>
+              <div class="settings-body p-3 p-md-4">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Pilih Mode Antrean</label>
+                    <select v-model="generalForm.queueMode" class="form-select">
+                      <option value="legacy">Antrean V1 (Legacy - 1 Kategori Gabungan)</option>
+                      <option value="split">Antrean V2 (Split - Kolom Jual & Beli Terpisah)</option>
+                    </select>
+                    <small class="text-muted mt-1 d-block">
+                      <strong>Legacy Mode (V1)</strong> menggunakan 1 loket gabungan (kategori A-D).
+                      <br />
+                      <strong>Split Mode (V2)</strong> memisahkan loket pemanggilan antara transaksi Jual (kategori D-E) dan Beli (kategori A-C).
+                    </small>
+                  </div>
+
+                  <!-- Hybrid Mode Toggle -->
+                  <div class="col-12 border-top pt-3 mt-3">
+                    <div class="d-flex justify-content-between align-items-center">
                       <div>
-                        <h6 class="mb-1 fw-semibold">Aktifkan Auto Play</h6>
-                        <p class="text-muted small mb-0">
-                          Jika aktif, Admin Antrian akan memutar pengumuman otomatis sesuai jam yang disimpan.
-                        </p>
+                        <h6 class="mb-0 fw-semibold">Aktifkan Pemanggilan Hybrid</h6>
+                        <small class="text-muted">
+                          Mengizinkan admin memanggil nomor berikutnya meskipun tidak ada tiket antrean yang diambil dari kiosk.
+                        </small>
                       </div>
-                      <div class="form-check form-switch" style="font-size: 1.6rem">
+                      <div class="form-check form-switch" style="font-size: 1.4rem">
+                        <input
+                          v-model="generalForm.hybridMode"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          style="cursor: pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Konfigurasi Pengumuman Penutupan -->
+            <div class="card settings-card mb-4 border-0">
+              <div class="settings-header p-3 text-white">
+                <h5 class="mb-0 text-white">
+                  <i class="fas fa-bullhorn me-2"></i>
+                  Konfigurasi Pengumuman Penutupan
+                </h5>
+              </div>
+
+              <div class="settings-body p-3 p-md-4">
+                <div class="row g-3">
+                  <!-- Auto Play Switch (Inline & Compact) -->
+                  <div class="col-12 border-bottom pb-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <h6 class="mb-0 fw-semibold">Aktifkan Auto Play</h6>
+                        <small class="text-muted">Admin Antrian memutar pengumuman otomatis sesuai jam.</small>
+                      </div>
+                      <div class="form-check form-switch" style="font-size: 1.4rem">
                         <input
                           v-model="form.enabled"
                           class="form-check-input"
                           type="checkbox"
                           role="switch"
-                          style="width: 1.4em; height: 0.95em; cursor: pointer"
+                          style="cursor: pointer"
                         />
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              <div class="col-12">
-                <div class="card border-0 shadow-sm">
-                  <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <!-- Conditionally show Auto Play details -->
+                  <template v-if="form.enabled">
+                    <div class="col-md-6 animate-fade-in">
+                      <label class="form-label fw-semibold">Jam Auto Play</label>
+                      <input v-model="form.time" type="time" class="form-control" @keydown.enter.prevent="saveSettings" />
+                      <small class="text-muted">Format 24 jam (Contoh: 20:55)</small>
+                    </div>
+
+                    <div class="col-md-6 animate-fade-in">
+                      <label class="form-label fw-semibold">Jumlah Pengulangan</label>
+                      <input
+                        v-model.number="form.repeat"
+                        type="number"
+                        min="1"
+                        max="5"
+                        class="form-control"
+                        @keydown.enter.prevent="saveSettings"
+                      />
+                      <small class="text-muted">Jumlah pengulangan (1-5 kali).</small>
+                    </div>
+                  </template>
+
+                  <!-- Reminder Limits Switch (Inline & Compact) -->
+                  <div class="col-12 border-bottom pb-3 pt-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
                       <div>
-                        <h6 class="mb-1 fw-semibold">Batas Klik Pengingat Antrian</h6>
-                        <p class="text-muted small mb-0">
-                          Jika aktif, tombol Pengingat Antrian dibatasi berdasarkan nilai yang Anda atur.
-                        </p>
+                        <h6 class="mb-0 fw-semibold">Batas Klik Pengingat Antrian</h6>
+                        <small class="text-muted">Membatasi frekuensi pemanggilan tombol Pengingat Antrian.</small>
                       </div>
-                      <div class="form-check form-switch" style="font-size: 1.6rem">
+                      <div class="form-check form-switch" style="font-size: 1.4rem">
                         <input
                           v-model="form.reminderLimitEnabled"
                           class="form-check-input"
                           type="checkbox"
                           role="switch"
-                          style="width: 1.4em; height: 0.95em; cursor: pointer"
+                          style="cursor: pointer"
                         />
                       </div>
                     </div>
                   </div>
+
+                  <!-- Conditionally show Reminder Limit details -->
+                  <template v-if="form.reminderLimitEnabled">
+                    <div class="col-md-6 animate-fade-in">
+                      <label class="form-label fw-semibold">Batas Pemanggilan</label>
+                      <input
+                        v-model.number="form.reminderLimitMaxCalls"
+                        type="number"
+                        min="1"
+                        max="20"
+                        class="form-control"
+                        @keydown.enter.prevent="saveSettings"
+                      />
+                      <small class="text-muted">Maksimal klik (1-20 kali).</small>
+                    </div>
+
+                    <div class="col-md-6 animate-fade-in">
+                      <label class="form-label fw-semibold">Batas Durasi (detik)</label>
+                      <input
+                        v-model.number="form.reminderLimitWindowSeconds"
+                        type="number"
+                        min="10"
+                        max="3600"
+                        class="form-control"
+                        @keydown.enter.prevent="saveSettings"
+                      />
+                      <small class="text-muted">Rentang durasi (10-3600 detik).</small>
+                    </div>
+                  </template>
+
+                  <!-- Message text -->
+                  <div class="col-12 pt-2 pb-3">
+                    <label class="form-label fw-semibold">Teks Pengumuman</label>
+                    <textarea
+                      v-model="form.message"
+                      rows="3"
+                      class="form-control"
+                      placeholder="Tulis pesan pengumuman penutupan..."
+                    ></textarea>
+                    <small class="text-muted">Pesan ini digunakan untuk pemutaran manual dan otomatis.</small>
+                  </div>
+                </div>
+
+                <div class="meta-info mb-0 pt-3 border-top">
+                  <i class="fas fa-clock me-1"></i>
+                  Terakhir update:
+                  <strong>{{ formattedLastUpdated }}</strong>
+                  <span class="mx-2">|</span>
+                  Oleh:
+                  <strong>{{ form.updatedBy || "-" }}</strong>
                 </div>
               </div>
-
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Batas Pemanggilan</label>
-                <input
-                  v-model.number="form.reminderLimitMaxCalls"
-                  type="number"
-                  min="1"
-                  max="20"
-                  class="form-control"
-                  :disabled="!form.reminderLimitEnabled"
-                  @keydown.enter.prevent="saveSettings"
-                />
-                <small class="text-muted">Rentang 1 sampai 20 kali.</small>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Batas Durasi (detik)</label>
-                <input
-                  v-model.number="form.reminderLimitWindowSeconds"
-                  type="number"
-                  min="10"
-                  max="3600"
-                  class="form-control"
-                  :disabled="!form.reminderLimitEnabled"
-                  @keydown.enter.prevent="saveSettings"
-                />
-                <small class="text-muted">Rentang 10 sampai 3600 detik.</small>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Jam Auto Play</label>
-                <input v-model="form.time" type="time" class="form-control" @keydown.enter.prevent="saveSettings" />
-                <small class="text-muted">Format 24 jam. Contoh: 20:55</small>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Jumlah Pengulangan</label>
-                <input
-                  v-model.number="form.repeat"
-                  type="number"
-                  min="1"
-                  max="5"
-                  class="form-control"
-                  @keydown.enter.prevent="saveSettings"
-                />
-                <small class="text-muted">Rentang 1 sampai 5 kali.</small>
-              </div>
-
-              <div class="col-12">
-                <label class="form-label fw-semibold">Teks Pengumuman</label>
-                <textarea
-                  v-model="form.message"
-                  rows="4"
-                  class="form-control"
-                  placeholder="Tulis pesan pengumuman penutupan..."
-                ></textarea>
-                <small class="text-muted">Pesan ini dipakai untuk play manual dan auto play.</small>
-              </div>
-            </div>
-
-            <div class="meta-info mb-3">
-              <i class="fas fa-clock me-1"></i>
-              Terakhir update:
-              <strong>{{ formattedLastUpdated }}</strong>
-              <span class="mx-1">|</span>
-              Oleh:
-              <strong>{{ form.updatedBy || "-" }}</strong>
             </div>
           </div>
-        </div>
 
-        <!-- Card 2: Kuota Pelayanan Kasir Jual -->
-        <div class="card settings-card mb-4">
-          <div class="settings-header p-3 text-white">
-            <h5 class="mb-0 text-white">
-              <i class="fas fa-users-cog me-2"></i>
-              Kuota Pelayanan Customer (Lantai: {{ auth.activeFloor || 'L1' }})
-            </h5>
-          </div>
-          <div class="settings-body p-3 p-md-4">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Kuota Shift Pagi</label>
-                <input
-                  v-model.number="quotaForm.morningJualQuota"
-                  type="number"
-                  min="1"
-                  max="10"
-                  class="form-control"
-                />
-                <small class="text-muted">Jumlah default staff Jual untuk shift pagi.</small>
+          <!-- Kolom Kanan: Kuota Pelayanan & TTS (col-lg-4) -->
+          <div class="col-lg-4 col-12">
+            <!-- Card 3: Kuota Pelayanan -->
+            <div class="card settings-card mb-4 border-0">
+              <div class="settings-header p-3 text-white">
+                <h5 class="mb-0 text-white">
+                  <i class="fas fa-users-cog me-2"></i>
+                  Kuota Pelayanan (Lantai: {{ auth.activeFloor || 'L1' }})
+                </h5>
               </div>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Kuota Shift Sore</label>
-                <input
-                  v-model.number="quotaForm.afternoonJualQuota"
-                  type="number"
-                  min="1"
-                  max="10"
-                  class="form-control"
-                />
-                <small class="text-muted">Jumlah default staff Jual untuk shift sore.</small>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-
-        <!-- Actions -->
-        <div class="d-flex flex-wrap gap-2 mb-4">
-          <button class="btn btn-primary" :disabled="saving" @click="saveSettings">
-            <i class="fas fa-save me-2"></i>
-            {{ saving ? "Menyimpan..." : "Simpan Pengaturan" }}
-          </button>
-          <button class="btn btn-outline-secondary" :disabled="saving" @click="resetToDefault">
-            <i class="fas fa-undo me-2"></i>
-            Reset Default
-          </button>
-          <button class="btn btn-success" :disabled="previewing" @click="testPlay">
-            <i class="fas fa-play me-2"></i>
-            {{ previewing ? "Memutar..." : "Tes Play Sekarang" }}
-          </button>
-        </div>
-      </template>
-
-      <!-- Google Cloud TTS Settings Card -->
-      <div class="card settings-card mt-4">
-        <div class="settings-header p-3">
-          <h5 class="mb-0">
-            <i class="fas fa-microphone me-2"></i>
-            Konfigurasi Pengisi Suara Antrian (TTS)
-          </h5>
-        </div>
-        <div class="settings-body p-3 p-md-4">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Pilih Layanan TTS (Semua Device)</label>
-              <select v-model="form.ttsProvider" class="form-select">
-                <option value="translate">Google Translate Gratis (Wanita - Default)</option>
-                <option value="google_cloud">Google Cloud Text-to-Speech (Berbayar - Kunci API)</option>
-              </select>
-            </div>
-            
-            <template v-if="form.ttsProvider === 'google_cloud'">
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Jenis Suara (Bahasa Indonesia)</label>
-                <select v-model="form.ttsVoiceName" class="form-select">
-                  <option value="id-ID-Standard-A">id-ID-Standard-A (Wanita)</option>
-                  <option value="id-ID-Standard-D">id-ID-Standard-D (Wanita)</option>
-                  <option value="id-ID-Standard-B">id-ID-Standard-B (Pria)</option>
-                  <option value="id-ID-Standard-C">id-ID-Standard-C (Pria)</option>
-                  <option value="id-ID-Wavenet-A">id-ID-Wavenet-A (Wanita - Premium)</option>
-                  <option value="id-ID-Wavenet-D">id-ID-Wavenet-D (Wanita - Premium)</option>
-                  <option value="id-ID-Wavenet-B">id-ID-Wavenet-B (Pria - Premium)</option>
-                  <option value="id-ID-Wavenet-C">id-ID-Wavenet-C (Pria - Premium)</option>
-                  <option value="id-ID-Neural2-F">id-ID-Neural2-F (Wanita - Ultra Premium)</option>
-                  <option value="id-ID-Neural2-B">id-ID-Neural2-B (Pria - Ultra Premium)</option>
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Pitch / Nada Suara ({{ form.ttsPitch >= 0 ? '+' : '' }}{{ form.ttsPitch }} Semitones)</label>
-                <div class="d-flex align-items-center gap-2">
-                  <input
-                    v-model.number="form.ttsPitch"
-                    type="range"
-                    min="-5.0"
-                    max="5.0"
-                    step="0.1"
-                    class="form-range flex-grow-1"
-                  />
-                  <button class="btn btn-outline-secondary btn-sm" @click="resetTtsPitch">Reset</button>
+              <div class="settings-body p-3 p-md-4">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Kuota Shift Pagi</label>
+                    <input
+                      v-model.number="quotaForm.morningJualQuota"
+                      type="number"
+                      min="1"
+                      max="10"
+                      class="form-control"
+                    />
+                    <small class="text-muted">Jumlah default staff Jual pagi.</small>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Kuota Shift Sore</label>
+                    <input
+                      v-model.number="quotaForm.afternoonJualQuota"
+                      type="number"
+                      min="1"
+                      max="10"
+                      class="form-control"
+                    />
+                    <small class="text-muted">Jumlah default staff Jual sore.</small>
+                  </div>
                 </div>
-                <small class="text-muted">Gunakan nilai positif (+) untuk membuat suara wanita/pria lebih melengking.</small>
               </div>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Kecepatan Pemanggilan / Rate ({{ form.ttsRate }}x)</label>
-                <div class="d-flex align-items-center gap-2">
-                  <input
-                    v-model.number="form.ttsRate"
-                    type="range"
-                    min="0.5"
-                    max="1.5"
-                    step="0.05"
-                    class="form-range flex-grow-1"
-                  />
-                  <button class="btn btn-outline-secondary btn-sm" @click="resetTtsRate">Reset</button>
+            </div>
+
+            <!-- Card 4: TTS Config -->
+            <div class="card settings-card border-0">
+              <div class="settings-header p-3 text-white">
+                <h5 class="mb-0 text-white">
+                  <i class="fas fa-microphone me-2"></i>
+                  Pengisi Suara (TTS)
+                </h5>
+              </div>
+              <div class="settings-body p-3 p-md-4">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Layanan TTS</label>
+                    <select v-model="form.ttsProvider" class="form-select">
+                      <option value="translate">Google Translate Gratis</option>
+                      <option value="google_cloud">Google Cloud (Premium)</option>
+                    </select>
+                  </div>
+                  
+                  <template v-if="form.ttsProvider === 'google_cloud'">
+                    <div class="col-12 animate-fade-in">
+                      <label class="form-label fw-semibold">Jenis Suara (ID)</label>
+                      <select v-model="form.ttsVoiceName" class="form-select">
+                        <option value="id-ID-Standard-A">id-ID-Standard-A (Wanita)</option>
+                        <option value="id-ID-Standard-D">id-ID-Standard-D (Wanita)</option>
+                        <option value="id-ID-Standard-B">id-ID-Standard-B (Pria)</option>
+                        <option value="id-ID-Standard-C">id-ID-Standard-C (Pria)</option>
+                        <option value="id-ID-Wavenet-A">id-ID-Wavenet-A (Wanita - Premium)</option>
+                        <option value="id-ID-Wavenet-D">id-ID-Wavenet-D (Wanita - Premium)</option>
+                        <option value="id-ID-Wavenet-B">id-ID-Wavenet-B (Pria - Premium)</option>
+                        <option value="id-ID-Wavenet-C">id-ID-Wavenet-C (Pria - Premium)</option>
+                        <option value="id-ID-Neural2-F">id-ID-Neural2-F (Wanita - Ultra Premium)</option>
+                        <option value="id-ID-Neural2-B">id-ID-Neural2-B (Pria - Ultra Premium)</option>
+                      </select>
+                    </div>
+                    <div class="col-12 animate-fade-in">
+                      <label class="form-label fw-semibold">Pitch ({{ form.ttsPitch >= 0 ? '+' : '' }}{{ form.ttsPitch }} ST)</label>
+                      <div class="d-flex align-items-center gap-2">
+                        <input
+                          v-model.number="form.ttsPitch"
+                          type="range"
+                          min="-5.0"
+                          max="5.0"
+                          step="0.1"
+                          class="form-range flex-grow-1"
+                        />
+                        <button class="btn btn-outline-secondary btn-sm" @click="resetTtsPitch">Reset</button>
+                      </div>
+                    </div>
+                    <div class="col-12 animate-fade-in">
+                      <label class="form-label fw-semibold">Kecepatan ({{ form.ttsRate }}x)</label>
+                      <div class="d-flex align-items-center gap-2">
+                        <input
+                          v-model.number="form.ttsRate"
+                          type="range"
+                          min="0.5"
+                          max="1.5"
+                          step="0.05"
+                          class="form-range flex-grow-1"
+                        />
+                        <button class="btn btn-outline-secondary btn-sm" @click="resetTtsRate">Reset</button>
+                      </div>
+                    </div>
+                  </template>
                 </div>
-                <small class="text-muted">Gunakan nilai di bawah 1.0 untuk memperlambat tempo pemanggilan.</small>
+                <div class="d-flex justify-content-start mt-3 pt-3 border-top">
+                  <button class="btn btn-success w-100 fw-semibold shadow-sm" :disabled="previewing" @click="testTtsVoice">
+                    <i class="fas fa-play me-2"></i>
+                    Tes Suara Terpilih
+                  </button>
+                </div>
               </div>
-            </template>
+            </div>
           </div>
-          <div class="d-flex justify-content-start mt-3">
-            <button class="btn btn-success" :disabled="previewing" @click="testTtsVoice">
+        </div>
+
+        <!-- Action Buttons at bottom -->
+        <div class="d-flex flex-wrap gap-2 mt-4 justify-content-between align-items-center bg-white p-3 rounded shadow-sm border">
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary fw-semibold px-4 py-2" :disabled="saving" @click="saveSettings">
+              <i class="fas fa-save me-2"></i>
+              {{ saving ? "Menyimpan..." : "Simpan Pengaturan" }}
+            </button>
+            <button class="btn btn-outline-secondary fw-semibold px-3 py-2" :disabled="saving" @click="resetToDefault">
+              <i class="fas fa-undo me-2"></i>
+              Reset Default
+            </button>
+          </div>
+          <div>
+            <button class="btn btn-success fw-semibold px-3 py-2" :disabled="previewing" @click="testPlay">
               <i class="fas fa-play me-2"></i>
-              Tes Suara Terpilih
+              {{ previewing ? "Memutar..." : "Tes Play Sekarang" }}
             </button>
           </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -299,6 +351,8 @@ import {
 import {
   fetchQueueQuotaSettings,
   saveQueueQuotaSettings,
+  fetchQueueGeneralSettings,
+  saveQueueGeneralSettings,
 } from "@/services/antrian-service";
 import { isAudioBusy, playClosingAnnouncement, primeAudioPlayback, speak } from "@/services/audio-service";
 
@@ -310,6 +364,7 @@ const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
 const quotaForm = reactive({ morningJualQuota: 2, afternoonJualQuota: 3 });
+const generalForm = reactive({ queueMode: "legacy", hybridMode: false });
 
 function resetTtsPitch() {
   form.ttsPitch = 0.0;
@@ -399,6 +454,10 @@ async function loadAllSettings() {
     const quotaData = await fetchQueueQuotaSettings(floorId);
     quotaForm.morningJualQuota = quotaData.morningJualQuota || 2;
     quotaForm.afternoonJualQuota = quotaData.afternoonJualQuota || 3;
+
+    const generalData = await fetchQueueGeneralSettings(floorId);
+    generalForm.queueMode = generalData.queueMode || "legacy";
+    generalForm.hybridMode = generalData.hybridMode || false;
   } catch (error) {
     console.error("Failed to load floor-scoped settings", error);
   }
@@ -477,6 +536,12 @@ async function saveSettings() {
       afternoonJualQuota: Number(quotaForm.afternoonJualQuota) || 3
     });
 
+    // Save General Queue Mode and Hybrid settings
+    await saveQueueGeneralSettings(floorId, {
+      queueMode: generalForm.queueMode,
+      hybridMode: !!generalForm.hybridMode
+    });
+
     await Swal.fire({
       icon: "success",
       title: "Berhasil",
@@ -511,6 +576,8 @@ async function resetToDefault() {
   
   quotaForm.morningJualQuota = 2;
   quotaForm.afternoonJualQuota = 3;
+  generalForm.queueMode = "legacy";
+  generalForm.hybridMode = false;
 }
 
 async function testPlay() {

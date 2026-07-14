@@ -6,5 +6,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   print: (type, payload, printerName) => ipcRenderer.invoke("print-job", { type, payload, printerName }),
   panggilAntreanDim: (duration) => ipcRenderer.invoke("duck-audio", duration),
   panggilAntreanUnduck: () => ipcRenderer.invoke("unduck-audio"),
-  getGoogleTTS: (text) => ipcRenderer.invoke("get-google-tts", text)
+  getGoogleTTS: (text) => ipcRenderer.invoke("get-google-tts", text),
+  toggleMenuBar: () => ipcRenderer.invoke("toggle-menu-bar")
 });

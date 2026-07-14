@@ -297,7 +297,6 @@ function setBrowsersVolume(volume) {
   });
 }
 
-// Create main cashier window
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -310,6 +309,9 @@ function createMainWindow() {
       nodeIntegration: false
     }
   });
+
+  mainWindow.setAutoHideMenuBar(true);
+  mainWindow.setMenuBarVisibility(false);
 
   // Load appropriate URL (dev server or Firebase production)
   const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -520,30 +522,178 @@ function printRawPowerShell(printerName, rawData) {
       const psScriptFile = path.join(tempDir, `print_${Date.now()}.ps1`);
       const psScript = `
 $ErrorActionPreference = "Stop"
+$printed = $false
+$filePath = "${tempFile.replace(/\\/g, "\\\\")}"
+
+# Detect if the target printer is a virtual/document printer (PDF, XPS, OneNote, etc.)
+$isVirtual = $false
 try {
     $printer = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq "${printerName}" }
-    if (-not $printer) { exit 1 }
-    $portName = $printer.PortName
-    $filePath = "${tempFile.replace(/\\/g, "\\\\")}"
-    
-    if ($portName -match "^(USB|LPT|COM)") {
-        Copy-Item -Path $filePath -Destination $portName -Force
-        exit 0
+    if ($printer) {
+        $port = $printer.PortName.ToLower()
+        $driver = $printer.DriverName.ToLower()
+        $name = $printer.Name.ToLower()
+        if ($port -match "(nul|prompt|file|pdf|xps|doc)") {
+            $isVirtual = $true
+        }
+        elseif ($driver -match "(pdf|xps|onenote|writer|fax|microsoft)") {
+            $isVirtual = $true
+        }
+        elseif ($name -match "(pdf|xps|onenote|writer|fax|virtual)") {
+            $isVirtual = $true
+        }
     }
-    
-    # Fallback to .NET graphics text rendering
+} catch {
+    # Ignore printer query errors, assume not virtual
+}
+
+# 1. Try sending raw bytes via winspool.drv Spooler API (only if NOT a virtual printer)
+if (-not $isVirtual) {
+    try {
+        $code = @"
+        using System;
+        using System.Runtime.InteropServices;
+        public class RawPrinterHelper {
+            [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+            public class DOCINFOA {
+                [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+                [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+                [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+            }
+            [DllImport("winspool.drv", EntryPoint = "OpenPrinterA", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
+            public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+            [DllImport("winspool.drv", EntryPoint = "ClosePrinter", SetLastError = true, ExactSpelling = true)]
+            public static extern bool ClosePrinter(IntPtr hPrinter);
+            [DllImport("winspool.drv", EntryPoint = "StartDocPrinterA", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
+            public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+            [DllImport("winspool.drv", EntryPoint = "EndDocPrinter", SetLastError = true, ExactSpelling = true)]
+            public static extern bool EndDocPrinter(IntPtr hPrinter);
+            [DllImport("winspool.drv", EntryPoint = "StartPagePrinter", SetLastError = true, ExactSpelling = true)]
+            public static extern bool StartPagePrinter(IntPtr hPrinter);
+            [DllImport("winspool.drv", EntryPoint = "EndPagePrinter", SetLastError = true, ExactSpelling = true)]
+            public static extern bool EndPagePrinter(IntPtr hPrinter);
+            [DllImport("winspool.drv", EntryPoint = "WritePrinter", SetLastError = true, ExactSpelling = true)]
+            public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+            public static bool SendBytesToPrinter(string szPrinterName, byte[] bytes) {
+                IntPtr hPrinter = IntPtr.Zero;
+                DOCINFOA di = new DOCINFOA();
+                bool bSuccess = false;
+                di.pDocName = "RAW Print Document";
+                di.pDataType = "RAW";
+                if (OpenPrinter(szPrinterName, out hPrinter, IntPtr.Zero)) {
+                    if (StartDocPrinter(hPrinter, 1, di)) {
+                        if (StartPagePrinter(hPrinter)) {
+                            IntPtr pBytes = Marshal.AllocCoTaskMem(bytes.Length);
+                            Marshal.Copy(bytes, 0, pBytes, bytes.Length);
+                            Int32 dwWritten = 0;
+                            bSuccess = WritePrinter(hPrinter, pBytes, bytes.Length, out dwWritten);
+                            Marshal.FreeCoTaskMem(pBytes);
+                            EndPagePrinter(hPrinter);
+                        }
+                        EndDocPrinter(hPrinter);
+                    }
+                    ClosePrinter(hPrinter);
+                }
+                return bSuccess;
+            }
+        }
+"@
+        Add-Type -TypeDefinition $code
+        $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        $printed = [RawPrinterHelper]::SendBytesToPrinter("${printerName}", $bytes)
+    } catch {
+        $printed = $false
+    }
+}
+
+if ($printed) {
+    exit 0
+}
+
+# 2. Try copying directly to port (USB/LPT/COM)
+try {
+    $printer = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq "${printerName}" }
+    if ($printer) {
+        $portName = $printer.PortName
+        if ($portName -match "^(USB|LPT|COM)") {
+            Copy-Item -Path $filePath -Destination $portName -Force
+            exit 0
+        }
+    }
+} catch {}
+
+# 3. Fallback to .NET graphics text rendering
+try {
     Add-Type -AssemblyName System.Drawing
     $bytes = [System.IO.File]::ReadAllBytes($filePath)
     $printDoc = New-Object System.Drawing.Printing.PrintDocument
     $printDoc.PrinterSettings.PrinterName = "${printerName}"
     $printDoc.add_PrintPage({
         param($sender, $ev)
-        $font = New-Object System.Drawing.Font("Courier New", 8)
-        $text = [System.Text.Encoding]::ASCII.GetString($bytes)
-        $ev.Graphics.DrawString($text, $font, [System.Drawing.Brushes]::Black, 10, 10)
+        $y = 10
+        $x = 10
+        $pageWidth = $ev.PageBounds.Width - 2 * $x
+        
+        $centerFormat = New-Object System.Drawing.StringFormat
+        $centerFormat.Alignment = [System.Drawing.StringAlignment]::Center
+        
+        $leftFormat = New-Object System.Drawing.StringFormat
+        $leftFormat.Alignment = [System.Drawing.StringAlignment]::Near
+        
+        $rawText = [System.Text.Encoding]::ASCII.GetString($bytes)
+        $lines = $rawText -split "\n"
+        foreach ($line in $lines) {
+            $line = $line.TrimEnd("\`r")
+            $isHuge = $line.Contains("$([char]0x1D)!U")
+            $isLarge = $line.Contains("$([char]0x1B)!8")
+            $isBold = $line.Contains("$([char]0x1B)E$([char]0x01)")
+            
+            $cleanLine = $line
+            $cleanLine = $cleanLine.Replace("$([char]0x1B)@", "")
+            $cleanLine = $cleanLine -replace "\x1B!.", ""
+            $cleanLine = $cleanLine -replace "\x1B[E]\x01", ""
+            $cleanLine = $cleanLine -replace "\x1B[E]\x00", ""
+            $cleanLine = $cleanLine -replace "\x1D!.", ""
+            $cleanLine = $cleanLine.Replace("$([char]0x1D)VA$([char]0x00)", "")
+            $cleanLine = $cleanLine -replace "[\x00-\x1F]", ""
+            
+            if ($cleanLine.Length -eq 0 -and $line.Length -gt 0 -and ($line -match "[\x1B\x1D]")) {
+                continue
+            }
+            
+            $trimmed = $cleanLine.Trim()
+            
+            if ($isHuge) {
+                $font = New-Object System.Drawing.Font("Courier New", 36, [System.Drawing.FontStyle]::Bold)
+                $lineHeight = 50
+            }
+            elseif ($isLarge) {
+                $font = New-Object System.Drawing.Font("Courier New", 18, [System.Drawing.FontStyle]::Bold)
+                $lineHeight = 28
+            }
+            elseif ($isBold) {
+                $font = New-Object System.Drawing.Font("Courier New", 10, [System.Drawing.FontStyle]::Bold)
+                $lineHeight = 16
+            }
+            else {
+                $font = New-Object System.Drawing.Font("Courier New", 10, [System.Drawing.FontStyle]::Regular)
+                $lineHeight = 16
+            }
+            
+            $format = $centerFormat
+            if ($trimmed.StartsWith("-") -or $trimmed -eq "CATATAN:") {
+                $format = $leftFormat
+                $trimmed = $cleanLine.TrimEnd()
+            }
+            
+            $rect = New-Object System.Drawing.RectangleF($x, $y, $pageWidth, $lineHeight)
+            $ev.Graphics.DrawString($trimmed, $font, [System.Drawing.Brushes]::Black, $rect, $format)
+            $y += $lineHeight
+        }
         $ev.HasMorePages = $false
     })
     $printDoc.Print()
+    exit 0
 } catch {
     exit 1
 }
@@ -569,12 +719,23 @@ try {
   });
 }
 
-// IPC Handlers
 ipcMain.handle("get-printers", async (event) => {
   if (!validateOrigin(event.sender)) {
     throw new Error("Unauthorized IPC Call");
   }
   return await listPrinters();
+});
+
+ipcMain.handle("toggle-menu-bar", (event) => {
+  if (!validateOrigin(event.sender)) {
+    throw new Error("Unauthorized IPC Call");
+  }
+  if (mainWindow) {
+    const isVisible = mainWindow.isMenuBarVisible();
+    mainWindow.setMenuBarVisibility(!isVisible);
+    return !isVisible;
+  }
+  return false;
 });
 
 ipcMain.handle("duck-audio", async (event, duration) => {
@@ -965,26 +1126,38 @@ function generateQueueText(data) {
   } = data;
 
   const isEn = lang === "en";
-  const width = 38;
+  const width = 48; // character column width for 80mm paper
 
   const centerText = (text) => {
     const padding = Math.max(0, Math.floor((width - text.length) / 2));
     return " ".repeat(padding) + text + "\n";
   };
 
+  const centerTextScaled = (text, scale = 1) => {
+    const scaledWidth = Math.floor(width / scale);
+    const padding = Math.max(0, Math.floor((scaledWidth - text.length) / 2));
+    return " ".repeat(padding) + text + "\n";
+  };
+
   const leftAlignText = (text) => text + "\n";
 
   const ESC = "\x1B";
+  const GS = "\x1D";
   const INIT = ESC + "@";
-  const TEXT_LARGE_BOLD = ESC + "!\x38";
   const TEXT_NORMAL = ESC + "!\x00";
   const BOLD_ON = ESC + "E\x01";
   const BOLD_OFF = ESC + "E\x00";
 
+  // Large size for Shop Name (2x size: double-width, double-height, bold)
+  const TEXT_LARGE_BOLD = ESC + "!\x38";
+  
+  // Huge size for Queue Number (6x size: 6x width, 6x height, bold)
+  const TEXT_HUGE_BOLD = GS + "!\x55";
+
   let output = INIT;
-  output += leftAlignText("==================================");
-  output += BOLD_ON + centerText(floor === "L2" ? "MELATI GOLD YOUNG" : "MELATI GOLD SHOP") + BOLD_OFF;
-  output += leftAlignText("==================================");
+  output += leftAlignText("=".repeat(width));
+  output += TEXT_LARGE_BOLD + centerTextScaled(floor === "L2" ? "MELATI GOLD YOUNG" : "MELATI GOLD SHOP", 2).trimEnd() + "\n" + TEXT_NORMAL;
+  output += leftAlignText("=".repeat(width));
   output += "\n";
 
   let floorLabel = floor === "L2"
@@ -997,10 +1170,9 @@ function generateQueueText(data) {
   output += BOLD_ON + centerText(titleLabel) + BOLD_OFF;
   output += "\n";
 
-  output += leftAlignText("--------------------------------");
-  output += TEXT_LARGE_BOLD + centerText(queueNumber).trimEnd() + "\n" + TEXT_NORMAL;
-  output += leftAlignText("--------------------------------");
-  output += "\n";
+  output += leftAlignText("-".repeat(width));
+  output += TEXT_HUGE_BOLD + centerTextScaled(queueNumber, 6).trimEnd() + "\n" + TEXT_NORMAL;
+  output += leftAlignText("-".repeat(width));
 
   let displayQueueType = queueType;
   if (isEn) {
@@ -1011,9 +1183,8 @@ function generateQueueText(data) {
 
   const timeLabel = isEn ? "Time" : "Waktu";
   output += centerText(timeLabel + ": " + dateStr + " " + timeStr);
-  output += "\n";
 
-  output += "--------------------------------------\n";
+  output += "-".repeat(width) + "\n";
   if (isEn) {
     output += "NOTES:\n";
     output += "- If your queue is missed by more than\n";
@@ -1023,20 +1194,20 @@ function generateQueueText(data) {
   } else {
     output += "CATATAN:\n";
     output += "- Jika antrian terlewat melebihi 10\n";
-    output += "  nomor antrian maka ambil antrian baru\n";
-    output += "- Jika belum melebihi 10 nomor silakan\n";
+    output += "  nomor antrian silahkan ambil antrian baru\n";
+    output += "- Jika belum melebihi 10 nomor silahkan\n";
     output += "  konfirmasi ke staff untuk dipanggil\n";
     output += "  di antrian selanjutnya\n";
   }
-  output += "--------------------------------------\n\n";
+  output += "-".repeat(width) + "\n\n";
 
   if (isEn) {
     output += centerText("Please wait for your queue");
     output += centerText("number to be called.");
     output += centerText("Thank you for your visit.");
   } else {
-    output += centerText("Harap menunggu nomor antrian");
-    output += centerText("anda dipanggil.");
+    output += centerText("Sembari menunggu nomor dipanggil,");
+    output += centerText("silakan melihat-lihat koleksi perhiasan kami");
     output += centerText("Terima kasih atas kunjungan Anda.");
   }
 

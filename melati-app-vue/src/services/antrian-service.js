@@ -471,3 +471,95 @@ export function calculateAutoRotation(activeSales, history, floorId, shift, quot
     beli: beliStaff
   };
 }
+
+export async function fetchQueueGeneralSettings(floorId = "") {
+  try {
+    const docRef = floorDoc(db, "queueSettings", "general", floorId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return {
+        queueMode: snap.data().queueMode || "legacy",
+        hybridMode: snap.data().hybridMode || false
+      };
+    }
+  } catch (error) {
+    console.error("Error fetching general queue settings:", error);
+  }
+  return {
+    queueMode: "legacy",
+    hybridMode: false
+  };
+}
+
+export async function saveQueueGeneralSettings(floorId, data) {
+  const docRef = floorDoc(db, "queueSettings", "general", floorId);
+  await setDoc(docRef, {
+    queueMode: data.queueMode || "legacy",
+    hybridMode: !!data.hybridMode,
+    lastUpdated: new Date().toISOString()
+  }, { merge: true });
+}
+
+export async function nextQueueHybrid(type, state, floorId = "") {
+  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
+  let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
+  
+  const letters = type === "jual" ? ["D", "E"] : ["A", "B", "C"];
+  
+  // If queue is empty or lastNumber is 0, auto-generate the next lastNumber/lastLetter
+  const currentIdx = (currentLetter ?? 0) * 50 + currentNumber;
+  const lastIdx = (lastLetter ?? 0) * 50 + lastNumber;
+  
+  if (lastIdx <= currentIdx || lastNumber === 0) {
+    if (lastNumber === 0) {
+      lastLetter = 0;
+      lastNumber = 1;
+    } else {
+      lastNumber++;
+      if (lastNumber > 50) {
+        lastNumber = 1;
+        lastLetter = (lastLetter + 1) % letters.length;
+      }
+    }
+  }
+  
+  // Now advance currentNumber
+  currentNumber++;
+  if (currentNumber > 50) {
+    currentNumber = 1;
+    currentLetter = (currentLetter + 1) % letters.length;
+  }
+  
+  // Check skip list
+  let limit = 0;
+  do {
+    const qStr = letters[currentLetter] + padNumber(currentNumber);
+    if (skipList.includes(qStr)) {
+      skipList = skipList.filter(q => q !== qStr);
+      currentNumber++;
+      if (currentNumber > 50) {
+        currentNumber = 1;
+        currentLetter = (currentLetter + 1) % letters.length;
+      }
+      limit++;
+      continue;
+    }
+    break;
+  } while (limit < 200);
+  
+  const newState = {
+    ...state,
+    [type]: {
+      currentLetter,
+      currentNumber,
+      lastLetter,
+      lastNumber,
+      delayedQueue,
+      missedQueue,
+      skipList
+    }
+  };
+  
+  await saveState(newState, floorId);
+  return newState;
+}

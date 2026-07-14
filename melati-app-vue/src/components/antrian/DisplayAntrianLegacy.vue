@@ -1,0 +1,613 @@
+<template>
+  <div class="display-page" style="user-select: none">
+    <!-- Decorative Elements -->
+    <div class="gold-decoration top-left"></div>
+    <div class="gold-decoration bottom-right"></div>
+
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <div class="row align-items-center justify-content-between">
+          <div class="col-md-6">
+            <div class="logo-container" style="cursor: pointer" @click="handleLogoClick">
+              <img src="/img/Melati.jfif" alt="Logo" class="logo gold-shimmer" />
+              <h1 class="brand-name">Melati Gold Shop</h1>
+            </div>
+          </div>
+          <div class="col-md-6 d-flex justify-content-end align-items-center">
+            <div class="date-time">
+              <div class="current-date">{{ currentDate }}</div>
+              <div class="d-flex align-items-center gap-3">
+                <div class="current-time">{{ currentTime }}</div>
+                <div class="display-promosi">
+                  <a href="/promosi/display" class="text-decoration-none">
+                    <i class="fas fa-desktop text-white fs-2" title="Display Promosi"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container-fluid" style="max-width: 1800px; margin: 0 auto">
+      <!-- Page Title -->
+      <div class="page-title">
+        <h1>ANTRIAN PELAYANAN</h1>
+      </div>
+
+      <!-- Queue Cards -->
+      <div class="row justify-content-center align-items-stretch mt-0 g-2">
+        <!-- Current Queue Card -->
+        <div :class="['col-12', showMissed ? 'col-md-4' : 'col-md-5']">
+          <div class="queue-card card-current gold-border">
+            <div class="queue-card-header">
+              <h1 :class="{ 'queue-card-title--compact': showMissed }">SEDANG DILAYANI</h1>
+            </div>
+            <div class="queue-card-body">
+              <Transition name="queue-change" mode="out-in">
+                <div :key="currentDisplay" class="queue-number active">
+                  {{ currentDisplay }}
+                </div>
+              </Transition>
+            </div>
+          </div>
+        </div>
+
+        <!-- Missed Queue Card (opsional, muncul jika ada antrian terlewat) -->
+        <Transition name="card-fade">
+          <div v-if="showMissed" class="col-12 col-md-4">
+            <div class="queue-card card-delayed gold-border">
+              <div class="queue-card-header queue-card-header-delayed">
+                <h1 class="queue-card-title--compact">ANTRIAN TERLEWAT</h1>
+              </div>
+              <div class="queue-card-body">
+                <div :class="['queue-number', missedFontClass]">
+                  {{ missedDisplay }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
+        <!-- Next Queue Card -->
+        <div :class="['col-12', showMissed ? 'col-md-4' : 'col-md-5']">
+          <div class="queue-card card-next gold-border">
+            <div class="queue-card-header">
+              <h1 :class="{ 'queue-card-title--compact': showMissed }">
+                {{ showMissed ? "ANTRIAN BERIKUTNYA" : "AKAN DIPANGGIL" }}
+              </h1>
+            </div>
+            <div class="queue-card-body">
+              <Transition name="queue-change" mode="out-in">
+                <div :key="nextDisplay" class="queue-number">
+                  {{ nextDisplay }}
+                </div>
+              </Transition>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="elegant-divider"></div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="row justify-content-center align-items-center" style="min-height: 80px">
+          <div class="col-auto">
+            <p class="footer-text mb-0">&copy; 2026 Melati Gold Shop. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRoute } from "vue-router";
+import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
+import { subscribeQueue, formatQueue } from "@/services/antrian-service-legacy";
+
+const currentDisplay = ref("-");
+const nextDisplay = ref("-");
+const missedDisplay = ref("-");
+const missedCount = ref(0);
+const currentTime = ref("");
+const currentDate = ref("");
+
+const route = useRoute();
+const activeFloor = computed(() => {
+  const normalized = normalizeFloorId(route.query.floor, DEFAULT_FLOOR_ID);
+  return normalized || DEFAULT_FLOOR_ID;
+});
+
+let clockInterval = null;
+let audioCtx = null;
+let unsubscribeQueue = null;
+let prevDisplay = "-";
+
+const showMissed = computed(() => missedCount.value > 0);
+
+const missedFontClass = computed(() => {
+  const count = missedCount.value;
+  if (count <= 1) return "text-xl";
+  if (count <= 2) return "text-lg";
+  if (count <= 3) return "text-md";
+  if (count <= 4) return "text-sm";
+  return "text-xs";
+});
+
+function updateClock() {
+  const now = new Date();
+  currentTime.value = now.toLocaleTimeString("id-ID");
+  currentDate.value = now.toLocaleDateString("id-ID", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function playNotif() {
+  try {
+    if (!audioCtx) audioCtx = new AudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.8);
+  } catch {
+    /* ignore */
+  }
+}
+
+function getCurrentServingDisplay(letterIndex, number) {
+  const safeNumber = Math.max(1, Number(number) || 1);
+  return formatQueue(letterIndex, safeNumber > 1 ? safeNumber - 1 : 1);
+}
+
+let logoClickCount = 0;
+let logoClickTimeout = null;
+
+function handleLogoClick() {
+  logoClickCount++;
+  if (logoClickCount >= 3) {
+    logoClickCount = 0;
+    if (logoClickTimeout) {
+      clearTimeout(logoClickTimeout);
+      logoClickTimeout = null;
+    }
+    if (window.electronAPI && window.electronAPI.toggleMenuBar) {
+      window.electronAPI.toggleMenuBar();
+    }
+    return;
+  }
+  if (logoClickTimeout) clearTimeout(logoClickTimeout);
+  logoClickTimeout = setTimeout(() => {
+    logoClickCount = 0;
+  }, 1000);
+}
+
+onMounted(() => {
+  updateClock();
+  clockInterval = setInterval(updateClock, 1000);
+
+  subscribeToQueue();
+});
+
+watch(activeFloor, () => {
+  subscribeToQueue();
+});
+
+function subscribeToQueue() {
+  if (unsubscribeQueue) unsubscribeQueue();
+  unsubscribeQueue = subscribeQueue(activeFloor.value, (state) => {
+    const newDisplay = getCurrentServingDisplay(state.currentLetter, state.currentNumber);
+    if (prevDisplay !== "-" && newDisplay !== prevDisplay) {
+      playNotif();
+    }
+    prevDisplay = newDisplay;
+    currentDisplay.value = newDisplay;
+
+    nextDisplay.value = formatQueue(state.currentLetter, Math.max(1, Number(state.currentNumber) || 1));
+
+    // Missed queue
+    const missed = state.missedQueue.filter((v) => v);
+    missedCount.value = missed.length;
+    missedDisplay.value = missed.length > 0 ? missed.join(", ") : "-";
+  });
+}
+
+onUnmounted(() => {
+  clearInterval(clockInterval);
+  if (unsubscribeQueue) unsubscribeQueue();
+});
+</script>
+
+<style scoped>
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap");
+
+.display-page {
+  font-family: "Poppins", sans-serif;
+  background-color: #f9f5eb;
+  color: #3a2c1c;
+  overflow-x: hidden;
+  min-height: 100vh;
+  padding-bottom: 100px;
+  position: relative;
+}
+
+/* ΓöÇΓöÇ Decorative Elements ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.gold-decoration {
+  position: fixed;
+  opacity: 0.1;
+  z-index: 0;
+  pointer-events: none;
+}
+.gold-decoration.top-left {
+  top: 10%;
+  left: 5%;
+  width: 200px;
+  height: 200px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path fill='%23d4af37' d='M50,0 L100,50 L50,100 L0,50 Z'/></svg>");
+  background-repeat: no-repeat;
+  transform: rotate(15deg);
+}
+.gold-decoration.bottom-right {
+  bottom: 10%;
+  right: 5%;
+  width: 250px;
+  height: 250px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle fill='%23d4af37' cx='50' cy='50' r='50'/></svg>");
+  background-repeat: no-repeat;
+  transform: rotate(-10deg);
+}
+
+/* ΓöÇΓöÇ Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.header {
+  background: linear-gradient(135deg, #9d7e2d, #3a2c1c);
+  padding: 1rem 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 10;
+}
+.header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #d4af37, transparent);
+}
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+.logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #d4af37;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+.gold-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.gold-shimmer::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  animation: shimmer 4s infinite;
+}
+@keyframes shimmer {
+  0% {
+    transform: rotate(30deg) translateX(-100%);
+  }
+  100% {
+    transform: rotate(30deg) translateX(100%);
+  }
+}
+.brand-name {
+  margin-left: 1rem;
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: 3rem;
+  color: #ffffff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  margin-bottom: 0;
+}
+.date-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: #ffffff;
+}
+.current-date {
+  font-size: 2rem;
+  font-weight: 500;
+  font-family: "Playfair Display", serif;
+}
+.current-time {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f9d776;
+}
+.display-promosi a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  background: transparent;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+.display-promosi a:hover {
+  background: rgba(212, 175, 55, 0.4);
+}
+
+/* ΓöÇΓöÇ Main / Page Title ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+main {
+  padding: 0;
+  min-height: calc(100vh - 250px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.page-title {
+  text-align: center;
+  margin-bottom: 1rem;
+  position: relative;
+  padding-bottom: 1rem;
+}
+.page-title h1 {
+  font-family: "Roboto", serif;
+  font-size: 6rem;
+  font-weight: 700;
+  color: #3a2c1c;
+  margin-bottom: 0;
+}
+.page-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #d4af37, transparent);
+}
+
+/* ΓöÇΓöÇ Queue Cards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.queue-card {
+  border-radius: 15px;
+  overflow: hidden;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+  width: 100%;
+  height: clamp(250px, 55vh, 500px);
+  border: none;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(184, 152, 7, 0.63);
+  display: flex;
+  flex-direction: column;
+}
+.queue-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+}
+.queue-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+}
+.card-current::before {
+  background: linear-gradient(90deg, #f9d776, #9d7e2d);
+}
+.card-next::before {
+  background: linear-gradient(90deg, #9d7e2d, #f9d776);
+}
+.card-delayed::before {
+  background: linear-gradient(90deg, #ff9800, #ff6d00);
+}
+
+/* ΓöÇΓöÇ Card Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.queue-card-header {
+  background-color: #ffffff;
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+.queue-card-header-delayed {
+  background-color: #fff8e1;
+  border-bottom-color: #ffcc02;
+}
+.queue-card-header h1 {
+  font-family: "Times New Roman", Times, serif;
+  font-size: clamp(1.6rem, 3.8vw, 5rem);
+  font-weight: bold;
+  margin: 0;
+  color: #3a2c1c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.queue-card-header h1.queue-card-title--compact {
+  font-size: clamp(1.25rem, 2.8vw, 3.1rem);
+}
+
+/* ΓöÇΓöÇ Card Body ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.queue-card-body {
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex: 1;
+}
+
+/* ΓöÇΓöÇ Queue Number ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.queue-number {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  color: #3a2c1c;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1.1;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  transition: font-size 0.3s ease;
+  font-size: clamp(4rem, 30vh, 20rem);
+}
+.queue-number::after {
+  content: "";
+  position: absolute;
+  bottom: -1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 3px;
+  background: #d4af37;
+  border-radius: 3px;
+}
+.queue-number.active {
+  animation: numberPulse 2s infinite;
+  color: #9d7e2d;
+}
+
+/* Font size utilities for delayed card */
+.queue-number.text-xl {
+  font-size: clamp(3rem, 26vh, 17rem);
+}
+.queue-number.text-lg {
+  font-size: clamp(2.5rem, 17vh, 11rem);
+}
+.queue-number.text-md {
+  font-size: clamp(1.5rem, 10vh, 6rem);
+}
+.queue-number.text-sm {
+  font-size: clamp(1.25rem, 7vh, 4rem);
+}
+.queue-number.text-xs {
+  font-size: clamp(1rem, 5vh, 3rem);
+}
+
+/* ΓöÇΓöÇ Gold Border ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.gold-border {
+  border-radius: 10px;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(45deg, #d4af37, #f9d776, #d4af37) border-box;
+  border: 1px solid transparent;
+}
+
+/* ΓöÇΓöÇ Footer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+.footer {
+  background: linear-gradient(135deg, #3a2c1c, #9d7e2d);
+  color: #ffffff;
+  text-align: center;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  z-index: 100;
+}
+.footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #d4af37, transparent);
+}
+.footer-text {
+  font-family: "Playfair Display", serif;
+  font-size: 1.5rem;
+}
+
+/* ΓöÇΓöÇ Animations ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+@keyframes numberPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Vue Transitions */
+.queue-change-enter-active {
+  animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.queue-change-leave-active {
+  animation: popOut 0.2s ease-in;
+}
+@keyframes popIn {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes popOut {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+}
+.card-fade-enter-active,
+.card-fade-leave-active {
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+.card-fade-enter-from,
+.card-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+</style>
