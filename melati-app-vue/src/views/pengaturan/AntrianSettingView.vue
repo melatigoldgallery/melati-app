@@ -3,7 +3,7 @@
     <div class="page-header">
       <h1>
         <i class="bi bi-bullseye me-2 text-dark"></i>
-        Setting Pengumuman Penutupan Antrian
+        Setting Antrian
       </h1>
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -184,14 +184,21 @@
                     <small class="text-muted">Pesan ini digunakan untuk pemutaran manual dan otomatis.</small>
                   </div>
                 </div>
-
-                <div class="meta-info mb-0 pt-3 border-top">
-                  <i class="fas fa-clock me-1"></i>
-                  Terakhir update:
-                  <strong>{{ formattedLastUpdated }}</strong>
-                  <span class="mx-2">|</span>
-                  Oleh:
-                  <strong>{{ form.updatedBy || "-" }}</strong>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="meta-info mb-0 pt-3 border-top">
+                    <i class="fas fa-clock me-1"></i>
+                    Terakhir update:
+                    <strong>{{ formattedLastUpdated }}</strong>
+                    <span class="mx-2">|</span>
+                    Oleh:
+                    <strong>{{ form.updatedBy || "-" }}</strong>
+                  </div>
+                  <div>
+                    <button class="btn btn-success fw-semibold px-3 py-2" :disabled="previewing" @click="testPlay">
+                      <i class="fas fa-play me-2"></i>
+                      {{ previewing ? "Memutar..." : "Tes Play Sekarang" }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -257,16 +264,10 @@
                     <div class="col-12 animate-fade-in">
                       <label class="form-label fw-semibold">Jenis Suara (ID)</label>
                       <select v-model="form.ttsVoiceName" class="form-select">
-                        <option value="id-ID-Standard-A">id-ID-Standard-A (Wanita)</option>
-                        <option value="id-ID-Standard-D">id-ID-Standard-D (Wanita)</option>
-                        <option value="id-ID-Standard-B">id-ID-Standard-B (Pria)</option>
-                        <option value="id-ID-Standard-C">id-ID-Standard-C (Pria)</option>
                         <option value="id-ID-Wavenet-A">id-ID-Wavenet-A (Wanita - Premium)</option>
-                        <option value="id-ID-Wavenet-D">id-ID-Wavenet-D (Wanita - Premium)</option>
-                        <option value="id-ID-Wavenet-B">id-ID-Wavenet-B (Pria - Premium)</option>
+                        <option value="id-ID-Wavenet-D">id-ID-Wavenet-B (Wanita - Premium)</option>
                         <option value="id-ID-Wavenet-C">id-ID-Wavenet-C (Pria - Premium)</option>
-                        <option value="id-ID-Neural2-F">id-ID-Neural2-F (Wanita - Ultra Premium)</option>
-                        <option value="id-ID-Neural2-B">id-ID-Neural2-B (Pria - Ultra Premium)</option>
+                        <option value="id-ID-Wavenet-B">id-ID-Wavenet-D (Pria - Premium)</option>
                       </select>
                     </div>
                     <div class="col-12 animate-fade-in">
@@ -307,6 +308,8 @@
                 </div>
               </div>
             </div>
+
+
           </div>
         </div>
 
@@ -320,12 +323,6 @@
             <button class="btn btn-outline-secondary fw-semibold px-3 py-2" :disabled="saving" @click="resetToDefault">
               <i class="fas fa-undo me-2"></i>
               Reset Default
-            </button>
-          </div>
-          <div>
-            <button class="btn btn-success fw-semibold px-3 py-2" :disabled="previewing" @click="testPlay">
-              <i class="fas fa-play me-2"></i>
-              {{ previewing ? "Memutar..." : "Tes Play Sekarang" }}
             </button>
           </div>
         </div>
@@ -365,6 +362,8 @@ const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
 const quotaForm = reactive({ morningJualQuota: 2, afternoonJualQuota: 3 });
 const generalForm = reactive({ queueMode: "legacy", hybridMode: false });
+
+
 
 function resetTtsPitch() {
   form.ttsPitch = 0.0;
@@ -578,6 +577,8 @@ async function resetToDefault() {
   quotaForm.afternoonJualQuota = 3;
   generalForm.queueMode = "legacy";
   generalForm.hybridMode = false;
+
+
 }
 
 async function testPlay() {

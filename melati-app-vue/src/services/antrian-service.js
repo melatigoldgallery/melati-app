@@ -1,5 +1,5 @@
 import { rtdb, db } from "@/config/firebase";
-import { ref as dbRef, onValue, set, get, push, remove } from "firebase/database";
+import { ref as dbRef, onValue, set, get, push, remove, increment, update } from "firebase/database";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { floorDataRef, floorDataRefWithFloorId, floorDoc } from "./floor-scope";
 
@@ -346,6 +346,96 @@ export async function resetAnalytics(year, month, floorId = "") {
     ? floorDataRefWithFloorId(rtdb, floorId, "queue", "analytics", String(year), String(month))
     : floorDataRef(rtdb, "queue", "analytics", String(year), String(month));
   await remove(dbRefNode);
+}
+
+// ── Printer Status (Software-Based Counter) ──────────────────────────────────
+export const DEFAULT_PRINTER_STATUS = Object.freeze({
+  active_paper_type: "80x80",
+  paper_roll_length: 40,      // in meters
+  ticket_length: 15.5,        // in cm
+  alert_threshold_pct: 85,    // in %
+  total_prints: 0,
+  max_capacity: 258,
+  threshold: 219,
+  last_reset: null,
+});
+
+export function printerStatusRef(floorId = "") {
+  return floorDataRefWithFloorId(rtdb, floorId, "queue", "printer_status");
+}
+
+export function subscribePrinterStatus(floorId = "", callback) {
+  return onValue(printerStatusRef(floorId), (snap) => {
+    const val = snap.val();
+    if (!val) {
+      callback({ ...DEFAULT_PRINTER_STATUS });
+    } else {
+      callback({
+        active_paper_type: val.active_paper_type || "80x80",
+        paper_roll_length: Number(val.paper_roll_length) || 40,
+        ticket_length: Number(val.ticket_length) || 15.5,
+        alert_threshold_pct: Number(val.alert_threshold_pct) || 85,
+        total_prints: Number(val.total_prints) || 0,
+        max_capacity: Number(val.max_capacity) || 258,
+        threshold: Number(val.threshold) || 219,
+        last_reset: val.last_reset || null,
+      });
+    }
+  });
+}
+
+export async function incrementPrintCount(floorId = "") {
+  const refNode = printerStatusRef(floorId);
+  await update(refNode, {
+    total_prints: increment(1)
+  });
+}
+
+export async function savePrinterSettings(floorId = "", data = {}) {
+  const paper_roll_length = Number(data.paper_roll_length) || 40;
+  const ticket_length = Number(data.ticket_length) || 15.5;
+  const alert_threshold_pct = Number(data.alert_threshold_pct) || 85;
+  const active_paper_type = data.active_paper_type || "80x80";
+  const total_prints = Number(data.total_prints) >= 0 ? Number(data.total_prints) : 0;
+
+  const max_capacity = Math.floor((paper_roll_length * 100) / ticket_length);
+  const threshold = Math.floor((max_capacity * alert_threshold_pct) / 100);
+
+  const payload = {
+    active_paper_type,
+    paper_roll_length,
+    ticket_length,
+    alert_threshold_pct,
+    total_prints,
+    max_capacity,
+    threshold
+  };
+
+  await update(printerStatusRef(floorId), payload);
+}
+
+export async function resetPrinterCounter(floorId = "", data = {}) {
+  const paper_roll_length = Number(data.paper_roll_length) || 40;
+  const ticket_length = Number(data.ticket_length) || 15.5;
+  const alert_threshold_pct = Number(data.alert_threshold_pct) || 85;
+  const active_paper_type = data.active_paper_type || "80x80";
+
+  const max_capacity = Math.floor((paper_roll_length * 100) / ticket_length);
+  const threshold = Math.floor((max_capacity * alert_threshold_pct) / 100);
+  const now = new Date().toISOString();
+
+  const payload = {
+    active_paper_type,
+    paper_roll_length,
+    ticket_length,
+    alert_threshold_pct,
+    total_prints: 0,
+    max_capacity,
+    threshold,
+    last_reset: now
+  };
+
+  await set(printerStatusRef(floorId), payload);
 }
 
 // ── Connection status ──────────────────────────────────────────────────────

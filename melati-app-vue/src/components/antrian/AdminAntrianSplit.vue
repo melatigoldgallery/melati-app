@@ -3,7 +3,18 @@
     <!-- Header -->
     <div class="page-header mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div>
-        <h1>Sistem Antrian</h1>
+        <h1 class="d-flex align-items-center gap-2">
+          Sistem Antrian
+          <span 
+            class="printer-status-indicator fs-5 cursor-pointer d-inline-flex align-items-center justify-content-center"
+            :class="printerIconClass"
+            :title="printerStatusTooltip"
+            @click="openPrinterModal"
+            style="cursor: pointer; width: 32px; height: 32px; border-radius: 50%;"
+          >
+            <i class="fas fa-print"></i>
+          </span>
+        </h1>
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
             <li class="breadcrumb-item"><RouterLink to="/dashboard">Home</RouterLink></li>
@@ -21,6 +32,34 @@
         </button>
       </div>
     </div>
+
+    <!-- Printer Paper Alert Banner -->
+    <Transition name="fade">
+      <div 
+        v-if="printerStatus.total_prints >= printerStatus.threshold" 
+        class="alert alert-dismissible fade show shadow-sm border-0 d-flex align-items-center gap-3 p-3 mb-4 animate-fade-in"
+        :class="printerStatus.total_prints >= printerStatus.max_capacity ? 'alert-danger-custom' : 'alert-warning-custom'"
+        role="alert"
+      >
+        <div class="alert-icon-wrapper text-center" :class="printerStatus.total_prints >= printerStatus.max_capacity ? 'bg-danger text-white' : 'bg-warning text-dark'">
+          <i class="fas fa-exclamation-triangle fs-4"></i>
+        </div>
+        <div class="flex-grow-1">
+          <h6 class="alert-heading fw-bold mb-1">
+            {{ printerStatus.total_prints >= printerStatus.max_capacity ? 'KERTAS PRINTER HABIS!' : 'KERTAS PRINTER HAMPIR HABIS!' }}
+          </h6>
+          <p class="mb-0 small">
+            <span v-if="printerStatus.total_prints >= printerStatus.max_capacity" class="text-danger fw-semibold">
+              Kapasitas cetak maksimal telah tercapai ({{ printerStatus.total_prints }}/{{ printerStatus.max_capacity }}). Silakan ganti roll kertas printer baru dan lakukan reset di menu Pengaturan Antrian.
+            </span>
+            <span v-else class="text-warning-emphasis fw-semibold">
+              Tersisa sekitar <strong>{{ Math.max(0, printerStatus.max_capacity - printerStatus.total_prints) }}</strong> struk cetak lagi (Batas: {{ printerStatus.max_capacity }} struk). Mohon segera bersiap mengganti roll kertas.
+            </span>
+          </p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </Transition>
 
     <!-- Announcement buttons -->
     <div class="row mb-4 border-bottom">
@@ -774,12 +813,17 @@
         </div>
       </div>
     </div>
+    
+    <!-- Printer Status Modal Component -->
+    <PrinterStatusModal :printerStatus="printerStatus" :floorId="activeFloor" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vue-router";
 import { Modal } from "bootstrap";
+import PrinterStatusModal from "./PrinterStatusModal.vue";
 import Swal from "sweetalert2";
 import { rtdb } from "@/config/firebase";
 import { ref as dbRef, get } from "firebase/database";
@@ -810,6 +854,7 @@ import {
   calculateAutoRotation,
   fetchQueueGeneralSettings,
   nextQueueHybrid,
+  subscribePrinterStatus,
 } from "@/services/antrian-service";
 import {
   playQueueAnnouncement,
@@ -834,6 +879,48 @@ const audioActiveBtn = ref("");
 const lastAutoRunSlot = ref(null);
 const closingSettings = ref({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 const hybridMode = ref(false);
+
+const router = useRouter();
+
+const printerStatus = ref({
+  active_paper_type: "80x80",
+  paper_roll_length: 40,
+  ticket_length: 15.5,
+  alert_threshold_pct: 85,
+  total_prints: 0,
+  max_capacity: 258,
+  threshold: 219,
+  last_reset: null
+});
+
+let unsubPrinterStatus = null;
+
+const printerIconClass = computed(() => {
+  const prints = printerStatus.value.total_prints;
+  const thresh = printerStatus.value.threshold;
+  const max = printerStatus.value.max_capacity;
+  if (prints >= max) return "printer-danger pulsing-fast";
+  if (prints >= thresh) return "printer-warning pulsing-slow";
+  return "printer-success";
+});
+
+const printerStatusTooltip = computed(() => {
+  const prints = printerStatus.value.total_prints;
+  const max = printerStatus.value.max_capacity;
+  const sisa = Math.max(0, max - prints);
+  return `Status Kertas: ${prints}/${max} struk terpakai (Estimasi sisa: ~${sisa} struk). Klik untuk Detail/Reset.`;
+});
+
+function openPrinterModal() {
+  Modal.getOrCreateInstance(document.getElementById("printerStatusModal")).show();
+}
+
+function initPrinterStatusSubscription() {
+  if (unsubPrinterStatus) unsubPrinterStatus();
+  unsubPrinterStatus = subscribePrinterStatus(activeFloor.value, (data) => {
+    printerStatus.value = data;
+  });
+}
 
 async function loadGeneralSettings() {
   try {
@@ -1668,6 +1755,7 @@ watch(activeFloor, async (newFloor) => {
   initDailyRosterSubscription();
   initActiveRoster();
   initClosingSettings();
+  initPrinterStatusSubscription();
 });
 
 onMounted(async () => {
@@ -1682,6 +1770,7 @@ onMounted(async () => {
   setupPrimeUnlockListeners();
   initDailyRosterSubscription();
   initActiveRoster();
+  initPrinterStatusSubscription();
 });
 
 onUnmounted(() => {
@@ -1690,6 +1779,7 @@ onUnmounted(() => {
   unsubClosingSettings?.();
   unsubActiveRoster?.();
   unsubDailyRoster?.();
+  unsubPrinterStatus?.();
   stopClosingScheduler();
   removeUnlockListeners();
 });
@@ -1923,5 +2013,68 @@ onUnmounted(() => {
   to {
     background-position: 0 0;
   }
+}
+
+/* Printer Status Indicator Styles */
+.printer-status-indicator {
+  transition: all 0.3s ease;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.printer-success {
+  background-color: #198754; /* Green */
+}
+.printer-warning {
+  background-color: #ffc107; /* Yellow */
+  color: #212529 !important;
+}
+.printer-danger {
+  background-color: #dc3545; /* Red */
+}
+.cursor-pointer {
+  cursor: pointer;
+}
+.pulsing-slow {
+  animation: pulse-slow-anim 2s infinite;
+}
+.pulsing-fast {
+  animation: pulse-fast-anim 1s infinite;
+}
+
+@keyframes pulse-slow-anim {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(255, 193, 7, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+@keyframes pulse-fast-anim {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+/* Custom Printer Alert styling */
+.alert-danger-custom {
+  background: rgba(254, 242, 242, 0.95);
+  backdrop-filter: blur(10px);
+  border-left: 5px solid #dc2626 !important;
+  color: #991b1b;
+}
+.alert-warning-custom {
+  background: rgba(255, 251, 235, 0.95);
+  backdrop-filter: blur(10px);
+  border-left: 5px solid #d97706 !important;
+  color: #92400e;
+}
+.alert-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 10px;
+  flex-shrink: 0;
 }
 </style>

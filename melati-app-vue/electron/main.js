@@ -319,7 +319,12 @@ function createMainWindow() {
     ? "https://localhost:5173" // Vite default HTTPS dev port
     : "https://melatigold.web.app";
 
-  mainWindow.loadURL(startUrl);
+  // Clear network cache to force latest web build download from Firebase
+  mainWindow.webContents.session.clearCache().then(() => {
+    mainWindow.loadURL(startUrl, {
+      extraHeaders: "pragma: no-cache\r\ncache-control: no-cache\r\n"
+    });
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -484,7 +489,7 @@ function printHTMLSingle(htmlPath, printerName) {
 function listPrinters() {
   return new Promise((resolve) => {
     exec(
-      'powershell -Command "Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default, PrinterStatus | ConvertTo-Json"',
+      'powershell -Command "Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default, PrinterStatus, DetectedErrorState | ConvertTo-Json"',
       (error, stdout) => {
         if (error || !stdout) {
           resolve([]);
@@ -496,7 +501,8 @@ function listPrinters() {
           const result = printerArray.map((p) => ({
             name: p.Name,
             isDefault: p.Default === true,
-            status: p.PrinterStatus === 3 ? "Ready" : "Offline"
+            status: p.PrinterStatus === 3 ? "Ready" : "Offline",
+            detectedErrorState: p.DetectedErrorState || 0
           }));
           resolve(result);
         } catch (e) {
@@ -522,107 +528,9 @@ function printRawPowerShell(printerName, rawData) {
       const psScriptFile = path.join(tempDir, `print_${Date.now()}.ps1`);
       const psScript = `
 $ErrorActionPreference = "Stop"
-$printed = $false
 $filePath = "${tempFile.replace(/\\/g, "\\\\")}"
 
-# Detect if the target printer is a virtual/document printer (PDF, XPS, OneNote, etc.)
-$isVirtual = $false
-try {
-    $printer = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq "${printerName}" }
-    if ($printer) {
-        $port = $printer.PortName.ToLower()
-        $driver = $printer.DriverName.ToLower()
-        $name = $printer.Name.ToLower()
-        if ($port -match "(nul|prompt|file|pdf|xps|doc)") {
-            $isVirtual = $true
-        }
-        elseif ($driver -match "(pdf|xps|onenote|writer|fax|microsoft)") {
-            $isVirtual = $true
-        }
-        elseif ($name -match "(pdf|xps|onenote|writer|fax|virtual)") {
-            $isVirtual = $true
-        }
-    }
-} catch {
-    # Ignore printer query errors, assume not virtual
-}
-
-# 1. Try sending raw bytes via winspool.drv Spooler API (only if NOT a virtual printer)
-if (-not $isVirtual) {
-    try {
-        $code = @"
-        using System;
-        using System.Runtime.InteropServices;
-        public class RawPrinterHelper {
-            [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-            public class DOCINFOA {
-                [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
-                [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
-                [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
-            }
-            [DllImport("winspool.drv", EntryPoint = "OpenPrinterA", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
-            public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
-            [DllImport("winspool.drv", EntryPoint = "ClosePrinter", SetLastError = true, ExactSpelling = true)]
-            public static extern bool ClosePrinter(IntPtr hPrinter);
-            [DllImport("winspool.drv", EntryPoint = "StartDocPrinterA", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
-            public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
-            [DllImport("winspool.drv", EntryPoint = "EndDocPrinter", SetLastError = true, ExactSpelling = true)]
-            public static extern bool EndDocPrinter(IntPtr hPrinter);
-            [DllImport("winspool.drv", EntryPoint = "StartPagePrinter", SetLastError = true, ExactSpelling = true)]
-            public static extern bool StartPagePrinter(IntPtr hPrinter);
-            [DllImport("winspool.drv", EntryPoint = "EndPagePrinter", SetLastError = true, ExactSpelling = true)]
-            public static extern bool EndPagePrinter(IntPtr hPrinter);
-            [DllImport("winspool.drv", EntryPoint = "WritePrinter", SetLastError = true, ExactSpelling = true)]
-            public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
-            public static bool SendBytesToPrinter(string szPrinterName, byte[] bytes) {
-                IntPtr hPrinter = IntPtr.Zero;
-                DOCINFOA di = new DOCINFOA();
-                bool bSuccess = false;
-                di.pDocName = "RAW Print Document";
-                di.pDataType = "RAW";
-                if (OpenPrinter(szPrinterName, out hPrinter, IntPtr.Zero)) {
-                    if (StartDocPrinter(hPrinter, 1, di)) {
-                        if (StartPagePrinter(hPrinter)) {
-                            IntPtr pBytes = Marshal.AllocCoTaskMem(bytes.Length);
-                            Marshal.Copy(bytes, 0, pBytes, bytes.Length);
-                            Int32 dwWritten = 0;
-                            bSuccess = WritePrinter(hPrinter, pBytes, bytes.Length, out dwWritten);
-                            Marshal.FreeCoTaskMem(pBytes);
-                            EndPagePrinter(hPrinter);
-                        }
-                        EndDocPrinter(hPrinter);
-                    }
-                    ClosePrinter(hPrinter);
-                }
-                return bSuccess;
-            }
-        }
-"@
-        Add-Type -TypeDefinition $code
-        $bytes = [System.IO.File]::ReadAllBytes($filePath)
-        $printed = [RawPrinterHelper]::SendBytesToPrinter("${printerName}", $bytes)
-    } catch {
-        $printed = $false
-    }
-}
-
-if ($printed) {
-    exit 0
-}
-
-# 2. Try copying directly to port (USB/LPT/COM)
-try {
-    $printer = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq "${printerName}" }
-    if ($printer) {
-        $portName = $printer.PortName
-        if ($portName -match "^(USB|LPT|COM)") {
-            Copy-Item -Path $filePath -Destination $portName -Force
-            exit 0
-        }
-    }
-} catch {}
-
-# 3. Fallback to .NET graphics text rendering
+# Unified GDI Graphics Print document
 try {
     Add-Type -AssemblyName System.Drawing
     $bytes = [System.IO.File]::ReadAllBytes($filePath)
@@ -631,7 +539,7 @@ try {
     $printDoc.add_PrintPage({
         param($sender, $ev)
         $y = 10
-        $x = 10
+        $x = 2
         $pageWidth = $ev.PageBounds.Width - 2 * $x
         
         $centerFormat = New-Object System.Drawing.StringFormat
@@ -664,20 +572,20 @@ try {
             $trimmed = $cleanLine.Trim()
             
             if ($isHuge) {
-                $font = New-Object System.Drawing.Font("Courier New", 36, [System.Drawing.FontStyle]::Bold)
-                $lineHeight = 50
+                $font = New-Object System.Drawing.Font("Consolas", 32, [System.Drawing.FontStyle]::Bold)
+                $lineHeight = 44
             }
             elseif ($isLarge) {
-                $font = New-Object System.Drawing.Font("Courier New", 18, [System.Drawing.FontStyle]::Bold)
-                $lineHeight = 28
+                $font = New-Object System.Drawing.Font("Consolas", 16, [System.Drawing.FontStyle]::Bold)
+                $lineHeight = 24
             }
             elseif ($isBold) {
-                $font = New-Object System.Drawing.Font("Courier New", 10, [System.Drawing.FontStyle]::Bold)
-                $lineHeight = 16
+                $font = New-Object System.Drawing.Font("Consolas", 8.5, [System.Drawing.FontStyle]::Bold)
+                $lineHeight = 14
             }
             else {
-                $font = New-Object System.Drawing.Font("Courier New", 10, [System.Drawing.FontStyle]::Regular)
-                $lineHeight = 16
+                $font = New-Object System.Drawing.Font("Consolas", 8.5, [System.Drawing.FontStyle]::Regular)
+                $lineHeight = 14
             }
             
             $format = $centerFormat
@@ -1172,6 +1080,7 @@ function generateQueueText(data) {
 
   output += leftAlignText("-".repeat(width));
   output += TEXT_HUGE_BOLD + centerTextScaled(queueNumber, 6).trimEnd() + "\n" + TEXT_NORMAL;
+  output += "\n";
   output += leftAlignText("-".repeat(width));
 
   let displayQueueType = queueType;
@@ -1206,8 +1115,8 @@ function generateQueueText(data) {
     output += centerText("number to be called.");
     output += centerText("Thank you for your visit.");
   } else {
-    output += centerText("Sembari menunggu nomor dipanggil,");
-    output += centerText("silakan melihat-lihat koleksi perhiasan kami");
+    output += centerText("Sembari menunggu dipanggil, silahkan");
+    output += centerText("melihat-lihat koleksi perhiasan kami");
     output += centerText("Terima kasih atas kunjungan Anda.");
   }
 

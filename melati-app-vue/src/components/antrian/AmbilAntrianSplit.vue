@@ -77,6 +77,15 @@
 
       <!-- Main Options -->
       <main class="container my-auto animate-slide-up">
+        <!-- Printer Error Alert Banner -->
+        <div v-if="printerErrorMsg" class="alert-printer-error mx-auto mb-4 animate-fade-in">
+          <i class="fas fa-exclamation-triangle alert-icon-error"></i>
+          <div class="alert-content-error">
+            <strong class="alert-title-error">{{ t('printerErrorTitle') }}</strong>
+            <p class="alert-desc-error">{{ printerErrorMsg }}</p>
+          </div>
+        </div>
+
         <div class="row justify-content-center g-3 g-md-4">
           <!-- Option Jual -->
           <div class="col-12 col-md-5 d-flex align-items-stretch">
@@ -90,7 +99,7 @@
                 <span class="next-ticket-label">{{ t('queueLabel') }}</span>
                 <div class="next-ticket-number">{{ nextJualNumber }}</div>
               </div>
-              <button class="btn-action" @click="takeQueue('jual')" :disabled="loading">
+              <button class="btn-action" @click="takeQueue('jual')" :disabled="loading || isPrinterDisabled">
                 <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
               </button>
@@ -109,7 +118,7 @@
                 <span class="next-ticket-label">{{ t('queueLabel') }}</span>
                 <div class="next-ticket-number">{{ nextBeliNumber }}</div>
               </div>
-              <button class="btn-action" @click="takeQueue('beli')" :disabled="loading">
+              <button class="btn-action" @click="takeQueue('beli')" :disabled="loading || isPrinterDisabled">
                 <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
               </button>
@@ -178,8 +187,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
-import { addCustomerQueue, subscribeQueue, padNumber } from "@/services/antrian-service";
-import { isElectron, printJob } from "@/utils/printHelper";
+import { addCustomerQueue, subscribeQueue, padNumber, incrementPrintCount } from "@/services/antrian-service";
+import { isElectron, printJob, getLocalPrinters, getTargetPrinter } from "@/utils/printHelper";
 
 const route = useRoute();
 const router = useRouter();
@@ -230,6 +239,96 @@ let timer = null;
 let audioCtx = null;
 let unsubQueue = null;
 
+// Printer Offline & Hardware Error state
+const isPrinterOffline = ref(false);
+const isPrinterHardwareError = ref(false);
+const isCheckingPrinter = ref(false);
+
+const isPrinterDisabled = computed(() => {
+  return isPrinterOffline.value || isPrinterHardwareError.value;
+});
+
+const printerErrorMsg = computed(() => {
+  if (isPrinterOffline.value) {
+    return t("printerOfflineMsg");
+  }
+  if (isPrinterHardwareError.value) {
+    return t("paperOutMsg");
+  }
+  return "";
+});
+
+const isElectronApp = ref(false);
+let recoveryInterval = null;
+
+// Check physical printer status
+async function checkPhysicalPrinter() {
+  if (isCheckingPrinter.value) return;
+  isCheckingPrinter.value = true;
+  try {
+    if (!isElectronApp.value) {
+      isPrinterOffline.value = false;
+      isPrinterHardwareError.value = false;
+      return;
+    }
+    const printers = await getLocalPrinters();
+    const targetName = getTargetPrinter("queue");
+    
+    let targetPrinter = null;
+    if (targetName) {
+      targetPrinter = printers.find(p => p.name === targetName);
+    } else {
+      targetPrinter = printers.find(p => p.isDefault);
+    }
+    
+    if (!targetPrinter) {
+      isPrinterOffline.value = true;
+    } else {
+      // Check offline status
+      isPrinterOffline.value = targetPrinter.status !== "Ready";
+      
+      // Check specific hardware errors via DetectedErrorState:
+      // 3 = Low Paper, 4 = No Paper, 7 = Door Open, 8 = Jammed
+      const errState = targetPrinter.detectedErrorState || 0;
+      const hasHardwareError = [3, 4, 7, 8].includes(errState);
+      
+      if (hasHardwareError) {
+        isPrinterHardwareError.value = true;
+      } else if (targetPrinter.status === "Ready" && errState === 0) {
+        // Clear printer error if everything is fully ready and error is cleared
+        isPrinterHardwareError.value = false;
+      }
+    }
+  } catch (err) {
+    console.warn("Gagal memeriksa status printer fisik:", err);
+  } finally {
+    isCheckingPrinter.value = false;
+  }
+}
+
+// Auto-recovery polling only when in error/offline state
+function startRecoveryPolling() {
+  if (recoveryInterval) return;
+  recoveryInterval = setInterval(async () => {
+    await checkPhysicalPrinter();
+  }, 10000); // Poll every 10s
+}
+
+function stopRecoveryPolling() {
+  if (recoveryInterval) {
+    clearInterval(recoveryInterval);
+    recoveryInterval = null;
+  }
+}
+
+watch(isPrinterDisabled, (disabled) => {
+  if (disabled) {
+    startRecoveryPolling();
+  } else {
+    stopRecoveryPolling();
+  }
+});
+
 const queueState = ref({
   jual: { lastLetter: 0, lastNumber: 0 },
   beli: { lastLetter: 0, lastNumber: 0 }
@@ -253,7 +352,10 @@ const t = (key) => {
       statusPrinting: "Sedang mencetak kertas antrian...",
       statusSuccess: "Kertas antrian berhasil dicetak. Silakan ambil tiket Anda!",
       statusError: "Printer tidak aktif / offline. Silakan foto atau catat nomor antrian di atas.",
-      serviceNotice: "Pengambilan barang servis yang sudah selesai dapat langsung menuju ke <strong>tempat pengambilan</strong> tanpa perlu mengambil nomor antrian."
+      serviceNotice: "Pengambilan barang servis yang sudah selesai dapat langsung menuju ke <strong>tempat pengambilan</strong> tanpa perlu mengambil nomor antrian.",
+      printerErrorTitle: "SISTEM ANTREAN NON-AKTIF",
+      printerOfflineMsg: "Printer antrean terputus atau offline. Silakan hubungi staf toko.",
+      paperOutMsg: "Printer antrean mengalami gangguan (kertas habis/error). Silakan hubungi staf toko."
     },
     en: {
       subtitle: "Welcome! Please take your queue number.<br />While waiting for your turn, feel free to browse our beautiful jewelry collections.",
@@ -269,7 +371,10 @@ const t = (key) => {
       statusPrinting: "Printing queue ticket...",
       statusSuccess: "Queue ticket printed successfully. Please take your ticket!",
       statusError: "Printer is offline. Please take a photo or note down the queue number above.",
-      serviceNotice: "<strong>Notice:</strong> Customers picking up completed service items can proceed directly to the <strong>pickup counter</strong> without taking a queue number."
+      serviceNotice: "<strong>Notice:</strong> Customers picking up completed service items can proceed directly to the <strong>pickup counter</strong> without taking a queue number.",
+      printerErrorTitle: "QUEUE SYSTEM INACTIVE",
+      printerOfflineMsg: "Queue printer is disconnected or offline. Please contact shop staff.",
+      paperOutMsg: "Queue printer has encountered an error (out of paper/hardware issue). Please contact shop staff."
     }
   };
   return dictionary[currentLang.value]?.[key] || key;
@@ -320,20 +425,21 @@ function subscribeToQueue() {
   });
 }
 
-const isElectronApp = ref(false);
-
-onMounted(() => {
+onMounted(async () => {
   isElectronApp.value = isElectron();
   subscribeToQueue();
+  await checkPhysicalPrinter();
 });
 
-watch(activeFloor, () => {
+watch(activeFloor, async () => {
   subscribeToQueue();
+  await checkPhysicalPrinter();
 });
 
 onUnmounted(() => {
   if (unsubQueue) unsubQueue();
   if (timer) clearInterval(timer);
+  stopRecoveryPolling();
 });
 
 function playNotif() {
@@ -359,6 +465,13 @@ function playNotif() {
 
 async function takeQueue(type) {
   if (loading.value) return;
+  
+  // 0. Lazy check printer status before proceeding
+  await checkPhysicalPrinter();
+  if (isPrinterDisabled.value) {
+    return;
+  }
+
   loading.value = true;
   printStatus.value = "printing";
   
@@ -393,6 +506,7 @@ async function takeQueue(type) {
       second: "2-digit"
     });
 
+    let printed = false;
     if (isElectronApp.value) {
       const printRes = await printJob("queue", {
         queueNumber: ticketNum,
@@ -405,15 +519,29 @@ async function takeQueue(type) {
 
       if (printRes && printRes.success) {
         printStatus.value = "success";
+        printed = true;
       } else {
         printStatus.value = "error";
+        isPrinterHardwareError.value = true;
       }
     } else {
       printStatus.value = "success"; // Silent success for UI countdown / flow
+      printed = true;
+    }
+
+    if (printed) {
+      try {
+        await incrementPrintCount(activeFloor.value);
+      } catch (e) {
+        console.warn("Failed to increment print count:", e);
+      }
     }
   } catch (err) {
     console.error("Failed to take queue or print:", err);
     printStatus.value = isElectronApp.value ? "error" : "success";
+    if (isElectronApp.value) {
+      isPrinterHardwareError.value = true;
+    }
   } finally {
     loading.value = false;
   }
@@ -530,7 +658,7 @@ function closeSuccess() {
   margin-bottom: 0;
 }
 .subtitle {
-  font-size: 1.35rem;
+  font-size: 1.5rem;
 }
 
 /* Kiosk Cards */
@@ -581,7 +709,7 @@ function closeSuccess() {
   font-size: 1.9rem;
 }
 .card-desc {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   line-height: 1.6;
 }
 .btn-action {
@@ -787,13 +915,6 @@ function closeSuccess() {
     white-space: normal;
   }
   
-  .card-desc {
-    font-size: 0.85rem;
-    line-height: 1.45;
-    margin-top: 0.5rem !important;
-    padding: 0 0.5rem;
-  }
-  
   .next-ticket-container {
     margin: 1rem 0;
     padding: 0.6rem 1rem;
@@ -958,7 +1079,7 @@ header.position-relative {
 }
 
 .notice-text {
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   color: #3a2c1c;
   line-height: 1.55;
   margin-bottom: 0;
@@ -1017,5 +1138,81 @@ header.position-relative {
 
 .back-btn-kiosk:active {
   transform: scale(0.95);
+}
+
+/* Printer Error Banner Styles */
+.alert-printer-error {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: rgba(220, 53, 69, 0.08);
+  border: 1.5px solid rgba(220, 53, 69, 0.35);
+  border-radius: 18px;
+  padding: 1.25rem 2rem;
+  max-width: 960px;
+  margin: 1.5rem auto 0;
+  box-shadow: 0 8px 30px rgba(220, 53, 69, 0.06);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.alert-printer-error:hover {
+  background: rgba(220, 53, 69, 0.12);
+  border-color: rgba(220, 53, 69, 0.55);
+  box-shadow: 0 10px 35px rgba(220, 53, 69, 0.12);
+}
+
+.alert-icon-error {
+  font-size: 2rem;
+  color: #dc3545;
+  animation: pulse-glow-error 2s infinite ease-in-out;
+}
+
+.alert-content-error {
+  text-align: left;
+}
+
+.alert-title-error {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #842029;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.alert-desc-error {
+  font-size: 1rem;
+  color: #842029;
+  margin-bottom: 0;
+  opacity: 0.9;
+}
+
+/* Disabled action button states */
+.btn-action:disabled {
+  background: #a8a096 !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.kiosk-card:hover .btn-action:disabled {
+  background: #a8a096 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+@keyframes pulse-glow-error {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(220, 53, 69, 0));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 8px rgba(220, 53, 69, 0.6));
+  }
 }
 </style>
