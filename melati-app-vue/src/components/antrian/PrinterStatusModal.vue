@@ -62,9 +62,9 @@
               />
             </div>
 
-            <!-- Koreksi Manual Hitungan Saat Ini -->
+            <!-- Counter Print -->
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Koreksi Counter (Struk)</label>
+              <label class="form-label fw-semibold">Counter Print </label>
               <input 
                 v-model.number="localForm.total_prints" 
                 type="number" 

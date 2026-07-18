@@ -12,7 +12,7 @@
             @click="openPrinterModal"
             style="cursor: pointer; width: 32px; height: 32px; border-radius: 50%;"
           >
-            <i class="fas fa-print"></i>
+            <i class="fas fa-print"; style="font-size: 16px;"></i>
           </span>
         </h1>
         <nav aria-label="breadcrumb">
@@ -24,7 +24,7 @@
       </div>
       <div>
         <button
-          class="btn btn-dark text-white fw-semibold px-3 py-2 shadow-sm d-flex align-items-center gap-2"
+          class="btn btn-secondary text-white fw-semibold px-3 py-2 shadow-sm d-flex align-items-center gap-2"
           @click="openRosterModal"
         >
           <i class="fas fa-users-cog"></i>
@@ -784,7 +784,7 @@
               class="btn btn-primary fw-bold px-4 py-2 shadow-sm rounded-pill d-flex align-items-center gap-2"
               @click="saveRosterSelection"
               :disabled="busy || loadingRosterModal || selectedSalesNames.length === 0"
-              style="background-color: #d4af37; border-color: #d4af37; color: #3a2c1c; font-size: 0.88rem;"
+              style="background-color: #d4af37; border-color: #d4af37; font-size: 0.88rem;"
             >
               <span v-if="busy" class="spinner-border spinner-border-sm text-dark"></span>
               <i v-else class="fas fa-check-circle"></i>

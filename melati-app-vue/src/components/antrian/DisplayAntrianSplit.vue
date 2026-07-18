@@ -673,7 +673,7 @@ main {
 }
 
 .queue-number.queue-number--compact {
-  font-size: clamp(4.5rem, 30vh, 14rem);
+  font-size: clamp(4rem, 26vh, 12rem);
 }
 
 /* ── Gold Border ─────────────────────────────────────────────────────────── */

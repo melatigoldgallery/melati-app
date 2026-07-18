@@ -1094,21 +1094,50 @@ function generateQueueText(data) {
   output += centerText(timeLabel + ": " + dateStr + " " + timeStr);
 
   output += "-".repeat(width) + "\n";
+
+  const firstChar = String(queueNumber || "").trim().toUpperCase().charAt(0);
+  const isBeliQueue = queueType.toLowerCase().includes("beli") || ["A", "B", "C"].includes(firstChar);
+
   if (isEn) {
-    output += "NOTES:\n";
-    output += "- If your queue is missed by more than\n";
-    output += "  10 numbers, please take a new one\n";
-    output += "- If it is less than 10 numbers, please\n";
-    output += "  confirm with staff to be called next\n";
+    output += "QUEUE FLOW:\n";
+    if (isBeliQueue) {
+      output += "Buy & Trade-In (A -> B -> C):\n";
+      output += "  A01->A50 ==> B01->B50 ==> C01->C50\n";
+      output += "*Queue letter advances every 50 numbers\n";
+    } else {
+      output += "Sell & Service (D -> E):\n";
+      output += "  D01->D50 ==> E01->E50\n";
+      output += "*Queue letter advances every 50 numbers\n";
+    }
   } else {
-    output += "CATATAN:\n";
-    output += "- Jika antrian terlewat melebihi 10\n";
-    output += "  nomor antrian silahkan ambil antrian baru\n";
-    output += "- Jika belum melebihi 10 nomor silahkan\n";
-    output += "  konfirmasi ke staff untuk dipanggil\n";
-    output += "  di antrian selanjutnya\n";
+    output += "ALUR ANTRIAN:\n";
+    if (isBeliQueue) {
+      output += "Beli & Tukar Tambah (A -> B -> C):\n";
+      output += "  A01->A50 => B01->B50 => C01->C50\n";
+      output += "*Huruf antrian berganti setiap 50 nomor\n";
+    } else {
+      output += "Jual & Servis (D -> E):\n";
+      output += "  D01->D50 => E01->E50\n";
+      output += "*Huruf antrian berganti setiap 50 nomor\n";
+    }
   }
-  output += "-".repeat(width) + "\n\n";
+  output += "-".repeat(width) + "\n";
+
+  // if (isEn) {
+  //   output += "NOTES:\n";
+  //   output += "- If your queue is missed by more than\n";
+  //   output += "  10 numbers, please take a new one\n";
+  //   output += "- If it is less than 10 numbers, please\n";
+  //   output += "  confirm with staff to be called next\n";
+  // } else {
+  //   output += "CATATAN:\n";
+  //   output += "- Jika antrian terlewat melebihi 10 nomor\n";
+  //   output += "   antrian silahkan ambil antrian baru\n";
+  //   output += "- Jika belum melebihi 10 nomor silahkan\n";
+  //   output += "  konfirmasi ke staff untuk dipanggil\n";
+  //   output += "  di antrian selanjutnya\n";
+  // }
+  // output += "-".repeat(width) + "\n\n";
 
   if (isEn) {
     output += centerText("Please wait for your queue");
@@ -1116,8 +1145,8 @@ function generateQueueText(data) {
     output += centerText("Thank you for your visit.");
   } else {
     output += centerText("Sembari menunggu dipanggil, silahkan");
-    output += centerText("melihat-lihat koleksi perhiasan kami");
-    output += centerText("Terima kasih atas kunjungan Anda.");
+    output += centerText("melihat-lihat koleksi perhiasan kami.");
+    output += centerText("Terima kasih atas kunjungannya Kak :)");
   }
 
   output += "\n\n\n\n\n";

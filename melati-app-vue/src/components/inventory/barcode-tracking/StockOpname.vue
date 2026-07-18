@@ -32,6 +32,10 @@
         </div>
 
         <template v-if="viewMode === 'active' && sessionActive">
+          <button class="btn btn-sm btn-outline-warning rounded-pill px-3 shadow-sm hover-lift text-dark" @click="cancelOpname" :disabled="loading">
+            <i class="bi bi-x-circle me-1"></i>
+            Batal Sesi
+          </button>
           <button class="btn btn-sm btn-outline-danger rounded-pill px-3 shadow-sm hover-lift" @click="confirmReset" :disabled="loading">
             <i class="bi bi-arrow-counterclockwise me-1"></i>
             Reset Sesi
@@ -48,49 +52,50 @@
     <template v-if="viewMode === 'active'">
       <!-- Filters Panel -->
       <div class="card-body bg-light-subtle border-bottom p-3">
-        <div class="row g-3 align-items-end justify-content-between">
-          <div class="col-lg-9 col-md-12">
-            <div class="row g-3">
-              <!-- Jenis Barang -->
-              <div class="col-md-4">
-                <label class="form-label text-muted small fw-bold text-uppercase mb-1.5" style="font-size: 0.72rem; letter-spacing: 0.3px;">Jenis Barang</label>
-                <select v-model="selectedCategory" class="form-select form-select-sm border-2 rounded-2 custom-select" :disabled="sessionActive && registeredBarcodes.length > 0">
-                  <option value="">-- Pilih Kategori --</option>
-                  <option v-for="card in cards" :key="card.id" :value="card.id">
-                    {{ card.label }}
-                  </option>
-                </select>
-              </div>
+        <div class="row g-3 align-items-end">
+          <!-- Jenis Barang -->
+          <div class="col-md-2">
+            <label class="form-label text-muted small fw-bold text-uppercase mb-1.5" style="font-size: 0.72rem; letter-spacing: 0.3px;">Jenis Barang</label>
+            <select v-model="selectedCategory" class="form-select form-select-sm border-2 rounded-2 custom-select" :disabled="sessionActive && registeredBarcodes.length > 0">
+              <option value="">-- Pilih Kategori --</option>
+              <option v-for="card in cards" :key="card.id" :value="card.id">
+                {{ card.label }}
+              </option>
+            </select>
+          </div>
 
-              <!-- Lokasi -->
-              <div class="col-md-4">
-                <label class="form-label text-muted small fw-bold text-uppercase mb-1.5" style="font-size: 0.72rem; letter-spacing: 0.3px;">Lokasi Fisik</label>
-                <select v-model="selectedLocation" class="form-select form-select-sm border-2 rounded-2 custom-select" :disabled="sessionActive && registeredBarcodes.length > 0">
-                  <option value="">-- Pilih Lokasi --</option>
-                  <option v-for="loc in locations" :key="loc.key" :value="loc.key">
-                    {{ loc.label }}
-                  </option>
-                </select>
-              </div>
+          <!-- Lokasi -->
+          <div class="col-md-2">
+            <label class="form-label text-muted small fw-bold text-uppercase mb-1.5" style="font-size: 0.72rem; letter-spacing: 0.3px;">Lokasi Fisik</label>
+            <select v-model="selectedLocation" class="form-select form-select-sm border-2 rounded-2 custom-select" :disabled="sessionActive && registeredBarcodes.length > 0">
+              <option value="">-- Pilih Lokasi --</option>
+              <option v-for="loc in locations" :key="loc.key" :value="loc.key">
+                {{ loc.label }}
+              </option>
+            </select>
+          </div>
 
-              <!-- Klasifikasi (Conditional) -->
-              <div v-if="detailMode !== 'default'" class="col-md-4">
-                <label class="form-label text-muted small fw-bold text-uppercase mb-1.5" style="font-size: 0.72rem; letter-spacing: 0.3px;">
-                  Klasifikasi ({{ detailMode === 'hala' ? 'Jenis' : 'Warna' }})
-                </label>
-                <select v-model="selectedSubType" class="form-select form-select-sm border-2 rounded-2 custom-select" :disabled="sessionActive && registeredBarcodes.length > 0">
-                  <option value="">-- Pilih Klasifikasi --</option>
-                  <option v-for="opt in detailOptions" :key="opt.key" :value="opt.key">
-                    {{ opt.label }}
-                  </option>
-                </select>
-              </div>
-            </div>
+          <!-- Klasifikasi (Conditional) -->
+          <div v-if="detailMode !== 'default'" class="col-md-2">
+            <label class="form-label text-muted small fw-bold text-uppercase mb-1.5" style="font-size: 0.72rem; letter-spacing: 0.3px;">
+              Klasifikasi ({{ detailMode === 'hala' ? 'Jenis' : 'Warna' }})
+            </label>
+            <select v-model="selectedSubType" class="form-select form-select-sm border-2 rounded-2 custom-select" :disabled="sessionActive && registeredBarcodes.length > 0">
+              <option value="">-- Pilih Klasifikasi --</option>
+              <option v-for="opt in detailOptions" :key="opt.key" :value="opt.key">
+                {{ opt.label }}
+              </option>
+            </select>
           </div>
 
           <!-- Start Button -->
-          <div class="col-lg-3 col-md-12 d-grid" v-if="!sessionActive">
-            <button class="btn btn-primary btn-sm rounded-pill py-2 shadow-sm hover-lift fw-bold" :disabled="!isFilterComplete || loading" @click="startOpname">
+          <div class="col-md-auto d-flex align-items-center gap-2 pb-0.5" v-if="!sessionActive">
+            <button v-if="hasActiveRtdbSession" class="btn btn-warning btn-sm rounded-pill px-3.5 py-2 shadow-sm hover-lift fw-bold text-dark text-nowrap" :disabled="!isFilterComplete || loading || isCheckingRtdb" @click="startOpname()">
+              <span class="spinner-border spinner-border-sm me-1" role="status" v-if="loading"></span>
+              <i class="bi bi-box-arrow-in-right me-1" v-else></i>
+              Gabung Sesi Opname
+            </button>
+            <button v-else class="btn btn-primary btn-sm rounded-pill px-3.5 py-2 shadow-sm hover-lift fw-bold text-nowrap" :disabled="!isFilterComplete || loading || isCheckingRtdb" @click="startOpname()">
               <span class="spinner-border spinner-border-sm me-1" role="status" v-if="loading"></span>
               <i class="bi bi-play-fill me-1" v-else></i>
               Mulai Sesi Opname
@@ -108,6 +113,22 @@
         </div>
 
         <template v-else>
+          <!-- Resume Mode Alert -->
+          <div v-if="resumedReportId" class="alert alert-info border-0 shadow-sm rounded-3 py-2.5 px-3 mb-4 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-pencil-square text-info fs-5"></i>
+              <div>
+                <span class="fw-bold text-info-emphasis small d-block">Mode Edit Laporan</span>
+                <small class="text-muted d-block text-xs">
+                  Melanjutkan laporan tanggal <strong>{{ formatDate(resumedReportMeta?.createdAt) }}</strong> oleh <strong>{{ resumedReportMeta?.createdBy || '-' }}</strong>.
+                </small>
+              </div>
+            </div>
+            <button class="btn btn-xs btn-outline-secondary rounded-pill px-3" @click="cancelResumedMode">
+              <i class="bi bi-x-circle me-1"></i> Batal Edit
+            </button>
+          </div>
+
           <!-- Stats Dashboard (Minimalist & Premium) -->
           <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -326,7 +347,7 @@
       <!-- Empty Session Warning -->
       <div class="card-body py-5 text-center bg-light-subtle" v-else>
         <div class="empty-state-icon bg-white shadow-sm text-secondary rounded-circle mx-auto mb-3.5 d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
-          <i class="bi bi-search-heart fs-2 text-primary opacity-75"></i>
+          <i class="bi bi-search fs-2 text-primary opacity-75"></i>
         </div>
         <h6 class="fw-bold text-dark mb-1">Mulai Audit Baru</h6>
         <p class="text-muted small mx-auto mb-0" style="max-width: 400px;">
@@ -361,7 +382,7 @@
                 <th style="width: 15%">Klasifikasi</th>
                 <th class="text-center" style="width: 15%">Hasil Sistem/Fisik</th>
                 <th class="text-center" style="width: 10%">Selisih</th>
-                <th class="text-end pe-3" style="width: 10%">Aksi</th>
+                <th class="text-center pe-3" style="width: 10%">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -385,7 +406,7 @@
                 <td class="text-center">
                   <span class="fw-semibold text-muted small">S:</span>
                   <span class="fw-semibold text-dark ms-1">{{ rec.totalSistem ?? 0 }}</span>
-                  <span class="text-muted px-1.5">|</span>
+                  <span class="text-muted px-1.5"> | </span>
                   <span class="fw-semibold text-muted small">F:</span>
                   <span class="fw-bold text-success ms-1">{{ rec.totalFisik ?? 0 }}</span>
                 </td>
@@ -397,10 +418,15 @@
                     {{ rec.totalSelisih ?? 0 }}
                   </span>
                 </td>
-                <td class="text-end pe-3">
-                  <button class="btn btn-outline-primary btn-sm rounded-pill px-3 hover-lift" @click="openReportDetail(rec)">
-                    <i class="bi bi-eye-fill me-1"></i>Detail
-                  </button>
+                <td class="text-center">
+                  <div class="d-flex justify-content-center gap-1">
+                    <button class="btn btn-outline-success btn-sm rounded-pill px-2 hover-lift" @click="openReportDetail(rec)">
+                      Lihat
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm rounded-pill px-2 hover-lift" @click="deleteReport(rec)">
+                      Hapus
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -441,32 +467,57 @@
           </div>
           <div class="modal-body p-4" v-if="selectedReport">
             <!-- Metadata Info -->
-            <div class="row g-3 mb-4 p-3 bg-light rounded-3 shadow-sm border border-light">
-              <div class="col-sm-6">
-                <div class="small text-muted text-uppercase fw-bold font-xs">Tanggal Audit</div>
-                <div class="fw-bold text-dark mt-0.5">{{ formatDate(selectedReport.createdAt) }}</div>
-              </div>
-              <div class="col-sm-6">
-                <div class="small text-muted text-uppercase fw-bold font-xs">Petugas Auditor</div>
-                <div class="fw-bold text-dark mt-0.5">{{ selectedReport.createdBy || '-' }}</div>
-              </div>
-              <div class="col-sm-4">
-                <div class="small text-muted text-uppercase fw-bold font-xs">Total Sistem</div>
-                <div class="fw-bold text-primary mt-0.5 fs-5">{{ selectedReport.totalSistem ?? 0 }}</div>
-              </div>
-              <div class="col-sm-4">
-                <div class="small text-muted text-uppercase fw-bold font-xs">Fisik Valid</div>
-                <div class="fw-bold text-success mt-0.5 fs-5">{{ selectedReport.totalFisik ?? 0 }}</div>
-              </div>
-              <div class="col-sm-4">
-                <div class="small text-muted text-uppercase fw-bold font-xs">Selisih</div>
-                <div class="fw-bold mt-0.5 fs-5" :class="(selectedReport.totalSelisih ?? 0) < 0 ? 'text-danger' : 'text-success'">
-                  {{ selectedReport.totalSelisih ?? 0 }}
+            <div class="row g-3 mb-4">
+              <!-- Left side: Audit Info and Notes -->
+              <div class="col-md-7">
+                <div class="p-3 bg-light rounded-3 shadow-sm border border-light h-100 d-flex flex-column">
+                  <div class="row g-2 mb-3">
+                    <div class="col-6">
+                      <div class="small text-muted text-uppercase fw-bold font-xs">Tanggal Audit</div>
+                      <div class="fw-bold text-dark mt-0.5">{{ formatDate(selectedReport.createdAt) }}</div>
+                    </div>
+                    <div class="col-6">
+                      <div class="small text-muted text-uppercase fw-bold font-xs">Petugas Auditor <span v-if="isEditingModalDetail" class="text-danger">*</span></div>
+                      <div v-if="!isEditingModalDetail" class="fw-bold text-dark mt-0.5">{{ selectedReport.createdBy || '-' }}</div>
+                      <select v-else v-model="modalEditForm.createdBy" class="form-select form-select-sm border-2 rounded-2 custom-select mt-0.5 font-xs" required>
+                        <option value="">-- Pilih Staff --</option>
+                        <option v-for="staff in staffOptions" :key="`modal-staff-${staff}`" :value="staff">
+                          {{ staff }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="small text-muted text-uppercase fw-bold font-xs">Catatan Temuan</div>
+                    <template v-if="!isEditingModalDetail">
+                      <div v-if="selectedReport.notes" class="text-secondary small bg-white p-2 border rounded mt-1 shadow-xs font-xs text-break" style="white-space: pre-wrap;">{{ selectedReport.notes }}</div>
+                      <div v-else class="text-muted small mt-1 fs-7"><em>Tidak ada catatan temuan.</em></div>
+                    </template>
+                    <textarea v-else v-model="modalEditForm.notes" class="form-control form-control-sm border-2 rounded mt-1 shadow-xs font-xs text-break font-xs" rows="3" placeholder="Tulis catatan temuan di sini..."></textarea>
+                  </div>
                 </div>
               </div>
-              <div class="col-12 mt-2" v-if="selectedReport.notes">
-                <div class="small text-muted text-uppercase fw-bold font-xs">Catatan Temuan</div>
-                <div class="text-secondary small bg-white p-2 border rounded mt-1 shadow-xs">{{ selectedReport.notes }}</div>
+
+              <!-- Right side: Numerical Results -->
+              <div class="col-md-5">
+                <div class="p-3 bg-light rounded-3 shadow-sm border border-light h-100">
+                  <div class="d-flex flex-column gap-2">
+                    <div class="d-flex align-items-center justify-content-between p-2.5 bg-white rounded border border-light shadow-xs">
+                      <span class="small text-muted text-uppercase fw-bold font-xs">Total Sistem</span>
+                      <span class="fw-bold text-primary fs-6">{{ selectedReport.totalSistem ?? 0 }} item</span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between p-2.5 bg-white rounded border border-light shadow-xs">
+                      <span class="small text-muted text-uppercase fw-bold font-xs">Fisik Valid</span>
+                      <span class="fw-bold text-success fs-6">{{ selectedReport.totalFisik ?? 0 }} item</span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between p-2.5 bg-white rounded border border-light shadow-xs">
+                      <span class="small text-muted text-uppercase fw-bold font-xs">Selisih</span>
+                      <span class="fw-bold fs-6" :class="(selectedReport.totalSelisih ?? 0) < 0 ? 'text-danger' : 'text-success'">
+                        {{ selectedReport.totalSelisih ?? 0 }} item
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -521,7 +572,27 @@
               </div>
             </div>
           </div>
-          <div class="modal-footer py-2 border-0 bg-light-subtle">
+          <div class="modal-footer py-2 border-0 bg-light-subtle d-flex flex-wrap justify-content-between gap-2">
+            <div class="d-flex gap-2 flex-wrap">
+              <button v-if="!isEditingModalDetail" type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" @click="isEditingModalDetail = true">
+                <i class="bi bi-pencil me-1"></i> Edit Info
+              </button>
+              <template v-else>
+                <button type="button" class="btn btn-success text-white btn-sm rounded-pill px-3" @click="saveModalInfoChanges" :disabled="submittingModalEdit">
+                  <span class="spinner-border spinner-border-sm me-1" role="status" v-if="submittingModalEdit"></span>
+                  <i class="bi bi-check-lg me-1" v-else></i> Simpan
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" @click="isEditingModalDetail = false">
+                  Batal
+                </button>
+              </template>
+              <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" @click="resumeOpname(selectedReport)">
+                <i class="bi bi-play-fill me-1"></i> Lanjut Opname
+              </button>
+              <button type="button" class="btn btn-success text-white btn-sm rounded-pill px-3" @click="exportReportToCSV(selectedReport)">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Ekspor CSV
+              </button>
+            </div>
             <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">
               Tutup
             </button>
@@ -533,7 +604,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, nextTick } from "vue";
+import { computed, ref, watch, onMounted, nextTick, onUnmounted } from "vue";
 import { 
   collection, 
   query, 
@@ -543,9 +614,13 @@ import {
   addDoc, 
   limit, 
   startAfter, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,
+  deleteDoc,
+  updateDoc
 } from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { db, rtdb } from "@/config/firebase";
+import { ref as dbRef, onValue, set, remove, get } from "firebase/database";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { Modal } from "bootstrap";
@@ -566,6 +641,12 @@ const { toast } = useAlert();
 
 // View Mode ('active' / 'history')
 const viewMode = ref("active");
+
+// Active Session Rtdb State
+const hasActiveRtdbSession = ref(false);
+const activeSessionMeta = ref(null);
+const isCheckingRtdb = ref(false);
+let unsubOpname = null;
 
 // Active Session Filters
 const selectedCategory = ref("");
@@ -608,6 +689,13 @@ const selectedReport = ref(null);
 const modalUnscannedSearch = ref("");
 const modalScannedSearch = ref("");
 
+// Resumed Report State
+const resumedReportId = ref(null);
+const resumedReportMeta = ref(null);
+const isEditingModalDetail = ref(false);
+const modalEditForm = ref({ createdBy: "", notes: "" });
+const submittingModalEdit = ref(false);
+
 // Get Selected Card Details
 const selectedCard = computed(() => {
   return props.cards.find(c => c.id === selectedCategory.value) || null;
@@ -645,6 +733,38 @@ const getSessionCacheKey = () => {
   const loc = selectedLocation.value;
   const sub = selectedSubType.value || "default";
   return `melati-opname:${floor}:${cat}:${loc}:${sub}`;
+};
+
+const getRtdbSessionPath = () => {
+  const floor = String(auth.activeFloor || "").trim().toUpperCase();
+  const cat = selectedCategory.value;
+  const loc = selectedLocation.value;
+  const sub = selectedSubType.value || "default";
+  return `stock_opnames/active/${floor}/${cat}_${loc}_${sub}`;
+};
+
+const checkActiveSession = async () => {
+  if (!isFilterComplete.value) {
+    hasActiveRtdbSession.value = false;
+    activeSessionMeta.value = null;
+    return;
+  }
+  isCheckingRtdb.value = true;
+  try {
+    const path = `${getRtdbSessionPath()}/metadata`;
+    const snap = await get(dbRef(rtdb, path));
+    if (snap.exists()) {
+      hasActiveRtdbSession.value = true;
+      activeSessionMeta.value = snap.val();
+    } else {
+      hasActiveRtdbSession.value = false;
+      activeSessionMeta.value = null;
+    }
+  } catch (err) {
+    console.error("Gagal memeriksa sesi aktif di RTDB:", err);
+  } finally {
+    isCheckingRtdb.value = false;
+  }
 };
 
 const saveSessionToCache = () => {
@@ -740,16 +860,60 @@ const fetchHistory = async (pageNumber = 1) => {
   }
 };
 
+// Delete Stock Opname History Record
+const deleteReport = async (report) => {
+  const confirmResult = await Swal.fire({
+    title: "Hapus Riwayat Opname?",
+    text: `Anda akan menghapus laporan opname untuk ${report.category} (${getSubDocLabel(report.location)}) tanggal ${formatDate(report.createdAt)}. Tindakan ini tidak dapat dibatalkan.`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, Hapus",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#dc3545",
+    cancelButtonColor: "#6c757d"
+  });
+
+  if (confirmResult.isConfirmed) {
+    try {
+      await deleteDoc(doc(db, "floors", auth.activeFloor, "barcodeStockOpnames", report.id));
+      toast("Laporan stok opname berhasil dihapus.", "success");
+      if (historyRecords.value.length === 1 && historyCurrentPage.value > 1) {
+        fetchHistory(historyCurrentPage.value - 1);
+      } else {
+        fetchHistory(historyCurrentPage.value);
+      }
+    } catch (e) {
+      toast(`Gagal menghapus laporan: ${e.message}`, "danger");
+      console.error(e);
+    }
+  }
+};
+
 // Fetch Barcodes from System
-const startOpname = async () => {
+const startOpname = async (resumedReport = null) => {
   if (!isFilterComplete.value) return;
   loading.value = true;
   sessionActive.value = true;
   feedback.value = null;
   scannedBarcodes.value = new Set();
   registeredBarcodes.value = [];
-  closingPetugas.value = "";
-  closingCatatan.value = "";
+  
+  const isResumed = resumedReport && typeof resumedReport === "object" && typeof resumedReport.id === "string";
+  
+  closingPetugas.value = isResumed ? (resumedReport.createdBy || "") : "";
+  closingCatatan.value = isResumed ? (resumedReport.notes || "") : "";
+  
+  if (isResumed) {
+    resumedReportId.value = resumedReport.id;
+    resumedReportMeta.value = {
+      createdAt: resumedReport.createdAt,
+      createdBy: resumedReport.createdBy,
+      notes: resumedReport.notes
+    };
+  } else {
+    resumedReportId.value = null;
+    resumedReportMeta.value = null;
+  }
   
   try {
     const cat = selectedCategory.value;
@@ -789,12 +953,49 @@ const startOpname = async () => {
     }
 
     registeredBarcodes.value = items;
-    loadSessionFromCache();
+
+    // Connect to Firebase RTDB for real-time synchronization
+    const sessionPath = getRtdbSessionPath();
+    const metaRef = dbRef(rtdb, `${sessionPath}/metadata`);
+    const metaSnap = await get(metaRef);
+    if (!metaSnap.exists()) {
+      await set(metaRef, {
+        category: cat,
+        location: loc,
+        detailType: subType,
+        startedAt: new Date().toISOString(),
+        startedBy: auth.user?.username || auth.user?.email || auth.userRole || "Staff",
+        resumedFromReportId: isResumed ? resumedReport.id : null
+      });
+    }
+
+    const scannedRef = dbRef(rtdb, `${sessionPath}/scanned`);
+    
+    // Write historical scanned barcodes to RTDB if resuming
+    if (isResumed && resumedReport.scannedBarcodes) {
+      const scannedData = {};
+      resumedReport.scannedBarcodes.forEach(bc => {
+        scannedData[bc] = true;
+      });
+      await set(scannedRef, scannedData);
+    }
+
+    if (unsubOpname) unsubOpname();
+    unsubOpname = onValue(scannedRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      scannedBarcodes.value = new Set(Object.keys(data));
+    });
+
+    hasActiveRtdbSession.value = true;
     focusInput();
-    toast(`Berhasil memuat ${items.length} data barcode sistem.`, "success");
+    toast(resumedReport 
+      ? `Berhasil melanjutkan opname. Memuat ${items.length} data sistem dan ${scannedBarcodes.value.size} data scan sebelumnya.`
+      : `Berhasil memuat ${items.length} data barcode sistem.`, "success");
   } catch (e) {
     toast(`Gagal memuat data: ${e.message}`, "danger");
     sessionActive.value = false;
+    resumedReportId.value = null;
+    resumedReportMeta.value = null;
   } finally {
     loading.value = false;
   }
@@ -813,8 +1014,9 @@ const handleBarcodeSubmit = () => {
       setFeedback("warning", `Barcode ${code} sudah discan sebelumnya.`);
       triggerPulse("pulse-warning");
     } else {
-      scannedBarcodes.value.add(code);
-      saveSessionToCache();
+      const sessionPath = getRtdbSessionPath();
+      const barcodeRef = dbRef(rtdb, `${sessionPath}/scanned/${code}`);
+      set(barcodeRef, true);
       setFeedback("success", `Barcode ${code} terverifikasi valid.`);
       triggerPulse("pulse-success");
     }
@@ -860,8 +1062,9 @@ const feedbackIcon = computed(() => {
 
 // Undo scan in active audit
 const undoScan = (bc) => {
-  scannedBarcodes.value.delete(bc);
-  saveSessionToCache();
+  const sessionPath = getRtdbSessionPath();
+  const barcodeRef = dbRef(rtdb, `${sessionPath}/scanned/${bc}`);
+  remove(barcodeRef);
   setFeedback("warning", `Batal memindai barcode ${bc}.`);
   focusInput();
 };
@@ -880,11 +1083,61 @@ const confirmReset = async () => {
   });
 
   if (confirm.isConfirmed) {
-    scannedBarcodes.value = new Set();
+    const sessionPath = getRtdbSessionPath();
+    await remove(dbRef(rtdb, `${sessionPath}/scanned`));
     clearSessionCache();
     feedback.value = null;
     toast("Sesi stok opname di-reset.", "info");
     focusInput();
+  }
+};
+
+// Cancel Active Session
+const cancelOpname = async () => {
+  const confirm = await Swal.fire({
+    title: "Batalkan Sesi Stok Opname?",
+    text: "Tindakan ini akan menghapus sesi opname aktif saat ini dan menghapus semua kemajuan pemindaian yang belum disimpan.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, Batalkan",
+    cancelButtonText: "Kembali",
+    confirmButtonColor: "#dc3545",
+    cancelButtonColor: "#6c757d"
+  });
+
+  if (confirm.isConfirmed) {
+    try {
+      // Disconnect RTDB listener
+      if (unsubOpname) {
+        unsubOpname();
+        unsubOpname = null;
+      }
+      // Remove active session from RTDB
+      const sessionPath = getRtdbSessionPath();
+      await remove(dbRef(rtdb, sessionPath));
+
+      // Clear local cache & state
+      clearSessionCache();
+      
+      // Reset local variables
+      sessionActive.value = false;
+      registeredBarcodes.value = [];
+      scannedBarcodes.value = new Set();
+      feedback.value = null;
+      unscannedSearch.value = "";
+      scannedSearch.value = "";
+      closingPetugas.value = "";
+      closingCatatan.value = "";
+      resumedReportId.value = null;
+      resumedReportMeta.value = null;
+      hasActiveRtdbSession.value = false;
+      activeSessionMeta.value = null;
+
+      toast("Sesi stok opname berhasil dibatalkan.", "info");
+    } catch (e) {
+      toast(`Gagal membatalkan sesi: ${e.message}`, "danger");
+      console.error(e);
+    }
   }
 };
 
@@ -934,6 +1187,49 @@ const exportToCSV = () => {
   toast("Laporan CSV berhasil diunduh.", "success");
 };
 
+// Export Historical Report to CSV
+const exportReportToCSV = (report) => {
+  if (!report) return;
+  const missing = report.missingBarcodes || [];
+  const valid = report.scannedBarcodes || [];
+
+  let csvContent = "\uFEFF"; // Add UTF-8 BOM
+  csvContent += `sep=,\n`; // Tells Excel that column delimiter is comma
+  csvContent += `"LAPORAN HASIL STOK OPNAME BARCODE (RIWAYAT)"\n`;
+  csvContent += `"Tanggal Audit","${formatDate(report.createdAt)}"\n`;
+  csvContent += `"Jenis Barang (Kategori)","${report.category}"\n`;
+  csvContent += `"Lokasi Fisik","${getSubDocLabel(report.location)}"\n`;
+  csvContent += `"Klasifikasi","${report.detailType ? getClassificationLabel(report.category, report.detailType) : '-'}"\n`;
+  csvContent += `"Ringkasan Audit","Total Sistem: ${report.totalSistem ?? 0} | Valid (Fisik): ${report.totalFisik ?? 0} | Selisih: ${report.totalSelisih ?? 0}"\n`;
+  csvContent += `\n`; // Empty line separator
+  
+  csvContent += `"Barcode","Status Opname"\n`;
+
+  missing.forEach(bc => {
+    csvContent += `"${bc}","BELUM SCAN / POTENSI HILANG"\n`;
+  });
+  valid.forEach(bc => {
+    csvContent += `"${bc}","VALID / COCOK"\n`;
+  });
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const encodedUri = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  
+  // Format dates cleanly for filename
+  let d;
+  if (report.createdAt && typeof report.createdAt.toDate === "function") d = report.createdAt.toDate();
+  else d = new Date(report.createdAt);
+  const dStr = Number.isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+  
+  link.setAttribute("download", `laporan_opname_${report.category}_${report.location}_${dStr}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  toast("Laporan CSV berhasil diunduh.", "success");
+};
+
 // Submit Audit Results to Firestore (Lazy Write)
 const submitOpnameResult = async () => {
   if (!closingPetugas.value) {
@@ -942,13 +1238,15 @@ const submitOpnameResult = async () => {
   }
 
   const confirm = await Swal.fire({
-    title: "Simpan Laporan Opname?",
-    text: "Laporan hasil audit fisik ini akan disimpan secara permanen di database sistem.",
+    title: resumedReportId.value ? "Perbarui Laporan Opname?" : "Simpan Laporan Opname?",
+    text: resumedReportId.value 
+      ? "Laporan hasil audit fisik ini akan diperbarui secara permanen di database sistem."
+      : "Laporan hasil audit fisik ini akan disimpan secara permanen di database sistem.",
     icon: "question",
     showCancelButton: true,
-    confirmButtonText: "Ya, Simpan",
+    confirmButtonText: resumedReportId.value ? "Ya, Perbarui" : "Ya, Simpan",
     cancelButtonText: "Batal",
-    confirmButtonColor: "#198754",
+    confirmButtonColor: resumedReportId.value ? "#0d6efd" : "#198754",
     cancelButtonColor: "#6c757d"
   });
 
@@ -970,15 +1268,41 @@ const submitOpnameResult = async () => {
       notes: closingCatatan.value.trim()
     };
 
-    await addDoc(
-      collection(db, "floors", auth.activeFloor, "barcodeStockOpnames"),
-      docData
-    );
+    if (resumedReportId.value) {
+      const reportRef = doc(db, "floors", auth.activeFloor, "barcodeStockOpnames", resumedReportId.value);
+      const updateData = {
+        createdBy: closingPetugas.value,
+        totalSistem: registeredBarcodes.value.length,
+        totalFisik: scannedBarcodes.value.size,
+        totalSelisih: scannedBarcodes.value.size - registeredBarcodes.value.length,
+        missingBarcodes: unscannedList.value.map(item => item.barcode),
+        scannedBarcodes: Array.from(scannedBarcodes.value),
+        notes: closingCatatan.value.trim(),
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.user?.username || auth.user?.email || auth.userRole || "Staff"
+      };
+      await updateDoc(reportRef, updateData);
+      toast("Laporan stok opname berhasil diperbarui.", "success");
+    } else {
+      await addDoc(
+        collection(db, "floors", auth.activeFloor, "barcodeStockOpnames"),
+        docData
+      );
+      toast("Laporan stok opname berhasil disimpan.", "success");
+    }
 
-    toast("Laporan stok opname berhasil disimpan.", "success");
+    // Clean up RTDB active session
+    if (unsubOpname) {
+      unsubOpname();
+      unsubOpname = null;
+    }
+    const sessionPath = getRtdbSessionPath();
+    await remove(dbRef(rtdb, sessionPath));
 
     // Clear session cache
     clearSessionCache();
+    hasActiveRtdbSession.value = false;
+    activeSessionMeta.value = null;
 
     // Reset local session state
     scannedBarcodes.value = new Set();
@@ -987,6 +1311,8 @@ const submitOpnameResult = async () => {
     closingPetugas.value = "";
     closingCatatan.value = "";
     feedback.value = null;
+    resumedReportId.value = null;
+    resumedReportMeta.value = null;
 
     // Switch view mode to history
     switchToHistory();
@@ -998,11 +1324,120 @@ const submitOpnameResult = async () => {
   }
 };
 
+// Resume Opname from History
+const resumeOpname = async (report) => {
+  if (opnameDetailModal) {
+    opnameDetailModal.hide();
+  }
+
+  // Set the filters first so isFilterComplete becomes true
+  selectedCategory.value = report.category;
+  selectedLocation.value = report.location;
+  selectedSubType.value = report.detailType || "";
+
+  // Switch to active view mode
+  viewMode.value = "active";
+
+  // Check if there is already an active session in RTDB
+  const floor = String(auth.activeFloor || "").trim().toUpperCase();
+  const cat = report.category;
+  const loc = report.location;
+  const sub = report.detailType || "default";
+  const sessionPath = `stock_opnames/active/${floor}/${cat}_${loc}_${sub}`;
+  
+  try {
+    const snap = await get(dbRef(rtdb, `${sessionPath}/metadata`));
+    if (snap.exists()) {
+      const confirmResult = await Swal.fire({
+        title: "Sesi Aktif Ditemukan",
+        text: "Terdapat sesi opname aktif yang sedang berjalan untuk kategori & lokasi ini. Apakah Anda ingin menimpanya dengan data dari laporan riwayat ini?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Timpa & Lanjut",
+        cancelButtonText: "Batal",
+        confirmButtonColor: "#dc3545",
+        cancelButtonColor: "#6c757d"
+      });
+      if (!confirmResult.isConfirmed) return;
+    }
+  } catch (err) {
+    console.error("Gagal memeriksa sesi aktif:", err);
+  }
+
+  // Start the opname using the resumed report data
+  await startOpname(report);
+};
+
+// Cancel Resumed Mode
+const cancelResumedMode = async () => {
+  const confirm = await Swal.fire({
+    title: "Batalkan Mode Edit?",
+    text: "Sesi opname saat ini akan tetap berjalan, tetapi laporan akan disimpan sebagai laporan baru bukan memperbarui laporan sebelumnya.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, Batalkan Edit",
+    cancelButtonText: "Kembali",
+    confirmButtonColor: "#fd7e14",
+    cancelButtonColor: "#6c757d"
+  });
+
+  if (confirm.isConfirmed) {
+    resumedReportId.value = null;
+    resumedReportMeta.value = null;
+    toast("Mode edit dibatalkan. Sesi dilanjutkan sebagai audit baru.", "info");
+  }
+};
+
+// Save Modal Metadata Changes directly
+const saveModalInfoChanges = async () => {
+  if (!modalEditForm.value.createdBy) {
+    toast("Pilih petugas audit terlebih dahulu.", "warning");
+    return;
+  }
+  submittingModalEdit.value = true;
+  try {
+    const reportRef = doc(db, "floors", auth.activeFloor, "barcodeStockOpnames", selectedReport.value.id);
+    const updateData = {
+      createdBy: modalEditForm.value.createdBy,
+      notes: modalEditForm.value.notes.trim(),
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.user?.username || auth.user?.email || auth.userRole || "Staff"
+    };
+    await updateDoc(reportRef, updateData);
+    
+    // Update the local selectedReport values so changes are visible instantly
+    selectedReport.value.createdBy = updateData.createdBy;
+    selectedReport.value.notes = updateData.notes;
+    
+    // Also update in the history list
+    const foundIdx = historyRecords.value.findIndex(r => r.id === selectedReport.value.id);
+    if (foundIdx !== -1) {
+      historyRecords.value[foundIdx].createdBy = updateData.createdBy;
+      historyRecords.value[foundIdx].notes = updateData.notes;
+    }
+    
+    isEditingModalDetail.value = false;
+    toast("Informasi laporan berhasil diperbarui.", "success");
+  } catch (e) {
+    toast(`Gagal menyimpan perubahan: ${e.message}`, "danger");
+    console.error(e);
+  } finally {
+    submittingModalEdit.value = false;
+  }
+};
+
+
+
 // Open Detail Modal from History Table
 const openReportDetail = (report) => {
   selectedReport.value = report;
   modalUnscannedSearch.value = "";
   modalScannedSearch.value = "";
+  isEditingModalDetail.value = false;
+  modalEditForm.value = {
+    createdBy: report.createdBy || "",
+    notes: report.notes || ""
+  };
 
   if (!opnameDetailModal) {
     opnameDetailModal = Modal.getOrCreateInstance(detailModalRef.value);
@@ -1056,7 +1491,12 @@ const filteredScannedList = computed(() => {
 });
 
 // Watch Active Filters to auto reset session on change
+// Watch Active Filters to auto reset session on change
 const resetFilters = () => {
+  if (unsubOpname) {
+    unsubOpname();
+    unsubOpname = null;
+  }
   sessionActive.value = false;
   registeredBarcodes.value = [];
   scannedBarcodes.value = new Set();
@@ -1065,6 +1505,10 @@ const resetFilters = () => {
   scannedSearch.value = "";
   closingPetugas.value = "";
   closingCatatan.value = "";
+  resumedReportId.value = null;
+  resumedReportMeta.value = null;
+  
+  checkActiveSession();
 };
 
 watch(selectedCategory, () => {
@@ -1073,6 +1517,13 @@ watch(selectedCategory, () => {
 });
 watch(selectedLocation, resetFilters);
 watch(selectedSubType, resetFilters);
+
+onUnmounted(() => {
+  if (unsubOpname) {
+    unsubOpname();
+    unsubOpname = null;
+  }
+});
 
 // Formatting Helpers
 function formatDate(value) {
@@ -1237,4 +1688,11 @@ function getClassificationLabel(category, key) {
   padding: 2.5px 10px;
   font-size: 0.75rem;
 }
+
+.btn-primary,
+.bg-primary {
+  background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
+  color: white;
+  border: none;
+} 
 </style>

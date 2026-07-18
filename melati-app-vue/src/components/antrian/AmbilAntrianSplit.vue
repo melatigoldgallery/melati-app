@@ -90,7 +90,7 @@
           <!-- Option Jual -->
           <div class="col-12 col-md-5 d-flex align-items-stretch">
             <div class="kiosk-card w-100 text-center">
-              <div class="card-icon-wrapper">
+              <div class="card-icon-wrapper" @click="handleIconTap('jual')" style="cursor: pointer;">
                 <i class="fas fa-hand-holding-usd"></i>
               </div>
               <h2 class="card-title">{{ t('jualTitle') }}</h2>
@@ -109,7 +109,7 @@
           <!-- Option Beli -->
           <div class="col-12 col-md-5 d-flex align-items-stretch">
             <div class="kiosk-card w-100 text-center">
-              <div class="card-icon-wrapper buy-wrapper">
+              <div class="card-icon-wrapper buy-wrapper" @click="handleIconTap('beli')" style="cursor: pointer;">
                 <i class="fas fa-shopping-bag"></i>
               </div>
               <h2 class="card-title">{{ t('beliTitle') }}</h2>
@@ -127,7 +127,7 @@
         </div>
 
         <!-- Service Pickup Notice -->
-        <div class="row justify-content-center mt-3 pt-1">
+        <div class="row justify-content-center m-2 pt-1">
           <div class="col-12 col-md-10">
             <div class="service-notice-banner">
               <i class="fas fa-bell notice-icon"></i>
@@ -180,6 +180,46 @@
         </div>
       </div>
     </Transition>
+    <!-- Reprint Modal Overlay -->
+    <Transition name="fade">
+      <div v-if="showReprintModal" class="modal-overlay d-flex align-items-center justify-content-center" style="z-index: 11000;">
+        <div class="kiosk-modal text-center gold-border p-4" style="max-width: 450px; width: 90%;">
+          <div class="mb-4">
+            <i class="fas fa-print fs-1 text-warning mb-3"></i>
+            <h3 class="modal-label text-uppercase fw-bold" style="font-size: 1.3rem; color: #aa7c11;">Cetak Ulang Antrean</h3>
+            <p class="text-muted small">Pilih nomor antrean <strong>{{ reprintQueueType === 'jual' ? 'Jual / Servis' : 'Beli / Tukar Tambah' }}</strong> yang ingin dicetak ulang:</p>
+          </div>
+          
+          <div class="d-flex flex-column gap-3 my-4">
+            <button 
+              v-for="(ticket, index) in reprintList" 
+              :key="index"
+              type="button"
+              class="btn btn-gold py-3 fw-bold d-flex justify-content-between align-items-center px-4"
+              @click="executeReprint(ticket)"
+              :disabled="reprinting"
+            >
+              <span class="fs-4">{{ ticket.queueNumber }}</span>
+              <span class="small font-monospace opacity-75" style="font-size: 0.85rem;">{{ ticket.timeStr }}</span>
+            </button>
+            
+            <div v-if="reprintList.length === 0" class="text-muted small py-3">
+              Belum ada antrean terbaru untuk dicetak ulang.
+            </div>
+          </div>
+          
+          <button 
+            type="button" 
+            class="btn btn-outline-secondary w-100 py-2.5 fw-bold" 
+            @click="showReprintModal = false"
+            :disabled="reprinting"
+          >
+            BATAL
+          </button>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
@@ -227,6 +267,98 @@ function handleLogoClick() {
   logoClickTimeout = setTimeout(() => {
     logoClickCount = 0;
   }, 1000);
+}
+
+const showReprintModal = ref(false);
+const reprintQueueType = ref("");
+const reprintList = ref([]);
+const reprinting = ref(false);
+
+const tapTracker = ref({
+  jual: { count: 0, lastTime: 0 },
+  beli: { count: 0, lastTime: 0 }
+});
+
+function handleIconTap(type) {
+  const now = Date.now();
+  const tracker = tapTracker.value[type];
+  
+  if (now - tracker.lastTime > 500) {
+    tracker.count = 1;
+  } else {
+    tracker.count++;
+  }
+  tracker.lastTime = now;
+  
+  if (tracker.count === 3) {
+    tracker.count = 0;
+    openReprintModal(type);
+  }
+}
+
+function openReprintModal(type) {
+  reprintQueueType.value = type;
+  const rawList = localStorage.getItem(`last_printed_queues_${type}`);
+  reprintList.value = rawList ? JSON.parse(rawList) : [];
+  showReprintModal.value = true;
+}
+
+function saveToReprintHistory(type, ticketNum, dateStr, timeStr) {
+  const key = `last_printed_queues_${type}`;
+  const raw = localStorage.getItem(key);
+  let list = raw ? JSON.parse(raw) : [];
+  
+  const newItem = {
+    queueNumber: ticketNum,
+    queueType: type === "jual" ? "Jual / Servis" : "Beli / Tukar Tambah",
+    dateStr,
+    timeStr,
+    floor: activeFloor.value,
+    lang: currentLang.value
+  };
+  
+  list.unshift(newItem);
+  if (list.length > 3) {
+    list = list.slice(0, 3);
+  }
+  
+  localStorage.setItem(key, JSON.stringify(list));
+}
+
+async function executeReprint(ticket) {
+  if (reprinting.value) return;
+  reprinting.value = true;
+  
+  try {
+    if (isElectronApp.value) {
+      const printRes = await printJob("queue", {
+        queueNumber: ticket.queueNumber,
+        queueType: ticket.queueType,
+        dateStr: ticket.dateStr,
+        timeStr: ticket.timeStr,
+        floor: ticket.floor,
+        lang: ticket.lang
+      });
+      
+      if (printRes && printRes.success) {
+        try {
+          await incrementPrintCount(ticket.floor);
+        } catch (e) {
+          console.warn("Failed to increment print count on reprint:", e);
+        }
+        showReprintModal.value = false;
+      } else {
+        alert("Gagal mencetak ulang tiket antrean. Pastikan printer terhubung.");
+      }
+    } else {
+      console.log("Browser mockup print:", ticket);
+      showReprintModal.value = false;
+    }
+  } catch (err) {
+    console.error("Reprint execution failed:", err);
+  } finally {
+    reprinting.value = false;
+  }
 }
 
 const loading = ref(false);
@@ -506,6 +638,8 @@ async function takeQueue(type) {
       second: "2-digit"
     });
 
+    saveToReprintHistory(type, ticketNum, dateStr, timeStr);
+
     let printed = false;
     if (isElectronApp.value) {
       const printRes = await printJob("queue", {
@@ -550,6 +684,7 @@ async function takeQueue(type) {
 function closeSuccess() {
   if (timer) clearInterval(timer);
   showSuccess.value = false;
+  currentLang.value = "id";
 }
 </script>
 

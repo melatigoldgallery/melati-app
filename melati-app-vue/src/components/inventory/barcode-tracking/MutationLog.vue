@@ -1,8 +1,9 @@
 <template>
   <div class="mutation-log card border-0 shadow-sm rounded-3 overflow-hidden">
     <div class="card-header bg-white border-0 py-3">
-      <div class="row align-items-center g-3">
-        <div class="col-sm-6 d-flex align-items-center">
+      <div class="d-flex flex-column gap-3">
+        <!-- Title Section -->
+        <div class="d-flex align-items-center">
           <div class="icon-box bg-light-info rounded-3 me-2 p-2 text-info">
             <i class="bi bi-clock-history fs-5"></i>
           </div>
@@ -11,26 +12,49 @@
             <small class="text-muted small">Riwayat perpindahan barcode</small>
           </div>
         </div>
-        <div class="col-sm-6">
-          <form @submit.prevent="handleSearch" class="d-flex gap-2 justify-content-sm-end">
-            <div class="input-group input-group-sm" style="max-width: 280px;">
-              <span class="input-group-text bg-white text-muted border-end-0">
-                <i class="bi bi-search"></i>
+
+        <!-- Filter & Search Toolbar (Row Layout) -->
+        <div class="row g-2 align-items-center mt-1">
+          <!-- Dropdown Filter Col -->
+          <div class="col-auto">
+            <div class="input-group input-group-sm shadow-xs rounded-2 border" style="width: 160px; height: 32px;">
+              <span class="input-group-text bg-white border-0 text-muted pe-1">
+                <i class="bi bi-funnel fs-7"></i>
               </span>
-              <input 
-                v-model="searchQuery" 
-                type="text" 
-                class="form-control border-start-0 ps-0" 
-                placeholder="Cari satu kode barcode..." 
-              />
-              <button v-if="searchQuery" type="button" class="btn btn-outline-secondary border" @click="clearSearch">
-                <i class="bi bi-x"></i>
-              </button>
+              <select 
+                v-model="selectedCategory" 
+                class="form-select border-0 ps-1 bg-white custom-select-clean small fw-semibold text-dark" 
+                @change="currentPage = 1"
+              >
+                <option v-for="cat in availableCategories" :key="cat" :value="cat">
+                  {{ formatCategory(cat) }}
+                </option>
+              </select>
             </div>
-            <button type="submit" class="btn btn-sm btn-primary px-3 rounded-2 hover-lift" :disabled="loading">
-              Cari
-            </button>
-          </form>
+          </div>
+
+          <!-- Search Input & Button Col -->
+          <div class="col-auto">
+            <form @submit.prevent="handleSearch" class="d-flex gap-2" style="width: 280px; height: 32px;">
+              <div class="input-group input-group-sm shadow-xs rounded-2 border">
+                <span class="input-group-text bg-white border-0 text-muted pe-1">
+                  <i class="bi bi-search fs-7"></i>
+                </span>
+                <input 
+                  v-model="searchQuery" 
+                  type="text" 
+                  class="form-control border-0 ps-1 small" 
+                  placeholder="Cari satu barcode..." 
+                />
+                <button v-if="searchQuery" type="button" class="btn btn-link text-decoration-none border-0 text-muted px-2 py-0 d-flex align-items-center justify-content-center" @click="clearSearch">
+                  <i class="bi bi-x text-dark"></i>
+                </button>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary px-3 rounded-2 hover-lift fw-semibold shadow-xs d-flex align-items-center justify-content-center" :disabled="loading" style="height: 32px;">
+                Cari
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -41,20 +65,23 @@
         <p class="mt-2 text-muted small">Memuat log mutasi...</p>
       </div>
 
-      <div v-else-if="logs.length === 0" class="text-center py-5 px-3">
+      <div v-else-if="filteredLogs.length === 0" class="text-center py-5 px-3">
         <div class="empty-state-icon bg-light-secondary text-secondary rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
           <i class="bi bi-journal-x fs-3"></i>
         </div>
         <h6 class="fw-semibold text-dark mb-1">Tidak Ada Data</h6>
-        <p class="text-muted small mb-0">Tidak ditemukan riwayat mutasi barcode.</p>
+        <p class="text-muted small mb-0">
+          {{ logs.length === 0 ? "Tidak ditemukan riwayat mutasi barcode." : "Tidak ditemukan riwayat mutasi barcode untuk jenis yang dipilih." }}
+        </p>
       </div>
 
       <div v-else>
         <!-- Search Timeline Info Banner (Instead of inline timeline) -->
-        <div v-if="isSearchMode && logs.length > 0" class="px-4 py-3 bg-light-subtle border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div v-if="isSearchMode && filteredLogs.length > 0" class="px-4 py-3 bg-light-subtle border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div class="d-flex align-items-center gap-2">
             <span class="badge bg-primary fs-7 monospace px-3 py-2">{{ searchedBarcode }}</span>
-            <span class="text-muted small">Ditemukan {{ logs.length }} riwayat mutasi.</span>
+            <span v-if="selectedCategory" class="text-muted small">Ditemukan {{ filteredLogs.length }} dari {{ logs.length }} riwayat mutasi.</span>
+            <span v-else class="text-muted small">Ditemukan {{ logs.length }} riwayat mutasi.</span>
           </div>
           <button 
             type="button" 
@@ -149,8 +176,8 @@
         <div v-if="totalPages > 1" class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-light-subtle">
           <div class="small text-muted">
             Menampilkan <strong>{{ (currentPage - 1) * pageSize + 1 }}</strong> - 
-            <strong>{{ Math.min(currentPage * pageSize, logs.length) }}</strong> dari 
-            <strong>{{ logs.length }}</strong> riwayat mutasi.
+            <strong>{{ Math.min(currentPage * pageSize, filteredLogs.length) }}</strong> dari 
+            <strong>{{ filteredLogs.length }}</strong> riwayat mutasi.
           </div>
           <nav aria-label="Page navigation">
             <ul class="pagination pagination-sm mb-0 align-items-center gap-1">
@@ -199,10 +226,6 @@
             </ul>
           </nav>
         </div>
-
-        <div v-if="!isSearchMode" class="text-center py-2 border-top bg-light">
-          <small class="text-muted">Menampilkan maks. 100 riwayat mutasi terbaru.</small>
-        </div>
       </div>
     </div>
 
@@ -220,29 +243,31 @@
             </div>
             <div class="modal-body bg-light-subtle">
               <div v-if="selectedLog" class="mb-3">
-                <div class="row g-2 mb-3 bg-light rounded-2 small">
+                <div class="row g-2 bg-light rounded-2 small">
                   <div class="col-3"><strong>Waktu:</strong> {{ formatDate(selectedLog.timestamp) }}</div>
-                  <div class="col-2"><strong>Petugas:</strong> {{ selectedLog.pemindah }}</div>
-                  <div class="col-2"><strong>Tujuan:</strong> {{ getSubDocLabel(selectedLog.destination) }}</div>
-                  <div class="col-2" v-if="selectedLog.notes"><strong>Catatan:</strong> {{ selectedLog.notes }}</div>
-                  <div class="col-3 d-flex align-items-center justify-content-end">
-                    <button 
+                  <div class="col-3"><strong>Petugas:</strong> {{ selectedLog.pemindah }}</div>
+                  <div class="col-6 text-end d-flex justify-content-end"><button 
                       type="button" 
-                      class="btn btn-primary btn-sm rounded-pill px-2 py-1 d-flex align-items-center gap-2"
+                      class="btn btn-secondary  btn-sm rounded-pill px-2 py-1 d-flex align-items-center gap-2"
                       style="font-size: 0.8rem;"
                       @click="copyAllBarcodes"
                       :disabled="!selectedLog?.barcodes?.length"
                     >
                       <i class="bi" :class="copiedAll ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
-                      <span>{{ copiedAll ? 'Copied' : 'Copy All' }}</span>
+                      <span>{{ copiedAll ? 'Copied' : 'Copy Barcode' }}</span>
                     </button>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                  </div>
+                  </div>                  
                 </div>
+                <div class="row g-2 mb-3 bg-light rounded-2 small">
+                  <div class="col-3"><strong>Tujuan:</strong> {{ getSubDocLabel(selectedLog.destination) }}</div>
+                  <div class="col-4" v-if="selectedLog.notes"><strong>Catatan:</strong> {{ selectedLog.notes }}</div>
+                </div>
+                
+ 
 
                 <div class="table-responsive border border-light rounded-4 shadow-sm bg-white custom-scrollbar" style="max-height: 350px; overflow-y: auto;">
                   <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
-                    <thead class="table-light">
+                    <thead class="table-secondary">
                       <tr>
                         <th class="ps-3" style="width: 60px;">No</th>
                         <th>Barcode</th>
@@ -320,18 +345,40 @@
                 >
                   <div class="timeline-dot-modal" :class="getTimelineDotClass(log, idx === 0)"></div>
                   <div class="timeline-card-modal p-3 bg-white border border-light-subtle rounded-3 shadow-sm-hover transition-all text-start">
-                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                      <span class="small fw-bold text-dark fs-6">{{ getSubDocLabel(log.destination) }}</span>
-                      <span v-if="isStopLocation(log.destination)" class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.65rem;">
-                        <i class="bi bi-shield-lock me-1"></i>Tracking Berhenti
+                    <!-- Route Flow (Asal -> Tujuan) -->
+                    <div class="d-flex align-items-center gap-2 mb-2.5 flex-wrap">
+                      <span class="badge bg-secondary-subtle text-secondary border px-2 py-1 small fw-bold">
+                        {{ getSubDocLabel(getBarcodeOriginInLog(log, searchedBarcode)) }}
                       </span>
-                      <small class="text-muted ms-auto" style="font-size: 0.72rem;">{{ formatDate(log.timestamp) }}</small>
+                      <i class="bi bi-arrow-right text-muted fs-6"></i>
+                      <span class="badge px-2 py-1 small fw-bold" :class="isStopLocation(log.destination) ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-primary-subtle text-primary border'">
+                        {{ getSubDocLabel(log.destination) }}
+                      </span>
+                      
+                      <!-- Status Badge -->
+                      <span v-if="log.destination === 'laku'" class="badge bg-success text-white px-2 py-1 rounded-pill ms-1" style="font-size: 0.65rem;">
+                        <i class="bi bi-check-circle me-1"></i>Terjual
+                      </span>
+                      <span v-else-if="log.destination === 'mutasi'" class="badge bg-danger text-white px-2 py-1 rounded-pill ms-1" style="font-size: 0.65rem;">
+                        <i class="bi bi-arrow-left-right me-1"></i>Mutasi Keluar
+                      </span>
                     </div>
-                    <p class="text-muted small mb-0">
-                      Dipindahkan oleh <span class="fw-semibold text-dark">{{ log.pemindah }}</span> dari <span class="fw-semibold text-dark">{{ getSubDocLabel(getBarcodeOriginInLog(log, searchedBarcode)) }}</span>.
-                    </p>
-                    <div v-if="log.notes" class="mt-2 p-2 bg-light rounded text-muted italic small border-start border-3 border-warning">
-                      "{{ log.notes }}"
+
+                    <!-- Staff & Time Info -->
+                    <div class="d-flex justify-content-between align-items-center text-muted small border-top pt-2" style="font-size: 0.78rem;">
+                      <div>
+                        <i class="bi bi-person me-1"></i>
+                        <span>Petugas: <strong>{{ log.pemindah }}</strong></span>
+                      </div>
+                      <div>
+                        <i class="bi bi-clock me-1"></i>
+                        <span>{{ formatDate(log.timestamp) }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div v-if="log.notes" class="mt-2 p-2 bg-light rounded text-muted italic small border-start border-3 border-warning" style="font-size: 0.75rem;">
+                      <i class="bi bi-chat-left-text me-1"></i> "{{ log.notes }}"
                     </div>
                   </div>
                 </div>
@@ -357,6 +404,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { Modal } from "bootstrap";
 import { revertMutationLog } from "@/services/barcode-service";
+import { subscribeInventorySettings } from "@/services/inventory-setting-service";
 
 const auth = useAuthStore();
 const { toast, error: showError, confirm } = useAlert();
@@ -392,6 +440,30 @@ const searchQuery = ref("");
 const searchedBarcode = ref("");
 const isSearchMode = ref(false);
 
+const selectedCategory = ref("KALUNG");
+const activeCards = ref([]);
+
+const availableCategories = computed(() => {
+  return activeCards.value;
+});
+
+const filteredLogs = computed(() => {
+  if (isSearchMode.value) return logs.value;
+  if (!selectedCategory.value) return logs.value;
+  return logs.value.filter(log => {
+    const logCat = (log.category || "").toUpperCase().trim();
+    return logCat === selectedCategory.value.toUpperCase().trim();
+  });
+});
+
+function formatCategory(cat) {
+  if (!cat) return "";
+  const upper = cat.toUpperCase();
+  if (upper === "HALA & SDW") return "Hala & SDW";
+  if (upper === "KENDARI & EMAS BALI") return "Kendari & Emas Bali";
+  return cat.split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
+}
+
 const selectedLog = ref(null);
 const copiedAll = ref(false);
 
@@ -414,12 +486,12 @@ const currentPage = ref(1);
 const pageSize = ref(20);
 
 const totalPages = computed(() => {
-  return Math.ceil(logs.value.length / pageSize.value);
+  return Math.ceil(filteredLogs.value.length / pageSize.value);
 });
 
 const paginatedLogs = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
-  return logs.value.slice(start, start + pageSize.value);
+  return filteredLogs.value.slice(start, start + pageSize.value);
 });
 
 const detailPage = ref(1);
@@ -522,6 +594,7 @@ async function loadLogs() {
   loading.value = true;
   isSearchMode.value = false;
   currentPage.value = 1;
+  logs.value = [];
   
   if (unsubLogs) unsubLogs();
   
@@ -529,7 +602,7 @@ async function loadLogs() {
     const q = query(
       collection(db, "floors", auth.activeFloor, "barcodeMutationLogs"),
       orderBy("timestamp", "desc"),
-      limit(100)
+      limit(500)
     );
     
     unsubLogs = onSnapshot(q, (snaps) => {
@@ -548,10 +621,6 @@ async function loadLogs() {
   }
 }
 
-onUnmounted(() => {
-  if (unsubLogs) unsubLogs();
-});
-
 async function handleSearch() {
   const queryVal = searchQuery.value.trim().toUpperCase();
   currentPage.value = 1;
@@ -560,6 +629,7 @@ async function handleSearch() {
     return;
   }
 
+  if (unsubLogs) unsubLogs();
   loading.value = true;
   isSearchMode.value = true;
   searchedBarcode.value = queryVal;
@@ -602,14 +672,44 @@ async function handleSearch() {
   }
 }
 
-function clearSearch() {
-  searchQuery.value = "";
-  loadLogs();
-}
+let unsubSettings = null;
 
 onMounted(() => {
   loadLogs();
+  
+  unsubSettings = subscribeInventorySettings((settings) => {
+    activeCards.value = (settings.cards || [])
+      .filter(card => card.enabled && card.type !== "computer")
+      .map(card => card.id);
+      
+    if (activeCards.value.length > 0) {
+      if (!selectedCategory.value || !activeCards.value.includes(selectedCategory.value)) {
+        if (activeCards.value.includes("KALUNG")) {
+          selectedCategory.value = "KALUNG";
+        } else {
+          selectedCategory.value = activeCards.value[0];
+        }
+      }
+    }
+  }, (err) => {
+    console.error("Gagal berlangganan pengaturan manajemen stok:", err.message);
+  }, auth.activeFloor);
 });
+
+onUnmounted(() => {
+  if (unsubLogs) unsubLogs();
+  if (unsubSettings) unsubSettings();
+});
+
+function clearSearch() {
+  searchQuery.value = "";
+  if (activeCards.value.includes("KALUNG")) {
+    selectedCategory.value = "KALUNG";
+  } else if (activeCards.value.length > 0) {
+    selectedCategory.value = activeCards.value[0];
+  }
+  loadLogs();
+}
 </script>
 
 <style scoped>
@@ -744,5 +844,13 @@ onMounted(() => {
 .shadow-sm-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+.custom-select-clean {
+  cursor: pointer;
+  outline: none;
+  box-shadow: none !important;
+}
+.custom-select-clean:focus {
+  background-color: #fff;
 }
 </style>

@@ -42,13 +42,7 @@
             <div class="col-12">
               <!-- Scrollable filter buttons based on active categories prefix -->
               <div class="d-flex gap-1.5 overflow-auto pb-1 scrollable-pills">
-                <button 
-                  class="btn btn-xs rounded-pill px-3 transition-all fw-semibold"
-                  :class="activeCategoryFilter === '' ? 'btn-success shadow-sm' : 'btn-outline-secondary'"
-                  @click="activeCategoryFilter = ''"
-                >
-                  Semua
-                </button>
+                <!-- No Semua button, defaults to KA -->
                 <button 
                   v-for="card in dynamicCards" 
                   :key="card.id"
@@ -217,7 +211,7 @@
               </h6>
               <button 
                 v-if="selectedClip.barcodes?.length > 0"
-                class="btn btn-xs btn-outline-danger rounded-pill px-2.5"
+                class="btn btn-xs btn-outline-danger rounded-pill px-2" style="font-size: 13px;"
                 @click="clearAllBarcodes"
                 :disabled="saving"
               >
@@ -296,7 +290,7 @@
                 </select>
               </div>
               <div class="col-md-3 text-start">
-                <label class="form-label small fw-bold text-secondary mb-1">Catatan Mutasi</label>
+                <label class="form-label small fw-bold text-secondary mb-1">Keterangan</label>
                 <input 
                   v-model="notesInput" 
                   type="text" 
@@ -305,23 +299,12 @@
                   :disabled="saving"
                 />
               </div>
-              <div class="col-12 d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light flex-wrap gap-2">
-                <div class="form-check form-switch text-start">
-                  <input 
-                    v-model="autoDeleteClip" 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    id="autoDeleteClipSwitch"
-                    :disabled="saving"
-                  />
-                  <label class="form-check-label small fw-semibold text-secondary" for="autoDeleteClipSwitch">
-                    Hapus klip otomatis setelah data berhasil dipindahkan
-                  </label>
-                </div>
+              <div class="col-md-3">
                 <button 
                   type="submit"
-                  class="btn btn-primary rounded-pill px-4 py-2.5 fw-bold d-flex align-items-center gap-2 shadow"
+                  class="btn btn-primary btn-sm rounded-4 px-3 fw-bold d-flex align-items-center gap-2 shadow w-100 justify-content-center"
                   :disabled="saving || !selectedClip.barcodes || selectedClip.barcodes.length === 0"
+                  style="height: 34px;"
                 >
                   <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
                   <i v-else class="bi bi-cloud-arrow-up-fill"></i>
@@ -439,7 +422,7 @@ const loadingClips = ref(false);
 const saving = ref(false);
 const selectedClip = ref(null);
 const searchQuery = ref("");
-const activeCategoryFilter = ref("");
+const activeCategoryFilter = ref("KA");
 
 // Barcode input and statuses
 const barcodeTextInput = ref("");
@@ -506,7 +489,7 @@ const filteredClips = computed(() => {
 watch(selectedClip, (newClip) => {
   barcodeStatuses.value = {}; // Clear status cache to force fresh verification!
   if (newClip) {
-    notesInput.value = `Mutasi Klip ${newClip.code}`;
+    notesInput.value = `Pindah data klip ${newClip.code}`;
     // Verify barcode statuses
     triggerBarcodeVerification(newClip.barcodes || []);
   } else {
@@ -542,7 +525,7 @@ watch(barcodeTextInput, (newVal) => {
     if (duplicates.length > 0) {
       toast(`Barcode ${duplicates[0]} sudah discan!`, "warning");
       const uniqueParsed = [...seen];
-      barcodeTextInput.value = uniqueParsed.join("\n");
+      barcodeTextInput.value = uniqueParsed.join("\n") + "\n";
     }
   }, 600);
 });

@@ -877,7 +877,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                   <div>
                     <button 
-                      class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 shadow-sm transition-all hover-btn-scale"
+                      class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 shadow-sm transition-all hover-btn-scale"
                       @click="copyAllBarcodes"
                       :disabled="copyingAll || barcodes.length === 0"
                     >
@@ -2179,7 +2179,7 @@ watch(
         toast(`Barcode ${duplicates[0]} sudah discan!`, "warning");
         // Bersihkan otomatis duplikat dari textarea
         const uniqueParsed = [...seen];
-        barcodeForm.value.barcodes = uniqueParsed.join("\n");
+        barcodeForm.value.barcodes = uniqueParsed.join("\n") + "\n";
         return; // Hentikan proses, biarkan watcher re-run dengan input yang bersih
       }
 
