@@ -248,14 +248,6 @@
                     <td class="text-end pe-3">
                       <div class="d-flex gap-1 justify-content-end">
                         <button 
-                          class="btn btn-link btn-xs text-secondary hover-primary border-0 p-1 rounded-circle"
-                          @click="editSingleBarcode(bc)"
-                          title="Ubah Barcode"
-                          :disabled="saving"
-                        >
-                          <i class="bi bi-pencil-square"></i>
-                        </button>
-                        <button 
                           class="btn btn-link btn-xs text-danger border-0 p-1 rounded-circle"
                           @click="deleteSingleBarcodeFromClip(bc)"
                           title="Hapus"
@@ -714,18 +706,33 @@ async function addBarcodesToClip() {
     const category = selectedClip.value.category || "KALUNG"; // Fallback to KALUNG for legacy docs
     const defaultDetailType = getFallbackDetailType(category, addedList[0]);
     
-    // Call mutation to register them as "Belum Posting"
-    await executeBarcodeMutation({
-      barcodes: addedList,
-      origin: "",
-      destination: belumPostingKey.value,
-      pemindah: inputPetugasName.value,
-      notes: `Registrasi Klip: ${selectedClip.value.code}`,
-      floorId: auth.activeFloor,
-      defaultDetailType,
-      category: category,
-      allowCategoryOverride: true,
-    });
+    // Check barcode status to filter out those already in the target location
+    let barcodesToRegister = [...addedList];
+    try {
+      const statusRes = await checkBarcodesStatus(addedList, auth.activeFloor);
+      if (statusRes && Array.isArray(statusRes.results)) {
+        barcodesToRegister = statusRes.results
+          .filter(item => !item.exists || item.location !== belumPostingKey.value)
+          .map(item => item.barcode);
+      }
+    } catch (err) {
+      console.warn("Gagal mengecek status barcode, memproses semua secara default:", err);
+    }
+
+    if (barcodesToRegister.length > 0) {
+      // Call mutation to register them as "Belum Posting"
+      await executeBarcodeMutation({
+        barcodes: barcodesToRegister,
+        origin: "",
+        destination: belumPostingKey.value,
+        pemindah: inputPetugasName.value,
+        notes: `Registrasi Klip: ${selectedClip.value.code}`,
+        floorId: auth.activeFloor,
+        defaultDetailType,
+        category: category,
+        allowCategoryOverride: true,
+      });
+    }
 
     // Save clip document with updated list
     await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
@@ -768,57 +775,7 @@ function getFallbackDetailType(mainCat, code) {
   return "";
 }
 
-// Edit single barcode string in clip
-async function editSingleBarcode(oldBarcode) {
-  if (!selectedClip.value) return;
-  
-  const { value: newBarcode } = await Swal.fire({
-    title: "Ubah Kode Barcode",
-    input: "text",
-    inputValue: oldBarcode,
-    inputPlaceholder: "Masukkan barcode baru...",
-    showCancelButton: true,
-    confirmButtonText: "Simpan",
-    cancelButtonText: "Batal",
-    inputValidator: (value) => {
-      if (!value || !value.trim()) return "Barcode tidak boleh kosong!";
-    }
-  });
 
-  if (!newBarcode) return;
-
-  const cleanNewBarcode = newBarcode.trim().toUpperCase();
-  if (cleanNewBarcode === oldBarcode) return;
-
-  saving.value = true;
-  try {
-    // Automatically register the edited barcode in "Belum Posting" first
-    const category = selectedClip.value.category || "KALUNG";
-    const defaultDetailType = getFallbackDetailType(category, cleanNewBarcode);
-    
-    await executeBarcodeMutation({
-      barcodes: [cleanNewBarcode],
-      origin: "",
-      destination: belumPostingKey.value,
-      pemindah: inputPetugasName.value || auth.user?.displayName || auth.user?.username || "System (Klip)",
-      notes: `Registrasi Ubah Kode Klip: ${selectedClip.value.code}`,
-      floorId: auth.activeFloor,
-      defaultDetailType,
-      category: category,
-      allowCategoryOverride: true,
-    });
-
-    const nextList = (selectedClip.value.barcodes || []).map(b => b === oldBarcode ? cleanNewBarcode : b);
-    await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
-
-    toast("Barcode berhasil diubah.");
-    triggerParentReload();
-  } catch (e) {
-    showError("Gagal mengubah barcode", e.message);
-  } finally {
-    saving.value = false;
-  }
-}
 
 // Delete single barcode from clip list
 async function deleteSingleBarcodeFromClip(barcode) {

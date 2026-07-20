@@ -1665,7 +1665,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     if (info.resolvedOrigin !== destination || info.oldCategory !== info.category || info.oldDetailType !== info.detailType) {
       addChange(info.resolvedOrigin, info.oldCategory, info.oldDetailType, -1);
       addChange(destination, info.category, info.detailType, 1);
-    } else {
+    } else if (!info.exists) {
       addChange(destination, info.category, info.detailType, 1);
     }
   });

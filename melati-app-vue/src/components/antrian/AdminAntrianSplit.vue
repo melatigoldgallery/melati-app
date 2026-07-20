@@ -12,7 +12,7 @@
             @click="openPrinterModal"
             style="cursor: pointer; width: 32px; height: 32px; border-radius: 50%;"
           >
-            <i class="fas fa-print"; style="font-size: 16px;"></i>
+            <i class="fas fa-print" style="font-size: 16px;"></i>
           </span>
         </h1>
         <nav aria-label="breadcrumb">
@@ -837,7 +837,6 @@ import {
   padNumber,
   LETTERS_MAP,
   nextQueue,
-  previousQueue,
   setCustomQueue,
   addToSkipList,
   addToDelayedQueue,

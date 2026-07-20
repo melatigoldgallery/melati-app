@@ -513,119 +513,7 @@ function listPrinters() {
   });
 }
 
-function printRawPowerShell(printerName, rawData) {
-  return new Promise((resolve, reject) => {
-    try {
-      const tempDir = path.join(app.getPath("temp"), "melati-print");
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
 
-      const tempFile = path.join(tempDir, `receipt_${Date.now()}.prn`);
-      const buffer = Buffer.from(rawData, "binary");
-      fs.writeFileSync(tempFile, buffer, "binary");
-
-      const psScriptFile = path.join(tempDir, `print_${Date.now()}.ps1`);
-      const psScript = `
-$ErrorActionPreference = "Stop"
-$filePath = "${tempFile.replace(/\\/g, "\\\\")}"
-
-# Unified GDI Graphics Print document
-try {
-    Add-Type -AssemblyName System.Drawing
-    $bytes = [System.IO.File]::ReadAllBytes($filePath)
-    $printDoc = New-Object System.Drawing.Printing.PrintDocument
-    $printDoc.PrinterSettings.PrinterName = "${printerName}"
-    $printDoc.add_PrintPage({
-        param($sender, $ev)
-        $y = 10
-        $x = 2
-        $pageWidth = $ev.PageBounds.Width - 2 * $x
-        
-        $centerFormat = New-Object System.Drawing.StringFormat
-        $centerFormat.Alignment = [System.Drawing.StringAlignment]::Center
-        
-        $leftFormat = New-Object System.Drawing.StringFormat
-        $leftFormat.Alignment = [System.Drawing.StringAlignment]::Near
-        
-        $rawText = [System.Text.Encoding]::ASCII.GetString($bytes)
-        $lines = $rawText -split "\n"
-        foreach ($line in $lines) {
-            $line = $line.TrimEnd("\`r")
-            $isHuge = $line.Contains("$([char]0x1D)!U")
-            $isLarge = $line.Contains("$([char]0x1B)!8")
-            $isBold = $line.Contains("$([char]0x1B)E$([char]0x01)")
-            
-            $cleanLine = $line
-            $cleanLine = $cleanLine.Replace("$([char]0x1B)@", "")
-            $cleanLine = $cleanLine -replace "\x1B!.", ""
-            $cleanLine = $cleanLine -replace "\x1B[E]\x01", ""
-            $cleanLine = $cleanLine -replace "\x1B[E]\x00", ""
-            $cleanLine = $cleanLine -replace "\x1D!.", ""
-            $cleanLine = $cleanLine.Replace("$([char]0x1D)VA$([char]0x00)", "")
-            $cleanLine = $cleanLine -replace "[\x00-\x1F]", ""
-            
-            if ($cleanLine.Length -eq 0 -and $line.Length -gt 0 -and ($line -match "[\x1B\x1D]")) {
-                continue
-            }
-            
-            $trimmed = $cleanLine.Trim()
-            
-            if ($isHuge) {
-                $font = New-Object System.Drawing.Font("Consolas", 32, [System.Drawing.FontStyle]::Bold)
-                $lineHeight = 44
-            }
-            elseif ($isLarge) {
-                $font = New-Object System.Drawing.Font("Consolas", 16, [System.Drawing.FontStyle]::Bold)
-                $lineHeight = 24
-            }
-            elseif ($isBold) {
-                $font = New-Object System.Drawing.Font("Consolas", 8.5, [System.Drawing.FontStyle]::Bold)
-                $lineHeight = 14
-            }
-            else {
-                $font = New-Object System.Drawing.Font("Consolas", 8.5, [System.Drawing.FontStyle]::Regular)
-                $lineHeight = 14
-            }
-            
-            $format = $centerFormat
-            if ($trimmed.StartsWith("-") -or $trimmed -eq "CATATAN:") {
-                $format = $leftFormat
-                $trimmed = $cleanLine.TrimEnd()
-            }
-            
-            $rect = New-Object System.Drawing.RectangleF($x, $y, $pageWidth, $lineHeight)
-            $ev.Graphics.DrawString($trimmed, $font, [System.Drawing.Brushes]::Black, $rect, $format)
-            $y += $lineHeight
-        }
-        $ev.HasMorePages = $false
-    })
-    $printDoc.Print()
-    exit 0
-} catch {
-    exit 1
-}
-`;
-      fs.writeFileSync(psScriptFile, psScript, "utf8");
-
-      exec(`powershell -ExecutionPolicy Bypass -File "${psScriptFile}"`, (err, stdout, stderr) => {
-        // Cleanup files
-        try {
-          if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-          if (fs.existsSync(psScriptFile)) fs.unlinkSync(psScriptFile);
-        } catch (_) {}
-
-        if (err) {
-          reject(new Error("PowerShell RAW print failed: " + stderr));
-        } else {
-          resolve(true);
-        }
-      });
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
 
 ipcMain.handle("get-printers", async (event) => {
   if (!validateOrigin(event.sender)) {
@@ -737,25 +625,101 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
       return { success: false, error: "Target printer name is required" };
     }
 
-    // 1. Raw Text Receipt printing via ESC/POS Commands
-    if (type === "receipt") {
-      const rawText = generateReceiptText(payload);
-      await printRawPowerShell(printerName, rawText);
-      return { success: true };
-    }
-
-    if (type === "queue") {
-      const rawText = generateQueueText(payload);
-      await printRawPowerShell(printerName, rawText);
-      return { success: true };
-    }
-
-    // 2. Graphic HTML templates via hidden window
+    // 1. Graphic HTML templates via hidden window
     let templateName = "";
     let dataForTemplate = { ...payload };
     let copiesCount = 1;
 
-    if (type === "invoice") {
+    const formatRupiah = (angka) => {
+      if (!angka && angka !== 0) return "Rp 0";
+      const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : angka;
+      return "Rp " + new Intl.NumberFormat("id-ID").format(number);
+    };
+
+    if (type === "queue") {
+      templateName = "queue.html";
+      const isEn = payload.lang === "en";
+      const firstChar = String(payload.queueNumber || "").trim().toUpperCase().charAt(0);
+      const isBeliQueue = String(payload.queueType || "").toLowerCase().includes("beli") || ["A", "B", "C"].includes(firstChar);
+
+      dataForTemplate = {
+        ...payload,
+        isEn,
+        isBeliQueue,
+        shopName: payload.floor === "L2" ? "MELATI GOLD YOUNG" : "MELATI GOLD SHOP",
+        floorLabel: payload.floor === "L2"
+          ? (isEn ? "* * 2ND FLOOR * *" : "* * LANTAI 2 * *")
+          : (isEn ? "* * 1ST FLOOR * *" : "* * LANTAI 1 * *"),
+        titleLabel: isEn ? "YOUR QUEUE NUMBER" : "NOMOR ANTRIAN ANDA",
+        displayQueueType: (isEn 
+          ? (payload.queueType.toLowerCase().includes("jual") ? "Sell / Service" : "Buy / Trade-In")
+          : payload.queueType
+        ).toUpperCase(),
+        timeLabel: isEn ? "Time" : "Waktu",
+        timeStrFormatted: `${payload.dateStr} ${payload.timeStr}`
+      };
+    } else if (type === "receipt") {
+      templateName = "receipt-aksesoris.html";
+      const {
+        items = [],
+        totalHarga = 0,
+        jumlahBayar = 0,
+        kembalian = 0,
+        sales = "",
+        tanggal = "",
+        metodeBayar = "tunai",
+        nominalDP = 0,
+        sisaPembayaran = 0,
+        transactionType = "AKSESORIS"
+      } = payload;
+
+      const metode = String(metodeBayar || "").toLowerCase();
+      const totalNum = Number(totalHarga || 0) || 0;
+      const bayarNum = Number(jumlahBayar || 0) || 0;
+      const effectiveJumlahBayar = metode !== "dp" && metode !== "free" && bayarNum <= 0 ? totalNum : bayarNum;
+      
+      const kembalianNum = Number(kembalian);
+      const effectiveKembalian = (metode !== "dp" && metode !== "free")
+        ? (Number.isFinite(kembalianNum) && kembalianNum >= 0 ? kembalianNum : Math.max(0, effectiveJumlahBayar - totalNum))
+        : 0;
+
+      const formattedItems = items.map(item => {
+        const nama = (item.nama || item.kode || "Item").toUpperCase();
+        const kode = item.kode || item.kodeText || "-";
+        const kadar = item.kadar || "-";
+        const berat = item.berat ? item.berat + "gr" : "-";
+        const details = `${kode}|${kadar}|${berat}|`;
+        const price = formatRupiah(item.totalHarga || item.harga || 0);
+        return { nama, details, price };
+      });
+
+      let hasNotes = false;
+      let keteranganText = "";
+      items.forEach(item => {
+        if (item.keterangan && item.keterangan.trim() !== "") {
+          hasNotes = true;
+          keteranganText += item.keterangan + " ";
+        }
+      });
+
+      dataForTemplate = {
+        transactionType,
+        tanggal,
+        sales,
+        items: formattedItems,
+        totalHargaFormatted: formatRupiah(totalHarga),
+        isDP: metode === "dp",
+        isFree: metode === "free",
+        nominalDPFormatted: formatRupiah(nominalDP),
+        sisaPembayaranFormatted: formatRupiah(sisaPembayaran),
+        isLunas: Number(nominalDP) >= totalNum,
+        jumlahBayarFormatted: formatRupiah(effectiveJumlahBayar),
+        hasKembalian: effectiveKembalian > 0,
+        kembalianFormatted: formatRupiah(effectiveKembalian),
+        hasNotes,
+        notes: keteranganText.trim()
+      };
+    } else if (type === "invoice") {
       templateName = "invoice.html";
       const normalizedItems = (payload.items || []).map((item) => ({
         code: item.kode || item.kodeText || item.code || "-",
@@ -897,260 +861,5 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
   }
 });
 
-// Simple plain text printer renderer for receipt (similar to printing-service/services/escposService.js)
-function generateReceiptText(data) {
-  const {
-    items = [],
-    totalHarga = 0,
-    jumlahBayar = 0,
-    kembalian = 0,
-    sales = "",
-    tanggal = "",
-    metodeBayar = "tunai",
-    nominalDP = 0,
-    sisaPembayaran = 0,
-    transactionType = "AKSESORIS"
-  } = data;
 
-  const metode = String(metodeBayar || "").toLowerCase();
-  const totalNum = Number(totalHarga || 0) || 0;
-  const bayarNum = Number(jumlahBayar || 0) || 0;
-  const effectiveJumlahBayar = metode !== "dp" && metode !== "free" && bayarNum <= 0 ? totalNum : bayarNum;
-  
-  const kembalianNum = Number(kembalian);
-  const effectiveKembalian = (metode !== "dp" && metode !== "free")
-    ? (Number.isFinite(kembalianNum) && kembalianNum >= 0 ? kembalianNum : Math.max(0, effectiveJumlahBayar - totalNum))
-    : 0;
-
-  const width = 38; // character column width for 76/80mm paper
-
-  const centerText = (text) => {
-    const padding = Math.max(0, Math.floor((width - text.length) / 2));
-    return " ".repeat(padding) + text + "\n";
-  };
-
-  const padLine = (left, right) => {
-    const rightMargin = 4;
-    const maxWidth = width - rightMargin;
-    const spaces = Math.max(1, maxWidth - left.length - right.length);
-    return left + " ".repeat(spaces) + right + "\n";
-  };
-
-  const formatRupiah = (angka) => {
-    if (!angka && angka !== 0) return "Rp 0";
-    const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : angka;
-    return "Rp " + new Intl.NumberFormat("id-ID").format(number);
-  };
-
-  let output = "";
-  output += "\n";
-  output += centerText("==================================");
-  output += centerText("M E L A T I   3");
-  output += centerText("JL. DIPONEGORO NO. 116");
-  output += centerText("NOTA PENJUALAN " + transactionType);
-  output += centerText("==================================");
-  output += "\n";
-
-  output += "Tanggal: " + tanggal + "\n";
-  output += "Sales  : " + sales + "\n";
-  output += "==================================\n";
-
-  let hasKeterangan = false;
-  let keteranganText = "";
-
-  items.forEach((item, index) => {
-    const isLastItem = index === items.length - 1;
-    const namaBarang = (item.nama || item.kode || "Item").toUpperCase();
-    output += namaBarang + "\n\n";
-
-    const kode = item.kode || item.kodeText || "-";
-    const kadar = item.kadar || "-";
-    const berat = item.berat ? item.berat + "gr" : "-";
-    const harga = formatRupiah(item.totalHarga || item.harga || 0);
-
-    const detailBarang = `${kode}|${kadar}|${berat}|`;
-    output += padLine(detailBarang, harga);
-    output += "\n";
-
-    if (!isLastItem) {
-      output += "- - - - - - - - - - - - - - - - - -\n";
-    }
-
-    if (item.keterangan && item.keterangan.trim() !== "") {
-      hasKeterangan = true;
-      keteranganText += item.keterangan + " ";
-    }
-  });
-
-  output += "==================================\n";
-  output += padLine("TOTAL:", formatRupiah(totalHarga));
-  output += "==================================\n";
-
-  if (metode === "dp") {
-    const dpAmount = parseInt(nominalDP || 0);
-    const total = parseInt(totalHarga || 0);
-    output += padLine("Total Harga:", formatRupiah(total));
-    output += padLine("DP:", formatRupiah(dpAmount));
-    if (dpAmount >= total) {
-      output += centerText("* * *  Lunas  * * *");
-    } else {
-      const sisa = parseInt(sisaPembayaran || 0);
-      output += padLine("Sisa:", formatRupiah(sisa));
-    }
-  } else if (metode !== "free") {
-    output += padLine("Bayar:", formatRupiah(effectiveJumlahBayar));
-    if (effectiveKembalian > 0) {
-      output += padLine("Kembalian:", formatRupiah(effectiveKembalian));
-    }
-  }
-
-  output += "==================================\n";
-
-  if (hasKeterangan) {
-    output += "\n";
-    output += "Keterangan: " + keteranganText.trim() + "\n";
-    output += "==================================\n";
-  }
-
-  output += "\n";
-  output += centerText("Terima Kasih");
-  output += centerText("Atas Kunjungan Anda");
-  output += "\n";
-  output += centerText("==================================");
-  output += "\n\n\n\n\n";
-
-  return output;
-}
-
-// Simple plain text printer renderer for queue ticket
-function generateQueueText(data) {
-  const {
-    queueNumber = "",
-    queueType = "",
-    dateStr = "",
-    timeStr = "",
-    floor = "L1",
-    lang = "id",
-  } = data;
-
-  const isEn = lang === "en";
-  const width = 48; // character column width for 80mm paper
-
-  const centerText = (text) => {
-    const padding = Math.max(0, Math.floor((width - text.length) / 2));
-    return " ".repeat(padding) + text + "\n";
-  };
-
-  const centerTextScaled = (text, scale = 1) => {
-    const scaledWidth = Math.floor(width / scale);
-    const padding = Math.max(0, Math.floor((scaledWidth - text.length) / 2));
-    return " ".repeat(padding) + text + "\n";
-  };
-
-  const leftAlignText = (text) => text + "\n";
-
-  const ESC = "\x1B";
-  const GS = "\x1D";
-  const INIT = ESC + "@";
-  const TEXT_NORMAL = ESC + "!\x00";
-  const BOLD_ON = ESC + "E\x01";
-  const BOLD_OFF = ESC + "E\x00";
-
-  // Large size for Shop Name (2x size: double-width, double-height, bold)
-  const TEXT_LARGE_BOLD = ESC + "!\x38";
-  
-  // Huge size for Queue Number (6x size: 6x width, 6x height, bold)
-  const TEXT_HUGE_BOLD = GS + "!\x55";
-
-  let output = INIT;
-  output += leftAlignText("=".repeat(width));
-  output += TEXT_LARGE_BOLD + centerTextScaled(floor === "L2" ? "MELATI GOLD YOUNG" : "MELATI GOLD SHOP", 2).trimEnd() + "\n" + TEXT_NORMAL;
-  output += leftAlignText("=".repeat(width));
-  output += "\n";
-
-  let floorLabel = floor === "L2"
-    ? (isEn ? "* * 2ND FLOOR * *" : "* * LANTAI 2 * *")
-    : (isEn ? "* * 1ST FLOOR * *" : "* * LANTAI 1 * *");
-  output += BOLD_ON + centerText(floorLabel) + BOLD_OFF;
-  output += "\n";
-
-  const titleLabel = isEn ? "YOUR QUEUE NUMBER" : "NOMOR ANTRIAN ANDA";
-  output += BOLD_ON + centerText(titleLabel) + BOLD_OFF;
-  output += "\n";
-
-  output += leftAlignText("-".repeat(width));
-  output += TEXT_HUGE_BOLD + centerTextScaled(queueNumber, 6).trimEnd() + "\n" + TEXT_NORMAL;
-  output += "\n";
-  output += leftAlignText("-".repeat(width));
-
-  let displayQueueType = queueType;
-  if (isEn) {
-    if (queueType.toLowerCase().includes("jual")) displayQueueType = "Sell / Service";
-    else if (queueType.toLowerCase().includes("beli")) displayQueueType = "Buy / Trade-In";
-  }
-  output += centerText(displayQueueType.toUpperCase());
-
-  const timeLabel = isEn ? "Time" : "Waktu";
-  output += centerText(timeLabel + ": " + dateStr + " " + timeStr);
-
-  output += "-".repeat(width) + "\n";
-
-  const firstChar = String(queueNumber || "").trim().toUpperCase().charAt(0);
-  const isBeliQueue = queueType.toLowerCase().includes("beli") || ["A", "B", "C"].includes(firstChar);
-
-  if (isEn) {
-    output += "QUEUE FLOW:\n";
-    if (isBeliQueue) {
-      output += "Buy & Trade-In (A -> B -> C):\n";
-      output += "  A01->A50 ==> B01->B50 ==> C01->C50\n";
-      output += "*Queue letter advances every 50 numbers\n";
-    } else {
-      output += "Sell & Service (D -> E):\n";
-      output += "  D01->D50 ==> E01->E50\n";
-      output += "*Queue letter advances every 50 numbers\n";
-    }
-  } else {
-    output += "ALUR ANTRIAN:\n";
-    if (isBeliQueue) {
-      output += "Beli & Tukar Tambah (A -> B -> C):\n";
-      output += "  A01->A50 => B01->B50 => C01->C50\n";
-      output += "*Huruf antrian berganti setiap 50 nomor\n";
-    } else {
-      output += "Jual & Servis (D -> E):\n";
-      output += "  D01->D50 => E01->E50\n";
-      output += "*Huruf antrian berganti setiap 50 nomor\n";
-    }
-  }
-  output += "-".repeat(width) + "\n";
-
-  // if (isEn) {
-  //   output += "NOTES:\n";
-  //   output += "- If your queue is missed by more than\n";
-  //   output += "  10 numbers, please take a new one\n";
-  //   output += "- If it is less than 10 numbers, please\n";
-  //   output += "  confirm with staff to be called next\n";
-  // } else {
-  //   output += "CATATAN:\n";
-  //   output += "- Jika antrian terlewat melebihi 10 nomor\n";
-  //   output += "   antrian silahkan ambil antrian baru\n";
-  //   output += "- Jika belum melebihi 10 nomor silahkan\n";
-  //   output += "  konfirmasi ke staff untuk dipanggil\n";
-  //   output += "  di antrian selanjutnya\n";
-  // }
-  // output += "-".repeat(width) + "\n\n";
-
-  if (isEn) {
-    output += centerText("Please wait for your queue");
-    output += centerText("number to be called.");
-    output += centerText("Thank you for your visit.");
-  } else {
-    output += centerText("Sembari menunggu dipanggil, silahkan");
-    output += centerText("melihat-lihat koleksi perhiasan kami.");
-    output += centerText("Terima kasih atas kunjungannya Kak :)");
-  }
-
-  output += "\n\n\n\n\n";
-  output += "\x1DV\x41\x00"; // Full Cut command
-  return output;
-}
 
