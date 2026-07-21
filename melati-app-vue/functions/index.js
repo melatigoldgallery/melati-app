@@ -1758,6 +1758,9 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
 
         const truncatedBarcodes = relevantBarcodes.slice(0, 10);
 
+        const historyOrigin = diffQty < 0 ? loc : (barcodeDetails.find(b => b.id === relevantBarcodes[0])?.resolvedOrigin || "any");
+        const historyDest = destination;
+
         updatedCategory.history.unshift({
           date: new Date().toISOString(),
           action: diffQty > 0 ? "Tambah" : "Kurangi",
@@ -1767,10 +1770,12 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
           petugas,
           keterangan: notes || "Mutasi Barcode",
           barcodes: truncatedBarcodes,
-          totalBarcodesCount: relevantBarcodes.length
+          totalBarcodesCount: relevantBarcodes.length,
+          origin: historyOrigin,
+          destination: historyDest
         });
-        if (updatedCategory.history.length > 10) {
-          updatedCategory.history = updatedCategory.history.slice(0, 10);
+        if (updatedCategory.history.length > 25) {
+          updatedCategory.history = updatedCategory.history.slice(0, 25);
         }
       }
       
@@ -2250,8 +2255,8 @@ export const deleteSingleBarcode = onCall(
         petugas: "Supervisor",
         keterangan: `Hapus Barcode Satuan: ${barcodeId}`
       });
-      if (updatedCategory.history.length > 10) {
-        updatedCategory.history = updatedCategory.history.slice(0, 10);
+      if (updatedCategory.history.length > 25) {
+        updatedCategory.history = updatedCategory.history.slice(0, 25);
       }
 
       if (detailType) {
@@ -2418,10 +2423,10 @@ export const revertSingleBarcode = onCall(
         newQuantity: newCurrentQty,
         petugas: petugasName,
         keterangan: isRevert 
-          ? `Pembatalan Mutasi Barcode ${cleanBarcodeId} kembali ke ${foundOrigin}`
+          ? `Batal Pemindahan Barcode ${cleanBarcodeId} kembali ke ${foundOrigin}`
           : `Hapus Barcode Satuan (Batalkan): ${cleanBarcodeId}`
       });
-      if (updatedCurrentCat.history.length > 10) updatedCurrentCat.history = updatedCurrentCat.history.slice(0, 10);
+      if (updatedCurrentCat.history.length > 25) updatedCurrentCat.history = updatedCurrentCat.history.slice(0, 25);
       
       if (detailType) {
         const details = currentCatData.details || {};
@@ -2452,9 +2457,9 @@ export const revertSingleBarcode = onCall(
           oldQuantity: originQty,
           newQuantity: newOriginQty,
           petugas: petugasName,
-          keterangan: `Pembatalan Mutasi Barcode ${cleanBarcodeId} kembali dari ${currentLoc}`
+          keterangan: `Batal Pemindahan Barcode ${cleanBarcodeId} kembali dari ${currentLoc}`
         });
-        if (updatedOriginCat.history.length > 10) updatedOriginCat.history = updatedOriginCat.history.slice(0, 10);
+        if (updatedOriginCat.history.length > 25) updatedOriginCat.history = updatedOriginCat.history.slice(0, 25);
         
         if (detailType) {
           const details = originCatData.details || {};
@@ -2520,7 +2525,7 @@ export const revertSingleBarcode = onCall(
           quantity: 1,
           userName: petugasName,
           keterangan: isRevert 
-            ? `Pembatalan Mutasi Barcode: ${cleanBarcodeId}`
+            ? `Batal Pemindahan Barcode: ${cleanBarcodeId}`
             : `Hapus Barcode Satuan (Batalkan): ${cleanBarcodeId}`
         }
       ];
@@ -2535,7 +2540,7 @@ export const revertSingleBarcode = onCall(
           after: newOriginQty,
           quantity: 1,
           userName: petugasName,
-          keterangan: `Pembatalan Mutasi Barcode: ${cleanBarcodeId}`
+          keterangan: `Batal Pemindahan Barcode: ${cleanBarcodeId}`
         });
       }
 
@@ -2663,8 +2668,8 @@ export const revertMutationLog = onCall(
               petugas: "Supervisor",
               keterangan: `Pembatalan Sesi Mutasi/Upload (Log ID: ${logId})`
             });
-            if (updatedCategory.history.length > 10) {
-              updatedCategory.history = updatedCategory.history.slice(0, 10);
+            if (updatedCategory.history.length > 25) {
+              updatedCategory.history = updatedCategory.history.slice(0, 25);
             }
           }
 

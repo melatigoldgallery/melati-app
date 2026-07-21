@@ -14,6 +14,16 @@
     <div class="kiosk-container container-fluid d-flex flex-column justify-content-between py-4">
       <!-- Header -->
       <header class="text-center mt-3 animate-fade-in position-relative">
+        <!-- Back Button (Arrow Left) -->
+        <button 
+          type="button" 
+          class="back-btn-kiosk position-absolute start-0 top-0 mt-2 ms-3 d-flex align-items-center justify-content-center"
+          @click="goBack"
+          title="Kembali"
+        >
+          <i class="fas fa-arrow-left"></i>
+        </button>
+
         <!-- Language Toggle -->
         <div class="lang-toggle-wrapper position-absolute end-0 top-0 mt-2 me-3 d-none d-md-block">
           <div class="lang-toggle-pill">
@@ -64,11 +74,11 @@
         <p class="subtitle text-muted mt-2" v-html="t('subtitle')"></p>
       </header>
 
-      <!-- Main Options Grid (4 Cards) -->
+      <!-- Main Options Grid (Single Card) -->
       <main class="container my-auto animate-slide-up">
         <div class="row justify-content-center g-3 g-md-4">
           <!-- Option A: Layanan Umum -->
-          <div class="col-12 col-md-6 col-lg-3 d-flex align-items-stretch">
+          <div class="col-12 col-md-8 col-lg-5 d-flex align-items-stretch">
             <div class="kiosk-card w-100 text-center">
               <div class="card-icon-wrapper">
                 <i class="fas fa-users"></i>
@@ -76,52 +86,7 @@
               <h2 class="card-title">{{ t('titleA') }}</h2>
               <p class="card-desc text-muted mt-2 d-none d-md-block">{{ t('descA') }}</p>
               <button class="btn-action w-100" @click="takeQueue(0)" :disabled="loading">
-                <span>{{ t('takeQueue') }} (A)</span>
-                <i class="fas fa-arrow-right ms-2"></i>
-              </button>
-            </div>
-          </div>
-
-          <!-- Option B: Khusus / Prioritas -->
-          <div class="col-12 col-md-6 col-lg-3 d-flex align-items-stretch">
-            <div class="kiosk-card w-100 text-center">
-              <div class="card-icon-wrapper priority-wrapper">
-                <i class="fas fa-star"></i>
-              </div>
-              <h2 class="card-title">{{ t('titleB') }}</h2>
-              <p class="card-desc text-muted mt-2 d-none d-md-block">{{ t('descB') }}</p>
-              <button class="btn-action w-100" @click="takeQueue(1)" :disabled="loading">
-                <span>{{ t('takeQueue') }} (B)</span>
-                <i class="fas fa-arrow-right ms-2"></i>
-              </button>
-            </div>
-          </div>
-
-          <!-- Option C: Servis / Reparasi -->
-          <div class="col-12 col-md-6 col-lg-3 d-flex align-items-stretch">
-            <div class="kiosk-card w-100 text-center">
-              <div class="card-icon-wrapper service-wrapper">
-                <i class="fas fa-tools"></i>
-              </div>
-              <h2 class="card-title">{{ t('titleC') }}</h2>
-              <p class="card-desc text-muted mt-2 d-none d-md-block">{{ t('descC') }}</p>
-              <button class="btn-action w-100" @click="takeQueue(2)" :disabled="loading">
-                <span>{{ t('takeQueue') }} (C)</span>
-                <i class="fas fa-arrow-right ms-2"></i>
-              </button>
-            </div>
-          </div>
-
-          <!-- Option D: Pembelian Emas -->
-          <div class="col-12 col-md-6 col-lg-3 d-flex align-items-stretch">
-            <div class="kiosk-card w-100 text-center">
-              <div class="card-icon-wrapper buyback-wrapper">
-                <i class="fas fa-hand-holding-usd"></i>
-              </div>
-              <h2 class="card-title">{{ t('titleD') }}</h2>
-              <p class="card-desc text-muted mt-2 d-none d-md-block">{{ t('descD') }}</p>
-              <button class="btn-action w-100" @click="takeQueue(3)" :disabled="loading">
-                <span>{{ t('takeQueue') }} (D)</span>
+                <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
               </button>
             </div>
@@ -177,6 +142,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import { addCustomerQueue } from "@/services/antrian-service-legacy";
 import { isElectron, printJob } from "@/utils/printHelper";
 
@@ -186,6 +152,12 @@ const props = defineProps({
     default: "L1"
   }
 });
+
+const router = useRouter();
+
+function goBack() {
+  router.back();
+}
 
 const brandName = computed(() => {
   return props.activeFloor === "L2" ? "Melati Gold Young" : "Melati Gold Shop";
@@ -229,8 +201,8 @@ const t = (key) => {
   const dictionary = {
     id: {
       subtitle: "Selamat datang! Silakan ambil nomor antrian Anda.<br />Sembari menunggu nomor dipanggil, silakan melihat-lihat koleksi perhiasan cantik kami.",
-      titleA: "LAYANAN UMUM",
-      descA: "Untuk transaksi umum, pembayaran, atau pertanyaan umum pelanggan.",
+      titleA: "LAYANAN ANTRIAN",
+      descA: "Silakan tekan tombol di bawah untuk mengambil nomor antrean Anda.",
       titleB: "PRIORITAS",
       descB: "Layanan khusus untuk Lansia, Ibu Hamil, Penyandang Disabilitas, atau Ibu dengan Balita.",
       titleC: "SERVIS / REPARASI",
@@ -248,8 +220,8 @@ const t = (key) => {
     },
     en: {
       subtitle: "Welcome! Please take your queue number.<br />While waiting for your turn, feel free to browse our beautiful jewelry collections.",
-      titleA: "GENERAL SERVICE",
-      descA: "For general transactions, payments, or general customer inquiries.",
+      titleA: "GET TICKET",
+      descA: "Please press the button below to get your queue ticket.",
       titleB: "PRIORITY",
       descB: "Special service for elderly, pregnant women, disabled, or mothers with toddlers.",
       titleC: "REPAIR / SERVICE",
@@ -269,7 +241,7 @@ const t = (key) => {
   return dictionary[currentLang.value]?.[key] || key;
 };
 
-const categoryLabels = ["Layanan Umum", "Khusus / Prioritas", "Servis / Reparasi", "Pembelian Emas"];
+const categoryLabels = ["Antrean", "Khusus / Prioritas", "Servis / Reparasi", "Pembelian Emas"];
 const getCategoryLabel = (index) => categoryLabels[index] || "Umum";
 
 function playNotif() {
@@ -335,7 +307,8 @@ async function takeQueue(letterIndex) {
         dateStr,
         timeStr,
         floor: props.activeFloor,
-        lang: currentLang.value
+        lang: currentLang.value,
+        isLegacy: true
       });
 
       if (res && res.success) {
@@ -689,5 +662,34 @@ onUnmounted(() => {
   0% { left: -150%; }
   50% { left: 150%; }
   100% { left: 150%; }
+}
+
+/* Kiosk Back Button Styles */
+.back-btn-kiosk {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fffbf6; /* Dark color for light background contrast */
+  font-size: 1.1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.back-btn-kiosk:hover {
+  background: rgba(212, 175, 55, 0.15);
+  color: #836720;
+  border-color: rgba(212, 175, 55, 0.7);
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2);
+}
+
+.back-btn-kiosk:active {
+  transform: scale(0.95);
 }
 </style>

@@ -890,7 +890,9 @@ function groupLogsByMainCategory(logDocs, categories = activeMainCategories.valu
           const after = toInt(log.after);
           const action = log.action || "update";
           const user = log.userName || "user";
-          const ket = log.keterangan || "";
+          let ket = log.keterangan || "";
+          ket = ket.replace(/Pembatalan Mutasi Barcode/g, "Batal Pemindahan Barcode");
+          ket = ket.replace(/PEMBATALAN MUTASI BARCODE/g, "BATAL PEMINDAHAN BARCODE");
           const qty = Math.abs(after - before);
           return safeCellText(`stok awal ${before} ${user} ${action} ${qty} : ${ket}`);
         })

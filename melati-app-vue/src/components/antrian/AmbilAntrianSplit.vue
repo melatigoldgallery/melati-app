@@ -91,7 +91,7 @@
           <div class="col-12 col-md-5 d-flex align-items-stretch">
             <div class="kiosk-card w-100 text-center">
               <div class="card-icon-wrapper" @click="handleIconTap('jual')" style="cursor: pointer;">
-                <i class="fas fa-hand-holding-usd"></i>
+                <i class="fas fa-handshake"></i>
               </div>
               <h2 class="card-title">{{ t('jualTitle') }}</h2>
               <p class="card-desc text-muted mt-2 d-none d-md-block">{{ t('jualDesc') }}</p>

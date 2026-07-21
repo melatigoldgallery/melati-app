@@ -784,17 +784,17 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(h, i) in historyList.slice(0, 10)" :key="i">
+                  <tr v-for="(h, i) in historyList.slice(0, 25)" :key="i">
                     <td>{{ i + 1 }}</td>
                     <td>{{ formatDate(h.date) }}</td>
                     <td>{{ formatHistoryQty(h) }}</td>
                     <td>{{ h.petugas || "-" }}</td>
                     <td>
-                      <div 
-                        v-if="!h.barcodes || !h.barcodes.length || (h.keterangan && h.keterangan.toLowerCase() !== 'mutasi barcode')" 
-                        class="fw-semibold text-dark mb-1"
-                      >
+                      <div class="fw-semibold text-dark mb-1">
                         {{ formatHistoryNote(h) }}
+                        <span v-if="getHistoryFlow(h)" class="text-muted fw-normal ms-1">
+                          | {{ getHistoryFlow(h) }}
+                        </span>
                       </div>
                       <div v-if="h.barcodes && h.barcodes.length" class="d-flex flex-wrap gap-1 align-items-center">
                         <span 
@@ -825,7 +825,7 @@
                 </tbody>
               </table>
             </div>
-            <small v-if="historyList.length > 10" class="text-muted">Menampilkan 10 riwayat terbaru.</small>
+            <small v-if="historyList.length > 25" class="text-muted">Menampilkan 25 riwayat terbaru.</small>
           </div>
         </div>
       </div>
@@ -1152,6 +1152,26 @@ const komputerColorForm = ref({
 
 const historyInfo = ref({ mainCat: "", subLabel: "" });
 const historyList = ref([]);
+const mutationLogsCache = ref([]);
+const isFetchingLogs = ref(false);
+
+function getSubDocLabel(key) {
+  const map = {
+    'brankas': 'Stok Brankas',
+    'posting': 'Belum Posting',
+    'barang-display': 'Display',
+    'barang-rusak': 'Rusak',
+    'batu-lepas': 'Batu Lepas',
+    'manual': 'Manual',
+    'admin': 'Admin',
+    'DP': 'DP',
+    'lainnya': 'Lainnya',
+    'mutasi': 'Mutasi',
+    'laku': 'Terjual',
+    'sistem_baru': 'Awal Input'
+  };
+  return map[key] || key;
+}
 const detailInfo = ref({ mainCat: "", subLabel: "" });
 const detailData = ref({});
 
@@ -1414,7 +1434,8 @@ function formatHistoryQty(record) {
 }
 
 function formatHistoryNote(record) {
-  const base = (record.keterangan || "-").toUpperCase();
+  let base = (record.keterangan || "-").toUpperCase();
+  base = base.replace(/PEMBATALAN MUTASI BARCODE/g, "BATAL PEMINDAHAN BARCODE");
   if (!record.items || !Array.isArray(record.items) || !record.items.length) return base;
   const summaryText = record.items
     .filter((it) => toInt(it.quantity) !== 0)
@@ -1716,13 +1737,81 @@ function openKomputerModal(mainCat) {
   showModal("komputerUpdateModal");
 }
 
-function openHistoryModal(mainCat, sub) {
+async function openHistoryModal(mainCat, sub) {
   historyInfo.value = {
     mainCat,
     subLabel: sub.label,
   };
-  historyList.value = getItem(sub.key, mainCat)?.history || [];
+  const list = getItem(sub.key, mainCat)?.history || [];
+  historyList.value = list;
+
+  // Optimasi Firestore Reads: Cek apakah ada entri mutasi barcode yang belum memiliki data origin/destination langsung
+  const needFetch = list.some(h => h.barcodes?.length > 0 && (!h.origin || !h.destination));
+
+  if (needFetch && mutationLogsCache.value.length === 0 && !isFetchingLogs.value) {
+    isFetchingLogs.value = true;
+    try {
+      const q = query(
+        collection(db, "floors", auth.activeFloor, "barcodeMutationLogs"),
+        where("category", "==", mainCat),
+        orderBy("timestamp", "desc"),
+        limit(20)
+      );
+      const snaps = await getDocs(q);
+      const fetched = [];
+      snaps.forEach((doc) => {
+        fetched.push({ id: doc.id, ...doc.data() });
+      });
+      mutationLogsCache.value = fetched;
+    } catch (e) {
+      console.warn("Gagal memuat log mutasi untuk riwayat:", e);
+    } finally {
+      isFetchingLogs.value = false;
+    }
+  }
+
   showModal("historyModal");
+}
+
+function findMatchedMutationLog(h) {
+  if (!h.barcodes || !h.barcodes.length) return null;
+  
+  const hTime = new Date(h.date).getTime();
+  const hBarcodesSet = new Set(h.barcodes.map(getBarcodeKey));
+  
+  let bestMatch = null;
+  let minDiff = Infinity;
+  
+  for (const log of mutationLogsCache.value) {
+    const logBarcodes = log.barcodeIds || (log.barcodes ? log.barcodes.map(b => b.barcode) : []);
+    const hasOverlap = logBarcodes.some(bc => hBarcodesSet.has(bc));
+    
+    if (hasOverlap) {
+      const logTime = log.timestamp?.toDate ? log.timestamp.toDate().getTime() : new Date(log.timestamp || 0).getTime();
+      const diff = Math.abs(hTime - logTime);
+      
+      // Pencocokan log dalam selisih waktu 30 detik
+      if (diff < 30000 && diff < minDiff) {
+        minDiff = diff;
+        bestMatch = log;
+      }
+    }
+  }
+  
+  return bestMatch;
+}
+
+function getHistoryFlow(h) {
+  if (h.origin && h.destination) {
+    return `${getSubDocLabel(h.origin)} -> ${getSubDocLabel(h.destination)}`;
+  }
+  
+  const matched = findMatchedMutationLog(h);
+  if (matched) {
+    return `${getSubDocLabel(matched.origin)} -> ${getSubDocLabel(matched.destination)}`;
+  }
+  
+  return "";
 }
 
 const modalTabs = computed(() => {
@@ -1821,10 +1910,57 @@ async function handleRevertBarcode(barcodeId) {
   try {
     await revertSingleBarcode({ barcodeId, floorId: auth.activeFloor });
     toast(`Barcode ${barcodeId} berhasil dibatalkan/diubah.`);
-    // Reload the current page of barcodes
-    await loadBarcodePage(currentPage.value);
-    // Reload stock summary and table data
-    await loadData({ force: true });
+
+    const cat = selectedCategory.value;
+    const loc = selectedLocation.value;
+    const subType = activeModalTab.value || null;
+
+    // 1. Hapus barcode dari list tampilan lokal instan
+    barcodes.value = barcodes.value.filter((b) => b.barcode !== barcodeId);
+
+    // 2. Bersihkan cache lokal untuk page rincian barcode agar sinkron
+    const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
+    if (barcodeCache.value[cacheKey]?.pages) {
+      Object.keys(barcodeCache.value[cacheKey].pages).forEach((pg) => {
+        const pgData = barcodeCache.value[cacheKey].pages[pg];
+        if (pgData && Array.isArray(pgData.barcodes)) {
+          pgData.barcodes = pgData.barcodes.filter((b) => b.barcode !== barcodeId);
+        }
+      });
+    }
+
+    // 3. Optimistic Update untuk stockData.value lokal agar UI utama/summary berkurang 1
+    const prevSub = stockData.value[loc] || {};
+    const prevItem = prevSub[cat] || {};
+    const nextItem = {
+      ...prevItem,
+      lastUpdated: new Date().toISOString(),
+    };
+    if (subType && nextItem.details) {
+      const curDetailQty = parseInt(nextItem.details[subType], 10) || 0;
+      nextItem.details = {
+        ...nextItem.details,
+        [subType]: Math.max(0, curDetailQty - 1),
+      };
+      nextItem.quantity = Object.values(nextItem.details).reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+    } else {
+      const curQty = parseInt(nextItem.quantity, 10) || 0;
+      nextItem.quantity = Math.max(0, curQty - 1);
+    }
+    
+    stockData.value = {
+      ...stockData.value,
+      [loc]: {
+        ...prevSub,
+        [cat]: nextItem,
+      },
+    };
+
+    // 4. Update metadata kuantitas cache agar isCacheValid tetap sinkron secara lokal
+    if (barcodeCache.value[cacheKey]) {
+      barcodeCache.value[cacheKey].quantity = subType ? getSubQty(subType) : getQty(cat, loc);
+      barcodeCache.value[cacheKey].lastUpdated = nextItem.lastUpdated;
+    }
   } catch (e) {
     showError("Gagal membatalkan barcode", e.message);
   } finally {

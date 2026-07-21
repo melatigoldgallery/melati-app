@@ -215,7 +215,7 @@
         <div class="card summary-card summary-card-jual text-center mb-3 border-0">
           <div class="card-body py-3">
             <div class="fw-bold text-muted mb-1" style="font-size: 1.35rem; font-family: 'Playfair Display', serif; letter-spacing: 0.5px;">
-              <i class="fas fa-hand-holding-usd me-1"></i>
+              <i class="fas fa-handshake me-1"></i>
               JUAL / SERVIS (D-E)
             </div>
             <div class="summary-label text-muted small mb-1" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px;">BELUM DILAYANI</div>
@@ -668,7 +668,7 @@
                   <div v-if="filteredAttendanceList.length === 0" class="text-muted py-5 text-center small">
                     <i class="fas fa-search-minus me-1"></i> Tidak ada nama sales yang cocok.
                   </div>
-                  <div v-else class="d-flex flex-column gap-1 overflow-auto pe-1" style="max-height: 280px; scrollbar-width: thin;">
+                  <div v-else class="d-flex flex-column gap-1 overflow-auto pe-1" style="max-height: 500px; scrollbar-width: thin;">
                     <div
                       v-for="att in filteredAttendanceList"
                       :key="att.id"
@@ -718,7 +718,7 @@
                 <!-- Jual Section -->
                 <div class="mb-4">
                   <h6 class="fw-bold text-muted d-flex align-items-center gap-2 mb-2" style="font-size: 0.85rem;">
-                    <i class="fas fa-hand-holding-usd"></i>
+                    <i class="fas fa-handshake"></i>
                     Pelayanan Jual Emas
                   </h6>
                   <div v-if="previewRotation.jual.length > 0" class="d-flex flex-wrap gap-2">
@@ -767,10 +767,18 @@
                       <strong class="text-dark d-block mb-1">Catatan Pembagian Pelayanan:</strong>
                       <ul class="ps-3 mb-0 text-muted" style="list-style-type: disc;">
                         <li class="mb-1.5">
-                          Sales yang bertugas di bagian <strong>Jual Emas</strong> ikut membantu melayani customer di bagian <strong>Beli / Tukar Tambah</strong> jika tidak ada antrian transaksi jual.
+                          Sales yang bertugas di bagian <strong>Jual Emas</strong> ikut membantu melayani customer di bagian <strong>Beli / Tukar Tambah</strong> jika tidak ada antrian transaksi jual, begitu juga sebaliknya.
+                        </li>
+                        <li class="mb-1.5">
+                          Tujuan pemisahan ini adalah untuk mempercepat alur transaksi dan mencegah penumpukan antrian, terutama ketika terjadi lonjakan transaksi penjualan barang dari customer.
                         </li>
                         <li>
-                          Tujuan pemisahan ini adalah untuk mempercepat alur transaksi dan mencegah penumpukan antrian, terutama ketika terjadi lonjakan transaksi penjualan barang dari customer.
+                          <div class="d-flex justify-content-between align-items-center mb-1">
+                            <p class=" mb-0" style="font-size: 0.78rem;">Jika ada costomer yang menanyakan pemisahan antrian, berikan penjelasan dan pengertian, contoh:</p>
+                          </div>
+                           <div class="p-2 bg-white border rounded-3 text-muted mt-2" style="font-size: 0.75rem; line-height: 1.45;">
+                            <em>"Pemisahan antrean ini dilakukan agar Kakak dilayani oleh tim sales khusus sesuai dengan keperluan transaksi Kakak (Beli/Jual). Mohon ditunggu ya Kak, terima kasih."</em>
+                          </div>
                         </li>
                       </ul>
                     </div>
@@ -950,6 +958,17 @@ const loadingRosterModal = ref(false);
 const allFloorsRosterData = ref({});
 let unsubDailyRoster = null;
 const searchQuery = ref("");
+function copyExplanationText() {
+  const text = "Pemisahan antrean ini kami terapkan agar Kakak yang ingin membeli perhiasan bisa langsung dilayani oleh tim sales khusus tanpa perlu menunggu antrean panjang transaksi penjualan emas yang membutuhkan proses administrasi lebih detail. Mohon ditunggu ya Kak, Terima kasih.";
+  navigator.clipboard.writeText(text);
+  Swal.fire({
+    icon: "success",
+    title: "Teks Disalin",
+    text: "Teks penjelasan berhasil disalin ke clipboard!",
+    timer: 1500,
+    showConfirmButton: false
+  });
+}
 
 const filteredAttendanceList = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();

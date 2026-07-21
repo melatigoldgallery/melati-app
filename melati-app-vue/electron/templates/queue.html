@@ -5,20 +5,21 @@
     <title>Struk Antrean</title>
     <style>
       @page {
-        size: 80mm auto;
+        size: 72mm auto;
         margin: 0;
       }
       body {
-        width: 80mm;
+        width: 72mm;
         margin: 0;
-        padding: 0 4mm 10mm 4mm; /* bottom padding for autocutter */
+        padding-left: 0;
+        padding-right: 0;
+        padding-bottom: 20mm; /* Diperbesar agar autocutter tidak memotong baris terakhir */
         box-sizing: border-box;
         font-family: 'Consolas', 'Courier New', monospace;
-        font-size: 11.5px;
-        line-height: 1.35;
+        font-size: 11.5px; 
+        line-height: 1.25;
         color: #000;
         background: transparent;
-        white-space: pre; /* maintain monospace character layout */
       }
       .center {
         text-align: center;
@@ -31,9 +32,9 @@
         font-weight: bold;
       }
       .huge {
-        font-size: 60px;
+        font-size: 50px;
         font-weight: bold;
-        line-height: 1.1;
+        line-height: 1;
         margin: 6px 0;
       }
       .left {
@@ -42,50 +43,68 @@
     </style>
   </head>
   <body>
-    <div>================================================</div>
-<div class="center large">{{shopName}}</div>
-<div>================================================</div>
+    <div class="center">======================================</div>
+    <div class="center large">{{shopName}}</div>
+    <div class="center">======================================</div>
 
-<div class="center bold">{{floorLabel}}</div>
-<div class="center bold">{{titleLabel}}</div>
-<div>------------------------------------------------</div>
-<div class="center huge">{{queueNumber}}</div>
-<div>------------------------------------------------</div>
-<div class="center bold">{{displayQueueType}}</div>
-<div class="center">{{timeLabel}}: {{timeStrFormatted}}</div>
-<div>------------------------------------------------</div>
-{{#if isEn}}
-<div class="left bold">QUEUE FLOW:</div>
-{{#if isBeliQueue}}
-<div class="left">Buy & Trade-In (A -> B -> C):</div>
-<div class="left">  A01->A50 ==> B01->B50 ==> C01->C50</div>
-<div class="left">*Queue letter advances every 50 numbers</div>
-{{else}}
-<div class="left">Sell & Service (D -> E):</div>
-<div class="left">  D01->D50 ==> E01->E50</div>
-<div class="left">*Queue letter advances every 50 numbers</div>
-{{/if}}
-{{else}}
-<div class="left bold">ALUR ANTRIAN:</div>
-{{#if isBeliQueue}}
-<div class="left">Beli & Tukar Tambah (A -> B -> C):</div>
-<div class="left">  A01->A50 => B01->B50 => C01->C50</div>
-<div class="left">*Huruf antrian berganti setiap 50 nomor</div>
-{{else}}
-<div class="left">Jual & Servis (D -> E):</div>
-<div class="left">  D01->D50 => E01->E50</div>
-<div class="left">*Huruf antrian berganti setiap 50 nomor</div>
-{{/if}}
-{{/if}}
-<div>------------------------------------------------</div>
-{{#if isEn}}
-<div class="center">Please wait for your queue</div>
-<div class="center">number to be called.</div>
-<div class="center">Thank you for your visit.</div>
-{{else}}
-<div class="center">Sembari menunggu dipanggil, silahkan</div>
-<div class="center">melihat-lihat koleksi perhiasan kami.</div>
-<div class="center">Terima kasih atas kunjungannya Kak :)</div>
-{{/if}}
+    <div class="center bold">{{floorLabel}}</div>
+    <div class="center bold">{{titleLabel}}</div>
+    <div class="center">--------------------------------------</div>
+    <div class="center huge">{{queueNumber}}</div>
+    <div class="center">--------------------------------------</div>
+    <div class="center bold">{{displayQueueType}}</div>
+    <div class="center">{{timeLabel}}: {{timeStrFormatted}}</div>
+    {{#unless isLegacy}}
+    <div class="center">--------------------------------------</div>
+    {{#if isEn}}
+    <div class="center bold">QUEUE FLOW:</div>
+    {{#if isBeliQueue}}
+    <div class="center">Buy & Trade-In (A -> B -> C):</div>
+    <div class="center">A01->A50 ==> B01->B50 ==> C01->C50</div>
+    <div class="center">*Queue letter advances every 50 numbers</div>
+    {{else}}
+    <div class="center">Sell & Service (D -> E):</div>
+    <div class="center">D01->D50 ==> E01->E50</div>
+    <div class="center">*Queue letter advances every 50 numbers</div>
+    {{/if}}
+    {{else}}
+    <div class="center bold">ALUR ANTRIAN:</div>
+    {{#if isBeliQueue}}
+    <div class="center">Beli & Tukar Tambah (A -> B -> C):</div>
+    <div class="center">A01->A50 => B01->B50 => C01->C50</div>
+    <div class="center">*Huruf antrian berganti setiap 50 nomor</div>
+    {{else}}
+    <div class="center">Jual & Servis (D -> E):</div>
+    <div class="center">D01->D50 => E01->E50</div>
+    <div class="center">*Huruf antrian berganti setiap 50 nomor</div>
+    {{/if}}
+    {{/if}}
+    {{/unless}}
+    <div class="center">--------------------------------------</div>
+    
+   {{!--
+    {{#if isEn}}
+    <div class="center bold">NOTES:</div>
+    <div class="left">- If your queue is missed by more than<br>&nbsp;&nbsp;10 numbers, please take a new one</div>
+    <div class="left">- If it is less than 10 numbers, please<br>&nbsp;&nbsp;confirm with staff to be called next</div>
+    {{else}}
+    <div class="center bold">CATATAN:</div>
+    <div class="left">- Jika antrian terlewat melebihi 10 nomor<br>&nbsp;&nbsp;antrian silahkan ambil antrian baru</div>
+    <div class="left">- Jika belum melebihi 10 nomor silahkan<br>&nbsp;&nbsp;konfirmasi ke staff untuk dipanggil<br>&nbsp;&nbsp;di antrian selanjutnya</div>
+    {{/if}}
+    <div class="center">--------------------------------------</div>
+    --}}
+ 
+    {{#if isEn}}
+    <div class="center">Please wait for your queue</div>
+    <div class="center">number to be called.</div>
+    <div class="center">Thank you for your visit.</div>
+    {{else}}
+    <div class="center">Sembari menunggu dipanggil, silahkan</div>
+    <div class="center">melihat-lihat koleksi perhiasan kami.</div>
+    <div class="center">Terima kasih atas kunjungannya Kak :)</div>
+    {{/if}}
+    <!-- Dot pembantu agar printer feed kertas sebelum memotong -->
+    <div style="margin-top: 15mm; font-size: 1px; color: #000; text-align: center;">.</div>
   </body>
 </html>

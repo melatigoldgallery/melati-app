@@ -646,6 +646,7 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
         ...payload,
         isEn,
         isBeliQueue,
+        isLegacy: !!payload.isLegacy,
         shopName: payload.floor === "L2" ? "MELATI GOLD YOUNG" : "MELATI GOLD SHOP",
         floorLabel: payload.floor === "L2"
           ? (isEn ? "* * 2ND FLOOR * *" : "* * LANTAI 2 * *")

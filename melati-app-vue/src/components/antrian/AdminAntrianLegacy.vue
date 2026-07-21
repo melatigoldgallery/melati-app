@@ -100,7 +100,7 @@
       <!-- Card 2: Handle Antrian Terlewat -->
       <div class="col-md-3 mb-4">
         <div class="card queue-card">
-          <div class="card-header d-flex justify-content-center p-2 text-white">
+          <div class="card-header d-flex justify-content-center p-2">
             <h6 class="card-title mb-0">
               <i class="fas fa-exclamation-circle me-2"></i>
               Handle Antrian Terlewat
@@ -1005,7 +1005,6 @@ onUnmounted(() => {
     var(--theme-antrian-card-header-start) 0%,
     var(--theme-antrian-card-header-end) 100%
   );
-  color: white;
   font-weight: 600;
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;

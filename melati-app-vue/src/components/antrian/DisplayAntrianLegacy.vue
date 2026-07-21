@@ -35,6 +35,14 @@
     <main class="container-fluid" style="max-width: 1800px; margin: 0 auto">
       <!-- Page Title -->
       <div class="page-title">
+        <button 
+          type="button" 
+          class="back-btn-kiosk position-absolute start-0 top-50 translate-middle-y"
+          @click="goBack"
+          title="Kembali"
+        >
+          <i class="fas fa-arrow-left"></i>
+        </button>
         <h1>ANTRIAN PELAYANAN</h1>
       </div>
 
@@ -109,7 +117,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
 import { subscribeQueue, formatQueue } from "@/services/antrian-service-legacy";
 
@@ -121,6 +129,12 @@ const currentTime = ref("");
 const currentDate = ref("");
 
 const route = useRoute();
+const router = useRouter();
+
+function goBack() {
+  router.back();
+}
+
 const activeFloor = computed(() => {
   const normalized = normalizeFloorId(route.query.floor, DEFAULT_FLOOR_ID);
   return normalized || DEFAULT_FLOOR_ID;
@@ -609,5 +623,34 @@ main {
 .card-fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Kiosk Back Button Styles */
+.back-btn-kiosk {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fffbf6;
+  font-size: 1.1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.back-btn-kiosk:hover {
+  background: rgba(212, 175, 55, 0.15);
+  color: #836720;
+  border-color: rgba(212, 175, 55, 0.7);
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2);
+}
+
+.back-btn-kiosk:active {
+  transform: scale(0.95);
 }
 </style>
