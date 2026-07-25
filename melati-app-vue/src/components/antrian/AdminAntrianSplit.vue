@@ -5,7 +5,9 @@
       <div>
         <h1 class="d-flex align-items-center gap-2">
           Sistem Antrian
+          <!-- Hidden printer status indicator (Path 1) -->
           <span 
+            v-if="false"
             class="printer-status-indicator fs-5 cursor-pointer d-inline-flex align-items-center justify-content-center"
             :class="printerIconClass"
             :title="printerStatusTooltip"
@@ -35,8 +37,9 @@
 
     <!-- Printer Paper Alert Banner -->
     <Transition name="fade">
+      <!-- Hidden printer paper alert banner (Path 1) -->
       <div 
-        v-if="printerStatus.total_prints >= printerStatus.threshold" 
+        v-if="false && printerStatus.total_prints >= printerStatus.threshold" 
         class="alert alert-dismissible fade show shadow-sm border-0 d-flex align-items-center gap-3 p-3 mb-4 animate-fade-in"
         :class="printerStatus.total_prints >= printerStatus.max_capacity ? 'alert-danger-custom' : 'alert-warning-custom'"
         role="alert"
@@ -822,8 +825,8 @@
       </div>
     </div>
     
-    <!-- Printer Status Modal Component -->
-    <PrinterStatusModal :printerStatus="printerStatus" :floorId="activeFloor" />
+    <!-- Printer Status Modal Component (Hidden in Path 1) -->
+    <PrinterStatusModal v-if="false" :printerStatus="printerStatus" :floorId="activeFloor" />
   </div>
 </template>
 
@@ -1773,7 +1776,7 @@ watch(activeFloor, async (newFloor) => {
   initDailyRosterSubscription();
   initActiveRoster();
   initClosingSettings();
-  initPrinterStatusSubscription();
+  // initPrinterStatusSubscription(); // Disabled in Path 1
 });
 
 onMounted(async () => {
@@ -1788,7 +1791,7 @@ onMounted(async () => {
   setupPrimeUnlockListeners();
   initDailyRosterSubscription();
   initActiveRoster();
-  initPrinterStatusSubscription();
+  // initPrinterStatusSubscription(); // Disabled in Path 1
 });
 
 onUnmounted(() => {

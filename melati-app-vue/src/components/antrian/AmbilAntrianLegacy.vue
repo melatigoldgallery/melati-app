@@ -673,7 +673,7 @@ onUnmounted(() => {
   background: transparent;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  color: #fffbf6; /* Dark color for light background contrast */
+  color: #ad9271; /* Dark color for light background contrast */
   font-size: 1.1rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;

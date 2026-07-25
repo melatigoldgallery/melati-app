@@ -77,15 +77,6 @@
 
       <!-- Main Options -->
       <main class="container my-auto animate-slide-up">
-        <!-- Printer Error Alert Banner -->
-        <div v-if="printerErrorMsg" class="alert-printer-error mx-auto mb-4 animate-fade-in">
-          <i class="fas fa-exclamation-triangle alert-icon-error"></i>
-          <div class="alert-content-error">
-            <strong class="alert-title-error">{{ t('printerErrorTitle') }}</strong>
-            <p class="alert-desc-error">{{ printerErrorMsg }}</p>
-          </div>
-        </div>
-
         <div class="row justify-content-center g-3 g-md-4">
           <!-- Option Jual -->
           <div class="col-12 col-md-5 d-flex align-items-stretch">
@@ -99,7 +90,7 @@
                 <span class="next-ticket-label">{{ t('queueLabel') }}</span>
                 <div class="next-ticket-number">{{ nextJualNumber }}</div>
               </div>
-              <button class="btn-action" @click="takeQueue('jual')" :disabled="loading || isPrinterDisabled">
+              <button class="btn-action" @click="takeQueue('jual')" :disabled="loading">
                 <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
               </button>
@@ -118,7 +109,7 @@
                 <span class="next-ticket-label">{{ t('queueLabel') }}</span>
                 <div class="next-ticket-number">{{ nextBeliNumber }}</div>
               </div>
-              <button class="btn-action" @click="takeQueue('beli')" :disabled="loading || isPrinterDisabled">
+              <button class="btn-action" @click="takeQueue('beli')" :disabled="loading">
                 <span>{{ t('takeQueue') }}</span>
                 <i class="fas fa-arrow-right ms-2"></i>
               </button>
@@ -371,95 +362,7 @@ let timer = null;
 let audioCtx = null;
 let unsubQueue = null;
 
-// Printer Offline & Hardware Error state
-const isPrinterOffline = ref(false);
-const isPrinterHardwareError = ref(false);
-const isCheckingPrinter = ref(false);
-
-const isPrinterDisabled = computed(() => {
-  return isPrinterOffline.value || isPrinterHardwareError.value;
-});
-
-const printerErrorMsg = computed(() => {
-  if (isPrinterOffline.value) {
-    return t("printerOfflineMsg");
-  }
-  if (isPrinterHardwareError.value) {
-    return t("paperOutMsg");
-  }
-  return "";
-});
-
 const isElectronApp = ref(false);
-let recoveryInterval = null;
-
-// Check physical printer status
-async function checkPhysicalPrinter() {
-  if (isCheckingPrinter.value) return;
-  isCheckingPrinter.value = true;
-  try {
-    if (!isElectronApp.value) {
-      isPrinterOffline.value = false;
-      isPrinterHardwareError.value = false;
-      return;
-    }
-    const printers = await getLocalPrinters();
-    const targetName = getTargetPrinter("queue");
-    
-    let targetPrinter = null;
-    if (targetName) {
-      targetPrinter = printers.find(p => p.name === targetName);
-    } else {
-      targetPrinter = printers.find(p => p.isDefault);
-    }
-    
-    if (!targetPrinter) {
-      isPrinterOffline.value = true;
-    } else {
-      // Check offline status
-      isPrinterOffline.value = targetPrinter.status !== "Ready";
-      
-      // Check specific hardware errors via DetectedErrorState:
-      // 3 = Low Paper, 4 = No Paper, 7 = Door Open, 8 = Jammed
-      const errState = targetPrinter.detectedErrorState || 0;
-      const hasHardwareError = [3, 4, 7, 8].includes(errState);
-      
-      if (hasHardwareError) {
-        isPrinterHardwareError.value = true;
-      } else if (targetPrinter.status === "Ready" && errState === 0) {
-        // Clear printer error if everything is fully ready and error is cleared
-        isPrinterHardwareError.value = false;
-      }
-    }
-  } catch (err) {
-    console.warn("Gagal memeriksa status printer fisik:", err);
-  } finally {
-    isCheckingPrinter.value = false;
-  }
-}
-
-// Auto-recovery polling only when in error/offline state
-function startRecoveryPolling() {
-  if (recoveryInterval) return;
-  recoveryInterval = setInterval(async () => {
-    await checkPhysicalPrinter();
-  }, 10000); // Poll every 10s
-}
-
-function stopRecoveryPolling() {
-  if (recoveryInterval) {
-    clearInterval(recoveryInterval);
-    recoveryInterval = null;
-  }
-}
-
-watch(isPrinterDisabled, (disabled) => {
-  if (disabled) {
-    startRecoveryPolling();
-  } else {
-    stopRecoveryPolling();
-  }
-});
 
 const queueState = ref({
   jual: { lastLetter: 0, lastNumber: 0 },
@@ -560,18 +463,15 @@ function subscribeToQueue() {
 onMounted(async () => {
   isElectronApp.value = isElectron();
   subscribeToQueue();
-  await checkPhysicalPrinter();
 });
 
 watch(activeFloor, async () => {
   subscribeToQueue();
-  await checkPhysicalPrinter();
 });
 
 onUnmounted(() => {
   if (unsubQueue) unsubQueue();
   if (timer) clearInterval(timer);
-  stopRecoveryPolling();
 });
 
 function playNotif() {
@@ -597,12 +497,6 @@ function playNotif() {
 
 async function takeQueue(type) {
   if (loading.value) return;
-  
-  // 0. Lazy check printer status before proceeding
-  await checkPhysicalPrinter();
-  if (isPrinterDisabled.value) {
-    return;
-  }
 
   loading.value = true;
   printStatus.value = "printing";
@@ -614,16 +508,6 @@ async function takeQueue(type) {
     newTicketType.value = type;
     showSuccess.value = true;
     playNotif();
-    
-    // Start countdown
-    countdown.value = 5;
-    if (timer) clearInterval(timer);
-    timer = setInterval(() => {
-      countdown.value--;
-      if (countdown.value <= 0) {
-        closeSuccess();
-      }
-    }, 1000);
 
     // 2. Call print service API
     const dateObj = new Date();
@@ -641,6 +525,8 @@ async function takeQueue(type) {
     saveToReprintHistory(type, ticketNum, dateStr, timeStr);
 
     let printed = false;
+    let timeoutDuration = 5;
+
     if (isElectronApp.value) {
       const printRes = await printJob("queue", {
         queueNumber: ticketNum,
@@ -654,13 +540,15 @@ async function takeQueue(type) {
       if (printRes && printRes.success) {
         printStatus.value = "success";
         printed = true;
+        timeoutDuration = 5;
       } else {
         printStatus.value = "error";
-        isPrinterHardwareError.value = true;
+        timeoutDuration = 15;
       }
     } else {
       printStatus.value = "success"; // Silent success for UI countdown / flow
       printed = true;
+      timeoutDuration = 5;
     }
 
     if (printed) {
@@ -670,12 +558,30 @@ async function takeQueue(type) {
         console.warn("Failed to increment print count:", e);
       }
     }
+
+    // Start countdown after final print status is resolved
+    countdown.value = timeoutDuration;
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      countdown.value--;
+      if (countdown.value <= 0) {
+        closeSuccess();
+      }
+    }, 1000);
+
   } catch (err) {
     console.error("Failed to take queue or print:", err);
     printStatus.value = isElectronApp.value ? "error" : "success";
-    if (isElectronApp.value) {
-      isPrinterHardwareError.value = true;
-    }
+    
+    // Start countdown for error (15 seconds)
+    countdown.value = isElectronApp.value ? 15 : 5;
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      countdown.value--;
+      if (countdown.value <= 0) {
+        closeSuccess();
+      }
+    }, 1000);
   } finally {
     loading.value = false;
   }
@@ -1255,7 +1161,7 @@ header.position-relative {
   background: transparent;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  color: #fffaee;
+  color: #ad9271;
   font-size: 1.1rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;

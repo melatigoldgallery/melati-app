@@ -25,6 +25,7 @@ app.on("certificate-error", (event, webContents, url, error, certificate, callba
 });
 
 let mainWindow = null;
+let sharedPrintWindow = null;
 
 // Path for WASAPI per-process volume control DLL
 const dllPath = path.join(app.getPath("userData"), "AudioControl_v4.dll");
@@ -337,6 +338,9 @@ app.whenReady().then(() => {
   ensureAudioControlDLL();
   createMainWindow();
 
+  // Warm up the shared print worker window (Path 1)
+  getSharedPrintWindow();
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
@@ -448,28 +452,73 @@ async function generateQRDataUrl(value) {
   }
 }
 
-/**
- * Prints a single copy of an HTML file using a temporary, isolated BrowserWindow.
- * Wraps the native callback-based webContents.print to block until the spooler accepts the job.
- */
-function printHTMLSingle(htmlPath, printerName) {
-  return new Promise((resolve, reject) => {
-    const workerWindow = new BrowserWindow({
+function getSharedPrintWindow() {
+  if (!sharedPrintWindow || sharedPrintWindow.isDestroyed()) {
+    sharedPrintWindow = new BrowserWindow({
       show: false,
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false
       }
     });
+  }
+  return sharedPrintWindow;
+}
+
+const printQueue = [];
+let isProcessingQueue = false;
+
+function enqueuePrintJob(htmlPath, printerName, printOptions) {
+  return new Promise((resolve, reject) => {
+    printQueue.push({ htmlPath, printerName, printOptions, resolve, reject });
+    processPrintQueue();
+  });
+}
+
+async function processPrintQueue() {
+  if (isProcessingQueue || printQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  const job = printQueue.shift();
+  try {
+    await executePrintJob(job.htmlPath, job.printerName, job.printOptions);
+    job.resolve();
+  } catch (err) {
+    console.error("Spooler job error:", err);
+    job.reject(err);
+  } finally {
+    isProcessingQueue = false;
+    processPrintQueue();
+  }
+}
+
+function executePrintJob(htmlPath, printerName, printOptions = {}) {
+  return new Promise((resolve, reject) => {
+    const workerWindow = getSharedPrintWindow();
+
+    const cleanup = () => {
+      workerWindow.webContents.removeAllListeners("did-finish-load");
+      workerWindow.webContents.removeAllListeners("did-fail-load");
+    };
 
     workerWindow.webContents.once("did-finish-load", () => {
-      workerWindow.webContents.print({
+      const defaultOptions = {
         silent: true,
         printBackground: true,
         deviceName: printerName,
-        copies: 1
-      }, (success, failureReason) => {
-        workerWindow.destroy();
+        copies: 1,
+        margins: {
+          marginType: "none"
+        }
+      };
+
+      const finalOptions = {
+        ...defaultOptions,
+        ...printOptions
+      };
+
+      workerWindow.webContents.print(finalOptions, (success, failureReason) => {
+        cleanup();
         if (success) {
           resolve();
         } else {
@@ -478,11 +527,23 @@ function printHTMLSingle(htmlPath, printerName) {
       });
     });
 
+    workerWindow.webContents.once("did-fail-load", (event, errorCode, errorDescription) => {
+      cleanup();
+      reject(new Error(`Failed to load temp HTML: ${errorDescription} (${errorCode})`));
+    });
+
     workerWindow.loadURL(`file://${htmlPath}`).catch((err) => {
-      workerWindow.destroy();
+      cleanup();
       reject(err);
     });
   });
+}
+
+/**
+ * Prints a single copy of an HTML file using pooled/reused BrowserWindow.
+ */
+function printHTMLSingle(htmlPath, printerName, printOptions) {
+  return enqueuePrintJob(htmlPath, printerName, printOptions);
 }
 
 // PowerShell Raw & Image Printer commands (compiled pure-JS without binary dependencies)
@@ -837,13 +898,56 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
     const tempHTMLPath = path.join(app.getPath("temp"), `print_${Date.now()}_${randomSuffix}.html`);
     fs.writeFileSync(tempHTMLPath, htmlString, "utf-8");
 
+    // Determine print options (pageSize in microns, landscape) based on print job type
+    let printOptions = {};
+    if (type === "queue") {
+      printOptions = {
+        pageSize: {
+          width: 72000,   // 72mm
+          height: 140000  // 140mm
+        }
+      };
+    } else if (type === "receipt") {
+      printOptions = {
+        pageSize: {
+          width: 72000,   // 72mm
+          height: 300000  // 300mm max height (actual height is content-driven via CSS size: 72mm auto)
+        }
+      };
+    } else if (type === "qr-sbpl" || type === "qr-silver") {
+      const pw = Number(payload.pageWidthMm) || 85;
+      const ph = Number(payload.pageHeightMm) || 28;
+      printOptions = {
+        pageSize: {
+          width: Math.round(pw * 1000),   // in microns
+          height: Math.round(ph * 1000)  // in microns
+        }
+      };
+    } else if (type === "nota-servis" || type === "nota-custom") {
+      printOptions = {
+        pageSize: {
+          width: 200000,   // 20cm
+          height: 129000   // 12.9cm
+        },
+        landscape: true
+      };
+    } else if (type === "invoice") {
+      printOptions = {
+        pageSize: {
+          width: 205000,   // 20.5cm
+          height: 105000   // 10.5cm
+        },
+        landscape: true
+      };
+    }
+
     try {
       for (let i = 0; i < copiesCount; i++) {
         if (i > 0) {
           // Wait 1.5 seconds between print jobs to allow the printer spooler to release the device lock
           await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500));
         }
-        await printHTMLSingle(tempHTMLPath, printerName);
+        await printHTMLSingle(tempHTMLPath, printerName, printOptions);
       }
       return { success: true };
     } catch (err) {
