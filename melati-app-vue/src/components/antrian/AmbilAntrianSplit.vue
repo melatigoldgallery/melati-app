@@ -72,6 +72,29 @@
           <img src="/img/Melati.jfif" alt="Logo" class="logo gold-shimmer" />
           <h1 class="brand-name">{{ brandName }}</h1>
         </div>
+
+        <!-- Floor Switcher Segmented Control -->
+        <div class="floor-switcher-wrapper mt-4 animate-fade-in">
+          <div class="floor-switcher-pill">
+            <button 
+              type="button"
+              class="floor-switcher-btn " 
+              :class="{ active: selectedFloor === 'L1' }" 
+              @click="selectedFloor = 'L1'"
+            >
+              <i class="fas fa-store me-2"></i> Lantai 1
+            </button>
+            <button 
+              type="button"
+              class="floor-switcher-btn" 
+              :class="{ active: selectedFloor === 'L2' }" 
+              @click="selectedFloor = 'L2'"
+            >
+              <i class="fas fa-store me-2"></i> Lantai 2
+            </button>
+          </div>
+        </div>
+
         <p class="subtitle text-muted mt-4 d-none d-md-block" v-html="t('subtitle')"></p>
       </header>
 
@@ -227,14 +250,36 @@ const router = useRouter();
 function goBack() {
   router.back();
 }
-const activeFloor = computed(() => {
+const kioskPhysicalFloor = computed(() => {
   const normalized = normalizeFloorId(route.query.floor, DEFAULT_FLOOR_ID);
   return normalized || DEFAULT_FLOOR_ID;
 });
 
+const selectedFloor = ref(kioskPhysicalFloor.value);
+
 const brandName = computed(() => {
-  return activeFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop";
+  return selectedFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop";
 });
+
+// Idle timeout safeguard for kiosk mode
+const idleTimer = ref(null);
+const IDLE_TIMEOUT_MS = 30000; // 30 seconds
+
+function resetIdleTimer() {
+  if (idleTimer.value) clearTimeout(idleTimer.value);
+  idleTimer.value = setTimeout(() => {
+    if (selectedFloor.value !== kioskPhysicalFloor.value) {
+      selectedFloor.value = kioskPhysicalFloor.value;
+    }
+    if (currentLang.value !== "id") {
+      currentLang.value = "id";
+    }
+  }, IDLE_TIMEOUT_MS);
+}
+
+function handleUserActivity() {
+  resetIdleTimer();
+}
 
 const PRINT_BASE = import.meta.env.VITE_PRINT_SERVICE_URL || "http://localhost:3001";
 
@@ -304,7 +349,7 @@ function saveToReprintHistory(type, ticketNum, dateStr, timeStr) {
     queueType: type === "jual" ? "Jual / Servis" : "Beli / Tukar Tambah",
     dateStr,
     timeStr,
-    floor: activeFloor.value,
+    floor: selectedFloor.value,
     lang: currentLang.value
   };
   
@@ -333,7 +378,9 @@ async function executeReprint(ticket) {
       
       if (printRes && printRes.success) {
         try {
-          await incrementPrintCount(ticket.floor);
+          // PENTING: Fitur dinonaktifkan/dikomentari saat ini.
+          // Jika diaktifkan nanti, counter akan ditambahkan ke printer fisik kiosk berada (kioskPhysicalFloor)!
+          // await incrementPrintCount(kioskPhysicalFloor.value);
         } catch (e) {
           console.warn("Failed to increment print count on reprint:", e);
         }
@@ -455,7 +502,7 @@ const nextBeliNumber = computed(() => {
 
 function subscribeToQueue() {
   if (unsubQueue) unsubQueue();
-  unsubQueue = subscribeQueue(activeFloor.value, (state) => {
+  unsubQueue = subscribeQueue(selectedFloor.value, (state) => {
     queueState.value = state;
   });
 }
@@ -463,15 +510,30 @@ function subscribeToQueue() {
 onMounted(async () => {
   isElectronApp.value = isElectron();
   subscribeToQueue();
+  resetIdleTimer();
+  
+  // Register inactivity listeners
+  window.addEventListener("click", handleUserActivity);
+  window.addEventListener("touchstart", handleUserActivity);
 });
 
-watch(activeFloor, async () => {
+watch(kioskPhysicalFloor, (newFloor) => {
+  selectedFloor.value = newFloor;
+});
+
+watch(selectedFloor, () => {
   subscribeToQueue();
+  resetIdleTimer();
 });
 
 onUnmounted(() => {
   if (unsubQueue) unsubQueue();
   if (timer) clearInterval(timer);
+  if (idleTimer.value) clearTimeout(idleTimer.value);
+  
+  // Clean up inactivity listeners
+  window.removeEventListener("click", handleUserActivity);
+  window.removeEventListener("touchstart", handleUserActivity);
 });
 
 function playNotif() {
@@ -503,7 +565,7 @@ async function takeQueue(type) {
   
   try {
     // 1. Generate number in Firebase RTDB
-    const ticketNum = await addCustomerQueue(type, activeFloor.value);
+    const ticketNum = await addCustomerQueue(type, selectedFloor.value);
     newTicketNumber.value = ticketNum;
     newTicketType.value = type;
     showSuccess.value = true;
@@ -533,7 +595,7 @@ async function takeQueue(type) {
         queueType: type === "jual" ? "Jual / Servis" : "Beli / Tukar Tambah",
         dateStr,
         timeStr,
-        floor: activeFloor.value,
+        floor: selectedFloor.value,
         lang: currentLang.value
       });
 
@@ -553,7 +615,9 @@ async function takeQueue(type) {
 
     if (printed) {
       try {
-        await incrementPrintCount(activeFloor.value);
+        // PENTING: Fitur dinonaktifkan/dikomentari saat ini.
+        // Jika diaktifkan nanti, counter akan ditambahkan ke printer fisik kiosk berada (kioskPhysicalFloor)!
+        // await incrementPrintCount(kioskPhysicalFloor.value);
       } catch (e) {
         console.warn("Failed to increment print count:", e);
       }
@@ -591,6 +655,10 @@ function closeSuccess() {
   if (timer) clearInterval(timer);
   showSuccess.value = false;
   currentLang.value = "id";
+  if (selectedFloor.value !== kioskPhysicalFloor.value) {
+    selectedFloor.value = kioskPhysicalFloor.value;
+  }
+  resetIdleTimer();
 }
 </script>
 
@@ -1073,6 +1141,70 @@ function closeSuccess() {
   background: linear-gradient(135deg, #f9d776, #9d7e2d);
   color: #ffffff;
   box-shadow: 0 4px 10px rgba(157, 126, 45, 0.2);
+}
+
+/* Floor Switcher Styles */
+.floor-switcher-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  z-index: 99;
+}
+.floor-switcher-pill {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 28px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(58, 44, 28, 0.06);
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+.floor-switcher-pill:hover {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.12);
+}
+.floor-switcher-btn {
+  border: none;
+  background: transparent;
+  padding: 12px 28px;
+  font-family: "Poppins", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #634b31;
+  border-radius: 26px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.floor-switcher-btn i {
+  font-size: 1.15rem;
+  transition: transform 0.3s ease;
+}
+.floor-switcher-btn.active {
+  background: linear-gradient(135deg, #3a2c1c, #634b31);
+  color: #ffffff;
+  box-shadow: 0 6px 15px rgba(58, 44, 28, 0.25);
+}
+.floor-switcher-btn.active i {
+  color: #f9d776;
+}
+.floor-switcher-btn:hover:not(.active) {
+  background: rgba(212, 175, 55, 0.12);
+  color: #836720;
+}
+.floor-switcher-btn:active {
+  transform: scale(0.97);
+}
+@media (max-width: 767px) {
+  .floor-switcher-btn {
+    padding: 10px 20px;
+    font-size: 1.05rem;
+  }
 }
 
 /* Position Adjustment for Header when toggle is absolute */

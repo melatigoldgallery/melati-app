@@ -47,8 +47,8 @@
                   v-for="card in dynamicCards" 
                   :key="card.id"
                   class="btn btn-xs rounded-pill px-3 transition-all fw-semibold text-nowrap"
-                  :class="activeCategoryFilter === getPrefix(card.id) ? 'btn-success shadow-sm' : 'btn-outline-secondary'"
-                  @click="activeCategoryFilter = getPrefix(card.id)"
+                  :class="activeCategoryFilter === card.id ? 'btn-success shadow-sm' : 'btn-outline-secondary'"
+                  @click="activeCategoryFilter = card.id"
                   :title="card.label"
                 >
                   {{ getPrefix(card.id) }}
@@ -186,7 +186,7 @@
                       </option>
                     </select>
                   </div>
-                  <div class="col-md-6 d-flex justify-content-start">
+                  <div class="col-md-9 d-flex justify-content-start">
                     <button 
                       class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
                       @click="addBarcodesToClip"
@@ -209,14 +209,23 @@
                 <i class="bi bi-list-task text-primary"></i>
                 <span>Daftar Barcode di Klip ({{ selectedClip.barcodes?.length || 0 }})</span>
               </h6>
-              <button 
-                v-if="selectedClip.barcodes?.length > 0"
-                class="btn btn-xs btn-outline-danger rounded-pill px-2" style="font-size: 13px;"
-                @click="clearAllBarcodes"
-                :disabled="saving"
-              >
-                Hapus Semua
-              </button>
+              <div v-if="selectedClip.barcodes?.length > 0" class="d-flex gap-2">
+                <button 
+                  class="btn btn-xs btn-outline-primary rounded-pill px-2.5" style="font-size: 13px;"
+                  @click="copyBarcodes"
+                  :disabled="saving"
+                >
+                  <i class="bi bi-clipboard me-1"></i>
+                  Salin Barcode
+                </button>
+                <button 
+                  class="btn btn-xs btn-outline-danger rounded-pill px-2.5" style="font-size: 13px;"
+                  @click="clearAllBarcodes"
+                  :disabled="saving"
+                >
+                  Hapus Semua
+                </button>
+              </div>
             </div>
 
             <div v-if="!selectedClip.barcodes || selectedClip.barcodes.length === 0" class="text-center py-4 border border-dashed rounded-3 bg-white mb-2">
@@ -331,11 +340,26 @@
                   </option>
                 </select>
               </div>
+              <!-- Dynamic sub-type selection dropdown (color or jewelry type) -->
+              <div class="mb-3" v-if="newClipCategory && newClipCategoryDetailOptions.length > 0">
+                <label class="form-label small fw-bold text-secondary">
+                  {{ newClipCategoryDetailMode === 'hala' ? 'Jenis Perhiasan' : 'Klasifikasi Warna' }}
+                </label>
+                <select v-model="newClipSubType" class="form-select form-select-sm border-2 rounded-2" required :disabled="creatingClip">
+                  <option value="" disabled>
+                    {{ newClipCategoryDetailMode === 'hala' ? '-- Pilih Jenis --' : '-- Pilih Warna --' }}
+                  </option>
+                  <option v-for="opt in newClipCategoryDetailOptions" :key="`new-clip-sub-${opt}`" :value="opt">
+                    {{ getNewClipDetailLabel(opt) }}
+                  </option>
+                </select>
+              </div>
+
               <div class="mb-3" v-if="newClipCategory">
                 <label class="form-label small fw-bold text-secondary">Suffix Kode Klip</label>
                 <div class="input-group input-group-sm">
                   <span class="input-group-text bg-light text-dark fw-bold monospace border-2 border-end-0 rounded-start-2">
-                    {{ getPrefix(newClipCategory) }}-
+                    {{ newClipPrefix }}-
                   </span>
                   <input 
                     v-model="newClipSuffix" 
@@ -350,7 +374,7 @@
               <!-- Code Preview -->
               <div v-if="newClipCategory && newClipSuffix" class="alert alert-info py-2 px-3 small border-0 rounded-2 monospace mb-0">
                 <div class="small text-muted">Pratinjau Kode:</div>
-                <strong class="text-primary">{{ getPrefix(newClipCategory) }}-{{ newClipSuffix }}</strong>
+                <strong class="text-primary">{{ newClipPrefix }}-{{ newClipSuffix }}</strong>
               </div>
             </div>
             <div class="modal-footer py-2.5 border-0 bg-light-subtle">
@@ -392,6 +416,7 @@ import {
   submitBarcodeMoveRequest,
   checkBarcodesStatus,
   parseBarcodeDetails,
+  deleteSingleBarcode,
 } from "@/services/barcode-service";
 
 import {
@@ -403,6 +428,10 @@ const props = defineProps({
   staffOptions: { type: Array, required: true },
   cards: { type: Array, required: true }, // nonComputerCards from parent
   tableRows: { type: Array, required: true },
+  colorTypes: { type: Array, default: () => [] },
+  colorLabels: { type: Object, default: () => ({}) },
+  halaTypes: { type: Array, default: () => [] },
+  halaLabels: { type: Object, default: () => ({}) },
 });
 
 const auth = useAuthStore();
@@ -414,7 +443,7 @@ const loadingClips = ref(false);
 const saving = ref(false);
 const selectedClip = ref(null);
 const searchQuery = ref("");
-const activeCategoryFilter = ref("KA");
+const activeCategoryFilter = ref("");
 
 // Barcode input and statuses
 const barcodeTextInput = ref("");
@@ -423,6 +452,7 @@ const barcodeInputCount = computed(() => {
 });
 const checkingStatus = ref(false);
 const barcodeStatuses = ref({}); // barcode -> { exists, location, category, detailType }
+const inputDetailType = ref("");
 
 // Mutation Action Form
 const petugasName = ref("");
@@ -435,6 +465,56 @@ let createModal = null;
 const creatingClip = ref(false);
 const newClipCategory = ref("");
 const newClipSuffix = ref("");
+const newClipSubType = ref("");
+
+// Computed helpers for dynamic details
+const selectedClipDetailMode = computed(() => {
+  if (!selectedClip.value) return "default";
+  const cat = selectedClip.value.category;
+  const card = props.cards.find(c => c.id === cat);
+  return card?.detailMode || "default";
+});
+
+const selectedClipDetailOptions = computed(() => {
+  const mode = selectedClipDetailMode.value;
+  if (mode === "color") return props.colorTypes || [];
+  if (mode === "hala") return props.halaTypes || [];
+  return [];
+});
+
+const newClipCategoryDetailMode = computed(() => {
+  if (!newClipCategory.value) return "default";
+  const card = props.cards.find(c => c.id === newClipCategory.value);
+  return card?.detailMode || "default";
+});
+
+const newClipCategoryDetailOptions = computed(() => {
+  const mode = newClipCategoryDetailMode.value;
+  if (mode === "color") return props.colorTypes || [];
+  if (mode === "hala") return props.halaTypes || [];
+  return [];
+});
+
+const newClipPrefix = computed(() => {
+  if (!newClipCategory.value) return "";
+  const catPrefix = getPrefix(newClipCategory.value);
+  if (newClipSubType.value) return `${catPrefix}-${newClipSubType.value}`;
+  return catPrefix;
+});
+
+function getDetailLabel(opt) {
+  const mode = selectedClipDetailMode.value;
+  if (mode === "color") return props.colorLabels[opt] || opt;
+  if (mode === "hala") return props.halaLabels[opt] || opt;
+  return opt;
+}
+
+function getNewClipDetailLabel(opt) {
+  const mode = newClipCategoryDetailMode.value;
+  if (mode === "color") return props.colorLabels[opt] || opt;
+  if (mode === "hala") return props.halaLabels[opt] || opt;
+  return opt;
+}
 
 // Listeners
 let unsubClips = null;
@@ -443,6 +523,13 @@ let unsubClips = null;
 const dynamicCards = computed(() => {
   return props.cards || [];
 });
+
+// Watch dynamicCards to set initial activeCategoryFilter to first card ID
+watch(dynamicCards, (newVal) => {
+  if (newVal && newVal.length > 0 && !activeCategoryFilter.value) {
+    activeCategoryFilter.value = newVal[0].id;
+  }
+}, { immediate: true });
 
 const belumPostingKey = computed(() => {
   if (!props.tableRows) return "posting";
@@ -466,7 +553,12 @@ const filteredClips = computed(() => {
   let list = clips.value;
   
   if (activeCategoryFilter.value) {
-    list = list.filter(c => c.type === activeCategoryFilter.value);
+    list = list.filter(c => {
+      if (c.category) return c.category === activeCategoryFilter.value;
+      const card = props.cards.find(card => card.id === activeCategoryFilter.value);
+      if (!card) return false;
+      return c.type === getPrefix(card.id);
+    });
   }
   
   if (searchQuery.value.trim()) {
@@ -477,6 +569,7 @@ const filteredClips = computed(() => {
   return list;
 });
 
+let lastClipId = null;
 // Watcher to load default note when selected clip changes
 watch(selectedClip, (newClip) => {
   barcodeStatuses.value = {}; // Clear status cache to force fresh verification!
@@ -484,8 +577,23 @@ watch(selectedClip, (newClip) => {
     notesInput.value = `Pindah data klip ${newClip.code}`;
     // Verify barcode statuses
     triggerBarcodeVerification(newClip.barcodes || []);
+    
+    // Only reset/update inputDetailType if a different clip is selected
+    if (newClip.id !== lastClipId) {
+      lastClipId = newClip.id;
+      const options = selectedClipDetailOptions.value;
+      if (newClip.subType && options.includes(newClip.subType)) {
+        inputDetailType.value = newClip.subType;
+      } else if (newClip.type && options.includes(newClip.type)) {
+        inputDetailType.value = newClip.type;
+      } else {
+        inputDetailType.value = "";
+      }
+    }
   } else {
+    lastClipId = null;
     notesInput.value = "";
+    inputDetailType.value = "";
   }
 });
 
@@ -704,7 +812,6 @@ async function addBarcodesToClip() {
 
     // Automatically register added barcodes to "Belum Posting" first
     const category = selectedClip.value.category || "KALUNG"; // Fallback to KALUNG for legacy docs
-    const defaultDetailType = getFallbackDetailType(category, addedList[0]);
     
     // Check barcode status to filter out those already in the target location
     let barcodesToRegister = [...addedList];
@@ -720,18 +827,42 @@ async function addBarcodesToClip() {
     }
 
     if (barcodesToRegister.length > 0) {
-      // Call mutation to register them as "Belum Posting"
-      await executeBarcodeMutation({
-        barcodes: barcodesToRegister,
-        origin: "",
-        destination: belumPostingKey.value,
-        pemindah: inputPetugasName.value,
-        notes: `Registrasi Klip: ${selectedClip.value.code}`,
-        floorId: auth.activeFloor,
-        defaultDetailType,
-        category: category,
-        allowCategoryOverride: true,
-      });
+      if (inputDetailType.value) {
+        // If a specific type is selected, use it for all barcodes in this addition
+        await executeBarcodeMutation({
+          barcodes: barcodesToRegister,
+          origin: "",
+          destination: belumPostingKey.value,
+          pemindah: inputPetugasName.value,
+          notes: `Registrasi Klip: ${selectedClip.value.code}`,
+          floorId: auth.activeFloor,
+          defaultDetailType: inputDetailType.value,
+          category: category,
+          allowCategoryOverride: true,
+        });
+      } else {
+        // Deteksi Otomatis: Group barcodes by their fallback detail type
+        const groups = {};
+        for (const bc of barcodesToRegister) {
+          const type = getFallbackDetailType(category, bc);
+          if (!groups[type]) groups[type] = [];
+          groups[type].push(bc);
+        }
+        
+        for (const [type, list] of Object.entries(groups)) {
+          await executeBarcodeMutation({
+            barcodes: list,
+            origin: "",
+            destination: belumPostingKey.value,
+            pemindah: inputPetugasName.value,
+            notes: `Registrasi Klip: ${selectedClip.value.code}`,
+            floorId: auth.activeFloor,
+            defaultDetailType: type,
+            category: category,
+            allowCategoryOverride: true,
+          });
+        }
+      }
     }
 
     // Save clip document with updated list
@@ -756,7 +887,7 @@ function getFallbackDetailType(mainCat, code) {
   const detailMode = matchedCard?.detailMode || "default";
 
   if (detailMode === "color") {
-    const types = getDynamicColorTypes();
+    const types = props.colorTypes || [];
     for (const key of types) {
       if (cleanCode.includes(key)) return key;
     }
@@ -764,7 +895,7 @@ function getFallbackDetailType(mainCat, code) {
   }
 
   if (detailMode === "hala") {
-    const types = getDynamicHalaTypes();
+    const types = props.halaTypes || [];
     for (const key of types) {
       const parts = [`-${key}-`, key];
       if (parts.some(p => cleanCode.includes(p))) return key;
@@ -777,13 +908,13 @@ function getFallbackDetailType(mainCat, code) {
 
 
 
-// Delete single barcode from clip list
+// Delete single barcode from clip list and database
 async function deleteSingleBarcodeFromClip(barcode) {
   if (!selectedClip.value) return;
 
   const result = await confirm({
-    title: "Hapus Barcode dari Klip?",
-    text: `Hapus barcode ${barcode} dari daftar klip ini? Data barcode di database tetap berada di lokasinya sekarang.`,
+    title: "Hapus Barcode?",
+    text: `Hapus barcode ${barcode} dari klip ini DAN hapus data fisiknya dari database? (Stok di sistem akan berkurang).`,
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Ya, Hapus",
@@ -794,23 +925,33 @@ async function deleteSingleBarcodeFromClip(barcode) {
 
   saving.value = true;
   try {
+    // 1. Delete from database first via Cloud Function
+    await deleteSingleBarcode({ barcodeId: barcode, floorId: auth.activeFloor });
+    
+    // 2. Remove from clip local list and update
     const nextList = (selectedClip.value.barcodes || []).filter(b => b !== barcode);
     await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
-    toast("Barcode berhasil dihapus dari klip.");
+    
+    toast("Barcode berhasil dihapus dari klip dan database.");
+    
+    // Trigger stock reload to update summary and rincian barcode
+    triggerParentReload();
   } catch (e) {
-    showError("Gagal menghapus barcode dari klip", e.message);
+    showError("Gagal menghapus barcode", e.message);
   } finally {
     saving.value = false;
   }
 }
 
-// Clear all barcodes in clip
+// Clear all barcodes in clip and database
 async function clearAllBarcodes() {
   if (!selectedClip.value) return;
+  const barcodesList = selectedClip.value.barcodes || [];
+  if (barcodesList.length === 0) return;
 
   const result = await confirm({
-    title: "Kosongkan Klip?",
-    text: "Hapus semua barcode di dalam klip ini? Data di database tidak akan terpengaruh.",
+    title: "Kosongkan Klip & Hapus Database?",
+    text: `Hapus semua (${barcodesList.length}) barcode dari klip ini DAN hapus data fisiknya dari database? (Stok di sistem akan berkurang).`,
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Ya, Kosongkan",
@@ -821,12 +962,36 @@ async function clearAllBarcodes() {
 
   saving.value = true;
   try {
+    // Delete all barcodes in parallel via Cloud Function
+    await Promise.all(barcodesList.map(bc => 
+      deleteSingleBarcode({ barcodeId: bc, floorId: auth.activeFloor })
+    ));
+
     await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: [] });
-    toast("Klip berhasil dikosongkan.");
+    toast("Klip dikosongkan dan semua barcode berhasil dihapus dari database.");
+    
+    // Trigger stock reload to update summary and rincian barcode
+    triggerParentReload();
   } catch (e) {
     showError("Gagal mengosongkan klip", e.message);
   } finally {
     saving.value = false;
+  }
+}
+
+// Copy all barcodes in clip to clipboard
+async function copyBarcodes() {
+  if (!selectedClip.value || !selectedClip.value.barcodes || selectedClip.value.barcodes.length === 0) {
+    return toast("Daftar barcode kosong", "warning");
+  }
+  
+  const barcodesText = selectedClip.value.barcodes.join("\n");
+  try {
+    await navigator.clipboard.writeText(barcodesText);
+    toast("Berhasil menyalin barcode ke clipboard.");
+  } catch (err) {
+    console.error("Gagal menyalin barcode: ", err);
+    showError("Gagal menyalin barcode ke clipboard.");
   }
 }
 
@@ -1029,10 +1194,16 @@ async function deleteSelectedClip() {
   }
 }
 
+// Watch newClipCategory to reset newClipSubType on change
+watch(newClipCategory, () => {
+  newClipSubType.value = "";
+});
+
 // Create clip modal helpers
 function openCreateModal() {
   newClipCategory.value = "";
   newClipSuffix.value = "";
+  newClipSubType.value = "";
   creatingClip.value = false;
   
   const el = document.getElementById("createClipModal");
@@ -1044,9 +1215,12 @@ function openCreateModal() {
 
 async function submitCreateClip() {
   if (!newClipCategory.value || !newClipSuffix.value.trim()) return;
+  if (newClipCategoryDetailOptions.value.length > 0 && !newClipSubType.value) {
+    return toast("Klasifikasi warna/jenis wajib dipilih", "warning");
+  }
   
   creatingClip.value = true;
-  const prefix = getPrefix(newClipCategory.value);
+  const prefix = newClipPrefix.value;
   const fullCode = `${prefix}-${newClipSuffix.value.trim().toUpperCase()}`;
 
   try {
@@ -1054,10 +1228,14 @@ async function submitCreateClip() {
       code: fullCode,
       type: prefix,
       category: newClipCategory.value,
+      subType: newClipSubType.value || null,
       barcodes: [],
     });
     
     toast(`Klip "${fullCode}" berhasil dibuat.`);
+    
+    // Auto switch filter category to match the category of the created clip
+    activeCategoryFilter.value = newClipCategory.value;
     
     // Auto select the new clip
     setTimeout(() => {

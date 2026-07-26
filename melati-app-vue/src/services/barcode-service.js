@@ -10,6 +10,7 @@ export const PREFIX_TO_CATEGORY = {
   S: "GIWANG",
   Z: "HALA & SDW",
   V: "HALA & SDW",
+  B: "BERLIAN",
 };
 
 export function parseBarcodes(text) {
@@ -18,9 +19,31 @@ export function parseBarcodes(text) {
 }
 
 export function parseBarcodeDetails(code, data) {
-  const prefix = code.charAt(0).toUpperCase();
-  let mainCat = PREFIX_TO_CATEGORY[prefix] || null;
+  const cleanCode = String(code || "").trim().toUpperCase();
+  const prefix2 = cleanCode.slice(0, 2);
+  const prefix1 = cleanCode.charAt(0);
+  
+  let mainCat = null;
+  if (prefix2 === "HL") {
+    mainCat = "HALA & SDW";
+  } else if (prefix2 === "KL") {
+    mainCat = "KENDARI & EMAS BALI";
+  } else if (prefix2 === "BL") {
+    mainCat = "BERLIAN";
+  } else {
+    mainCat = PREFIX_TO_CATEGORY[prefix1] || null;
+  }
+  
   let subType = null;
+  
+  // Generic dynamic subtype parser based on code structure (e.g. TE-CA-01 -> CA)
+  if (cleanCode.includes("-")) {
+    const parts = cleanCode.split("-");
+    if (parts.length >= 3) {
+      subType = parts[parts.length - 2];
+    }
+  }
+  
   let namaBarang = "";
   let kadar = "-";
   let berat = 0;
@@ -41,21 +64,24 @@ export function parseBarcodeDetails(code, data) {
       }
     }
     
-    if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
-      if (nama.includes("hijau")) subType = "HIJAU";
-      else if (nama.includes("biru")) subType = "BIRU";
-      else if (nama.includes("pink")) subType = "PINK";
-      else if (nama.includes("kuning")) subType = "KUNING";
-      else subType = "PUTIH";
-    } else if (mainCat === "HALA & SDW" || mainCat === "KENDARI & EMAS BALI") {
-      const lowerCode = code.toLowerCase();
-      if (lowerCode.includes("-ka-") || lowerCode.includes("ka")) subType = "KA";
-      else if (lowerCode.includes("-la-") || lowerCode.includes("la")) subType = "LA";
-      else if (lowerCode.includes("-an-") || lowerCode.includes("an")) subType = "AN";
-      else if (lowerCode.includes("-ca-") || lowerCode.includes("ca")) subType = "CA";
-      else if (lowerCode.includes("-sa-") || lowerCode.includes("sa")) subType = "SA";
-      else if (lowerCode.includes("-ga-") || lowerCode.includes("ga")) subType = "GA";
-      else subType = "KA";
+    // Only check fallback if subtype not resolved dynamically
+    if (!subType) {
+      if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
+        if (nama.includes("hijau")) subType = "HIJAU";
+        else if (nama.includes("biru")) subType = "BIRU";
+        else if (nama.includes("pink")) subType = "PINK";
+        else if (nama.includes("kuning")) subType = "KUNING";
+        else subType = "PUTIH";
+      } else if (mainCat === "HALA & SDW" || mainCat === "KENDARI & EMAS BALI" || mainCat === "BERLIAN") {
+        const lowerCode = code.toLowerCase();
+        if (lowerCode.includes("-ka-") || lowerCode.includes("ka")) subType = "KA";
+        else if (lowerCode.includes("-la-") || lowerCode.includes("la")) subType = "LA";
+        else if (lowerCode.includes("-an-") || lowerCode.includes("an")) subType = "AN";
+        else if (lowerCode.includes("-ca-") || lowerCode.includes("ca")) subType = "CA";
+        else if (lowerCode.includes("-sa-") || lowerCode.includes("sa")) subType = "SA";
+        else if (lowerCode.includes("-ga-") || lowerCode.includes("ga")) subType = "GA";
+        else subType = "KA";
+      }
     }
   }
   

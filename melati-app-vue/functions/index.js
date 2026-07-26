@@ -1553,30 +1553,54 @@ const PREFIX_TO_CATEGORY = {
   S: "GIWANG",
   Z: "HALA & SDW",
   V: "HALA & SDW",
+  B: "BERLIAN",
 };
 
 function parseBarcodeCategoryAndType(code) {
   const cleanCode = String(code || "").trim().toUpperCase();
+  const prefix2 = cleanCode.slice(0, 2);
   const prefix = cleanCode.charAt(0);
-  let mainCat = PREFIX_TO_CATEGORY[prefix] || "CINCIN";
+  
+  let mainCat = "CINCIN";
+  if (prefix2 === "HL") {
+    mainCat = "HALA & SDW";
+  } else if (prefix2 === "KL") {
+    mainCat = "KENDARI & EMAS BALI";
+  } else if (prefix2 === "BL") {
+    mainCat = "BERLIAN";
+  } else {
+    mainCat = PREFIX_TO_CATEGORY[prefix] || "CINCIN";
+  }
+  
   let subType = null;
+  
+  // Generic dynamic subtype parser based on code structure (e.g. TE-CA-01 -> CA)
+  if (cleanCode.includes("-")) {
+    const parts = cleanCode.split("-");
+    if (parts.length >= 3) {
+      subType = parts[parts.length - 2];
+    }
+  }
 
-  if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
-    const lower = cleanCode.toLowerCase();
-    if (lower.includes("hijau")) subType = "HIJAU";
-    else if (lower.includes("biru")) subType = "BIRU";
-    else if (lower.includes("pink")) subType = "PINK";
-    else if (lower.includes("kuning")) subType = "KUNING";
-    else subType = "PUTIH";
-  } else if (mainCat === "HALA & SDW") {
-    const lower = cleanCode.toLowerCase();
-    if (lower.includes("-ka-") || lower.includes("ka")) subType = "KA";
-    else if (lower.includes("-la-") || lower.includes("la")) subType = "LA";
-    else if (lower.includes("-an-") || lower.includes("an")) subType = "AN";
-    else if (lower.includes("-ca-") || lower.includes("ca")) subType = "CA";
-    else if (lower.includes("-sa-") || lower.includes("sa")) subType = "SA";
-    else if (lower.includes("-ga-") || lower.includes("ga")) subType = "GA";
-    else subType = "KA";
+  // Fallback to legacy checks if subtype is not resolved dynamically
+  if (!subType) {
+    if (mainCat === "KALUNG" || mainCat === "LIONTIN") {
+      const lower = cleanCode.toLowerCase();
+      if (lower.includes("hijau")) subType = "HIJAU";
+      else if (lower.includes("biru")) subType = "BIRU";
+      else if (lower.includes("pink")) subType = "PINK";
+      else if (lower.includes("kuning")) subType = "KUNING";
+      else subType = "PUTIH";
+    } else if (mainCat === "HALA & SDW" || mainCat === "KENDARI & EMAS BALI" || mainCat === "BERLIAN") {
+      const lower = cleanCode.toLowerCase();
+      if (lower.includes("-ka-") || lower.includes("ka")) subType = "KA";
+      else if (lower.includes("-la-") || lower.includes("la")) subType = "LA";
+      else if (lower.includes("-an-") || lower.includes("an")) subType = "AN";
+      else if (lower.includes("-ca-") || lower.includes("ca")) subType = "CA";
+      else if (lower.includes("-sa-") || lower.includes("sa")) subType = "SA";
+      else if (lower.includes("-ga-") || lower.includes("ga")) subType = "GA";
+      else subType = "KA";
+    }
   }
   
   return { mainCat, subType };
@@ -1649,6 +1673,27 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     stockDataMap[loc] = stockSnaps[idx].exists ? stockSnaps[idx].data() : {};
   });
 
+  // Step 2b: Read all clipCodes inside the transaction to check for auto-cleanup
+  const clipDocsToUpdate = [];
+  const isPostingDest = ["posting", "belum-posting", "belum_posting"].includes(destination);
+  if (!isPostingDest) {
+    const clipCodesRef = dbFloorRef.collection("clipCodes");
+    const clipCodesSnap = await t.get(clipCodesRef);
+    clipCodesSnap.forEach((clipSnap) => {
+      const clipData = clipSnap.data();
+      const clipBarcodes = clipData.barcodes || [];
+      const hasMovedBarcodes = clipBarcodes.some(bc => barcodeIds.includes(bc));
+      
+      if (hasMovedBarcodes) {
+        const cleanBarcodes = clipBarcodes.filter(bc => !barcodeIds.includes(bc));
+        clipDocsToUpdate.push({
+          ref: clipSnap.ref,
+          barcodes: cleanBarcodes
+        });
+      }
+    });
+  }
+
   // Step 3: Accumulate stock changes
   const changes = {};
   const addChange = (loc, cat, type, diff) => {
@@ -1691,6 +1736,14 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     // Ensure we delete it from history since it is now active again
     const historyRef = dbFloorRef.collection("barcodesHistory").doc(info.id);
     t.delete(historyRef);
+  });
+
+  // Update clip codes (auto-cleanup moved barcodes)
+  clipDocsToUpdate.forEach((item) => {
+    t.update(item.ref, {
+      barcodes: item.barcodes,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
   });
 
   // Write single history log document for the transaction
@@ -1753,12 +1806,14 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
           .filter(info => 
             (info.category === cat || info.oldCategory === cat) && 
             (info.resolvedOrigin === loc || destination === loc)
-          )
-          .map(info => info.id);
+          );
 
-        const truncatedBarcodes = relevantBarcodes.slice(0, 10);
+        const truncatedBarcodes = relevantBarcodes.slice(0, 10).map(info => ({
+          barcode: info.id,
+          detailType: info.detailType || info.oldDetailType || ""
+        }));
 
-        const historyOrigin = diffQty < 0 ? loc : (barcodeDetails.find(b => b.id === relevantBarcodes[0])?.resolvedOrigin || "any");
+        const historyOrigin = diffQty < 0 ? loc : (relevantBarcodes[0]?.resolvedOrigin || "any");
         const historyDest = destination;
 
         updatedCategory.history.unshift({

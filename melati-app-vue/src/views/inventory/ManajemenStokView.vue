@@ -398,6 +398,10 @@
           :staff-options="staffOptions"
           :cards="nonComputerCards"
           :table-rows="tableRows"
+          :color-types="COLOR_TYPES"
+          :color-labels="COLOR_LABELS"
+          :hala-types="HALA_TYPES"
+          :hala-labels="HALA_LABELS"
         />
       </div>
     </template>
@@ -618,18 +622,20 @@
                   </span>
                 </div>
               </div>
-              <!-- Dropdown Klasifikasi Dinamis (Hanya muncul jika ada barcode BARU dan kategori butuh warna/jenis) -->
-              <div v-if="currentDetailOptions.length > 0 && hasNewBarcode" class="mb-3">
-                <label class="form-label small fw-bold text-secondary">Klasifikasi Warna / Jenis (Untuk Barcode Baru)</label>
-                <select v-model="barcodeForm.detailType" class="form-select form-select-sm border-2 rounded-2" required>
-                  <option value="">-- Pilih Klasifikasi --</option>
+              <!-- Dropdown Klasifikasi Dinamis (Muncul jika kategori butuh warna/jenis) -->
+              <div v-if="currentDetailOptions.length > 0" class="mb-3">
+                <label class="form-label small fw-bold text-secondary">
+                  {{ hasNewBarcode ? 'Klasifikasi Warna / Jenis (Wajib untuk Barcode Baru)' : 'Koreksi / Ubah Klasifikasi Warna / Jenis (Opsional)' }}
+                </label>
+                <select v-model="barcodeForm.detailType" class="form-select form-select-sm border-2 rounded-2" :required="hasNewBarcode">
+                  <option value="">{{ hasNewBarcode ? '-- Pilih Klasifikasi --' : '-- Tetap (Tidak Ada Perubahan) --' }}</option>
                   <option v-for="opt in currentDetailOptions" :key="`classif-${opt}`" :value="opt">
                     {{ getDetailLabel(opt) }}
                   </option>
                 </select>
                 <div class="form-text text-muted small">
                   <i class="bi bi-info-circle text-info me-1"></i>
-                  Ditujukan bagi barcode baru agar terdaftar ke kelompok warna/jenis yang benar.
+                  {{ hasNewBarcode ? 'Wajib diisi untuk barcode baru agar terdaftar ke kelompok yang benar.' : 'Pilih jika ingin memindahkan/mengoreksi barcode yang terdaftar salah.' }}
                 </div>
               </div>
               <div class="mb-3">
@@ -1380,6 +1386,16 @@ function getFallbackDetailType(mainCat, code) {
   
   if (detailMode === "color") {
     const types = COLOR_TYPES.value;
+    
+    // Try dynamic parsing first if it contains hyphens
+    if (cleanCode.includes("-")) {
+      const parts = cleanCode.split("-");
+      if (parts.length >= 3) {
+        const parsedType = parts[parts.length - 2];
+        if (types.includes(parsedType)) return parsedType;
+      }
+    }
+    
     for (const key of types) {
       if (cleanCode.includes(key)) return key;
     }
@@ -1388,6 +1404,16 @@ function getFallbackDetailType(mainCat, code) {
   
   if (detailMode === "hala") {
     const types = HALA_TYPES.value;
+    
+    // Try dynamic parsing first if it contains hyphens (e.g. TE-GA-01 -> GA)
+    if (cleanCode.includes("-")) {
+      const parts = cleanCode.split("-");
+      if (parts.length >= 3) {
+        const parsedType = parts[parts.length - 2];
+        if (types.includes(parsedType)) return parsedType;
+      }
+    }
+    
     for (const key of types) {
       const parts = [`-${key}-`, key];
       if (parts.some(p => cleanCode.includes(p))) return key;
@@ -1422,7 +1448,7 @@ function getHistoryRecordClassification(mainCat, record) {
   if (!detailType) return "";
   const label = getTypeLabel(mainCat, detailType);
   const detailMode = getCardDetailMode(mainCat);
-  const prefix = detailMode === "hala" ? "Jenis" : "Warna";
+  const prefix = detailMode === "hala" ? "Jenis" : "Barcode";
   return `${prefix}: ${label}`;
 }
 
@@ -2329,7 +2355,14 @@ watch(
 
           // 3. Deteksi jika barcode sudah ada di lokasi tujuan terpilih (Client-side menggunakan cache)
           const dest = barcodeForm.value.destination;
-          const alreadyInDest = res.results.find(item => item.exists && item.location === dest);
+          const alreadyInDest = res.results.find(item => {
+            if (!item.exists || item.location !== dest) return false;
+            // Jika klasifikasi warna/jenis sedang dirubah, izinkan mutasi meskipun lokasi sama
+            if (barcodeForm.value.detailType && item.detailType !== barcodeForm.value.detailType) {
+              return false;
+            }
+            return true;
+          });
           if (alreadyInDest) {
             toast(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(barcodeForm.value.mainCat, alreadyInDest.location)})`, "warning");
             return;
@@ -2345,7 +2378,14 @@ watch(
             barcodeForm.value.barcodes = cleanParsed.join("\n");
             return;
           }
-        } else {
+
+          // 5. Auto-default classification based on barcode code if not set
+          if (!barcodeForm.value.detailType && parsed.length > 0) {
+            const detected = getFallbackDetailType(barcodeForm.value.mainCat, parsed[0]);
+            if (detected) {
+              barcodeForm.value.detailType = detected;
+            }
+          }
           hasNewBarcode.value = false;
           checkedBarcodesList.value = [];
         }
@@ -2385,7 +2425,14 @@ async function submitBarcodeUpdate() {
   if (barcodesArray.length === 0) return toast("Tidak ada barcode yang valid", "warning");
 
   const dest = barcodeForm.value.destination;
-  const alreadyInDest = checkedBarcodesList.value.find(item => item.exists && item.location === dest);
+  const alreadyInDest = checkedBarcodesList.value.find(item => {
+    if (!item.exists || item.location !== dest) return false;
+    // Jika klasifikasi warna/jenis sedang dirubah, izinkan mutasi meskipun lokasi sama
+    if (barcodeForm.value.detailType && item.detailType !== barcodeForm.value.detailType) {
+      return false;
+    }
+    return true;
+  });
   if (alreadyInDest) {
     return swal(`Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan`, "warning");
   }
@@ -2421,7 +2468,8 @@ async function submitBarcodeUpdate() {
           notes: barcodeForm.value.keterangan?.trim() || "",
           floorId: auth.activeFloor,
           defaultDetailType: barcodeForm.value.detailType,
-          category: barcodeForm.value.mainCat
+          category: barcodeForm.value.mainCat,
+          allowCategoryOverride: true
         });
       }
       toast("Mutasi barcode berhasil diproses langsung.");
@@ -2436,7 +2484,8 @@ async function submitBarcodeUpdate() {
           notes: barcodeForm.value.keterangan?.trim() || "",
           floorId: auth.activeFloor,
           defaultDetailType: barcodeForm.value.detailType,
-          category: barcodeForm.value.mainCat
+          category: barcodeForm.value.mainCat,
+          allowCategoryOverride: true
         });
       }
       toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
@@ -2672,7 +2721,7 @@ async function initDailySnapshots() {
 }
 
 async function handleStockReload() {
-  await loadData({ force: true });
+  await loadData({ force: true, silent: true });
 }
 
 onMounted(async () => {
