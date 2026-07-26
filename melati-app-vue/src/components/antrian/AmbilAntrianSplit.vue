@@ -74,7 +74,7 @@
         </div>
 
         <!-- Floor Switcher Segmented Control -->
-        <div class="floor-switcher-wrapper mt-4 animate-fade-in">
+        <div v-if="showFloorSwitcher" class="floor-switcher-wrapper mt-4 animate-fade-in">
           <div class="floor-switcher-pill">
             <button 
               type="button"
@@ -241,7 +241,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
-import { addCustomerQueue, subscribeQueue, padNumber, incrementPrintCount } from "@/services/antrian-service";
+import { addCustomerQueue, subscribeQueue, padNumber, incrementPrintCount, subscribeQueueGeneralSettings } from "@/services/antrian-service";
 import { isElectron, printJob, getLocalPrinters, getTargetPrinter } from "@/utils/printHelper";
 
 const route = useRoute();
@@ -256,6 +256,8 @@ const kioskPhysicalFloor = computed(() => {
 });
 
 const selectedFloor = ref(kioskPhysicalFloor.value);
+const showFloorSwitcher = ref(false);
+let unsubGeneralSettings = null;
 
 const brandName = computed(() => {
   return selectedFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop";
@@ -507,10 +509,18 @@ function subscribeToQueue() {
   });
 }
 
-onMounted(async () => {
+function subscribeToGeneralSettings() {
+  if (unsubGeneralSettings) unsubGeneralSettings();
+  unsubGeneralSettings = subscribeQueueGeneralSettings((settings) => {
+    showFloorSwitcher.value = settings.showFloorSwitcher || false;
+  }, kioskPhysicalFloor.value);
+}
+
+onMounted(() => {
   isElectronApp.value = isElectron();
   subscribeToQueue();
   resetIdleTimer();
+  subscribeToGeneralSettings();
   
   // Register inactivity listeners
   window.addEventListener("click", handleUserActivity);
@@ -528,6 +538,7 @@ watch(selectedFloor, () => {
 
 onUnmounted(() => {
   if (unsubQueue) unsubQueue();
+  if (unsubGeneralSettings) unsubGeneralSettings();
   if (timer) clearInterval(timer);
   if (idleTimer.value) clearTimeout(idleTimer.value);
   

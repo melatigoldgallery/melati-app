@@ -1,6 +1,6 @@
 import { rtdb, db } from "@/config/firebase";
 import { ref as dbRef, onValue, set, get, push, remove, increment, update } from "firebase/database";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { floorDataRef, floorDataRefWithFloorId, floorDoc } from "./floor-scope";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -114,6 +114,15 @@ export async function nextQueue(type, state, floorId = "") {
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
   const letters = type === "jual" ? ["D", "E"] : ["A", "B", "C"];
+  const maxIdx = letters.length * 50;
+  
+  const currentIdx = currentLetter * 50 + currentNumber;
+  const lastIdx = lastLetter * 50 + lastNumber;
+  const nextAfterLastIdx = (lastIdx % maxIdx) + 1;
+  
+  if (lastNumber !== 0 && currentIdx === nextAfterLastIdx) {
+    return state;
+  }
   
   currentNumber++;
   if (currentNumber > 50) {
@@ -569,7 +578,8 @@ export async function fetchQueueGeneralSettings(floorId = "") {
     if (snap.exists()) {
       return {
         queueMode: snap.data().queueMode || "legacy",
-        hybridMode: snap.data().hybridMode || false
+        hybridMode: snap.data().hybridMode || false,
+        showFloorSwitcher: snap.data().showFloorSwitcher || false
       };
     }
   } catch (error) {
@@ -577,7 +587,8 @@ export async function fetchQueueGeneralSettings(floorId = "") {
   }
   return {
     queueMode: "legacy",
-    hybridMode: false
+    hybridMode: false,
+    showFloorSwitcher: false
   };
 }
 
@@ -586,8 +597,28 @@ export async function saveQueueGeneralSettings(floorId, data) {
   await setDoc(docRef, {
     queueMode: data.queueMode || "legacy",
     hybridMode: !!data.hybridMode,
+    showFloorSwitcher: !!data.showFloorSwitcher,
     lastUpdated: new Date().toISOString()
   }, { merge: true });
+}
+
+export function subscribeQueueGeneralSettings(callback, floorId = "") {
+  const docRef = floorDoc(db, "queueSettings", "general", floorId);
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      callback({
+        queueMode: snap.data().queueMode || "legacy",
+        hybridMode: snap.data().hybridMode || false,
+        showFloorSwitcher: snap.data().showFloorSwitcher || false
+      });
+    } else {
+      callback({
+        queueMode: "legacy",
+        hybridMode: false,
+        showFloorSwitcher: false
+      });
+    }
+  });
 }
 
 export async function nextQueueHybrid(type, state, floorId = "") {

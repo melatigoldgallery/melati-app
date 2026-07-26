@@ -137,7 +137,7 @@
                   >
                     <i class="fas fa-bullhorn"></i> Panggil
                   </button>
-                  <button class="btn btn-outline-success" @click="openServeConfirm('beli')" :disabled="busy || (!hybridMode && state.beli.currentNumber === 0 && state.beli.lastNumber === 0)">
+                  <button class="btn btn-outline-success" @click="openServeConfirm('beli')" :disabled="busy || (!hybridMode && unservedBeliCount === 0)">
                     <i class="fas fa-check-circle"></i> Sudah Dilayani
                   </button>
                   <button class="btn btn-outline-secondary" @click="openDelay('beli')" :disabled="busy || beliCurrentQueueStr === '-'">
@@ -243,7 +243,7 @@
                   >
                     <i class="fas fa-bullhorn"></i> Panggil
                   </button>
-                  <button class="btn btn-outline-success" @click="openServeConfirm('jual')" :disabled="busy || (!hybridMode && state.jual.currentNumber === 0 && state.jual.lastNumber === 0)">
+                  <button class="btn btn-outline-success" @click="openServeConfirm('jual')" :disabled="busy || (!hybridMode && unservedJualCount === 0)">
                     <i class="fas fa-check-circle"></i> Sudah Dilayani
                   </button>
                   <button class="btn btn-outline-secondary" @click="openDelay('jual')" :disabled="busy || jualCurrentQueueStr === '-'">
@@ -1355,6 +1355,12 @@ async function confirmServed() {
   modal("confirmModal").hide();
   try {
     const type = modalQueueType.value;
+    const unservedCount = type === "jual" ? unservedJualCount.value : unservedBeliCount.value;
+    if (!hybridMode.value && unservedCount === 0) {
+      busy.value = false;
+      return;
+    }
+
     const qState = state.value[type];
     const curStr = type === "jual" ? jualCurrentQueueStr.value : beliCurrentQueueStr.value;
     

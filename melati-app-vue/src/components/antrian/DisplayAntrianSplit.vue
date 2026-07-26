@@ -43,7 +43,7 @@
         <!-- Column 1: Jual Perhiasan -->
         <div class="col-12 col-lg-6">
           <div class="section-title text-center mb-3">
-            <h2>JUAL EMAS / SERVIS</h2>
+            <h2>JUAL / SERVIS</h2>
           </div>
           <div class="row g-2 justify-content-center align-items-stretch">
             <!-- Current Queue Card -->

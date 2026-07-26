@@ -68,6 +68,27 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Floor Switcher Toggle -->
+                  <div class="col-12 border-top pt-3 mt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <h6 class="mb-0 fw-semibold">Aktifkan Switcher Lantai di Kiosk</h6>
+                        <small class="text-muted">
+                          Menampilkan tombol pemilih lantai di kiosk pengambilan antrean (kiosk) agar pelanggan bisa mengambil antrean lantai lain.
+                        </small>
+                      </div>
+                      <div class="form-check form-switch" style="font-size: 1.4rem">
+                        <input
+                          v-model="generalForm.showFloorSwitcher"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          style="cursor: pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -361,7 +382,7 @@ const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
 const quotaForm = reactive({ morningJualQuota: 2, afternoonJualQuota: 3 });
-const generalForm = reactive({ queueMode: "legacy", hybridMode: false });
+const generalForm = reactive({ queueMode: "legacy", hybridMode: false, showFloorSwitcher: false });
 
 
 
@@ -457,6 +478,7 @@ async function loadAllSettings() {
     const generalData = await fetchQueueGeneralSettings(floorId);
     generalForm.queueMode = generalData.queueMode || "legacy";
     generalForm.hybridMode = generalData.hybridMode || false;
+    generalForm.showFloorSwitcher = generalData.showFloorSwitcher || false;
   } catch (error) {
     console.error("Failed to load floor-scoped settings", error);
   }
@@ -538,7 +560,8 @@ async function saveSettings() {
     // Save General Queue Mode and Hybrid settings
     await saveQueueGeneralSettings(floorId, {
       queueMode: generalForm.queueMode,
-      hybridMode: !!generalForm.hybridMode
+      hybridMode: !!generalForm.hybridMode,
+      showFloorSwitcher: !!generalForm.showFloorSwitcher
     });
 
     await Swal.fire({
@@ -577,8 +600,7 @@ async function resetToDefault() {
   quotaForm.afternoonJualQuota = 3;
   generalForm.queueMode = "legacy";
   generalForm.hybridMode = false;
-
-
+  generalForm.showFloorSwitcher = false;
 }
 
 async function testPlay() {
