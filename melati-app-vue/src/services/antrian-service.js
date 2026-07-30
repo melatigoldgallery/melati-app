@@ -474,21 +474,55 @@ export async function fetchQueueQuotaSettings(floorId = "") {
   };
 }
 
+const WITA_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+export function getNowWITA() {
+  const date = new Date();
+  const utcMs = date.getTime() + date.getTimezoneOffset() * 60_000;
+  return new Date(utcMs + WITA_OFFSET_MS);
+}
+
+export function getTodayStringWITA() {
+  const d = getNowWITA();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function getISOStringWITA() {
+  const d = getNowWITA();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${day}T${h}:${min}:${s}+08:00`;
+}
+
 export async function saveQueueQuotaSettings(floorId, data) {
   const docRef = floorDoc(db, "queueSettings", "quota", floorId);
   await setDoc(docRef, {
     morningJualQuota: Number(data.morningJualQuota) || 2,
     afternoonJualQuota: Number(data.afternoonJualQuota) || 3,
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: getISOStringWITA(),
   }, { merge: true });
+}
+
+function getRosterHistoryDocRef(floorId) {
+  const resolved = String(floorId || "").trim().toUpperCase();
+  const validFloor = resolved === "L2" ? "L2" : "L1";
+  return doc(db, "floors", validFloor, "queueSettings", "rosterHistory");
 }
 
 export async function fetchRosterHistory(floorId = "") {
   try {
-    const docRef = floorDoc(db, "queueSettings", "rosterHistory", floorId);
+    const docRef = getRosterHistoryDocRef(floorId);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      return snap.data().history || {};
+      const data = snap.data();
+      return data.history || data || {};
     }
   } catch (error) {
     console.error("Error fetching roster history", error);
@@ -496,11 +530,30 @@ export async function fetchRosterHistory(floorId = "") {
   return {};
 }
 
+export function subscribeRosterHistory(floorId = "", callback) {
+  const docRef = getRosterHistoryDocRef(floorId);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        callback(data.history || data || {});
+      } else {
+        callback({});
+      }
+    },
+    (error) => {
+      console.error("Error subscribing to roster history:", error);
+      callback({});
+    }
+  );
+}
+
 export async function saveRosterHistory(floorId, history) {
-  const docRef = floorDoc(db, "queueSettings", "rosterHistory", floorId);
+  const docRef = getRosterHistoryDocRef(floorId);
   await setDoc(docRef, {
     history: history || {},
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: getISOStringWITA(),
   }, { merge: true });
 }
 
@@ -527,40 +580,183 @@ export function subscribeActiveRoster(date, shift, floorId, callback) {
   });
 }
 
+export function buildHistoryTimeline(history, excludeDate = "", excludeShift = "") {
+  if (!history || typeof history !== "object") return [];
+
+  const timeline = [];
+  const dateKeys = Object.keys(history).sort();
+
+  dateKeys.forEach(dateKey => {
+    const val = history[dateKey];
+    if (!val) return;
+
+    const isSameDate = excludeDate && dateKey === excludeDate;
+
+    if (Array.isArray(val)) {
+      if (!isSameDate) {
+        timeline.push({
+          key: dateKey,
+          dateStr: dateKey.split("_")[0],
+          jual: val.map(n => String(n).trim()).filter(Boolean)
+        });
+      }
+    } else if (typeof val === "object") {
+      if (Array.isArray(val.morning) && val.morning.length > 0) {
+        if (!(isSameDate && excludeShift === "morning")) {
+          timeline.push({
+            key: `${dateKey}_morning`,
+            dateStr: dateKey,
+            shift: "morning",
+            jual: val.morning.map(n => String(n).trim()).filter(Boolean)
+          });
+        }
+      }
+      if (Array.isArray(val.afternoon) && val.afternoon.length > 0) {
+        if (!(isSameDate && excludeShift === "afternoon")) {
+          timeline.push({
+            key: `${dateKey}_afternoon`,
+            dateStr: dateKey,
+            shift: "afternoon",
+            jual: val.afternoon.map(n => String(n).trim()).filter(Boolean)
+          });
+        }
+      }
+      if (Array.isArray(val.legacy) && val.legacy.length > 0 && !val.morning && !val.afternoon) {
+        if (!isSameDate) {
+          timeline.push({
+            key: dateKey,
+            dateStr: dateKey,
+            jual: val.legacy.map(n => String(n).trim()).filter(Boolean)
+          });
+        }
+      }
+    }
+  });
+
+  return timeline;
+}
+
+export function getStaffRosterStats(history, staffName, currentDate = "", currentShift = "") {
+  if (!staffName) return { text: "", badgeClass: "bg-light text-muted", isNever: true, count: 0 };
+  const target = String(staffName).trim().toLowerCase();
+  
+  const timeline = buildHistoryTimeline(history, currentDate, currentShift).slice(-60);
+  
+  let lastEvent = null;
+  let lastIdx = -1;
+  let count = 0;
+
+  timeline.forEach((event, idx) => {
+    const match = (event.jual || []).some(n => String(n).trim().toLowerCase() === target);
+    if (match) {
+      count++;
+      lastIdx = idx;
+      lastEvent = event;
+    }
+  });
+
+  if (lastIdx === -1) {
+    return {
+      text: "",
+      badgeClass: "",
+      isNever: true,
+      count: 0
+    };
+  }
+
+  const dateStr = lastEvent?.dateStr || "";
+  let daysAgoText = "";
+  if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const lastDate = new Date(dateStr + "T00:00:00");
+    const todayStr = currentDate || getTodayStringWITA();
+    const todayDate = new Date(todayStr + "T00:00:00");
+    const diffDays = Math.round((todayDate - lastDate) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 0) {
+      daysAgoText = lastEvent.shift === "morning" ? "Jual Pagi Ini" : "Jual Hari Ini";
+    } else if (diffDays === 1) {
+      daysAgoText = lastEvent.shift === "morning" ? "Jual Pagi Kemarin" : "Jual Kemarin";
+    } else {
+      daysAgoText = `Jual ${diffDays} hr lalu`;
+    }
+  } else {
+    daysAgoText = "Pernah Jual";
+  }
+
+  const isRecent = (timeline.length - 1 - lastIdx) <= 2;
+  const badgeClass = isRecent
+    ? "bg-warning bg-opacity-10 text-dark border border-warning border-opacity-20"
+    : "bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-20";
+
+  return {
+    text: daysAgoText,
+    badgeClass,
+    isNever: false,
+    count
+  };
+}
+
 export function calculateAutoRotation(activeSales, history, floorId, shift, quota) {
-  const staffList = (activeSales || []).map(n => String(n).trim());
+  const staffList = (activeSales || []).map(n => String(n).trim()).filter(Boolean);
   if (staffList.length === 0) {
     return { jual: [], beli: [] };
   }
 
-  // Count Jual appearances in the history (last 7 days/entries)
-  const jualCounts = {};
+  const todayStr = getTodayStringWITA();
+  const timeline = buildHistoryTimeline(history, todayStr, shift).slice(-60);
+
+  const staffStats = {};
   staffList.forEach(name => {
-    jualCounts[name.toLowerCase()] = 0;
+    const norm = name.toLowerCase();
+    staffStats[norm] = {
+      name,
+      jualCount: 0,
+      lastJualIndex: -1,
+      neverServed: true
+    };
   });
 
-  const historyKeys = Object.keys(history || {}).sort().slice(-7);
-  historyKeys.forEach(dateKey => {
-    const jualList = history[dateKey] || [];
-    jualList.forEach(name => {
-      const normalized = String(name).trim().toLowerCase();
-      if (jualCounts[normalized] !== undefined) {
-        jualCounts[normalized]++;
+  timeline.forEach((event, idx) => {
+    (event.jual || []).forEach(rawName => {
+      const norm = String(rawName).trim().toLowerCase();
+      if (staffStats[norm]) {
+        staffStats[norm].jualCount += 1;
+        staffStats[norm].lastJualIndex = idx;
+        staffStats[norm].neverServed = false;
       }
     });
   });
 
-  // Sort staff by frequency (ascending) and then alphabetically by name
+  const seedString = `${todayStr}_${floorId || 'L1'}_${shift || 'morning'}`;
+  const seedHash = Array.from(seedString).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+
+  const getTieBreakerRank = (name) => {
+    const nameHash = Array.from(name.toLowerCase()).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    return (nameHash * 31 + seedHash) % 1000;
+  };
+
   const sortedStaff = [...staffList].sort((a, b) => {
-    const countA = jualCounts[a.toLowerCase()] || 0;
-    const countB = jualCounts[b.toLowerCase()] || 0;
-    if (countA !== countB) {
-      return countA - countB;
+    const statA = staffStats[a.toLowerCase()];
+    const statB = staffStats[b.toLowerCase()];
+
+    // Tier 1: Never served Jual comes first
+    if (statA.neverServed !== statB.neverServed) {
+      return statA.neverServed ? -1 : 1;
     }
-    return a.localeCompare(b);
+
+    // Tier 2: Recency - staff who served Jual longest ago (smaller lastJualIndex) comes first
+    if (statA.lastJualIndex !== statB.lastJualIndex) {
+      return statA.lastJualIndex - statB.lastJualIndex;
+    }
+
+    // Tier 3: Total frequency - staff with fewer Jual assignments comes first
+    if (statA.jualCount !== statB.jualCount) {
+      return statA.jualCount - statB.jualCount;
+    }
+
+    // Tier 4: Daily rotating tie-breaker seed instead of permanent alphabetical bias
+    return getTieBreakerRank(a) - getTieBreakerRank(b);
   });
 
-  // Assign top N as Jual, others as Beli
   const targetQuota = Math.max(1, Number(quota) || 2);
   const jualStaff = sortedStaff.slice(0, targetQuota);
   const beliStaff = sortedStaff.slice(targetQuota);

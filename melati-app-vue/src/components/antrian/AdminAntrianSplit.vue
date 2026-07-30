@@ -700,10 +700,39 @@
                         </label>
                       </div>
 
-                      <!-- Locked Badge -->
-                      <span v-if="isNameLocked(att.name)" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 small py-0.5">
-                        Aktif di {{ activeFloor === 'L1' ? 'L2' : 'L1' }}
-                      </span>
+                      <!-- Rotation Status & Locked Badge -->
+                      <div class="d-flex align-items-center gap-1">
+                        <span v-if="isNameLocked(att.name)" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 small py-0.5">
+                          Aktif di {{ activeFloor === 'L1' ? 'L2' : 'L1' }}
+                        </span>
+                        <template v-else>
+                          <!-- Live Preview Duty Badge -->
+                          <span
+                            v-if="selectedSalesNames.includes(att.name) && previewRotation.jual.map(n => n.trim()).includes(att.name.trim())"
+                            class="badge bg-warning bg-opacity-15 text-dark border border-warning border-opacity-30 small py-0.5"
+                            style="font-size: 0.72rem; font-weight: 600;"
+                          >
+                            <i class="fas fa-star text-warning me-1"></i>Jual
+                          </span>
+                          <span
+                            v-else-if="selectedSalesNames.includes(att.name)"
+                            class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 small py-0.5"
+                            style="font-size: 0.72rem; font-weight: 600;"
+                          >
+                            <i class="fas fa-shopping-bag text-primary me-1"></i>Beli
+                          </span>
+
+                          <!-- Past History Badge -->
+                          <span
+                            v-if="getStaffRosterStats(rosterHistory, att.name, todayStringWITA(), getCurrentShift()).text"
+                            class="badge small py-0.5"
+                            :class="getStaffRosterStats(rosterHistory, att.name, todayStringWITA(), getCurrentShift()).badgeClass"
+                            style="font-size: 0.72rem; font-weight: 500;"
+                          >
+                            {{ getStaffRosterStats(rosterHistory, att.name, todayStringWITA(), getCurrentShift()).text }}
+                          </span>
+                        </template>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -862,6 +891,8 @@ import {
   fetchRosterHistory,
   saveRosterHistory,
   calculateAutoRotation,
+  getStaffRosterStats,
+  subscribeRosterHistory,
   fetchQueueGeneralSettings,
   nextQueueHybrid,
   subscribePrinterStatus,
@@ -950,7 +981,7 @@ const DEFAULT_REMINDER_MAX_CLICKS = DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS.remind
 
 const activeRoster = ref(null);
 let unsubActiveRoster = null;
-const { todayStringWITA } = useWITA();
+const { todayStringWITA, nowWITA } = useWITA();
 
 // Roster states
 const attendanceList = ref([]);
@@ -1103,6 +1134,8 @@ let unlockAudioHandler = null;
 let schedulerActive = false;
 const closingTimeoutIds = new Set();
 
+let unsubRosterHistoryModal = null;
+
 function modal(id) {
   return Modal.getOrCreateInstance(document.getElementById(id));
 }
@@ -1117,12 +1150,17 @@ async function openRosterModal() {
 
     searchQuery.value = ""; // Reset search query on open
 
+    // Real-time Firestore subscription while modal is open
+    if (unsubRosterHistoryModal) unsubRosterHistoryModal();
+    unsubRosterHistoryModal = subscribeRosterHistory(floorId, (historyData) => {
+      rosterHistory.value = historyData;
+    });
+
     // Fetch master attendance from L1
     const attData = await fetchAttendanceByRange(today, today, currentShift, "", "L1");
     attendanceList.value = attData;
 
-    // Fetch history and quota
-    rosterHistory.value = await fetchRosterHistory(floorId);
+    // Fetch quota
     quotaSettings.value = await fetchQueueQuotaSettings(floorId);
 
     // Initialize selected checklist from RTB data if exists, otherwise empty
@@ -1623,7 +1661,7 @@ async function announceClosingNow() {
 }
 
 function getCurrentShift() {
-  const hour = new Date().getHours();
+  const hour = nowWITA().getHours();
   return hour < 14 ? "morning" : "afternoon";
 }
 
@@ -1637,7 +1675,26 @@ function isNameLocked(name) {
 }
 
 const previewRotation = computed(() => {
+  const today = todayStringWITA();
   const currentShift = getCurrentShift();
+  const floorId = activeFloor.value;
+  const history = rosterHistory.value || {};
+  const todayRecord = history[today];
+
+  // 1. Direct real-time read from Firestore rosterHistory for today's shift if present
+  if (todayRecord && Array.isArray(todayRecord[currentShift]) && todayRecord[currentShift].length > 0) {
+    const savedJual = todayRecord[currentShift];
+    const savedJualNorm = savedJual.map(n => String(n).trim().toLowerCase());
+    const beliStaff = selectedSalesNames.value.filter(
+      name => !savedJualNorm.includes(String(name).trim().toLowerCase())
+    );
+    return {
+      jual: savedJual,
+      beli: beliStaff
+    };
+  }
+
+  // 2. Fallback to calculateAutoRotation
   const quota = currentShift === "morning"
     ? quotaSettings.value.morningJualQuota || 2
     : quotaSettings.value.afternoonJualQuota || 3;
@@ -1645,7 +1702,7 @@ const previewRotation = computed(() => {
   return calculateAutoRotation(
     selectedSalesNames.value,
     rosterHistory.value,
-    activeFloor.value,
+    floorId,
     currentShift,
     quota
   );
@@ -1675,14 +1732,27 @@ async function saveRosterSelection() {
       beliList
     );
 
-    // Save history (write to firestore)
+    // Save history to Firestore (fetch latest to prevent parallel overwrite, store shift object per date)
     const history = await fetchRosterHistory(floorId);
-    history[today] = jualList;
-    const historyKeys = Object.keys(history).sort();
-    if (historyKeys.length > 14) {
-      delete history[historyKeys[0]];
+    let dateRecord = history[today];
+    if (!dateRecord || Array.isArray(dateRecord)) {
+      const legacyArr = Array.isArray(dateRecord) ? dateRecord : [];
+      dateRecord = legacyArr.length > 0 ? { legacy: legacyArr } : {};
     }
+
+    dateRecord[currentShift] = jualList;
+    dateRecord.lastUpdated = new Date().toISOString();
+    history[today] = dateRecord;
+
+    // Retain last 30 date keys
+    const historyKeys = Object.keys(history).sort();
+    while (historyKeys.length > 30) {
+      const oldest = historyKeys.shift();
+      delete history[oldest];
+    }
+
     await saveRosterHistory(floorId, history);
+    rosterHistory.value = history;
 
     modal("rosterModal").hide();
 
@@ -1798,6 +1868,16 @@ onMounted(async () => {
   initDailyRosterSubscription();
   initActiveRoster();
   // initPrinterStatusSubscription(); // Disabled in Path 1
+
+  const rosterModalEl = document.getElementById("rosterModal");
+  if (rosterModalEl) {
+    rosterModalEl.addEventListener("hidden.bs.modal", () => {
+      if (unsubRosterHistoryModal) {
+        unsubRosterHistoryModal();
+        unsubRosterHistoryModal = null;
+      }
+    });
+  }
 });
 
 onUnmounted(() => {
@@ -1807,6 +1887,7 @@ onUnmounted(() => {
   unsubActiveRoster?.();
   unsubDailyRoster?.();
   unsubPrinterStatus?.();
+  unsubRosterHistoryModal?.();
   stopClosingScheduler();
   removeUnlockListeners();
 });
