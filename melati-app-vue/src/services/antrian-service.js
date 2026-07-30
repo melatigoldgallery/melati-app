@@ -78,10 +78,9 @@ export async function addCustomerQueue(type, floorId = "") {
   const val = snap.val() || {};
   const current = val[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   
-  let lastLetter = current.lastLetter ?? 0;
+  const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+  let lastLetter = (current.lastLetter ?? 0) % letters.length;
   let lastNumber = current.lastNumber ?? 0;
-  
-  const letters = type === "jual" ? ["D", "E"] : ["A", "B", "C"];
   
   if (lastNumber === 0) {
     lastLetter = 0;
@@ -113,7 +112,10 @@ export async function nextQueue(type, state, floorId = "") {
   const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
-  const letters = type === "jual" ? ["D", "E"] : ["A", "B", "C"];
+  const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+  currentLetter = (currentLetter ?? 0) % letters.length;
+  lastLetter = (lastLetter ?? 0) % letters.length;
+  
   const maxIdx = letters.length * 50;
   
   const currentIdx = currentLetter * 50 + currentNumber;
@@ -168,7 +170,9 @@ export async function previousQueue(type, state, floorId = "") {
   const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
-  const letters = type === "jual" ? ["D", "E"] : ["A", "B", "C"];
+  const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+  currentLetter = (currentLetter ?? 0) % letters.length;
+  lastLetter = (lastLetter ?? 0) % letters.length;
   
   currentNumber--;
   if (currentNumber < 1) {

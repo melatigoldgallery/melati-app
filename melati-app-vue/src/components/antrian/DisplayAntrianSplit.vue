@@ -168,9 +168,9 @@ const currentShift = computed(() => {
 const isJualEmpty = computed(() => {
   const q = jualState.value;
   if (q.lastNumber === 0) return true;
-  const currentIdx = (q.currentLetter ?? 0) * 50 + q.currentNumber;
-  const lastIdx = (q.lastLetter ?? 0) * 50 + q.lastNumber;
-  const nextAfterLast = (lastIdx % 100) + 1;
+  const currentIdx = ((q.currentLetter ?? 0) % 1) * 50 + q.currentNumber;
+  const lastIdx = ((q.lastLetter ?? 0) % 1) * 50 + q.lastNumber;
+  const nextAfterLast = (lastIdx % 50) + 1;
   return currentIdx === nextAfterLast;
 });
 
@@ -186,39 +186,39 @@ const isBeliEmpty = computed(() => {
 // Computed displays for Jual
 const jualCurrentDisplay = computed(() => {
   if (isJualEmpty.value) {
-    if (jualState.value.lastNumber === 0) return "D01";
+    if (jualState.value.lastNumber === 0) return "E01";
     return "-";
   }
   const { currentLetter, currentNumber } = jualState.value;
-  const letters = ["D", "E"];
+  const letters = ["E"];
   
-  const currentIdx = (currentLetter ?? 0) * 50 + currentNumber;
+  const currentIdx = ((currentLetter ?? 0) % letters.length) * 50 + currentNumber;
   if (currentIdx <= 1) {
-    return "D01";
+    return "E01";
   }
   
   const prevIdx = currentIdx - 1;
-  const prevLet = Math.floor((prevIdx - 1) / 50);
+  const prevLet = Math.floor((prevIdx - 1) / 50) % letters.length;
   const prevNum = ((prevIdx - 1) % 50) + 1;
-  const letter = letters[prevLet] || "D";
+  const letter = letters[prevLet] || "E";
   return formatQueue(letter, prevNum);
 });
 
 const jualNextDisplay = computed(() => {
   if (isJualEmpty.value) return "-";
   const { currentLetter, currentNumber, lastLetter, lastNumber } = jualState.value;
-  const currentIdx = (currentLetter ?? 0) * 50 + currentNumber;
-  const lastIdx = (lastLetter ?? 0) * 50 + lastNumber;
+  const letters = ["E"];
+  const currentIdx = ((currentLetter ?? 0) % letters.length) * 50 + currentNumber;
+  const lastIdx = ((lastLetter ?? 0) % letters.length) * 50 + lastNumber;
   if (currentIdx === lastIdx) return "-";
   
   let nextNum = currentNumber + 1;
-  let nextLet = currentLetter ?? 0;
+  let nextLet = (currentLetter ?? 0) % letters.length;
   if (nextNum > 50) {
     nextNum = 1;
-    nextLet = (nextLet + 1) % 2;
+    nextLet = (nextLet + 1) % letters.length;
   }
-  const letters = ["D", "E"];
-  return formatQueue(letters[nextLet] || "D", nextNum);
+  return formatQueue(letters[nextLet] || "E", nextNum);
 });
 
 const jualMissedDisplay = computed(() => {

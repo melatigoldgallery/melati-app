@@ -44,7 +44,7 @@
                     <small class="text-muted mt-1 d-block">
                       <strong>Legacy Mode (V1)</strong> menggunakan 1 loket gabungan (kategori A-D).
                       <br />
-                      <strong>Split Mode (V2)</strong> memisahkan loket pemanggilan antara transaksi Jual (kategori D-E) dan Beli (kategori A-C).
+                      <strong>Split Mode (V2)</strong> memisahkan loket pemanggilan antara transaksi Jual (kategori E) dan Beli (kategori A-C).
                     </small>
                   </div>
 

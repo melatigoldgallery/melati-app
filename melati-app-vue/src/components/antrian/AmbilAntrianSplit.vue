@@ -466,8 +466,8 @@ const t = (key) => {
 
 const nextJualNumber = computed(() => {
   const q = queueState.value.jual;
-  const letters = ["D", "E"];
-  let nextLet = q.lastLetter ?? 0;
+  const letters = ["E"];
+  let nextLet = (q.lastLetter ?? 0) % letters.length;
   let nextNum = q.lastNumber ?? 0;
   
   if (nextNum === 0) {
@@ -477,7 +477,7 @@ const nextJualNumber = computed(() => {
     nextNum++;
     if (nextNum > 50) {
       nextNum = 1;
-      nextLet = (nextLet + 1) % 2;
+      nextLet = (nextLet + 1) % letters.length;
     }
   }
   return letters[nextLet] + padNumber(nextNum);
