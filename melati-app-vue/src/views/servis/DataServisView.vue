@@ -1287,9 +1287,14 @@
                   </tbody>
                   <tfoot class="table-light">
                     <tr>
+                      <td colspan="6" class="text-end fw-semibold">Total DP:</td>
+                      <td class="fw-bold text-info">Rp {{ editTotalDP.toLocaleString("id-ID") }}</td>
+                      <td colspan="4"></td>
+                    </tr>
+                    <tr>
                       <td colspan="7" class="text-end fw-semibold">Total Ongkos:</td>
                       <td class="fw-bold text-success">Rp {{ editTotalOngkos.toLocaleString("id-ID") }}</td>
-                      <td colspan="2"></td>
+                      <td colspan="3"></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1578,6 +1583,11 @@ const editTotalOngkos = computed(() => {
   return rows.reduce((sum, r) => sum + Number(r.ongkos || 0), 0);
 });
 
+const editTotalDP = computed(() => {
+  if (editForm.value.jenisInput !== "custom") return 0;
+  return editForm.value.customRows.reduce((sum, r) => sum + Number(r.totalDP || r.dp || 0), 0);
+});
+
 const newServisRow = () => ({
   jumlah: 1,
   namaBarang: "",
@@ -1680,11 +1690,12 @@ function getItemOngkos(item) {
 function getItemDP(item) {
   const isCustom = (item?.jenisInput || "servis") === "custom";
   if (!isCustom) return 0;
-  if (item.totalDP != null) return Number(item.totalDP || 0);
 
   const items = getItems(item);
-  if (!items.length) return Number(item.dp || 0);
-  return items.reduce((sum, i) => sum + Number(i.totalDP || i.dp || 0), 0);
+  if (items && items.length > 0) {
+    return items.reduce((sum, i) => sum + Number(i.totalDP || i.dp || 0), 0);
+  }
+  return Number(item.totalDP || item.dp || 0);
 }
 
 function normalizePhoneForDisplay(phone) {
@@ -2785,7 +2796,10 @@ async function saveEdit() {
       ongkos: totalOngkos,
     };
     if (isCustom) {
+      const totalDP = editTotalDP.value;
       payload.detailBarangCustom = rows;
+      payload.totalDP = totalDP;
+      payload.dp = totalDP;
     } else {
       payload.detailBarang = rows;
     }

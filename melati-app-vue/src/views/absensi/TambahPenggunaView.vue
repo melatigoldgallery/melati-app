@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="container-fluid py-3">
     <!-- Page Header -->
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -87,8 +87,8 @@
                 ></svg>
               </td>
               <td class="text-center">
-                <span class="badge" :class="emp.type === 'staff' ? 'bg-primary' : 'bg-secondary'">
-                  {{ emp.type }}
+                <span class="badge" :class="getBadgeClass(emp.type)">
+                  {{ getEmployeeTypeLabel(emp.type) }}
                 </span>
               </td>
               <td class="text-center">
@@ -203,10 +203,21 @@
             </div>
             <div class="mb-1">
               <label class="form-label small fw-semibold">Tipe Karyawan</label>
-              <select v-model="form.type" class="form-select form-select-sm">
-                <option value="staff">Staff</option>
-                <option value="ob">OB</option>
-              </select>
+              <div class="input-group input-group-sm">
+                <select v-model="form.type" class="form-select">
+                  <option v-for="t in employeeTypes" :key="t.id" :value="t.id">
+                    {{ t.label }}
+                  </option>
+                </select>
+                <button
+                  class="btn btn-outline-secondary"
+                  type="button"
+                  @click="openManageTypes"
+                  title="Kelola Tipe Karyawan"
+                >
+                  <i class="bi bi-gear-fill"></i>
+                </button>
+              </div>
             </div>
           </div>
           <div class="modal-footer py-2">
@@ -216,6 +227,74 @@
               <i v-else class="bi bi-check2 me-1"></i>
               Simpan
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Kelola Tipe Karyawan -->
+    <div class="modal fade" id="modalKelolaTipe" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+          <div class="modal-header py-2 border-bottom-0">
+            <h6 class="modal-title fw-bold">
+              <i class="bi bi-tags me-2 text-primary"></i>
+              Kelola Tipe Karyawan
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body pt-0">
+            <!-- Form Tambah Tipe Baru -->
+            <div class="card bg-light border-0 p-2 mb-3">
+              <label class="form-label small fw-semibold mb-1">Tambah Tipe Baru</label>
+              <div class="mb-2">
+                <input
+                  v-model="newTypeForm.label"
+                  type="text"
+                  class="form-control form-control-sm"
+                  placeholder="Nama Tipe (misal: Kasir)"
+                  @keydown.enter.prevent="addEmployeeType"
+                />
+              </div>
+              <div class="d-flex gap-2">
+                <select v-model="newTypeForm.badgeClass" class="form-select form-select-sm">
+                  <option v-for="b in badgeOptions" :key="b.class" :value="b.class">
+                    {{ b.label }}
+                  </option>
+                </select>
+                <button class="btn btn-primary btn-sm text-nowrap" @click="addEmployeeType" :disabled="savingTypes">
+                  <span v-if="savingTypes" class="spinner-border spinner-border-sm me-1"></span>
+                  <i v-else class="bi bi-plus-lg me-1"></i>
+                  Tambah
+                </button>
+              </div>
+            </div>
+
+            <!-- List Tipe yang Ada -->
+            <label class="form-label small fw-semibold mb-1">Daftar Tipe</label>
+            <div class="list-group list-group-flush border rounded overflow-hidden">
+              <div
+                v-for="t in employeeTypes"
+                :key="t.id"
+                class="list-group-item d-flex align-items-center justify-content-between py-2 px-2"
+              >
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge" :class="t.badgeClass">{{ t.label }}</span>
+                  <span class="small text-muted">({{ t.id }})</span>
+                </div>
+                <button
+                  class="btn btn-outline-danger btn-delete-type"
+                  @click="removeEmployeeType(t)"
+                  :disabled="employeeTypes.length <= 1 || savingTypes"
+                  title="Hapus Tipe"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button data-bs-dismiss="modal" class="btn btn-sm btn-secondary">Selesai</button>
           </div>
         </div>
       </div>
@@ -296,6 +375,9 @@ import {
   saveFaceDescriptor,
   fetchAllFaceDescriptors,
   deleteFaceDescriptor,
+  subscribeEmployeeTypes,
+  saveEmployeeTypes,
+  DEFAULT_EMPLOYEE_TYPES,
 } from "@/services/absensi-service";
 
 const { error: showError, confirm } = useAlert();
@@ -332,8 +414,118 @@ let stream = null;
 let faceapi = null;
 let detectionInterval = null;
 let jsBarcodeLoaded = false;
+let unsubEmployeeTypes = null;
+
+const employeeTypes = ref([...DEFAULT_EMPLOYEE_TYPES]);
+const savingTypes = ref(false);
+const newTypeForm = ref({ label: "", badgeClass: "bg-primary" });
+const badgeOptions = [
+  { class: "bg-primary", label: "Biru (Primary)" },
+  { class: "bg-secondary", label: "Abu-abu (Secondary)" },
+  { class: "bg-success", label: "Hijau (Success)" },
+  { class: "bg-danger", label: "Merah (Danger)" },
+  { class: "bg-warning text-dark", label: "Kuning (Warning)" },
+  { class: "bg-info text-dark", label: "Cyan (Info)" },
+  { class: "bg-dark", label: "Hitam (Dark)" },
+];
 
 const form = ref({ employeeId: "", name: "", barcode: "", type: "staff" });
+
+function getEmployeeTypeLabel(typeId) {
+  if (!typeId) return "-";
+  const found = employeeTypes.value.find((t) => t.id.toLowerCase() === String(typeId).toLowerCase());
+  return found ? found.label : String(typeId).toUpperCase();
+}
+
+function getBadgeClass(typeId) {
+  if (!typeId) return "bg-secondary";
+  const found = employeeTypes.value.find((t) => t.id.toLowerCase() === String(typeId).toLowerCase());
+  return found ? found.badgeClass : "bg-secondary";
+}
+
+function openManageTypes() {
+  newTypeForm.value = { label: "", badgeClass: "bg-primary" };
+  const modalEl = document.getElementById("modalKelolaTipe");
+  if (!modalEl) return;
+
+  modalEl.addEventListener(
+    "show.bs.modal",
+    () => {
+      setTimeout(() => {
+        const backdrops = document.querySelectorAll(".modal-backdrop");
+        if (backdrops.length > 1) {
+          backdrops[backdrops.length - 1].style.zIndex = "1060";
+        }
+      }, 10);
+    },
+    { once: true },
+  );
+
+  modalEl.addEventListener(
+    "hidden.bs.modal",
+    () => {
+      const modalTambahEl = document.getElementById("modalTambah");
+      if (modalTambahEl && modalTambahEl.classList.contains("show")) {
+        document.body.classList.add("modal-open");
+      }
+    },
+    { once: true },
+  );
+
+  const instance = Modal.getInstance(modalEl) || new Modal(modalEl);
+  instance.show();
+}
+
+async function addEmployeeType() {
+  const label = newTypeForm.value.label.trim();
+  if (!label) return showSwalAlert("warning", "Input Belum Lengkap", "Nama tipe karyawan wajib diisi.");
+
+  const id = label.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  if (!id) return showSwalAlert("warning", "Input Tidak Valid", "Nama tipe karyawan harus mengandung huruf/angka.");
+
+  if (employeeTypes.value.some((t) => t.id === id)) {
+    return showSwalAlert("warning", "Tipe Sudah Ada", `Tipe "${label}" sudah terdaftar.`);
+  }
+
+  savingTypes.value = true;
+  try {
+    const updated = [...employeeTypes.value, { id, label, badgeClass: newTypeForm.value.badgeClass }];
+    await saveEmployeeTypes(updated);
+    newTypeForm.value = { label: "", badgeClass: "bg-primary" };
+    form.value.type = id;
+    await showSwalAlert("success", "Berhasil", `Tipe karyawan "${label}" berhasil ditambahkan.`);
+  } catch (e) {
+    showError("Gagal menyimpan tipe karyawan", e.message);
+  } finally {
+    savingTypes.value = false;
+  }
+}
+
+async function removeEmployeeType(typeObj) {
+  if (employeeTypes.value.length <= 1) {
+    return showSwalAlert("warning", "Tidak Bisa Dihapus", "Minimal harus ada 1 tipe karyawan.");
+  }
+  const r = await confirm({
+    title: "Hapus Tipe Karyawan?",
+    text: `Tipe "${typeObj.label}" akan dihapus dari daftar opsi.`,
+    icon: "warning",
+  });
+  if (!r.isConfirmed) return;
+
+  savingTypes.value = true;
+  try {
+    const updated = employeeTypes.value.filter((t) => t.id !== typeObj.id);
+    await saveEmployeeTypes(updated);
+    if (form.value.type === typeObj.id) {
+      form.value.type = updated[0]?.id || "staff";
+    }
+    await showSwalAlert("success", "Berhasil", `Tipe karyawan "${typeObj.label}" berhasil dihapus.`);
+  } catch (e) {
+    showError("Gagal menghapus tipe karyawan", e.message);
+  } finally {
+    savingTypes.value = false;
+  }
+}
 
 // ── Computed ──────────────────────────────────────────────────────────────
 const filtered = computed(() => {
@@ -933,10 +1125,32 @@ async function captureFace() {
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────
-onMounted(() => load());
+onMounted(() => {
+  load();
+  unsubEmployeeTypes = subscribeEmployeeTypes((types) => {
+    employeeTypes.value = types;
+    if (types.length && !types.some((t) => t.id === form.value.type)) {
+      form.value.type = types[0].id;
+    }
+  });
+});
 
 onUnmounted(() => {
+  if (unsubEmployeeTypes) unsubEmployeeTypes();
   if (detectionInterval) clearInterval(detectionInterval);
   if (stream) stream.getTracks().forEach((t) => t.stop());
 });
 </script>
+
+<style scoped>
+#modalKelolaTipe {
+  z-index: 1065 !important;
+}
+
+.btn-delete-type {
+  padding: 0.15rem 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  border-radius: 4px;
+}
+</style>

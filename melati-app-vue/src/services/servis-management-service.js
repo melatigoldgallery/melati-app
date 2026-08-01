@@ -10,6 +10,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -18,6 +19,32 @@ import {
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { calculateReconciliationStatus, getSafeQty } from "@/utils/floor-math";
+
+export const DEFAULT_MANAGEMENT_USER = "legacy_admin";
+
+/**
+ * Cleanup legacy documents (legacy_supervisor, legacy_adminyoung) in servis_management
+ */
+export async function cleanupLegacyServisManagementDocs() {
+  const targets = ["legacy_supervisor", "legacy_adminyoung"];
+  const tipes = ["servis", "custom"];
+
+  for (const userId of targets) {
+    try {
+      for (const tipe of tipes) {
+        const subColRef = collection(db, "servis_management", userId, tipe);
+        const snapshot = await getDocs(subColRef);
+        for (const d of snapshot.docs) {
+          await deleteDoc(doc(db, "servis_management", userId, tipe, d.id));
+        }
+      }
+      await deleteDoc(doc(db, "servis_management", userId));
+      console.log(`[servis_management] Successfully cleaned up legacy document: ${userId}`);
+    } catch (e) {
+      console.warn(`[servis_management] Cleanup note for ${userId}:`, e?.message || e);
+    }
+  }
+}
 
 // Cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes

@@ -157,6 +157,10 @@ onMounted(() => {
     form.value.identifier = localStorage.getItem("remembered_identifier") || "";
     const savedPw = localStorage.getItem("remembered_password") || "";
     form.value.password = savedPw ? b64Decode(savedPw) : "";
+    const savedFloor = localStorage.getItem("remembered_floor") || "";
+    if (savedFloor) {
+      selectedFloor.value = normalizeFloorId(savedFloor);
+    }
   }
 });
 
@@ -175,10 +179,12 @@ async function handleLogin() {
       localStorage.setItem("remember_me", "true");
       localStorage.setItem("remembered_identifier", form.value.identifier);
       localStorage.setItem("remembered_password", b64Encode(form.value.password));
+      localStorage.setItem("remembered_floor", selectedFloor.value);
     } else {
       localStorage.removeItem("remember_me");
       localStorage.removeItem("remembered_identifier");
       localStorage.removeItem("remembered_password");
+      localStorage.removeItem("remembered_floor");
     }
 
     const redirect = route.query.redirect || "/dashboard";

@@ -205,6 +205,11 @@ body {
   color: #000;
 }
 
+/* SweetAlert2 Override: Ensure alerts appear above all stacked modals */
+.swal2-container {
+  z-index: 2000 !important;
+}
+
 /* Loading overlay */
 .loading-overlay {
   position: fixed;

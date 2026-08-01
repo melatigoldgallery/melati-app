@@ -505,7 +505,9 @@ function executePrintJob(htmlPath, printerName, printOptions = {}) {
       const defaultOptions = {
         silent: true,
         printBackground: true,
-        deviceName: printerName,
+        ...(printerName && typeof printerName === "string" && printerName.trim() !== ""
+          ? { deviceName: printerName.trim() }
+          : {}),
         copies: 1,
         margins: {
           marginType: "none"
@@ -682,8 +684,19 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
   }
 
   try {
-    if (!printerName) {
-      return { success: false, error: "Target printer name is required" };
+    let targetPrinter = String(printerName || "").trim();
+    if (!targetPrinter) {
+      try {
+        const printers = await listPrinters();
+        const defaultSys = printers.find((p) => p.isDefault);
+        if (defaultSys && defaultSys.name) {
+          targetPrinter = defaultSys.name;
+        } else if (printers.length > 0) {
+          targetPrinter = printers[0].name;
+        }
+      } catch (err) {
+        console.warn("[Print IPC] Failed to resolve system default printer:", err);
+      }
     }
 
     // 1. Graphic HTML templates via hidden window
@@ -947,7 +960,7 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
           // Wait 1.5 seconds between print jobs to allow the printer spooler to release the device lock
           await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500));
         }
-        await printHTMLSingle(tempHTMLPath, printerName, printOptions);
+        await printHTMLSingle(tempHTMLPath, targetPrinter, printOptions);
       }
       return { success: true };
     } catch (err) {

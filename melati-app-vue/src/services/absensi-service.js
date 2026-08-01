@@ -508,6 +508,67 @@ export function subscribeAttendanceSettings(callback, floorId = "") {
   });
 }
 
+// ── Employee Types Settings ──────────────────────────────────────────────────
+
+export const DEFAULT_EMPLOYEE_TYPES = [
+  { id: "staff", label: "Staff", badgeClass: "bg-primary" },
+  { id: "ob", label: "OB", badgeClass: "bg-secondary" },
+];
+
+function normalizeEmployeeTypes(raw = {}) {
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (Array.isArray(raw.types)) {
+    list = raw.types;
+  }
+
+  if (!list.length) return [...DEFAULT_EMPLOYEE_TYPES];
+
+  return list
+    .map((item) => {
+      if (typeof item === "string") {
+        const id = item.toLowerCase();
+        return {
+          id,
+          label: id === "ob" ? "OB" : id.charAt(0).toUpperCase() + id.slice(1),
+          badgeClass: id === "staff" ? "bg-primary" : "bg-secondary",
+        };
+      }
+      return {
+        id: String(item.id || "").trim().toLowerCase(),
+        label: String(item.label || item.id || "").trim(),
+        badgeClass: item.badgeClass || "bg-secondary",
+      };
+    })
+    .filter((t) => t.id);
+}
+
+export async function fetchEmployeeTypes(floorId = "") {
+  const snap = await getDoc(floorDoc(db, "settings", "employeeTypes", floorId));
+  return normalizeEmployeeTypes(snap.exists() ? snap.data() : { types: DEFAULT_EMPLOYEE_TYPES });
+}
+
+export async function saveEmployeeTypes(typesArray, floorId = "") {
+  const normalized = normalizeEmployeeTypes({ types: typesArray });
+  await setDoc(
+    floorDoc(db, "settings", "employeeTypes", floorId),
+    {
+      types: normalized,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: auth.currentUser?.email || "System",
+    },
+    { merge: true },
+  );
+  return normalized;
+}
+
+export function subscribeEmployeeTypes(callback, floorId = "") {
+  return onSnapshot(floorDoc(db, "settings", "employeeTypes", floorId), (snap) => {
+    callback(normalizeEmployeeTypes(snap.exists() ? snap.data() : { types: DEFAULT_EMPLOYEE_TYPES }));
+  });
+}
+
 // ── Leave Requests ────────────────────────────────────────────────────────
 
 export async function submitLeaveRequest(data, floorId = "") {

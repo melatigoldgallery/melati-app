@@ -400,6 +400,8 @@ import {
   formatBulan,
   groupServisByMonth,
   invalidateCache as invalidateManagementCache,
+  DEFAULT_MANAGEMENT_USER,
+  cleanupLegacyServisManagementDocs,
 } from "@/services/servis-management-service.js";
 import { fetchServisByMonth, fetchServisByRange } from "@/services/servis-service";
 
@@ -442,7 +444,7 @@ const modalData = ref({
   notes: "",
 });
 
-const currentUserId = computed(() => authStore.currentUser?.uid || authStore.user?.uid || "");
+const currentUserId = computed(() => authStore.currentUser?.uid || authStore.user?.uid || DEFAULT_MANAGEMENT_USER);
 const physicalCountSchedule = Object.freeze([
   {
     key: "senin",
@@ -1005,6 +1007,7 @@ function capitalizeFirst(str) {
 
 onMounted(async () => {
   try {
+    cleanupLegacyServisManagementDocs();
     // Load management snapshot first so first paint is not blocked by full servis query.
     await loadManagementData(true);
   } catch (error) {
