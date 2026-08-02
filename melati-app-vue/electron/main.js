@@ -6,6 +6,39 @@ const Handlebars = require("handlebars");
 const bwipjs = require("bwip-js");
 const https = require("https");
 
+// Set consistent application name for AppData path (%APPDATA%\Melati App)
+app.setName("Melati App");
+
+// Native User Config Store (%APPDATA%\Melati App\user-config.json)
+const userConfigPath = path.join(app.getPath("userData"), "user-config.json");
+
+function readUserConfig() {
+  try {
+    if (fs.existsSync(userConfigPath)) {
+      const data = fs.readFileSync(userConfigPath, "utf8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error("Failed to read user-config.json:", err);
+  }
+  return {};
+}
+
+function saveUserConfigKey(key, value) {
+  try {
+    const config = readUserConfig();
+    if (value === null || value === undefined) {
+      delete config[key];
+    } else {
+      config[key] = value;
+    }
+    fs.mkdirSync(path.dirname(userConfigPath), { recursive: true });
+    fs.writeFileSync(userConfigPath, JSON.stringify(config, null, 2), "utf8");
+  } catch (err) {
+    console.error("Failed to write user-config.json:", err);
+  }
+}
+
 // Try to safely load the loudness module
 let loudness = null;
 try {
@@ -505,6 +538,7 @@ function executePrintJob(htmlPath, printerName, printOptions = {}) {
       const defaultOptions = {
         silent: true,
         printBackground: true,
+        preferCSSPageSize: true,
         ...(printerName && typeof printerName === "string" && printerName.trim() !== ""
           ? { deviceName: printerName.trim() }
           : {}),
@@ -595,6 +629,20 @@ ipcMain.handle("toggle-menu-bar", (event) => {
     return !isVisible;
   }
   return false;
+});
+
+ipcMain.handle("get-native-config", (event) => {
+  if (!validateOrigin(event.sender)) {
+    throw new Error("Unauthorized IPC Call");
+  }
+  return readUserConfig();
+});
+
+ipcMain.on("save-native-config-key", (event, { key, value }) => {
+  if (!validateOrigin(event.sender)) {
+    return;
+  }
+  saveUserConfigKey(key, value);
 });
 
 ipcMain.handle("duck-audio", async (event, duration) => {
@@ -911,7 +959,7 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
     const tempHTMLPath = path.join(app.getPath("temp"), `print_${Date.now()}_${randomSuffix}.html`);
     fs.writeFileSync(tempHTMLPath, htmlString, "utf-8");
 
-    // Determine print options (pageSize in microns, landscape) based on print job type
+    // Determine print options (pageSize in microns) based on print job type
     let printOptions = {};
     if (type === "queue") {
       printOptions = {
@@ -923,8 +971,8 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
     } else if (type === "receipt") {
       printOptions = {
         pageSize: {
-          width: 72000,   // 72mm
-          height: 300000  // 300mm max height (actual height is content-driven via CSS size: 72mm auto)
+          width: 76000,   // 76mm physical paper width
+          height: 297000  // 297mm height
         }
       };
     } else if (type === "qr-sbpl" || type === "qr-silver") {
@@ -936,21 +984,26 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
           height: Math.round(ph * 1000)  // in microns
         }
       };
-    } else if (type === "nota-servis" || type === "nota-custom") {
+    } else if (type === "nota-servis") {
       printOptions = {
         pageSize: {
           width: 200000,   // 20cm
           height: 129000   // 12.9cm
-        },
-        landscape: true
+        }
+      };
+    } else if (type === "nota-custom") {
+      printOptions = {
+        pageSize: {
+          width: 200000,   // 20cm
+          height: 120000   // 12cm
+        }
       };
     } else if (type === "invoice") {
       printOptions = {
         pageSize: {
           width: 205000,   // 20.5cm
           height: 105000   // 10.5cm
-        },
-        landscape: true
+        }
       };
     }
 

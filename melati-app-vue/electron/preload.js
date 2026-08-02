@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   panggilAntreanDim: (duration) => ipcRenderer.invoke("duck-audio", duration),
   panggilAntreanUnduck: () => ipcRenderer.invoke("unduck-audio"),
   getGoogleTTS: (text) => ipcRenderer.invoke("get-google-tts", text),
-  toggleMenuBar: () => ipcRenderer.invoke("toggle-menu-bar")
+  toggleMenuBar: () => ipcRenderer.invoke("toggle-menu-bar"),
+  getNativeConfig: () => ipcRenderer.invoke("get-native-config"),
+  saveNativeConfigKey: (key, value) => ipcRenderer.send("save-native-config-key", { key, value })
 });

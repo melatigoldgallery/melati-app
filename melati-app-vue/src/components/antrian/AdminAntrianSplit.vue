@@ -1140,6 +1140,17 @@ function modal(id) {
   return Modal.getOrCreateInstance(document.getElementById(id));
 }
 
+const activeSubscribedShift = ref("");
+
+function syncRosterSubscriptions(force = false) {
+  const currentShift = getCurrentShift();
+  if (force || activeSubscribedShift.value !== currentShift) {
+    activeSubscribedShift.value = currentShift;
+    initDailyRosterSubscription();
+    initActiveRoster();
+  }
+}
+
 async function openRosterModal() {
   modal("rosterModal").show();
   loadingRosterModal.value = true;
@@ -1150,22 +1161,29 @@ async function openRosterModal() {
 
     searchQuery.value = ""; // Reset search query on open
 
+    // Ensure subscriptions match latest shift
+    syncRosterSubscriptions(true);
+
     // Real-time Firestore subscription while modal is open
     if (unsubRosterHistoryModal) unsubRosterHistoryModal();
     unsubRosterHistoryModal = subscribeRosterHistory(floorId, (historyData) => {
       rosterHistory.value = historyData;
     });
 
-    // Fetch master attendance from L1
+    // Fetch master attendance from L1 for current shift, filter out OBs
     const attData = await fetchAttendanceByRange(today, today, currentShift, "", "L1");
-    attendanceList.value = attData;
+    attendanceList.value = (attData || []).filter((att) => (att.type || "staff").toLowerCase() !== "ob");
 
     // Fetch quota
     quotaSettings.value = await fetchQueueQuotaSettings(floorId);
 
-    // Initialize selected checklist from RTB data if exists, otherwise empty
-    const currentRoster = allFloorsRosterData.value[floorId];
-    if (currentRoster && currentRoster.activeSales) {
+    // Directly fetch current shift roster snapshot from RTB to guarantee instant accurate state
+    const snap = await get(dbRef(rtdb, `queue/daily_roster/${today}/${currentShift}`));
+    const dailyRosterVal = snap.val() || {};
+    allFloorsRosterData.value = dailyRosterVal;
+
+    const currentRoster = dailyRosterVal[floorId];
+    if (currentRoster && Array.isArray(currentRoster.activeSales)) {
       selectedSalesNames.value = [...currentRoster.activeSales];
     } else {
       selectedSalesNames.value = [];
@@ -1843,14 +1861,17 @@ function initActiveRoster() {
   });
 }
 
+function handleWindowFocus() {
+  syncRosterSubscriptions();
+}
+
 watch(activeFloor, async (newFloor) => {
   if (unsubQueue) unsubQueue();
   unsubQueue = subscribeQueue(newFloor, (s) => {
     state.value = s;
   });
   await loadGeneralSettings();
-  initDailyRosterSubscription();
-  initActiveRoster();
+  syncRosterSubscriptions(true);
   initClosingSettings();
   // initPrinterStatusSubscription(); // Disabled in Path 1
 });
@@ -1865,8 +1886,11 @@ onMounted(async () => {
   await loadGeneralSettings();
   initClosingSettings();
   setupPrimeUnlockListeners();
-  initDailyRosterSubscription();
-  initActiveRoster();
+  syncRosterSubscriptions(true);
+
+  window.addEventListener("focus", handleWindowFocus);
+  document.addEventListener("visibilitychange", handleWindowFocus);
+
   // initPrinterStatusSubscription(); // Disabled in Path 1
 
   const rosterModalEl = document.getElementById("rosterModal");
@@ -1881,6 +1905,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("focus", handleWindowFocus);
+  document.removeEventListener("visibilitychange", handleWindowFocus);
   unsubQueue?.();
   unsubConn?.();
   unsubClosingSettings?.();
