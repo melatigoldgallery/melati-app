@@ -18,7 +18,7 @@ export function formatQueue(letterOrIndex, number) {
 }
 
 export const LETTERS_MAP = {
-  A: "Beli / Tukar (A)",
+  A: "Jual / Servis (A)",
   B: "Beli / Tukar (B)",
   C: "Beli / Tukar (C)",
   D: "Jual / Servis (D)",
@@ -78,7 +78,7 @@ export async function addCustomerQueue(type, floorId = "") {
   const val = snap.val() || {};
   const current = val[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   
-  const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+  const letters = type === "jual" ? ["A"] : ["B", "C"];
   let lastLetter = (current.lastLetter ?? 0) % letters.length;
   let lastNumber = current.lastNumber ?? 0;
   
@@ -87,7 +87,7 @@ export async function addCustomerQueue(type, floorId = "") {
     lastNumber = 1;
   } else {
     lastNumber++;
-    if (lastNumber > 50) {
+    if (lastNumber > 99) {
       lastNumber = 1;
       lastLetter = (lastLetter + 1) % letters.length;
     }
@@ -112,14 +112,14 @@ export async function nextQueue(type, state, floorId = "") {
   const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
-  const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+  const letters = type === "jual" ? ["A"] : ["B", "C"];
   currentLetter = (currentLetter ?? 0) % letters.length;
   lastLetter = (lastLetter ?? 0) % letters.length;
   
-  const maxIdx = letters.length * 50;
+  const maxIdx = letters.length * 99;
   
-  const currentIdx = currentLetter * 50 + currentNumber;
-  const lastIdx = lastLetter * 50 + lastNumber;
+  const currentIdx = currentLetter * 99 + currentNumber;
+  const lastIdx = lastLetter * 99 + lastNumber;
   const nextAfterLastIdx = (lastIdx % maxIdx) + 1;
   
   if (lastNumber !== 0 && currentIdx === nextAfterLastIdx) {
@@ -127,7 +127,7 @@ export async function nextQueue(type, state, floorId = "") {
   }
   
   currentNumber++;
-  if (currentNumber > 50) {
+  if (currentNumber > 99) {
     currentNumber = 1;
     currentLetter = (currentLetter + 1) % letters.length;
   }
@@ -139,7 +139,7 @@ export async function nextQueue(type, state, floorId = "") {
     if (skipList.includes(qStr)) {
       skipList = skipList.filter(q => q !== qStr);
       currentNumber++;
-      if (currentNumber > 50) {
+      if (currentNumber > 99) {
         currentNumber = 1;
         currentLetter = (currentLetter + 1) % letters.length;
       }
@@ -170,13 +170,13 @@ export async function previousQueue(type, state, floorId = "") {
   const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
-  const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+  const letters = type === "jual" ? ["A"] : ["B", "C"];
   currentLetter = (currentLetter ?? 0) % letters.length;
   lastLetter = (lastLetter ?? 0) % letters.length;
   
   currentNumber--;
   if (currentNumber < 1) {
-    currentNumber = 50;
+    currentNumber = 99;
     currentLetter = (currentLetter - 1 + letters.length) % letters.length;
   }
   
@@ -204,7 +204,7 @@ export async function setCustomQueue(type, state, letterIndex, number, floorId =
     [type]: {
       ...current,
       currentLetter: Math.max(0, letterIndex),
-      currentNumber: Math.max(1, Math.min(50, number))
+      currentNumber: Math.max(1, Math.min(99, number))
     }
   };
   await saveState(newState, floorId);
@@ -825,11 +825,11 @@ export async function nextQueueHybrid(type, state, floorId = "") {
   const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
-  const letters = type === "jual" ? ["D", "E"] : ["A", "B", "C"];
+  const letters = type === "jual" ? ["A"] : ["B", "C"];
   
   // If queue is empty or lastNumber is 0, auto-generate the next lastNumber/lastLetter
-  const currentIdx = (currentLetter ?? 0) * 50 + currentNumber;
-  const lastIdx = (lastLetter ?? 0) * 50 + lastNumber;
+  const currentIdx = (currentLetter ?? 0) * 99 + currentNumber;
+  const lastIdx = (lastLetter ?? 0) * 99 + lastNumber;
   
   if (lastIdx <= currentIdx || lastNumber === 0) {
     if (lastNumber === 0) {
@@ -837,7 +837,7 @@ export async function nextQueueHybrid(type, state, floorId = "") {
       lastNumber = 1;
     } else {
       lastNumber++;
-      if (lastNumber > 50) {
+      if (lastNumber > 99) {
         lastNumber = 1;
         lastLetter = (lastLetter + 1) % letters.length;
       }
@@ -846,7 +846,7 @@ export async function nextQueueHybrid(type, state, floorId = "") {
   
   // Now advance currentNumber
   currentNumber++;
-  if (currentNumber > 50) {
+  if (currentNumber > 99) {
     currentNumber = 1;
     currentLetter = (currentLetter + 1) % letters.length;
   }
@@ -858,7 +858,7 @@ export async function nextQueueHybrid(type, state, floorId = "") {
     if (skipList.includes(qStr)) {
       skipList = skipList.filter(q => q !== qStr);
       currentNumber++;
-      if (currentNumber > 50) {
+      if (currentNumber > 99) {
         currentNumber = 1;
         currentLetter = (currentLetter + 1) % letters.length;
       }

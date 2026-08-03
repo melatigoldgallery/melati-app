@@ -113,7 +113,7 @@
           <div class="card-body py-3">
             <div class="fw-bold text-muted mb-1" style="font-size: 1.35rem; font-family: 'Playfair Display', serif; letter-spacing: 0.5px;">
               <i class="fas fa-shopping-bag me-1"></i>
-              BELI / TUKAR TAMBAH (A-C)
+              BELI / TUKAR TAMBAH (B-C)
             </div>
             <div class="summary-label text-muted small mb-1" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px;">BELUM DILAYANI</div>
             <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedBeliCount }} <span class="summary-unit">orang</span></div>
@@ -219,7 +219,7 @@
           <div class="card-body py-3">
             <div class="fw-bold text-muted mb-1" style="font-size: 1.35rem; font-family: 'Playfair Display', serif; letter-spacing: 0.5px;">
               <i class="fas fa-handshake me-1"></i>
-              JUAL / SERVIS (E)
+              JUAL / SERVIS (A)
             </div>
             <div class="summary-label text-muted small mb-1" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px;">BELUM DILAYANI</div>
             <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedJualCount }} <span class="summary-unit">orang</span></div>
@@ -479,23 +479,23 @@
               Anda akan melewati nomor antrian tertentu.
             </div>
             <p>
-              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual / Servis (E)' : 'Beli / Tukar Tambah (A-C)' }}</strong>
+              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual / Servis (A)' : 'Beli / Tukar Tambah (B-C)' }}</strong>
             </p>
             <div class="mb-3">
               <label class="form-label">Pilih Huruf Antrian</label>
               <select v-model="customLetter" class="form-select">
-                <option v-for="(letChar, idx) in (modalQueueType === 'jual' ? ['E'] : ['A', 'B', 'C'])" :key="letChar" :value="idx">
+                <option v-for="(letChar, idx) in (modalQueueType === 'jual' ? ['A'] : ['B', 'C'])" :key="letChar" :value="idx">
                   {{ letChar }}
                 </option>
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">Nomor Antrian yang Akan Dilewati (1-50)</label>
+              <label class="form-label">Nomor Antrian yang Akan Dilewati (1-99)</label>
               <input
                 v-model.number="skipNumber"
                 type="number"
                 min="1"
-                max="50"
+                max="99"
                 class="form-control"
                 placeholder="Masukkan nomor antrian"
               />
@@ -532,23 +532,23 @@
               Anda akan mengatur nomor antrian aktif saat ini secara manual.
             </div>
             <p>
-              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual / Servis (E)' : 'Beli / Tukar Tambah (A-C)' }}</strong>
+              Tipe antrian: <strong>{{ modalQueueType === 'jual' ? 'Jual / Servis (A)' : 'Beli / Tukar Tambah (B-C)' }}</strong>
             </p>
             <div class="mb-3">
               <label class="form-label">Pilih Huruf Antrian</label>
               <select v-model="customLetter" class="form-select">
-                <option v-for="(letChar, idx) in (modalQueueType === 'jual' ? ['E'] : ['A', 'B', 'C'])" :key="letChar" :value="idx">
+                <option v-for="(letChar, idx) in (modalQueueType === 'jual' ? ['A'] : ['B', 'C'])" :key="letChar" :value="idx">
                   {{ letChar }}
                 </option>
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">Nomor Antrian (1-50)</label>
+              <label class="form-label">Nomor Antrian (1-99)</label>
               <input
                 v-model.number="customNumber"
                 type="number"
                 min="1"
-                max="50"
+                max="99"
                 class="form-control"
                 placeholder="Masukkan nomor antrian"
               />
@@ -1032,18 +1032,18 @@ const reminderClickTimestamps = ref([]);
 const isBeliEmpty = computed(() => {
   const q = state.value.beli;
   if (q.lastNumber === 0) return true;
-  const currentIdx = q.currentLetter * 50 + q.currentNumber;
-  const lastIdx = q.lastLetter * 50 + q.lastNumber;
-  const nextAfterLast = (lastIdx % 150) + 1;
+  const currentIdx = q.currentLetter * 99 + q.currentNumber;
+  const lastIdx = q.lastLetter * 99 + q.lastNumber;
+  const nextAfterLast = (lastIdx % 198) + 1;
   return currentIdx === nextAfterLast;
 });
 
 const isJualEmpty = computed(() => {
   const q = state.value.jual;
   if (q.lastNumber === 0) return true;
-  const currentIdx = ((q.currentLetter ?? 0) % 1) * 50 + q.currentNumber;
-  const lastIdx = ((q.lastLetter ?? 0) % 1) * 50 + q.lastNumber;
-  const nextAfterLast = (lastIdx % 50) + 1;
+  const currentIdx = ((q.currentLetter ?? 0) % 1) * 99 + q.currentNumber;
+  const lastIdx = ((q.lastLetter ?? 0) % 1) * 99 + q.lastNumber;
+  const nextAfterLast = (lastIdx % 99) + 1;
   return currentIdx === nextAfterLast;
 });
 
@@ -1051,32 +1051,32 @@ const isJualEmpty = computed(() => {
 const unservedBeliCount = computed(() => {
   if (isBeliEmpty.value) return 0;
   const q = state.value.beli;
-  const currentIdx = q.currentLetter * 50 + q.currentNumber;
-  const lastIdx = q.lastLetter * 50 + q.lastNumber;
+  const currentIdx = q.currentLetter * 99 + q.currentNumber;
+  const lastIdx = q.lastLetter * 99 + q.lastNumber;
   let diff = lastIdx - currentIdx;
-  if (diff < 0) diff += 150; // loop size is 3 letters * 50 = 150
+  if (diff < 0) diff += 198; // loop size is 2 letters * 99 = 198
   return diff + 1;
 });
 
 const unservedJualCount = computed(() => {
   if (isJualEmpty.value) return 0;
   const q = state.value.jual;
-  const currentIdx = ((q.currentLetter ?? 0) % 1) * 50 + q.currentNumber;
-  const lastIdx = ((q.lastLetter ?? 0) % 1) * 50 + q.lastNumber;
+  const currentIdx = ((q.currentLetter ?? 0) % 1) * 99 + q.currentNumber;
+  const lastIdx = ((q.lastLetter ?? 0) % 1) * 99 + q.lastNumber;
   let diff = lastIdx - currentIdx;
-  if (diff < 0) diff += 50; // loop size is 1 letter * 50 = 50
+  if (diff < 0) diff += 99; // loop size is 1 letter * 99 = 99
   return diff + 1;
 });
 
 // Display helpers for Beli
 const beliCurrentQueueStr = computed(() => {
   if (!hybridMode.value && isBeliEmpty.value) {
-    if (state.value.beli.lastNumber === 0) return "A01";
+    if (state.value.beli.lastNumber === 0) return "B01";
     return "-";
   }
   const q = state.value.beli;
-  const letters = ["A", "B", "C"];
-  return formatQueue(letters[q.currentLetter] || "A", q.currentNumber);
+  const letters = ["B", "C"];
+  return formatQueue(letters[q.currentLetter] || "B", q.currentNumber);
 });
 
 const beliDelayedDisplay = computed(() => {
@@ -1100,12 +1100,12 @@ const beliSkipDisplay = computed(() => (state.value.beli.skipList.length ? state
 // Display helpers for Jual
 const jualCurrentQueueStr = computed(() => {
   if (!hybridMode.value && isJualEmpty.value) {
-    if (state.value.jual.lastNumber === 0) return "E01";
+    if (state.value.jual.lastNumber === 0) return "A01";
     return "-";
   }
   const q = state.value.jual;
-  const letters = ["E"];
-  return formatQueue(letters[(q.currentLetter ?? 0) % letters.length] || "E", q.currentNumber);
+  const letters = ["A"];
+  return formatQueue(letters[(q.currentLetter ?? 0) % letters.length] || "A", q.currentNumber);
 });
 
 const jualDelayedDisplay = computed(() => {
@@ -1424,9 +1424,9 @@ async function confirmServed() {
       await writeAnalyticsEntry({ queueNumber: curStr, status: "served", floorId: activeFloor.value });
     }
     
-    const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
-    const currentIdx = ((qState.currentLetter ?? 0) % letters.length) * 50 + qState.currentNumber;
-    const lastIdx = ((qState.lastLetter ?? 0) % letters.length) * 50 + qState.lastNumber;
+    const letters = type === "jual" ? ["A"] : ["B", "C"];
+    const currentIdx = ((qState.currentLetter ?? 0) % letters.length) * 99 + qState.currentNumber;
+    const lastIdx = ((qState.lastLetter ?? 0) % letters.length) * 99 + qState.lastNumber;
     
     if (currentIdx !== lastIdx) {
       const s = await nextQueue(type, state.value, activeFloor.value);
@@ -1468,7 +1468,7 @@ async function confirmSkip() {
   modal("skipQueueModal").hide();
   try {
     const type = modalQueueType.value;
-    const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
+    const letters = type === "jual" ? ["A"] : ["B", "C"];
     const qNum = letters[customLetter.value % letters.length] + padNumber(skipNumber.value);
     state.value = await addToSkipList(type, state.value, qNum, activeFloor.value);
   } catch (e) {
@@ -1498,9 +1498,9 @@ async function confirmDelay() {
     
     let s = await addToDelayedQueue(type, state.value, curStr, activeFloor.value);
     
-    const letters = type === "jual" ? ["E"] : ["A", "B", "C"];
-    const currentIdx = ((qState.currentLetter ?? 0) % letters.length) * 50 + qState.currentNumber;
-    const lastIdx = ((qState.lastLetter ?? 0) % letters.length) * 50 + qState.lastNumber;
+    const letters = type === "jual" ? ["A"] : ["B", "C"];
+    const currentIdx = ((qState.currentLetter ?? 0) % letters.length) * 99 + qState.currentNumber;
+    const lastIdx = ((qState.lastLetter ?? 0) % letters.length) * 99 + qState.lastNumber;
     
     if (currentIdx !== lastIdx) {
       s = await nextQueue(type, s, activeFloor.value);

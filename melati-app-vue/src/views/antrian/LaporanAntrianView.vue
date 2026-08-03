@@ -141,8 +141,8 @@ const letterDist = computed(() => {
   const dist = { J: 0, B: 0 };
   entries.value.forEach((e) => {
     const letter = e.queueNumber?.[0];
-    if (["A", "B", "C"].includes(letter)) dist.B++;
-    else if (["D", "E", "F"].includes(letter)) dist.J++;
+    if (["B", "C"].includes(letter)) dist.B++;
+    else if (["A", "D", "E", "F"].includes(letter)) dist.J++;
   });
   return dist;
 });

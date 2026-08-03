@@ -168,57 +168,57 @@ const currentShift = computed(() => {
 const isJualEmpty = computed(() => {
   const q = jualState.value;
   if (q.lastNumber === 0) return true;
-  const currentIdx = ((q.currentLetter ?? 0) % 1) * 50 + q.currentNumber;
-  const lastIdx = ((q.lastLetter ?? 0) % 1) * 50 + q.lastNumber;
-  const nextAfterLast = (lastIdx % 50) + 1;
+  const currentIdx = ((q.currentLetter ?? 0) % 1) * 99 + q.currentNumber;
+  const lastIdx = ((q.lastLetter ?? 0) % 1) * 99 + q.lastNumber;
+  const nextAfterLast = (lastIdx % 99) + 1;
   return currentIdx === nextAfterLast;
 });
 
 const isBeliEmpty = computed(() => {
   const q = beliState.value;
   if (q.lastNumber === 0) return true;
-  const currentIdx = (q.currentLetter ?? 0) * 50 + q.currentNumber;
-  const lastIdx = (q.lastLetter ?? 0) * 50 + q.lastNumber;
-  const nextAfterLast = (lastIdx % 150) + 1;
+  const currentIdx = (q.currentLetter ?? 0) * 99 + q.currentNumber;
+  const lastIdx = (q.lastLetter ?? 0) * 99 + q.lastNumber;
+  const nextAfterLast = (lastIdx % 198) + 1;
   return currentIdx === nextAfterLast;
 });
 
 // Computed displays for Jual
 const jualCurrentDisplay = computed(() => {
   if (isJualEmpty.value) {
-    if (jualState.value.lastNumber === 0) return "E01";
+    if (jualState.value.lastNumber === 0) return "A01";
     return "-";
   }
   const { currentLetter, currentNumber } = jualState.value;
-  const letters = ["E"];
+  const letters = ["A"];
   
-  const currentIdx = ((currentLetter ?? 0) % letters.length) * 50 + currentNumber;
+  const currentIdx = ((currentLetter ?? 0) % letters.length) * 99 + currentNumber;
   if (currentIdx <= 1) {
-    return "E01";
+    return "A01";
   }
   
   const prevIdx = currentIdx - 1;
-  const prevLet = Math.floor((prevIdx - 1) / 50) % letters.length;
-  const prevNum = ((prevIdx - 1) % 50) + 1;
-  const letter = letters[prevLet] || "E";
+  const prevLet = Math.floor((prevIdx - 1) / 99) % letters.length;
+  const prevNum = ((prevIdx - 1) % 99) + 1;
+  const letter = letters[prevLet] || "A";
   return formatQueue(letter, prevNum);
 });
 
 const jualNextDisplay = computed(() => {
   if (isJualEmpty.value) return "-";
   const { currentLetter, currentNumber, lastLetter, lastNumber } = jualState.value;
-  const letters = ["E"];
-  const currentIdx = ((currentLetter ?? 0) % letters.length) * 50 + currentNumber;
-  const lastIdx = ((lastLetter ?? 0) % letters.length) * 50 + lastNumber;
+  const letters = ["A"];
+  const currentIdx = ((currentLetter ?? 0) % letters.length) * 99 + currentNumber;
+  const lastIdx = ((lastLetter ?? 0) % letters.length) * 99 + lastNumber;
   if (currentIdx === lastIdx) return "-";
   
   let nextNum = currentNumber + 1;
   let nextLet = (currentLetter ?? 0) % letters.length;
-  if (nextNum > 50) {
+  if (nextNum > 99) {
     nextNum = 1;
     nextLet = (nextLet + 1) % letters.length;
   }
-  return formatQueue(letters[nextLet] || "E", nextNum);
+  return formatQueue(letters[nextLet] || "A", nextNum);
 });
 
 const jualMissedDisplay = computed(() => {
@@ -230,39 +230,39 @@ const showJualMissed = computed(() => jualState.value.missedQueue.filter(v => v)
 // Computed displays for Beli
 const beliCurrentDisplay = computed(() => {
   if (isBeliEmpty.value) {
-    if (beliState.value.lastNumber === 0) return "A01";
+    if (beliState.value.lastNumber === 0) return "B01";
     return "-";
   }
   const { currentLetter, currentNumber } = beliState.value;
-  const letters = ["A", "B", "C"];
+  const letters = ["B", "C"];
   
-  const currentIdx = (currentLetter ?? 0) * 50 + currentNumber;
+  const currentIdx = (currentLetter ?? 0) * 99 + currentNumber;
   if (currentIdx <= 1) {
-    return "A01";
+    return "B01";
   }
   
   const prevIdx = currentIdx - 1;
-  const prevLet = Math.floor((prevIdx - 1) / 50) % 3;
-  const prevNum = ((prevIdx - 1) % 50) + 1;
-  const letter = letters[prevLet] || "A";
+  const prevLet = Math.floor((prevIdx - 1) / 99) % letters.length;
+  const prevNum = ((prevIdx - 1) % 99) + 1;
+  const letter = letters[prevLet] || "B";
   return formatQueue(letter, prevNum);
 });
 
 const beliNextDisplay = computed(() => {
   if (isBeliEmpty.value) return "-";
   const { currentLetter, currentNumber, lastLetter, lastNumber } = beliState.value;
-  const currentIdx = (currentLetter ?? 0) * 50 + currentNumber;
-  const lastIdx = (lastLetter ?? 0) * 50 + lastNumber;
+  const letters = ["B", "C"];
+  const currentIdx = (currentLetter ?? 0) * 99 + currentNumber;
+  const lastIdx = (lastLetter ?? 0) * 99 + lastNumber;
   if (currentIdx === lastIdx) return "-";
   
   let nextNum = currentNumber + 1;
-  let nextLet = currentLetter ?? 0;
-  if (nextNum > 50) {
+  let nextLet = (currentLetter ?? 0) % letters.length;
+  if (nextNum > 99) {
     nextNum = 1;
-    nextLet = (nextLet + 1) % 3;
+    nextLet = (nextLet + 1) % letters.length;
   }
-  const letters = ["A", "B", "C"];
-  return formatQueue(letters[nextLet] || "A", nextNum);
+  return formatQueue(letters[nextLet] || "B", nextNum);
 });
 
 const beliMissedDisplay = computed(() => {
