@@ -151,7 +151,7 @@ const b64Decode = (str) => {
   }
 };
 
-function loadRememberedCredentials() {
+function loadRememberedCredentials(setFloor = false) {
   const remember = localStorage.getItem("remember_me") === "true";
   rememberMe.value = remember;
   if (remember) {
@@ -160,20 +160,20 @@ function loadRememberedCredentials() {
     if (savedId) form.value.identifier = savedId;
     if (savedPw) form.value.password = b64Decode(savedPw);
     const savedFloor = localStorage.getItem("remembered_floor") || "";
-    if (savedFloor) {
+    if (setFloor && savedFloor) {
       selectedFloor.value = normalizeFloorId(savedFloor);
     }
   }
 }
 
 onMounted(() => {
-  loadRememberedCredentials();
+  loadRememberedCredentials(true);
 });
 
 function selectFloor(floorId) {
   selectedFloor.value = normalizeFloorId(floorId);
   errorMsg.value = "";
-  loadRememberedCredentials();
+  loadRememberedCredentials(false);
 }
 
 async function handleLogin() {

@@ -765,7 +765,7 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
       templateName = "queue.html";
       const isEn = payload.lang === "en";
       const firstChar = String(payload.queueNumber || "").trim().toUpperCase().charAt(0);
-      const isBeliQueue = String(payload.queueType || "").toLowerCase().includes("beli") || ["A", "B", "C"].includes(firstChar);
+      const isBeliQueue = String(payload.queueType || "").toLowerCase().includes("beli") || ["B", "C"].includes(firstChar);
 
       dataForTemplate = {
         ...payload,
