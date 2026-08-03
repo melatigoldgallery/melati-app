@@ -34,6 +34,36 @@ export async function getLocalPrinters() {
   return [];
 }
 
+// Auto-setup printer default OS ke localStorage (dan native user-config.json) saat login di Electron
+export async function autoSetupElectronPrinters() {
+  if (!isElectron()) return;
+  try {
+    const printers = await getLocalPrinters();
+    if (Array.isArray(printers) && printers.length > 0) {
+      const defaultSys = printers.find((p) => p.isDefault) || printers[0];
+      if (defaultSys && defaultSys.name) {
+        if (!localStorage.getItem("user_default_printer")) {
+          localStorage.setItem("user_default_printer", defaultSys.name);
+        }
+        if (!localStorage.getItem("printer_receipt")) {
+          localStorage.setItem("printer_receipt", defaultSys.name);
+        }
+        if (!localStorage.getItem("printer_invoice")) {
+          localStorage.setItem("printer_invoice", defaultSys.name);
+        }
+        if (!localStorage.getItem("printer_label")) {
+          localStorage.setItem("printer_label", defaultSys.name);
+        }
+        if (!localStorage.getItem("printer_queue")) {
+          localStorage.setItem("printer_queue", defaultSys.name);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Print Helper] Auto setup printer on login failed:", err);
+  }
+}
+
 // Mendapatkan printer target berdasarkan tipe pekerjaan cetak
 export function getTargetPrinter(type) {
   if (typeof localStorage === "undefined") return "";

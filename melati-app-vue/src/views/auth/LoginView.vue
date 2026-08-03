@@ -117,6 +117,7 @@ import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { getFloorLabel, normalizeFloorId } from "@/config/floor-config";
+import { autoSetupElectronPrinters } from "@/utils/printHelper";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -150,23 +151,29 @@ const b64Decode = (str) => {
   }
 };
 
-onMounted(() => {
+function loadRememberedCredentials() {
   const remember = localStorage.getItem("remember_me") === "true";
   rememberMe.value = remember;
   if (remember) {
-    form.value.identifier = localStorage.getItem("remembered_identifier") || "";
+    const savedId = localStorage.getItem("remembered_identifier") || "";
     const savedPw = localStorage.getItem("remembered_password") || "";
-    form.value.password = savedPw ? b64Decode(savedPw) : "";
+    if (savedId) form.value.identifier = savedId;
+    if (savedPw) form.value.password = b64Decode(savedPw);
     const savedFloor = localStorage.getItem("remembered_floor") || "";
     if (savedFloor) {
       selectedFloor.value = normalizeFloorId(savedFloor);
     }
   }
+}
+
+onMounted(() => {
+  loadRememberedCredentials();
 });
 
 function selectFloor(floorId) {
   selectedFloor.value = normalizeFloorId(floorId);
   errorMsg.value = "";
+  loadRememberedCredentials();
 }
 
 async function handleLogin() {
@@ -186,6 +193,9 @@ async function handleLogin() {
       localStorage.removeItem("remembered_password");
       localStorage.removeItem("remembered_floor");
     }
+
+    // Auto setup printer di Electron jika berjalan di Electron
+    await autoSetupElectronPrinters();
 
     const redirect = route.query.redirect || "/dashboard";
     router.push(redirect);

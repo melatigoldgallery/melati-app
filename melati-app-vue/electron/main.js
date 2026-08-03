@@ -411,6 +411,9 @@ function validateOrigin(sender) {
   const url = sender.getURL();
   try {
     const parsed = new URL(url);
+    if (parsed.protocol === "file:" || url.startsWith("file://")) {
+      return true;
+    }
     const allowed = [
       "https://melatigold.web.app",
       "https://melatigoldgallery.github.io",
