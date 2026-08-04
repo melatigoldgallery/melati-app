@@ -541,14 +541,11 @@ function executePrintJob(htmlPath, printerName, printOptions = {}) {
       const defaultOptions = {
         silent: true,
         printBackground: true,
-        preferCSSPageSize: true,
+        preferCSSPageSize: false,
         ...(printerName && typeof printerName === "string" && printerName.trim() !== ""
           ? { deviceName: printerName.trim() }
           : {}),
-        copies: 1,
-        margins: {
-          marginType: "none"
-        }
+        copies: 1
       };
 
       const finalOptions = {
@@ -969,14 +966,24 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
         pageSize: {
           width: 72000,   // 72mm
           height: 140000  // 140mm
-        }
+        },
+        preferCSSPageSize: true,
+        margins: {
+          marginType: "none"
+        },
+        marginsType: 1
       };
     } else if (type === "receipt") {
       printOptions = {
         pageSize: {
           width: 76000,   // 76mm physical paper width
           height: 297000  // 297mm height
-        }
+        },
+        preferCSSPageSize: true,
+        margins: {
+          marginType: "none"
+        },
+        marginsType: 1
       };
     } else if (type === "qr-sbpl" || type === "qr-silver") {
       const pw = Number(payload.pageWidthMm) || 85;
@@ -985,28 +992,24 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
         pageSize: {
           width: Math.round(pw * 1000),   // in microns
           height: Math.round(ph * 1000)  // in microns
-        }
+        },
+        preferCSSPageSize: false,
+        margins: {
+          marginType: "none"
+        },
+        marginsType: 1
       };
     } else if (type === "nota-servis") {
       printOptions = {
-        pageSize: {
-          width: 200000,   // 20cm
-          height: 129000   // 12.9cm
-        }
+        preferCSSPageSize: false
       };
     } else if (type === "nota-custom") {
       printOptions = {
-        pageSize: {
-          width: 200000,   // 20cm
-          height: 120000   // 12cm
-        }
+        preferCSSPageSize: false
       };
     } else if (type === "invoice") {
       printOptions = {
-        pageSize: {
-          width: 205000,   // 20.5cm
-          height: 105000   // 10.5cm
-        }
+        preferCSSPageSize: false
       };
     }
 
