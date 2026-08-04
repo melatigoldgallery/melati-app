@@ -175,8 +175,22 @@
                     </template>
                   </span>
                 </td>
-                <td class="small text-muted" style="max-width: 120px; white-space: normal; word-break: break-word">
-                  {{ row.item ? row.item.keterangan || "" : row.trx.keterangan || "" }}
+                <td class="small text-muted" style="max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="row.item ? row.item.keterangan : row.trx.keterangan">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <span class="text-truncate" style="flex: 1;">{{ row.item ? row.item.keterangan || "—" : row.trx.keterangan || "—" }}</span>
+                    <!-- Photo edit trigger button (for manual transactions only) -->
+                    <template v-if="row.trx.jenisPenjualan === 'manual' && row.item">
+                      <button 
+                        @click="openDirectPhotoModal(row.trx, row.item)"
+                        type="button"
+                        class="btn btn-outline-secondary btn-xs py-0 px-1 d-inline-flex align-items-center gap-1"
+                        style="font-size: 0.70rem; white-space: nowrap; flex-shrink: 0;"
+                      >
+                        <i :class="row.item.foto ? 'bi bi-image text-success' : 'bi bi-camera text-primary'"></i>
+                        <span>Foto</span>
+                      </button>
+                    </template>
+                  </div>
                 </td>
                 <td class="text-center small">
                   <button
@@ -378,11 +392,11 @@
                   class="form-control form-control-sm text-end"
                 />
               </div>
-                <!-- Keterangan (manual only) -->
-                <div v-if="editTarget.jenisPenjualan === 'manual'" class="col-md-10">
-                  <label class="form-label small">Keterangan</label>
-                  <input v-model="item.keterangan" class="form-control form-control-sm" rows="2"></input>
-                </div>
+              <!-- Keterangan (manual only) -->
+              <div v-if="editTarget.jenisPenjualan === 'manual'" class="col-md-10">
+                <label class="form-label small">Keterangan</label>
+                <input v-model="item.keterangan" class="form-control form-control-sm" rows="2"></input>
+              </div>
             </div>
           </div>
 
@@ -399,6 +413,61 @@
           <span v-if="isSavingEdit" class="spinner-border spinner-border-sm me-1"></span>
           Simpan
         </button>
+      </template>
+    </AppModal>
+
+    <!-- -- Direct Photo Modal (View, Capture, Override) -- -->
+    <AppModal v-model="showDirectPhotoModal" title="Foto Barang" size="sm" :closable="!isUploadingFotoDirect && !isSavingDirectPhoto">
+      <template #default>
+        <div class="p-3 text-center">
+          
+          <!-- State 1: Camera Active -->
+          <div v-if="isDirectCameraActive" class="w-100">
+            <div class="position-relative border rounded-3 bg-dark shadow-sm overflow-hidden mb-3 mx-auto" style="aspect-ratio: 1/1; max-width: 240px;">
+              <video ref="directVideoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+              <div v-if="isUploadingFotoDirect" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center bg-black bg-opacity-60 text-white">
+                <span class="spinner-border spinner-border-sm mb-2 text-light" role="status"></span>
+                <span class="small fw-semibold">Mengunggah...</span>
+              </div>
+            </div>
+            
+            <div class="d-flex justify-content-center gap-2">
+              <button type="button" @click="stopDirectCamera" class="btn btn-sm btn-outline-secondary px-3" :disabled="isUploadingFotoDirect">
+                Batal
+              </button>
+              <button type="button" @click="captureDirectPhoto" class="btn btn-sm btn-primary px-3" :disabled="isUploadingFotoDirect">
+                <i class="bi bi-camera me-1"></i> Ambil
+              </button>
+            </div>
+          </div>
+          
+          <!-- State 2: Normal Image Display -->
+          <div v-else class="w-100">
+            <div class="mb-3 position-relative d-inline-block shadow-sm rounded-3 border bg-light overflow-hidden" style="width: 200px; height: 200px;">
+              <img v-if="directPhotoUrl" :src="directPhotoUrl" style="width: 100%; height: 100%; object-fit: cover;" class="d-block" />
+              <div v-else class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-muted">
+                <i class="bi bi-image display-5 mb-2 opacity-55"></i>
+                <span class="small opacity-75">Belum ada foto</span>
+              </div>
+              
+              <!-- Trash button if photo exists -->
+              <button v-if="directPhotoUrl" type="button" @click="deleteDirectPhoto" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 p-0 d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 28px; height: 28px;" title="Hapus Foto">
+                <i class="bi bi-trash-fill text-white" style="font-size: 0.85rem;"></i>
+              </button>
+            </div>
+            
+            <div class="d-flex justify-content-center gap-2 mt-2">
+              <button type="button" @click="startDirectCamera" class="btn btn-sm btn-outline-primary px-3">
+                <i class="bi bi-camera-fill me-1"></i> {{ directPhotoUrl ? 'Ubah Foto' : 'Ambil Foto' }}
+              </button>
+              <button type="button" @click="saveDirectPhoto" :disabled="isSavingDirectPhoto" class="btn btn-sm btn-success px-3">
+                <span v-if="isSavingDirectPhoto" class="spinner-border spinner-border-sm me-1"></span>
+                <i v-else class="bi bi-check-circle me-1"></i> Simpan
+              </button>
+            </div>
+          </div>
+          
+        </div>
       </template>
     </AppModal>
 
@@ -436,7 +505,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { useAccessoriesStore } from "@/stores/accessories";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
@@ -444,6 +513,10 @@ import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import { getSafeAmount, resolveReprintReceiptPayment } from "@/utils/print-payment";
 import { printJob } from "@/utils/printHelper";
+import { storage } from "@/config/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { scopeStoragePath } from "@/services/floor-scope";
+import Swal from "sweetalert2";
 
 const store = useAccessoriesStore();
 const authStore = useAuthStore();
@@ -484,6 +557,22 @@ const editTarget = ref(null);
 const editForm = ref({ salesName: "", customerName: "", customerPhone: "", metodePembayaran: "", keterangan: "" });
 const editItems = ref([]);
 const isSavingEdit = ref(false);
+
+const showDirectPhotoModal = ref(false);
+const directPhotoTrx = ref(null);
+const directPhotoItem = ref(null);
+const directPhotoUrl = ref("");
+const isDirectCameraActive = ref(false);
+const isUploadingFotoDirect = ref(false);
+const isSavingDirectPhoto = ref(false);
+const directVideoElement = ref(null);
+let directMediaStream = null;
+
+watch(showDirectPhotoModal, (newVal) => {
+  if (!newVal) {
+    stopDirectCamera();
+  }
+});
 
 // Print state
 const showPrintChoiceModal = ref(false);
@@ -838,6 +927,7 @@ function openEditModal(trx) {
     subtotal: item.subtotal ?? item.totalHarga ?? item.harga ?? 0,
     keterangan: item.keterangan || "",
     tipe: item.tipe || "",
+    foto: item.foto || "",
     _raw: item,
   }));
   showEditModal.value = true;
@@ -871,6 +961,7 @@ async function saveEdit() {
           subtotal: safeSubtotal,
           harga: safeSubtotal,
           keterangan: ei.keterangan,
+          foto: ei.foto || "",
           // Keep backwards-compat fields too
           kodeLock: ei.kodeLock,
           nama: ei.namaBarang,
@@ -901,6 +992,7 @@ async function saveEdit() {
         subtotal: safeSubtotal,
         harga: safeSubtotal,
         keterangan: rawKeterangan,
+        foto: ei._raw?.foto || "",
         // Keep backwards-compat fields too
         kodeLock: rawKodeLock,
         nama: rawNama,
@@ -946,6 +1038,7 @@ function mapPrintItem(item) {
     subtotal: totalHarga,
     totalHarga,
     keterangan: item?.keterangan || "",
+    foto: item?.foto || "",
   };
 }
 
@@ -1097,12 +1190,149 @@ async function handleStockSync(e) {
   }
 }
 
+
+
+function openDirectPhotoModal(trx, item) {
+  directPhotoTrx.value = trx;
+  directPhotoItem.value = item;
+  directPhotoUrl.value = item.foto || "";
+  isDirectCameraActive.value = false;
+  showDirectPhotoModal.value = true;
+}
+
+function closeDirectPhotoModal() {
+  stopDirectCamera();
+  showDirectPhotoModal.value = false;
+  directPhotoTrx.value = null;
+  directPhotoItem.value = null;
+  directPhotoUrl.value = "";
+}
+
+async function startDirectCamera() {
+  try {
+    isDirectCameraActive.value = true;
+    await nextTick();
+    directMediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+    });
+    if (directVideoElement.value) {
+      directVideoElement.value.srcObject = directMediaStream;
+    }
+  } catch (err) {
+    isDirectCameraActive.value = false;
+    Swal.fire({
+      icon: "error",
+      title: "Gagal Mengakses Kamera",
+      text: err.message || "Pastikan izin kamera diizinkan.",
+    });
+  }
+}
+
+function stopDirectCamera() {
+  if (directMediaStream) {
+    directMediaStream.getTracks().forEach((track) => track.stop());
+    directMediaStream = null;
+  }
+  isDirectCameraActive.value = false;
+}
+
+async function captureDirectPhoto() {
+  if (!directVideoElement.value || !directMediaStream) return;
+  
+  isUploadingFotoDirect.value = true;
+  try {
+    const video = directVideoElement.value;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Gagal menginisialisasi canvas");
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85);
+    });
+    
+    if (!blob) throw new Error("Gagal mengambil data gambar");
+    
+    const filename = `manual_sale_${Date.now()}.jpg`;
+    const storagePath = scopeStoragePath(`manual-sales/${filename}`, activeFloor.value);
+    const fileRef = storageRef(storage, storagePath);
+    
+    await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
+    const downloadUrl = await getDownloadURL(fileRef);
+    
+    directPhotoUrl.value = downloadUrl;
+    stopDirectCamera();
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Gagal Mengambil/Mengunggah Foto",
+      text: err.message || "Terjadi kesalahan saat memproses gambar.",
+    });
+  } finally {
+    isUploadingFotoDirect.value = false;
+  }
+}
+
+function deleteDirectPhoto() {
+  directPhotoUrl.value = "";
+}
+
+async function saveDirectPhoto() {
+  if (!directPhotoTrx.value || !directPhotoItem.value) return;
+  
+  isSavingDirectPhoto.value = true;
+  try {
+    const updatedItems = (directPhotoTrx.value.items || []).map((item) => {
+      const itemCode = item.kodeText || item.kode || "";
+      const targetCode = directPhotoItem.value.kodeText || directPhotoItem.value.kode || "";
+      const itemName = item.namaBarang || item.nama || "";
+      const targetName = directPhotoItem.value.namaBarang || directPhotoItem.value.nama || "";
+      
+      if (itemCode === targetCode && itemName === targetName) {
+        return { ...item, foto: directPhotoUrl.value };
+      }
+      return item;
+    });
+    
+    const updates = {
+      items: updatedItems,
+    };
+    
+    await store.updateTransactionFull(directPhotoTrx.value.id, updates);
+    
+    // Update local UI states of the direct items since they are mapped dynamically
+    directPhotoItem.value.foto = directPhotoUrl.value;
+    
+    Swal.fire({
+      icon: "success",
+      title: "Foto Berhasil Diperbarui",
+      showConfirmButton: false,
+      timer: 1500
+    });
+    
+    closeDirectPhotoModal();
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Gagal Menyimpan Foto",
+      text: err.message || "Terjadi kesalahan saat memperbarui database.",
+    });
+  } finally {
+    isSavingDirectPhoto.value = false;
+  }
+}
+
 // --- Lifecycle ----------------------------------------------------------------
 onMounted(() => {
   window.addEventListener("storage", handleStockSync);
 });
 
 onUnmounted(() => {
+  stopCamera();
   store.stopTodayListener();
   window.removeEventListener("storage", handleStockSync);
 });

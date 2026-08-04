@@ -726,6 +726,42 @@ ipcMain.handle("get-google-tts", async (event, text) => {
   });
 });
 
+function downloadImageAsBase64(url) {
+  return new Promise((resolve) => {
+    if (!url || typeof url !== "string") {
+      resolve("");
+      return;
+    }
+    if (url.startsWith("data:")) {
+      resolve(url);
+      return;
+    }
+    if (!url.startsWith("http")) {
+      resolve("");
+      return;
+    }
+    https.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        resolve("");
+        return;
+      }
+      const data = [];
+      res.on("data", (chunk) => {
+        data.push(chunk);
+      });
+      res.on("end", () => {
+        const buffer = Buffer.concat(data);
+        const base64 = buffer.toString("base64");
+        const contentType = res.headers["content-type"] || "image/jpeg";
+        resolve(`data:${contentType};base64,${base64}`);
+      });
+    }).on("error", (err) => {
+      console.error("Failed to download image:", err);
+      resolve("");
+    });
+  });
+}
+
 ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
   if (!validateOrigin(event.sender)) {
     return { success: false, error: "Unauthorized IPC caller origin" };
@@ -844,14 +880,20 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
       };
     } else if (type === "invoice") {
       templateName = "invoice.html";
-      const normalizedItems = (payload.items || []).map((item) => ({
-        code: item.kode || item.kodeText || item.code || "-",
-        quantity: item.jumlah || item.quantity || 1,
-        name: item.nama || item.name || "-",
-        purity: item.kadar || item.purity || "-",
-        weight: item.berat || (typeof item.weight === "string" ? item.weight.replace(" gr", "").trim() : item.weight) || "-",
-        price: item.totalHarga || item.harga || item.price || 0
-      }));
+      const normalizedItems = await Promise.all(
+        (payload.items || []).map(async (item) => {
+          const base64Foto = await downloadImageAsBase64(item.foto || item.photo);
+          return {
+            code: item.kode || item.kodeText || item.code || "-",
+            quantity: item.jumlah || item.quantity || 1,
+            name: item.nama || item.name || "-",
+            purity: item.kadar || item.purity || "-",
+            weight: item.berat || (typeof item.weight === "string" ? item.weight.replace(" gr", "").trim() : item.weight) || "-",
+            price: item.totalHarga || item.harga || item.price || 0,
+            foto: base64Foto
+          };
+        })
+      );
       const barcodeValue = String(normalizedItems[0]?.code || "").trim();
       const barcodeDataUrl = await generateBarcodeDataUrl(barcodeValue);
       const resolvedNotes = String(payload.notes || payload.keterangan || "").trim() ||

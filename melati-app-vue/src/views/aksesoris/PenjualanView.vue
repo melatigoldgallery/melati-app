@@ -422,6 +422,7 @@
                 <th style="width: 120px">Harga/Gram</th>
                 <th style="width: 140px">Total Harga</th>
                 <th>Keterangan</th>
+                <th style="width: 50px">Foto</th>
                 <th style="width: 50px"></th>
               </tr>
             </thead>
@@ -503,10 +504,25 @@
                     placeholder="Keterangan"
                   />
                 </td>
+                <td>
+                  <div class="d-flex flex-column align-items-center gap-1">
+                    <!-- Preview Foto -->
+                    <div v-if="manualInput.foto" class="position-relative">
+                      <img :src="manualInput.foto" class="img-thumbnail" style="width: 40px; height: 40px; object-fit: cover;" />
+                      <button type="button" @click="manualInput.foto = ''" class="btn btn-danger btn-xs position-absolute top-0 end-0 p-0" style="font-size: 8px; width: 14px; height: 14px; line-height: 14px;">
+                        <i class="bi bi-x"></i>
+                      </button>
+                    </div>
+                    <!-- Tombol Ambil -->
+                    <button v-else type="button" @click="startCamera" class="btn btn-primary btn-sm w-100 py-1 text-center" style="font-size: 12px;">
+                      <i class="bi bi-camera"></i>
+                    </button>
+                  </div>
+                </td>
               </tr>
               <!-- Data Rows -->
               <tr v-if="!manualRows.length">
-                <td colspan="9" class="text-center text-muted py-2">
+                <td colspan="10" class="text-center text-muted py-2">
                   Isi form di atas dan klik
                   <strong>Enter</strong>
                   untuk menambahkan.
@@ -521,6 +537,12 @@
                 <td class="small">{{ formatCurrency(row.hargaPerGram) }}</td>
                 <td class="small fw-semibold">{{ formatCurrency(row.totalHarga) }}</td>
                 <td class="small">{{ row.keterangan || "" }}</td>
+                <td>
+                  <a v-if="row.foto" :href="row.foto" target="_blank">
+                    <img :src="row.foto" class="img-thumbnail" style="width: 40px; height: 40px; object-fit: cover;" />
+                  </a>
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td class="text-center align-middle">
                   <button @click="manualRows.splice(i, 1)" class="btn btn-sm btn-danger">
                     <i class="bi bi-trash"></i>
@@ -532,7 +554,7 @@
               <tr class="table-light fw-bold">
                 <td colspan="6" class="text-end">Grand Total:</td>
                 <td class="text-primary">{{ formatCurrency(grandTotalManual) }}</td>
-                <td colspan="2"></td>
+                <td colspan="3"></td>
               </tr>
             </tfoot>
           </table>
@@ -786,6 +808,30 @@
       </template>
     </AppModal>
 
+    <!-- -- Camera Modal -- -->
+    <AppModal v-model="showCameraModal" title="Ambil Foto Barang" size="sm" :closable="true">
+      <template #default>
+        <div class="d-flex flex-column align-items-center justify-content-center p-3">
+          <div class="position-relative border rounded bg-dark w-100" style="aspect-ratio: 4/3; max-width: 320px; overflow: hidden;">
+            <video ref="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+            <div v-if="isUploadingFoto" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center bg-black bg-opacity-50 text-white">
+              <span class="spinner-border spinner-border-sm mb-2" role="status"></span>
+              <span class="small">Mengunggah ke Storage...</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <button type="button" @click="showCameraModal = false" class="btn btn-secondary btn-sm" :disabled="isUploadingFoto">
+          Batal
+        </button>
+        <button type="button" @click="capturePhoto" class="btn btn-primary btn-sm" :disabled="isUploadingFoto">
+          <i class="bi bi-camera me-1"></i>
+          Ambil Foto
+        </button>
+      </template>
+    </AppModal>
+
     <!-- -- Print Modal -- -->
     <AppModal v-model="showPrintModal" title="Transaksi Berhasil" :closable="false" :static-backdrop="true">
       <template #default>
@@ -828,9 +874,10 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { getDocs, getDoc, query, where, orderBy, serverTimestamp, doc, setDoc } from "firebase/firestore";
-import { floorCollection } from "@/services/floor-scope";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { floorCollection, scopeStoragePath } from "@/services/floor-scope";
 import Swal from "sweetalert2";
-import { db } from "@/config/firebase";
+import { db, storage } from "@/config/firebase";
 import { useAccessoriesStore } from "@/stores/accessories";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
@@ -889,6 +936,7 @@ const manualInput = reactive({
   hargaPerGram: 0,
   totalHargaStr: "",
   keterangan: "",
+  foto: "",
 });
 
 // Silver inline input
@@ -1535,6 +1583,13 @@ function pickFromCatalog(item) {
 const showLockModal = ref(false);
 const lockSearch = ref("");
 
+const showCameraModal = ref(false);
+watch(showCameraModal, (newVal) => {
+  if (!newVal) {
+    stopCamera();
+  }
+});
+
 const filteredLockCatalog = computed(() => {
   const items = store.activeSalesItems.filter((i) => i.kategori === "aksesoris");
   if (!lockSearch.value) return items;
@@ -1563,7 +1618,85 @@ function resetManualInput() {
     hargaPerGram: 0,
     totalHargaStr: "",
     keterangan: "",
+    foto: "",
   });
+}
+
+const isCameraActive = ref(false);
+const videoElement = ref(null);
+const isUploadingFoto = ref(false);
+let mediaStream = null;
+
+async function startCamera() {
+  try {
+    isCameraActive.value = true;
+    showCameraModal.value = true;
+    await nextTick();
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+    });
+    if (videoElement.value) {
+      videoElement.value.srcObject = mediaStream;
+    }
+  } catch (err) {
+    isCameraActive.value = false;
+    showCameraModal.value = false;
+    Swal.fire({
+      icon: "error",
+      title: "Gagal Mengakses Kamera",
+      text: err.message || "Pastikan izin kamera diizinkan.",
+    });
+  }
+}
+
+function stopCamera() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+  isCameraActive.value = false;
+  showCameraModal.value = false;
+}
+
+async function capturePhoto() {
+  if (!videoElement.value || !mediaStream) return;
+  
+  isUploadingFoto.value = true;
+  try {
+    const video = videoElement.value;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Gagal menginisialisasi canvas");
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85);
+    });
+    
+    if (!blob) throw new Error("Gagal mengambil data gambar");
+    
+    const filename = `manual_sale_${Date.now()}.jpg`;
+    const storagePath = scopeStoragePath(`manual-sales/${filename}`, activeFloor.value);
+    const fileRef = storageRef(storage, storagePath);
+    
+    await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
+    const downloadUrl = await getDownloadURL(fileRef);
+    
+    manualInput.foto = downloadUrl;
+    stopCamera();
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Gagal Mengambil/Mengunggah Foto",
+      text: err.message || "Terjadi kesalahan saat memproses gambar.",
+    });
+  } finally {
+    isUploadingFoto.value = false;
+  }
 }
 
 function commitManualRow() {
@@ -1594,6 +1727,7 @@ function commitManualRow() {
     hargaPerGram: manualInput.hargaPerGram,
     totalHarga,
     keterangan: manualInput.keterangan || "",
+    foto: manualInput.foto || "",
   });
   resetManualInput();
 }
@@ -1912,6 +2046,7 @@ function buildCartItems() {
     harga: row.totalHarga,
     subtotal: row.totalHarga,
     keterangan: row.keterangan || "",
+    foto: row.foto || "",
   }));
 }
 
@@ -1957,6 +2092,7 @@ function mapPrintItem(item) {
     subtotal: totalHarga,
     totalHarga,
     keterangan: item?.keterangan || "",
+    foto: item?.foto || "",
   };
 }
 
@@ -2157,6 +2293,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  stopCamera();
   window.removeEventListener("storage", handleStockSync);
 });
 </script>
