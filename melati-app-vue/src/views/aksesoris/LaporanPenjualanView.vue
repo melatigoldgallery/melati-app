@@ -453,17 +453,20 @@ const activeRows = computed(() => {
 const tableTotals = computed(() => {
   let pcs = 0;
   let berat = 0;
-  let harga = 0;
   let hasBerat = false;
 
   activeRows.value.forEach((row) => {
     pcs += row.pcs;
-    harga += row.harga;
     if (row.berat > 0 && row.jenisRaw !== "kotak") {
       berat += row.berat;
       hasBerat = true;
     }
   });
+
+  const hasSearch = Boolean(searchText.value.trim());
+  const harga = hasSearch
+    ? activeRows.value.reduce((sum, r) => sum + r.harga, 0)
+    : summaryTotals.value.harga;
 
   return {
     pcs,
@@ -1054,7 +1057,7 @@ async function exportRekapToExcel() {
 
   const totalPcs = rekapRows.value.reduce((sum, r) => sum + r.pcs, 0);
   const totalBerat = rekapRows.value.reduce((sum, r) => sum + (r.jenisRaw === "kotak" ? 0 : r.berat), 0);
-  const totalHarga = rekapRows.value.reduce((sum, r) => sum + r.harga, 0);
+  const totalHarga = summaryTotals.value.harga;
 
   const totalRow = isKotak
     ? ["TOTAL", "", "", totalPcs, "-", "-", `Rp ${formatCurrency(totalHarga)}`, ""]
@@ -1179,7 +1182,7 @@ async function exportRekapToPdf() {
 
   const totalPcs = rekapRows.value.reduce((sum, r) => sum + r.pcs, 0);
   const totalBerat = rekapRows.value.reduce((sum, r) => sum + (r.jenisRaw === "kotak" ? 0 : r.berat), 0);
-  const totalHarga = rekapRows.value.reduce((sum, r) => sum + r.harga, 0);
+  const totalHarga = summaryTotals.value.harga;
 
   body.push(
     isKotak
