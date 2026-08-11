@@ -1332,7 +1332,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  stopCamera();
+  stopDirectCamera();
   store.stopTodayListener();
   window.removeEventListener("storage", handleStockSync);
 });

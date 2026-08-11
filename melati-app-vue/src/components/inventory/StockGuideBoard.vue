@@ -37,7 +37,7 @@
                     <div class="rule-text text-start">
                       <h6 class="fw-bold text-info-emphasis mb-1">Konfirmasi ke Tim Input</h6>
                       <p class="mb-0 text-muted small">
-                        Setiap selesai memindahkan barang, <strong>konfirmasi ke Tim Input</strong> untuk memastikan perpindahan valid dan menghindari lupa scan barcode.
+                        Setelah selesai scan barcode, <strong>konfirmasi ke Tim Input</strong> untuk memastikan perpindahan valid dan menghindari lupa scan barcode.
                       </p>
                     </div>
                   </div>
@@ -61,7 +61,7 @@
                     <div class="rule-text text-start">
                       <h6 class="fw-bold text-danger mb-1">Ketentuan Kelalaian (Tanpa Scan)</h6>
                       <p class="mb-0 text-muted small">
-                        Jika diketahui ada sales yang mengambil/memindahkan barang tanpa melakukan scan barcode, <strong>nama sales yang bersangkutan akan diumumkan di grup toko</strong>.
+                        Jika diketahui ada sales yang mengambil/memindahkan barang tanpa melakukan scan barcode, <strong>nama sales yang bersangkutan akan diumumkan di grup toko</strong> sebagai pengingat untuk yang bersangkutan dan sales secara keseluruhan.
                       </p>
                     </div>
                   </div>
