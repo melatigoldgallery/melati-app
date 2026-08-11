@@ -9,7 +9,7 @@
         margin: 0;
       }
       body {
-        width: 72mm;
+        width: 62mm;
         margin: 0 auto;
         padding-left: 0;
         padding-right: 0;
@@ -56,7 +56,7 @@
     
     <div style="margin-top: 4px;">Tanggal: {{tanggal}}</div>
     <div>Sales  : {{sales}}</div>
-    <div class="bold">==================================</div>
+    <div class="center bold">==================================</div>
     
     <div class="item-container">
       {{#each items}}
@@ -68,17 +68,17 @@
         </div>
       </div>
       {{#unless @last}}
-      <div>- - - - - - - - - - - - - - - - - -</div>
+      <div class="center">- - - - - - - - - - - - - - - - - -</div>
       {{/unless}}
       {{/each}}
     </div>
     
-    <div class="bold">==================================</div>
+    <div class="center bold">==================================</div>
     <div class="flex-row bold">
       <span>TOTAL:</span>
       <span>{{totalHargaFormatted}}</span>
     </div>
-    <div class="bold">==================================</div>
+    <div class="center bold">==================================</div>
     
     {{#if isDP}}
     <div class="flex-row">
@@ -112,11 +112,11 @@
     {{/unless}}
     {{/if}}
     
-    <div class="bold">==================================</div>
+    <div class="center bold">==================================</div>
     
     {{#if hasNotes}}
     <div style="margin-top: 4px; word-break: break-word;">Keterangan: {{notes}}</div>
-    <div class="bold">==================================</div>
+    <div class="center bold">==================================</div>
     {{/if}}
     
     <div class="center" style="margin-top: 6px;">Terima Kasih</div>

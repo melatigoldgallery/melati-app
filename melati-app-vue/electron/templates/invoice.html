@@ -9,7 +9,7 @@
       }
       body {
         font-family: Arial, Helvetica, sans-serif;
-        font-size: 12px;
+        font-size: 11px;
         margin: 0;
         padding: 0;
         width: 20.5cm;
@@ -29,7 +29,7 @@
         top: 1.1cm;
         left: 15cm;
         text-align: left;
-        font-size: 12px;
+        font-size: 11px;
         line-height: 1.4;
       }
       .customer-section .date {
@@ -57,7 +57,7 @@
         table-layout: fixed;
       }
       .items-table td {
-        font-size: 12px;
+        font-size: 11px;
         line-height: 1.2;
         padding: 0;
         vertical-align: top;
@@ -91,7 +91,7 @@
       }
       .items-table .col-price {
         width: 2.6cm;
-        text-align: center;
+        text-align: left;
       }
 
       /* Barcode Section - Kiri Tengah */
@@ -111,7 +111,7 @@
       .total-section {
         position: absolute;
         top: 7.6cm;
-        right: 3.5cm;
+        right: 4cm;
         text-align: right;
         font-size: 12px;
         font-weight: bold;
@@ -132,9 +132,21 @@
       .sales-section {
         position: absolute;
         top: 8.5cm;
-        right: 2.3cm;
+        right: 2.6cm;
         text-align: right;
-        font-size: 12px;
+        font-size: 11px;
+      }
+
+      /* Item Photo - Kanan Tengah */
+      .item-photo {
+        position: absolute;
+        top: 4.3cm;
+        right: 0.4cm;
+        width: 2.8cm;
+        height: 2.8cm;
+        object-fit: cover;
+        border: 1px solid #ccc;
+        border-radius: 2px;
       }
     </style>
   </head>
@@ -155,7 +167,7 @@
             <tr>
               <td class="col-code">{{code}}{{kode}}</td>
               <td class="col-qty">
-                {{#if quantity}}{{quantity}}{{else}}{{#if jumlah}}{{jumlah}}{{else}}1{{/if}}{{/if}}pcs
+                {{#if quantity}}{{quantity}}{{else}}{{#if jumlah}}{{jumlah}}{{else}}1{{/if}}{{/if}}
               </td>
               <td class="col-name">{{name}}{{nama}}</td>
               <td class="col-purity">{{purity}}{{kadar}}</td>
@@ -187,6 +199,13 @@
 
       <!-- Sales ID - Kanan Bawah -->
       <div class="sales-section">{{sales}}</div>
+
+      <!-- Item Photo -->
+      {{#each items}}
+        {{#if foto}}
+        <img src="{{foto}}" class="item-photo" alt="Foto Barang" />
+        {{/if}}
+      {{/each}}
     </div>
   </body>
 </html>

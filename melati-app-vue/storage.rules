@@ -39,7 +39,16 @@ service firebase.storage {
       allow delete: if isAuthenticated();
     }
 
-    // Rules for global store services (layanan toko)
+    // Rules for manual sales photo uploads
+    match /floors/{floorId}/manual-sales/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if isAuthenticated();
+    }
+
+    // Rules for global store services (layanan toko) - needed by LayananTokoView.vue
     match /layanan/{category}/{fileName} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated()
@@ -48,14 +57,7 @@ service firebase.storage {
       allow delete: if isAuthenticated();
     }
 
-    // Rules for legacy floor-scoped store services
-    match /floors/{floorId}/layanan/{category}/{fileName} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated()
-                   && request.resource.size < 3 * 1024 * 1024 // Max 3MB
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isAuthenticated();
-    }
+
 
     // Medical Certificate Rules (Phase 1 - Cloudinary → Firebase Migration)
     // Path structure: medical-certificates/{year}/{month}/{employeeId}_{timestamp}_{uuid}.{ext}
@@ -163,5 +165,3 @@ service firebase.storage {
     }
   }
 }
-
-

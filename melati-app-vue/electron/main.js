@@ -541,14 +541,11 @@ function executePrintJob(htmlPath, printerName, printOptions = {}) {
       const defaultOptions = {
         silent: true,
         printBackground: true,
-        preferCSSPageSize: true,
+        preferCSSPageSize: false,
         ...(printerName && typeof printerName === "string" && printerName.trim() !== ""
           ? { deviceName: printerName.trim() }
           : {}),
-        copies: 1,
-        margins: {
-          marginType: "none"
-        }
+        copies: 1
       };
 
       const finalOptions = {
@@ -729,6 +726,42 @@ ipcMain.handle("get-google-tts", async (event, text) => {
   });
 });
 
+function downloadImageAsBase64(url) {
+  return new Promise((resolve) => {
+    if (!url || typeof url !== "string") {
+      resolve("");
+      return;
+    }
+    if (url.startsWith("data:")) {
+      resolve(url);
+      return;
+    }
+    if (!url.startsWith("http")) {
+      resolve("");
+      return;
+    }
+    https.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        resolve("");
+        return;
+      }
+      const data = [];
+      res.on("data", (chunk) => {
+        data.push(chunk);
+      });
+      res.on("end", () => {
+        const buffer = Buffer.concat(data);
+        const base64 = buffer.toString("base64");
+        const contentType = res.headers["content-type"] || "image/jpeg";
+        resolve(`data:${contentType};base64,${base64}`);
+      });
+    }).on("error", (err) => {
+      console.error("Failed to download image:", err);
+      resolve("");
+    });
+  });
+}
+
 ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
   if (!validateOrigin(event.sender)) {
     return { success: false, error: "Unauthorized IPC caller origin" };
@@ -847,14 +880,20 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
       };
     } else if (type === "invoice") {
       templateName = "invoice.html";
-      const normalizedItems = (payload.items || []).map((item) => ({
-        code: item.kode || item.kodeText || item.code || "-",
-        quantity: item.jumlah || item.quantity || 1,
-        name: item.nama || item.name || "-",
-        purity: item.kadar || item.purity || "-",
-        weight: item.berat || (typeof item.weight === "string" ? item.weight.replace(" gr", "").trim() : item.weight) || "-",
-        price: item.totalHarga || item.harga || item.price || 0
-      }));
+      const normalizedItems = await Promise.all(
+        (payload.items || []).map(async (item) => {
+          const base64Foto = await downloadImageAsBase64(item.foto || item.photo);
+          return {
+            code: item.kode || item.kodeText || item.code || "-",
+            quantity: item.jumlah || item.quantity || 1,
+            name: item.nama || item.name || "-",
+            purity: item.kadar || item.purity || "-",
+            weight: item.berat || (typeof item.weight === "string" ? item.weight.replace(" gr", "").trim() : item.weight) || "-",
+            price: item.totalHarga || item.harga || item.price || 0,
+            foto: base64Foto
+          };
+        })
+      );
       const barcodeValue = String(normalizedItems[0]?.code || "").trim();
       const barcodeDataUrl = await generateBarcodeDataUrl(barcodeValue);
       const resolvedNotes = String(payload.notes || payload.keterangan || "").trim() ||
@@ -969,14 +1008,24 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
         pageSize: {
           width: 72000,   // 72mm
           height: 140000  // 140mm
-        }
+        },
+        preferCSSPageSize: true,
+        margins: {
+          marginType: "none"
+        },
+        marginsType: 1
       };
     } else if (type === "receipt") {
       printOptions = {
         pageSize: {
           width: 76000,   // 76mm physical paper width
           height: 297000  // 297mm height
-        }
+        },
+        preferCSSPageSize: true,
+        margins: {
+          marginType: "none"
+        },
+        marginsType: 1
       };
     } else if (type === "qr-sbpl" || type === "qr-silver") {
       const pw = Number(payload.pageWidthMm) || 85;
@@ -985,28 +1034,24 @@ ipcMain.handle("print-job", async (event, { type, payload, printerName }) => {
         pageSize: {
           width: Math.round(pw * 1000),   // in microns
           height: Math.round(ph * 1000)  // in microns
-        }
+        },
+        preferCSSPageSize: false,
+        margins: {
+          marginType: "none"
+        },
+        marginsType: 1
       };
     } else if (type === "nota-servis") {
       printOptions = {
-        pageSize: {
-          width: 200000,   // 20cm
-          height: 129000   // 12.9cm
-        }
+        preferCSSPageSize: false
       };
     } else if (type === "nota-custom") {
       printOptions = {
-        pageSize: {
-          width: 200000,   // 20cm
-          height: 120000   // 12cm
-        }
+        preferCSSPageSize: false
       };
     } else if (type === "invoice") {
       printOptions = {
-        pageSize: {
-          width: 205000,   // 20.5cm
-          height: 105000   // 10.5cm
-        }
+        preferCSSPageSize: false
       };
     }
 
