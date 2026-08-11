@@ -33,12 +33,14 @@ const activeComponent = computed(() => {
 
 async function loadSettings() {
   loading.value = true;
+  const cacheKey = `kiosk_queue_mode_${activeFloor.value}`;
   try {
     const data = await fetchQueueGeneralSettings(activeFloor.value);
     queueMode.value = data.queueMode || "legacy";
+    localStorage.setItem(cacheKey, queueMode.value);
   } catch (error) {
     console.error("Gagal mengambil pengaturan mode antrian untuk kiosk:", error);
-    queueMode.value = "legacy";
+    queueMode.value = localStorage.getItem(cacheKey) || "legacy";
   } finally {
     loading.value = false;
   }

@@ -24,13 +24,21 @@
           </ol>
         </nav>
       </div>
-      <div>
+      <div class="d-flex gap-2">
         <button
-          class="btn btn-secondary text-white fw-semibold px-3 py-2 shadow-sm d-flex align-items-center gap-2"
+          class="btn btn-success text-white fw-semibold px-3 py-2 shadow-sm d-flex align-items-center gap-2"
           @click="openRosterModal"
         >
           <i class="fas fa-users-cog"></i>
           Pembagian Pelayanan
+        </button>
+        <button
+          class="btn btn-danger text-white fw-semibold px-3 py-2 shadow-sm d-flex align-items-center gap-2"
+          @click="openReset"
+          :disabled="busy"
+        >
+          <i class="fas fa-redo-alt"></i>
+          Reset Antrian
         </button>
       </div>
     </div>
@@ -70,7 +78,7 @@
         <button
           :class="[
             'btn',
-            'btn-danger',
+            'btn-primary',
             'announcement-btn',
             {
               'audio-active': audioActiveBtn === 'announceWait',
@@ -88,7 +96,7 @@
         <button
           :class="[
             'btn',
-            'btn-success',
+            'btn-warning',
             'announcement-btn',
             {
               'audio-active': audioActiveBtn === 'announceReminder',
@@ -143,11 +151,8 @@
                   <button class="btn btn-outline-secondary" @click="openDelay('beli')" :disabled="busy || beliCurrentQueueStr === '-'">
                     <i class="fas fa-pause-circle"></i> Tunda Nomor
                   </button>
-                  <button class="btn btn-outline-warning" @click="openCustom('beli')" :disabled="busy">
+                  <button class="btn btn-outline-warning text-muted" @click="openCustom('beli')" :disabled="busy">
                     <i class="fas fa-edit"></i> Custom
-                  </button>
-                  <button class="btn btn-outline-danger" @click="openReset" :disabled="busy">
-                    <i class="fas fa-redo-alt"></i> Reset
                   </button>
                 </div>
               </div>
@@ -185,10 +190,25 @@
                 <h6 class="card-title mb-0 text-dark">Skip List (Beli)</h6>
               </div>
               <div class="card-body">
-                <div class="queue-display list-display mb-2">{{ beliSkipDisplay }}</div>
-                <button class="btn btn-outline-primary w-100 py-2 fw-semibold" @click="openSkip('beli')" :disabled="busy">
-                  <i class="fas fa-forward me-1"></i> Skip Nomor
-                </button>
+                <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
+                  <span 
+                    v-for="q in state.beli.skipList" 
+                    :key="q"
+                    class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill d-inline-flex align-items-center gap-1"
+                    style="font-size: 0.85rem; font-weight: 600; cursor: pointer;"
+                    @click="removeSkipItem('beli', q)"
+                    title="Klik untuk menghapus dari skip list"
+                  >
+                    {{ q }}
+                    <i class="fas fa-times text-danger ms-1" style="font-size: 0.75rem;"></i>
+                  </span>
+                  <span v-if="state.beli.skipList.length === 0" class="text-muted small">-</span>
+                </div>
+                <div class="action-buttons">
+                  <button class="btn btn-outline-primary w-100" @click="openSkip('beli')" :disabled="busy">
+                    <i class="fas fa-forward me-1"></i> Skip Nomor
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -200,7 +220,17 @@
                 <h6 class="card-title mb-0 text-dark">Tertunda (Beli)</h6>
               </div>
               <div class="card-body">
-                <div class="queue-display list-display mb-3">{{ beliDelayedDisplay }}</div>
+                <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
+                  <span 
+                    v-for="q in state.beli.delayedQueue" 
+                    :key="q"
+                    class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill"
+                    style="font-size: 0.85rem; font-weight: 600;"
+                  >
+                    {{ q }}
+                  </span>
+                  <span v-if="state.beli.delayedQueue.length === 0" class="text-muted small">-</span>
+                </div>
                 <div class="action-buttons">
                   <button class="btn btn-outline-danger" @click="openMoveToMissed('beli')" :disabled="busy || state.beli.delayedQueue.length === 0">
                     <i class="fas fa-exclamation-circle me-1"></i> Lewatkan
@@ -249,11 +279,8 @@
                   <button class="btn btn-outline-secondary" @click="openDelay('jual')" :disabled="busy || jualCurrentQueueStr === '-'">
                     <i class="fas fa-pause-circle"></i> Tunda Nomor
                   </button>
-                  <button class="btn btn-outline-warning" @click="openCustom('jual')" :disabled="busy">
+                  <button class="btn btn-outline-warning text-muted" @click="openCustom('jual')" :disabled="busy">
                     <i class="fas fa-edit"></i> Custom
-                  </button>
-                  <button class="btn btn-outline-danger" @click="openReset" :disabled="busy">
-                    <i class="fas fa-redo-alt"></i> Reset
                   </button>
                 </div>
               </div>
@@ -291,10 +318,25 @@
                 <h6 class="card-title mb-0 text-dark">Skip List (Jual)</h6>
               </div>
               <div class="card-body">
-                <div class="queue-display list-display mb-2">{{ jualSkipDisplay }}</div>
-                <button class="btn btn-outline-primary w-100 py-2 fw-semibold" @click="openSkip('jual')" :disabled="busy">
-                  <i class="fas fa-forward me-1"></i> Skip Nomor
-                </button>
+                <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
+                  <span 
+                    v-for="q in state.jual.skipList" 
+                    :key="q"
+                    class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill d-inline-flex align-items-center gap-1"
+                    style="font-size: 0.85rem; font-weight: 600; cursor: pointer;"
+                    @click="removeSkipItem('jual', q)"
+                    title="Klik untuk menghapus dari skip list"
+                  >
+                    {{ q }}
+                    <i class="fas fa-times text-danger ms-1" style="font-size: 0.75rem;"></i>
+                  </span>
+                  <span v-if="state.jual.skipList.length === 0" class="text-muted small">-</span>
+                </div>
+                <div class="action-buttons">
+                  <button class="btn btn-outline-primary w-100" @click="openSkip('jual')" :disabled="busy">
+                    <i class="fas fa-forward me-1"></i> Skip Nomor
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -306,7 +348,17 @@
                 <h6 class="card-title mb-0 text-dark">Tertunda (Jual)</h6>
               </div>
               <div class="card-body">
-                <div class="queue-display list-display mb-3">{{ jualDelayedDisplay }}</div>
+                <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
+                  <span 
+                    v-for="q in state.jual.delayedQueue" 
+                    :key="q"
+                    class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill"
+                    style="font-size: 0.85rem; font-weight: 600;"
+                  >
+                    {{ q }}
+                  </span>
+                  <span v-if="state.jual.delayedQueue.length === 0" class="text-muted small">-</span>
+                </div>
                 <div class="action-buttons">
                   <button class="btn btn-outline-danger" @click="openMoveToMissed('jual')" :disabled="busy || state.jual.delayedQueue.length === 0">
                     <i class="fas fa-exclamation-circle me-1"></i> Lewatkan
@@ -466,7 +518,7 @@
     <div class="modal fade" id="skipQueueModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header bg-warning text-white">
+          <div class="modal-header bg-primary text-light">
             <h5 class="modal-title">
               <i class="fas fa-forward me-2"></i>
               Skip Nomor Antrian
@@ -474,7 +526,7 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <div class="alert alert-warning">
+            <div class="alert alert-primary">
               <i class="fas fa-exclamation-triangle me-2"></i>
               Anda akan melewati nomor antrian tertentu.
             </div>
@@ -506,7 +558,7 @@
               <i class="fas fa-times me-2"></i>
               Batal
             </button>
-            <button type="button" class="btn btn-outline-warning" @click="confirmSkip" :disabled="busy">
+            <button type="button" class="btn btn-outline-primary" @click="confirmSkip" :disabled="busy">
               <i class="fas fa-check me-2"></i>
               Tambahkan ke Skip List
             </button>
@@ -519,15 +571,15 @@
     <div class="modal fade" id="customQueueModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header bg-primary text-white">
+          <div class="modal-header bg-warning ">
             <h5 class="modal-title">
-              <i class="fas fa-edit me-2"></i>
+              <i class="fas fa-edit me-2"></i> 
               Set Custom Nomor Antrian
             </h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <div class="alert alert-info">
+            <div class="alert alert-warning">
               <i class="fas fa-info-circle me-2"></i>
               Anda akan mengatur nomor antrian aktif saat ini secara manual.
             </div>
@@ -559,7 +611,7 @@
               <i class="fas fa-times me-2"></i>
               Batal
             </button>
-            <button type="button" class="btn btn-outline-primary" @click="confirmCustom" :disabled="busy">
+            <button type="button" class="btn btn-outline-warning text-muted" @click="confirmCustom" :disabled="busy">
               <i class="fas fa-check me-2"></i>
               Terapkan
             </button>
@@ -580,9 +632,9 @@
             <div class="alert alert-warning">
               <i class="fas fa-exclamation-triangle me-2"></i>
               <strong>Perhatian!</strong>
-              Tindakan ini akan mereset seluruh data antrian (Jual & Beli).
+              Tindakan ini akan mereset seluruh data antrian.
             </div>
-            <p>Apakah Anda yakin ingin mereset seluruh nomor antrian? Tindakan ini tidak dapat dibatalkan.</p>
+            <p>Apakah Anda yakin akan mereset antrean <strong>Jual / Servis</strong> dan <strong>Beli / Tukar Tambah</strong>? Tindakan ini tidak dapat dibatalkan.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
@@ -879,6 +931,7 @@ import {
   nextQueue,
   setCustomQueue,
   addToSkipList,
+  removeFromSkipList,
   addToDelayedQueue,
   moveToMissed,
   removeFromMissed,
@@ -1478,6 +1531,42 @@ async function confirmSkip() {
   }
 }
 
+async function removeSkipItem(type, qNum) {
+  const confirmResult = await Swal.fire({
+    title: "Batalkan Skip?",
+    text: `Apakah Anda yakin ingin menghapus nomor ${qNum} dari skip list?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Ya, Hapus",
+    cancelButtonText: "Batal"
+  });
+
+  if (confirmResult.isConfirmed) {
+    busy.value = true;
+    try {
+      state.value = await removeFromSkipList(type, state.value, qNum, activeFloor.value);
+      Swal.fire({
+        icon: "success",
+        title: "Dihapus",
+        text: `Nomor ${qNum} berhasil dihapus dari skip list.`,
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: "Gagal menghapus nomor dari skip list."
+      });
+    } finally {
+      busy.value = false;
+    }
+  }
+}
+
 function openDelay(type) {
   const qState = state.value[type];
   if (qState.missedQueue.length > 0) {
@@ -1548,12 +1637,57 @@ function openReset() {
 }
 
 async function confirmReset() {
-  busy.value = true;
   modal("resetModal").hide();
+
+  // Prompt for password
+  const { value: inputPassword, isDismissed } = await Swal.fire({
+    title: "Verifikasi Sandi",
+    text: "Masukkan password untuk melakukan reset antrean:",
+    input: "password",
+    inputPlaceholder: "Password",
+    inputAttributes: {
+      autocapitalize: "off",
+      autocorrect: "off"
+    },
+    showCancelButton: true,
+    confirmButtonText: "Verifikasi",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#dc3545",
+    cancelButtonColor: "#6c757d",
+  });
+
+  if (isDismissed || inputPassword === undefined) return;
+
+  busy.value = true;
   try {
+    const settings = await fetchQueueGeneralSettings(activeFloor.value);
+    const dbPassword = settings.resetPassword || "melatigo";
+
+    if (inputPassword !== dbPassword) {
+      await Swal.fire({
+        icon: "error",
+        title: "Password Salah",
+        text: "Password yang Anda masukkan tidak sesuai.",
+        confirmButtonColor: "#dc3545",
+      });
+      return;
+    }
+
     await resetQueue(activeFloor.value);
+    Swal.fire({
+      icon: "success",
+      title: "Antrean Direset",
+      text: "Seluruh data antrean (Jual & Beli) berhasil direset.",
+      timer: 2000,
+      showConfirmButton: false
+    });
   } catch (e) {
     console.error(e);
+    Swal.fire({
+      icon: "error",
+      title: "Gagal",
+      text: "Gagal mereset data antrean."
+    });
   } finally {
     busy.value = false;
   }

@@ -31,11 +31,34 @@ function queueRef(floorId = "") {
   return floorDataRef(rtdb, "queue", "state_v2");
 }
 
+function getQueueSectionState(val, type) {
+  const current = val[type] || {};
+  return {
+    currentLetter: current.currentLetter ?? 0,
+    currentNumber: current.currentNumber ?? 1,
+    lastLetter: current.lastLetter ?? 0,
+    lastNumber: current.lastNumber ?? 0,
+    delayedQueue: current.delayedQueue || [],
+    missedQueue: current.missedQueue || [],
+    skipList: current.skipList || []
+  };
+}
+
+function normalizeQueueState(val) {
+  const data = val || {};
+  return {
+    jual: getQueueSectionState(data, "jual"),
+    beli: getQueueSectionState(data, "beli")
+  };
+}
+
 function analyticsRef(year, month, day) {
   return floorDataRef(rtdb, "queue", "analytics", String(year), String(month), String(day));
 }
 
 // ── State subscription ─────────────────────────────────────────────────────
+let latestQueueState = {};
+
 export function subscribeQueue(arg1, arg2) {
   const floorId = typeof arg1 === "string" ? arg1 : "";
   const callback = typeof arg1 === "function" ? arg1 : arg2;
@@ -44,26 +67,9 @@ export function subscribeQueue(arg1, arg2) {
   }
   return onValue(queueRef(floorId), (snap) => {
     const val = snap.val() || {};
-    callback({
-      jual: {
-        currentLetter: val.jual?.currentLetter ?? 0,
-        currentNumber: val.jual?.currentNumber ?? 1,
-        lastLetter: val.jual?.lastLetter ?? 0,
-        lastNumber: val.jual?.lastNumber ?? 0,
-        delayedQueue: val.jual?.delayedQueue || [],
-        missedQueue: val.jual?.missedQueue || [],
-        skipList: val.jual?.skipList || [],
-      },
-      beli: {
-        currentLetter: val.beli?.currentLetter ?? 0,
-        currentNumber: val.beli?.currentNumber ?? 1,
-        lastLetter: val.beli?.lastLetter ?? 0,
-        lastNumber: val.beli?.lastNumber ?? 0,
-        delayedQueue: val.beli?.delayedQueue || [],
-        missedQueue: val.beli?.missedQueue || [],
-        skipList: val.beli?.skipList || [],
-      }
-    });
+    const state = normalizeQueueState(val);
+    latestQueueState[floorId] = state;
+    callback(state);
   });
 }
 
@@ -72,16 +78,51 @@ async function saveState(state, floorId = "") {
 }
 
 // ── Operations ─────────────────────────────────────────────────────────────
-export async function addCustomerQueue(type, floorId = "") {
-  const dbRefNode = queueRef(floorId);
-  const snap = await get(dbRefNode);
-  const val = snap.val() || {};
-  const current = val[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
+export function addCustomerQueue(type, floorId = "") {
+  const resolvedFloor = floorId || "";
+  const dbRefNode = queueRef(resolvedFloor);
   
+  // 1. Ambil data terbaru dari cache memori lokal (Firebase subscription)
+  const hasFirebaseState = !!latestQueueState[resolvedFloor];
+  const dbCurrent = (hasFirebaseState && latestQueueState[resolvedFloor][type]) 
+    || { lastLetter: 0, lastNumber: 0 };
+  
+  // 2. Ambil data dari LocalStorage Kiosk (Filter berdasarkan tanggal hari ini)
+  const todayStr = getTodayStringWITA();
+  const localKey = `kiosk_queue_counter_${resolvedFloor}_${type}`;
+  let localCurrent = { lastLetter: 0, lastNumber: 0 };
+  
+  try {
+    const rawLocal = localStorage.getItem(localKey);
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      if (parsed.date === todayStr) {
+        localCurrent = { lastLetter: parsed.lastLetter ?? 0, lastNumber: parsed.lastNumber ?? 0 };
+      }
+    }
+  } catch (e) {
+    console.warn("Gagal membaca localStorage:", e);
+  }
+  
+  // 3. Bandingkan dan ambil nilai maksimum (Max-Wins) dengan mitigasi Reset Manual
   const letters = type === "jual" ? ["A"] : ["B", "C"];
-  let lastLetter = (current.lastLetter ?? 0) % letters.length;
+  
+  let current;
+  if (hasFirebaseState && dbCurrent.lastNumber === 0 && dbCurrent.lastLetter === 0) {
+    // KASUS MITIGASI MANUAL RESET: Jika Firebase terhubung dan datanya 0,
+    // artinya admin melakukan reset antrean atau ini adalah awal hari. Force reset local.
+    current = { lastLetter: 0, lastNumber: 0 };
+  } else {
+    // KASUS NORMAL / OFFLINE: Bandingkan indeks maksimum
+    const dbIndex = (dbCurrent.lastLetter ?? 0) * 99 + (dbCurrent.lastNumber ?? 0);
+    const localIndex = (localCurrent.lastLetter ?? 0) * 99 + (localCurrent.lastNumber ?? 0);
+    current = localIndex > dbIndex ? localCurrent : dbCurrent;
+  }
+  
+  let lastLetter = current.lastLetter ?? 0;
   let lastNumber = current.lastNumber ?? 0;
   
+  // 4. Inkremen nomor antrean
   if (lastNumber === 0) {
     lastLetter = 0;
     lastNumber = 1;
@@ -95,21 +136,33 @@ export async function addCustomerQueue(type, floorId = "") {
   
   const formattedNum = letters[lastLetter] + padNumber(lastNumber);
   
-  const newState = {
-    ...val,
-    [type]: {
-      ...current,
+  // 5. Simpan kembali ke LocalStorage Kiosk secara sinkron
+  try {
+    localStorage.setItem(localKey, JSON.stringify({
+      date: todayStr,
       lastLetter,
       lastNumber
-    }
-  };
+    }));
+  } catch (e) {
+    console.warn("Gagal menulis ke localStorage:", e);
+  }
   
-  await set(dbRefNode, newState);
+  // 6. Update database secara asinkron di background (TANPA await agar tidak memblokir)
+  update(dbRefNode, {
+    [`${type}/lastLetter`]: lastLetter,
+    [`${type}/lastNumber`]: lastNumber
+  }).catch((err) => {
+    console.warn("Firebase update antrean tertunda (offline):", err);
+  });
+  
   return formattedNum;
 }
 
 export async function nextQueue(type, state, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
   const letters = type === "jual" ? ["A"] : ["B", "C"];
@@ -123,7 +176,7 @@ export async function nextQueue(type, state, floorId = "") {
   const nextAfterLastIdx = (lastIdx % maxIdx) + 1;
   
   if (lastNumber !== 0 && currentIdx === nextAfterLastIdx) {
-    return state;
+    return val;
   }
   
   currentNumber++;
@@ -149,30 +202,33 @@ export async function nextQueue(type, state, floorId = "") {
     break;
   } while (limit < 200);
   
-  const newState = {
-    ...state,
+  await update(dbRefNode, {
+    [`${type}/currentLetter`]: currentLetter,
+    [`${type}/currentNumber`]: currentNumber,
+    [`${type}/skipList`]: skipList
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
+      ...current,
       currentLetter,
       currentNumber,
-      lastLetter,
-      lastNumber,
-      delayedQueue,
-      missedQueue,
       skipList
     }
-  };
-  
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function previousQueue(type, state, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+  let { currentLetter, currentNumber } = current;
   
   const letters = type === "jual" ? ["A"] : ["B", "C"];
   currentLetter = (currentLetter ?? 0) % letters.length;
-  lastLetter = (lastLetter ?? 0) % letters.length;
   
   currentNumber--;
   if (currentNumber < 1) {
@@ -180,118 +236,184 @@ export async function previousQueue(type, state, floorId = "") {
     currentLetter = (currentLetter - 1 + letters.length) % letters.length;
   }
   
-  const newState = {
-    ...state,
-    [type]: {
-      currentLetter,
-      currentNumber,
-      lastLetter,
-      lastNumber,
-      delayedQueue,
-      missedQueue,
-      skipList
-    }
-  };
+  await update(dbRefNode, {
+    [`${type}/currentLetter`]: currentLetter,
+    [`${type}/currentNumber`]: currentNumber
+  });
   
-  await saveState(newState, floorId);
-  return newState;
+  const updatedVal = normalizeQueueState({
+    ...val,
+    [type]: {
+      ...current,
+      currentLetter,
+      currentNumber
+    }
+  });
+  return updatedVal;
 }
 
 export async function setCustomQueue(type, state, letterIndex, number, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  const newState = {
-    ...state,
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+  
+  const currentLetter = Math.max(0, letterIndex);
+  const currentNumber = Math.max(1, Math.min(99, number));
+  
+  await update(dbRefNode, {
+    [`${type}/currentLetter`]: currentLetter,
+    [`${type}/currentNumber`]: currentNumber
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      currentLetter: Math.max(0, letterIndex),
-      currentNumber: Math.max(1, Math.min(99, number))
+      currentLetter,
+      currentNumber
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function addToSkipList(type, state, queueNumber, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  if (current.skipList.includes(queueNumber)) return state;
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
   
-  const newState = {
-    ...state,
+  if (current.skipList.includes(queueNumber)) return val;
+  
+  const skipList = [...current.skipList, queueNumber];
+  
+  await update(dbRefNode, {
+    [`${type}/skipList`]: skipList
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      skipList: [...current.skipList, queueNumber]
+      skipList
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function removeFromSkipList(type, state, queueNumber, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  const newState = {
-    ...state,
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+  
+  const skipList = current.skipList.filter(q => q !== queueNumber);
+  
+  await update(dbRefNode, {
+    [`${type}/skipList`]: skipList
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      skipList: current.skipList.filter(q => q !== queueNumber)
+      skipList
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function addToDelayedQueue(type, state, queueNumber, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  if (current.delayedQueue.includes(queueNumber)) return state;
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
   
-  const newState = {
-    ...state,
+  if (current.delayedQueue.includes(queueNumber)) return val;
+  
+  const delayedQueue = [...current.delayedQueue, queueNumber];
+  
+  await update(dbRefNode, {
+    [`${type}/delayedQueue`]: delayedQueue
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      delayedQueue: [...current.delayedQueue, queueNumber]
+      delayedQueue
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function removeFromDelayedQueue(type, state, queueNumber, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  const newState = {
-    ...state,
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+  
+  const delayedQueue = current.delayedQueue.filter((q) => q !== queueNumber);
+  
+  await update(dbRefNode, {
+    [`${type}/delayedQueue`]: delayedQueue
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      delayedQueue: current.delayedQueue.filter((q) => q !== queueNumber)
+      delayedQueue
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function moveToMissed(type, state, queueNumber, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  const newState = {
-    ...state,
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+  
+  const delayedQueue = current.delayedQueue.filter((q) => q !== queueNumber);
+  const missedQueue = current.missedQueue.includes(queueNumber) ? current.missedQueue : [...current.missedQueue, queueNumber];
+  
+  await update(dbRefNode, {
+    [`${type}/delayedQueue`]: delayedQueue,
+    [`${type}/missedQueue`]: missedQueue
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      delayedQueue: current.delayedQueue.filter((q) => q !== queueNumber),
-      missedQueue: current.missedQueue.includes(queueNumber) ? current.missedQueue : [...current.missedQueue, queueNumber]
+      delayedQueue,
+      missedQueue
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function removeFromMissed(type, state, queueNumber, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
-  const newState = {
-    ...state,
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+  
+  const missedQueue = current.missedQueue.filter((q) => q !== queueNumber);
+  
+  await update(dbRefNode, {
+    [`${type}/missedQueue`]: missedQueue
+  });
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
       ...current,
-      missedQueue: current.missedQueue.filter((q) => q !== queueNumber)
+      missedQueue
     }
-  };
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }
 
 export async function resetQueue(floorId = "") {
@@ -772,23 +894,21 @@ export function calculateAutoRotation(activeSales, history, floorId, shift, quot
 }
 
 export async function fetchQueueGeneralSettings(floorId = "") {
-  try {
-    const docRef = floorDoc(db, "queueSettings", "general", floorId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return {
-        queueMode: snap.data().queueMode || "legacy",
-        hybridMode: snap.data().hybridMode || false,
-        showFloorSwitcher: snap.data().showFloorSwitcher || false
-      };
-    }
-  } catch (error) {
-    console.error("Error fetching general queue settings:", error);
+  const docRef = floorDoc(db, "queueSettings", "general", floorId);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    return {
+      queueMode: snap.data().queueMode || "legacy",
+      hybridMode: snap.data().hybridMode || false,
+      showFloorSwitcher: snap.data().showFloorSwitcher || false,
+      resetPassword: snap.data().resetPassword || "melatigo"
+    };
   }
   return {
     queueMode: "legacy",
     hybridMode: false,
-    showFloorSwitcher: false
+    showFloorSwitcher: false,
+    resetPassword: "melatigo"
   };
 }
 
@@ -798,6 +918,7 @@ export async function saveQueueGeneralSettings(floorId, data) {
     queueMode: data.queueMode || "legacy",
     hybridMode: !!data.hybridMode,
     showFloorSwitcher: !!data.showFloorSwitcher,
+    resetPassword: data.resetPassword || "melatigo",
     lastUpdated: new Date().toISOString()
   }, { merge: true });
 }
@@ -809,27 +930,33 @@ export function subscribeQueueGeneralSettings(callback, floorId = "") {
       callback({
         queueMode: snap.data().queueMode || "legacy",
         hybridMode: snap.data().hybridMode || false,
-        showFloorSwitcher: snap.data().showFloorSwitcher || false
+        showFloorSwitcher: snap.data().showFloorSwitcher || false,
+        resetPassword: snap.data().resetPassword || "melatigo"
       });
     } else {
       callback({
         queueMode: "legacy",
         hybridMode: false,
-        showFloorSwitcher: false
+        showFloorSwitcher: false,
+        resetPassword: "melatigo"
       });
     }
   });
 }
 
 export async function nextQueueHybrid(type, state, floorId = "") {
-  const current = state[type] || { currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] };
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
   let { currentLetter, currentNumber, lastLetter, lastNumber, delayedQueue, missedQueue, skipList } = current;
   
   const letters = type === "jual" ? ["A"] : ["B", "C"];
   
-  // If queue is empty or lastNumber is 0, auto-generate the next lastNumber/lastLetter
   const currentIdx = (currentLetter ?? 0) * 99 + currentNumber;
   const lastIdx = (lastLetter ?? 0) * 99 + lastNumber;
+  
+  const updates = {};
   
   if (lastIdx <= currentIdx || lastNumber === 0) {
     if (lastNumber === 0) {
@@ -842,9 +969,10 @@ export async function nextQueueHybrid(type, state, floorId = "") {
         lastLetter = (lastLetter + 1) % letters.length;
       }
     }
+    updates[`${type}/lastLetter`] = lastLetter;
+    updates[`${type}/lastNumber`] = lastNumber;
   }
   
-  // Now advance currentNumber
   currentNumber++;
   if (currentNumber > 99) {
     currentNumber = 1;
@@ -868,19 +996,22 @@ export async function nextQueueHybrid(type, state, floorId = "") {
     break;
   } while (limit < 200);
   
-  const newState = {
-    ...state,
+  updates[`${type}/currentLetter`] = currentLetter;
+  updates[`${type}/currentNumber`] = currentNumber;
+  updates[`${type}/skipList`] = skipList;
+  
+  await update(dbRefNode, updates);
+  
+  const updatedVal = normalizeQueueState({
+    ...val,
     [type]: {
+      ...current,
       currentLetter,
       currentNumber,
       lastLetter,
       lastNumber,
-      delayedQueue,
-      missedQueue,
       skipList
     }
-  };
-  
-  await saveState(newState, floorId);
-  return newState;
+  });
+  return updatedVal;
 }

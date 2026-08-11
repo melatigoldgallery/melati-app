@@ -512,6 +512,7 @@ import {
   fetchClosingAnnouncementSettings,
   subscribeClosingAnnouncementSettings,
 } from "@/services/antrian-closing-service";
+import { fetchQueueGeneralSettings } from "@/services/antrian-service";
 
 const state = ref({ currentLetter: 0, currentNumber: 1, delayedQueue: [], skipList: [], missedQueue: [] });
 const auth = useAuthStore();
@@ -842,12 +843,57 @@ function openReset() {
 }
 
 async function confirmReset() {
-  busy.value = true;
   modal("resetModal").hide();
+
+  // Prompt for password
+  const { value: inputPassword, isDismissed } = await Swal.fire({
+    title: "Verifikasi Sandi",
+    text: "Masukkan password untuk melakukan reset antrean:",
+    input: "password",
+    inputPlaceholder: "Password",
+    inputAttributes: {
+      autocapitalize: "off",
+      autocorrect: "off"
+    },
+    showCancelButton: true,
+    confirmButtonText: "Verifikasi",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#dc3545",
+    cancelButtonColor: "#6c757d",
+  });
+
+  if (isDismissed || inputPassword === undefined) return;
+
+  busy.value = true;
   try {
+    const settings = await fetchQueueGeneralSettings(activeFloor.value);
+    const dbPassword = settings.resetPassword || "melatigo";
+
+    if (inputPassword !== dbPassword) {
+      await Swal.fire({
+        icon: "error",
+        title: "Password Salah",
+        text: "Password yang Anda masukkan tidak sesuai.",
+        confirmButtonColor: "#dc3545",
+      });
+      return;
+    }
+
     await resetQueue(activeFloor.value);
+    Swal.fire({
+      icon: "success",
+      title: "Antrean Direset",
+      text: "Seluruh data antrean berhasil direset.",
+      timer: 2000,
+      showConfirmButton: false
+    });
   } catch (e) {
     console.error(e);
+    Swal.fire({
+      icon: "error",
+      title: "Gagal",
+      text: "Gagal mereset data antrean."
+    });
   } finally {
     busy.value = false;
   }

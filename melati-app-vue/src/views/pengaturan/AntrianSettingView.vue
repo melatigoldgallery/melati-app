@@ -89,6 +89,26 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Password Reset Antrian -->
+                  <div class="col-12 border-top pt-3 mt-3">
+                    <label class="form-label fw-semibold">Password Reset Antrian</label>
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                      <input
+                        v-model="generalForm.resetPassword"
+                        :type="showPassword ? 'text' : 'password'"
+                        class="form-control"
+                        placeholder="Masukkan password reset antrian"
+                      />
+                      <button class="btn btn-outline-secondary" type="button" @click="showPassword = !showPassword">
+                        <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                      </button>
+                    </div>
+                    <small class="text-muted mt-1 d-block">
+                      Password yang digunakan saat admin ingin mereset antrean. Default: <code>melatigo</code>.
+                    </small>
+                  </div>
                 </div>
               </div>
             </div>
@@ -382,7 +402,8 @@ const previewing = ref(false);
 const form = reactive({ ...DEFAULT_CLOSING_ANNOUNCEMENT_SETTINGS });
 
 const quotaForm = reactive({ morningJualQuota: 2, afternoonJualQuota: 3 });
-const generalForm = reactive({ queueMode: "legacy", hybridMode: false, showFloorSwitcher: false });
+const generalForm = reactive({ queueMode: "legacy", hybridMode: false, showFloorSwitcher: false, resetPassword: "melatigo" });
+const showPassword = ref(false);
 
 
 
@@ -479,6 +500,7 @@ async function loadAllSettings() {
     generalForm.queueMode = generalData.queueMode || "legacy";
     generalForm.hybridMode = generalData.hybridMode || false;
     generalForm.showFloorSwitcher = generalData.showFloorSwitcher || false;
+    generalForm.resetPassword = generalData.resetPassword || "melatigo";
   } catch (error) {
     console.error("Failed to load floor-scoped settings", error);
   }
@@ -561,7 +583,8 @@ async function saveSettings() {
     await saveQueueGeneralSettings(floorId, {
       queueMode: generalForm.queueMode,
       hybridMode: !!generalForm.hybridMode,
-      showFloorSwitcher: !!generalForm.showFloorSwitcher
+      showFloorSwitcher: !!generalForm.showFloorSwitcher,
+      resetPassword: generalForm.resetPassword || "melatigo"
     });
 
     await Swal.fire({
@@ -601,6 +624,7 @@ async function resetToDefault() {
   generalForm.queueMode = "legacy";
   generalForm.hybridMode = false;
   generalForm.showFloorSwitcher = false;
+  generalForm.resetPassword = "melatigo";
 }
 
 async function testPlay() {

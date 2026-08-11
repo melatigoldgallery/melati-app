@@ -143,7 +143,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { addCustomerQueue } from "@/services/antrian-service-legacy";
+import { addCustomerQueue, subscribeQueue } from "@/services/antrian-service-legacy";
 import { isElectron, printJob } from "@/utils/printHelper";
 
 const props = defineProps({
@@ -332,12 +332,17 @@ function closeSuccess() {
   showSuccess.value = false;
 }
 
+let unsubQueue = null;
+
 onMounted(() => {
   isElectronApp.value = isElectron();
+  if (unsubQueue) unsubQueue();
+  unsubQueue = subscribeQueue(props.activeFloor, () => {});
 });
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  if (unsubQueue) unsubQueue();
 });
 </script>
 

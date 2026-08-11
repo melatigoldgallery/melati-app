@@ -115,7 +115,7 @@
               </div>
               <button class="btn-action" @click="takeQueue('jual')" :disabled="loading">
                 <span>{{ t('takeQueue') }}</span>
-                <i class="fas fa-arrow-right ms-2"></i>
+                <i class="fas fa-hand-pointer ms-2"></i>
               </button>
             </div>
           </div>
@@ -134,7 +134,7 @@
               </div>
               <button class="btn-action" @click="takeQueue('beli')" :disabled="loading">
                 <span>{{ t('takeQueue') }}</span>
-                <i class="fas fa-arrow-right ms-2"></i>
+                <i class="fas fa-hand-pointer ms-2"></i>
               </button>
             </div>
           </div>
@@ -241,7 +241,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
-import { addCustomerQueue, subscribeQueue, padNumber, incrementPrintCount, subscribeQueueGeneralSettings } from "@/services/antrian-service";
+import { addCustomerQueue, subscribeQueue, padNumber, incrementPrintCount, subscribeQueueGeneralSettings, getTodayStringWITA } from "@/services/antrian-service";
 import { isElectron, printJob, getLocalPrinters, getTargetPrinter } from "@/utils/printHelper";
 
 const route = useRoute();
@@ -328,7 +328,7 @@ function handleIconTap(type) {
   }
   tracker.lastTime = now;
   
-  if (tracker.count === 3) {
+  if (tracker.count === 2) {
     tracker.count = 0;
     openReprintModal(type);
   }
@@ -464,11 +464,38 @@ const t = (key) => {
   return dictionary[currentLang.value]?.[key] || key;
 };
 
+const loadedFirebase = ref(false);
+
 const nextJualNumber = computed(() => {
-  const q = queueState.value.jual;
+  let lastLetter = queueState.value.jual.lastLetter ?? 0;
+  let lastNumber = queueState.value.jual.lastNumber ?? 0;
+  
+  // Baca localStorage Kiosk
+  const localKey = `kiosk_queue_counter_${selectedFloor.value}_jual`;
+  try {
+    const raw = localStorage.getItem(localKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.date === getTodayStringWITA()) {
+        const dbIndex = lastLetter * 99 + lastNumber;
+        const localIndex = (parsed.lastLetter ?? 0) * 99 + (parsed.lastNumber ?? 0);
+        
+        if (loadedFirebase.value && lastNumber === 0 && lastLetter === 0) {
+          // Kasus reset manual oleh admin
+          lastLetter = 0;
+          lastNumber = 0;
+        } else if (localIndex > dbIndex) {
+          // Kasus offline atau database ter-rollback
+          lastLetter = parsed.lastLetter ?? 0;
+          lastNumber = parsed.lastNumber ?? 0;
+        }
+      }
+    }
+  } catch (e) {}
+  
   const letters = ["A"];
-  let nextLet = (q.lastLetter ?? 0) % letters.length;
-  let nextNum = q.lastNumber ?? 0;
+  let nextLet = lastLetter % letters.length;
+  let nextNum = lastNumber;
   
   if (nextNum === 0) {
     nextLet = 0;
@@ -484,10 +511,35 @@ const nextJualNumber = computed(() => {
 });
 
 const nextBeliNumber = computed(() => {
-  const q = queueState.value.beli;
+  let lastLetter = queueState.value.beli.lastLetter ?? 0;
+  let lastNumber = queueState.value.beli.lastNumber ?? 0;
+  
+  // Baca localStorage Kiosk
+  const localKey = `kiosk_queue_counter_${selectedFloor.value}_beli`;
+  try {
+    const raw = localStorage.getItem(localKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.date === getTodayStringWITA()) {
+        const dbIndex = lastLetter * 99 + lastNumber;
+        const localIndex = (parsed.lastLetter ?? 0) * 99 + (parsed.lastNumber ?? 0);
+        
+        if (loadedFirebase.value && lastNumber === 0 && lastLetter === 0) {
+          // Kasus reset manual oleh admin
+          lastLetter = 0;
+          lastNumber = 0;
+        } else if (localIndex > dbIndex) {
+          // Kasus offline atau database ter-rollback
+          lastLetter = parsed.lastLetter ?? 0;
+          lastNumber = parsed.lastNumber ?? 0;
+        }
+      }
+    }
+  } catch (e) {}
+  
   const letters = ["B", "C"];
-  let nextLet = (q.lastLetter ?? 0) % letters.length;
-  let nextNum = q.lastNumber ?? 0;
+  let nextLet = lastLetter % letters.length;
+  let nextNum = lastNumber;
   
   if (nextNum === 0) {
     nextLet = 0;
@@ -506,6 +558,7 @@ function subscribeToQueue() {
   if (unsubQueue) unsubQueue();
   unsubQueue = subscribeQueue(selectedFloor.value, (state) => {
     queueState.value = state;
+    loadedFirebase.value = true;
   });
 }
 
@@ -581,6 +634,23 @@ async function takeQueue(type) {
     newTicketType.value = type;
     showSuccess.value = true;
     playNotif();
+
+    // UPDATE STATE LOKAL SECARA REAKTIF (LATENCY COMPENSATION)
+    try {
+      const prefix = ticketNum.charAt(0);
+      const numPart = parseInt(ticketNum.substring(1));
+      const letters = type === "jual" ? ["A"] : ["B", "C"];
+      const letterIdx = letters.indexOf(prefix);
+      if (letterIdx !== -1 && !isNaN(numPart)) {
+        queueState.value[type] = {
+          ...queueState.value[type],
+          lastLetter: letterIdx,
+          lastNumber: numPart
+        };
+      }
+    } catch (e) {
+      console.warn("Gagal memperbarui state lokal secara reaktif:", e);
+    }
 
     // 2. Call print service API
     const dateObj = new Date();
