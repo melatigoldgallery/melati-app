@@ -1,5 +1,8 @@
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/config/firebase";
+import { query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
+import { db } from "@/config/firebase";
+import { floorCollection } from "./floor-scope";
 
 export const PREFIX_TO_CATEGORY = {
   C: "CINCIN",
@@ -98,9 +101,49 @@ export async function checkBarcodesStatus(barcodes, floorId) {
   return res.data;
 }
 
+async function autoResolveDiscrepancies(floorId, barcodeIds, destination, pemindah) {
+  if (!barcodeIds || barcodeIds.length === 0) return;
+  try {
+    const colRef = floorCollection(db, "barcodeDiscrepancies", floorId);
+    const batch = writeBatch(db);
+    let hasUpdates = false;
+
+    for (const barcode of barcodeIds) {
+      const q = query(
+        colRef,
+        where("barcode", "==", barcode),
+        where("resolved", "==", false)
+      );
+      const snaps = await getDocs(q);
+      snaps.forEach((docSnap) => {
+        batch.update(docSnap.ref, {
+          resolved: true,
+          resolvedAt: Timestamp.now(),
+          resolvedBy: pemindah || "System (Auto)",
+          resolutionNote: "sudah dipindah"
+        });
+        hasUpdates = true;
+      });
+    }
+
+    if (hasUpdates) {
+      await batch.commit();
+      console.log(`Auto resolved discrepancy for barcodes: ${barcodeIds.join(", ")}`);
+    }
+  } catch (e) {
+    console.error("Gagal auto-resolve discrepancy:", e);
+  }
+}
+
 export async function executeBarcodeMutation({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category, allowCategoryOverride }) {
   const callable = httpsCallable(functions, "executeBarcodeMutation");
   const res = await callable({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category, allowCategoryOverride });
+  
+  if (res.data?.success && ["barang-display", "laku", "mutasi"].includes(destination)) {
+    const barcodeIds = barcodes.map(b => typeof b === "string" ? b : b.barcode).filter(Boolean);
+    autoResolveDiscrepancies(floorId, barcodeIds, destination, pemindah).catch(console.error);
+  }
+  
   return res.data;
 }
 

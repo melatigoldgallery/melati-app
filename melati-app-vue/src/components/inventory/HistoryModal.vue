@@ -10,7 +10,7 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-4 bg-light-subtle">
-          <div v-if="historyList.length === 0" class="text-center text-muted py-5">
+          <div v-if="filteredHistoryList.length === 0" class="text-center text-muted py-5">
             <i class="bi bi-journal-x fs-2 d-block mb-2 opacity-50"></i>
             <span>Belum ada riwayat update untuk lokasi ini.</span>
           </div>
@@ -27,7 +27,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(h, i) in historyList.slice(0, 25)" :key="i">
+                  <tr v-for="(h, i) in filteredHistoryList.slice(0, 25)" :key="i">
                     <td class="ps-3 text-muted small fw-medium">{{ i + 1 }}</td>
                     <td class="text-muted small">
                       <span class="d-inline-flex align-items-center gap-1.5">
@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { getCardDetailMode } from "@/services/inventory-service";
@@ -109,6 +109,15 @@ const props = defineProps({
 
 const mutationLogsCache = ref([]);
 const isFetchingLogs = ref(false);
+
+const filteredHistoryList = computed(() => {
+  return (props.historyList || []).filter(h => {
+    const petugas = String(h.petugas || "").toLowerCase();
+    const keterangan = String(h.keterangan || "").toLowerCase();
+    const isSync = petugas.includes("sync") || petugas.includes("desktop") || keterangan.includes("sync") || keterangan.includes("kasir desktop");
+    return !isSync;
+  });
+});
 
 function getSubDocLabel(key) {
   const map = {
@@ -264,9 +273,9 @@ function getHistoryFlow(h) {
 
 // Watcher to fetch mutation logs from Firestore on history list load
 watch(
-  () => [props.historyList, props.activeFloor],
+  () => [filteredHistoryList.value, props.activeFloor],
   async () => {
-    const list = props.historyList;
+    const list = filteredHistoryList.value;
     if (!list || !list.length || !props.activeFloor) return;
 
     const needFetch = list.some(h => h.barcodes?.length > 0 && (!h.origin || !h.destination));
@@ -282,7 +291,13 @@ watch(
         const snaps = await getDocs(q);
         const fetched = [];
         snaps.forEach((doc) => {
-          fetched.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          const pemindah = String(data.pemindah || "").toLowerCase();
+          const notes = String(data.notes || "").toLowerCase();
+          const isSync = pemindah.includes("sync") || pemindah.includes("desktop") || notes.includes("sync") || notes.includes("kasir desktop");
+          if (!isSync) {
+            fetched.push({ id: doc.id, ...data });
+          }
         });
         mutationLogsCache.value = fetched;
       } catch (e) {

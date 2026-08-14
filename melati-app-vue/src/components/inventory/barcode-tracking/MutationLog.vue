@@ -606,10 +606,17 @@ async function loadLogs() {
     );
     
     unsubLogs = onSnapshot(q, (snaps) => {
-      logs.value = snaps.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      logs.value = snaps.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(log => {
+          const pemindah = String(log.pemindah || "").toLowerCase();
+          const notes = String(log.notes || "").toLowerCase();
+          const isSync = pemindah.includes("sync") || pemindah.includes("desktop") || notes.includes("sync") || notes.includes("kasir desktop");
+          return !isSync;
+        });
       loading.value = false;
     }, (e) => {
       showError("Gagal memuat log mutasi", e.message);
@@ -650,7 +657,13 @@ async function handleSearch() {
 
     const logMap = new Map();
     [...snapSingle.docs, ...snapBulk.docs].forEach(doc => {
-      logMap.set(doc.id, { id: doc.id, ...doc.data() });
+      const data = doc.data();
+      const pemindah = String(data.pemindah || "").toLowerCase();
+      const notes = String(data.notes || "").toLowerCase();
+      const isSync = pemindah.includes("sync") || pemindah.includes("desktop") || notes.includes("sync") || notes.includes("kasir desktop");
+      if (!isSync) {
+        logMap.set(doc.id, { id: doc.id, ...data });
+      }
     });
 
     const combined = Array.from(logMap.values()).sort((a, b) => {

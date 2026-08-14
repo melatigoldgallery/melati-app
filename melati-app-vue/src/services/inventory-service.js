@@ -14,6 +14,8 @@ import {
   arrayUnion,
   Timestamp,
   deleteField,
+  runTransaction,
+  where,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
@@ -664,4 +666,185 @@ export async function cleanupDeletedDetailTypes({
     }
   }
 }
+
+export async function fetchBarcodeDiscrepancies({ floorId = "", resolved = false }) {
+  const colRef = floorCollection(db, "barcodeDiscrepancies", floorId);
+  const q = query(
+    colRef,
+    orderBy("detectedAt", "desc")
+  );
+  const snaps = await getDocs(q);
+  const results = [];
+  snaps.forEach((docSnap) => {
+    const data = docSnap.data();
+    if (data.resolved === resolved) {
+      results.push(data);
+    }
+  });
+  return results;
+}
+
+export async function resolveBarcodeDiscrepancy({
+  floorId = "",
+  discrepancyId = "",
+  resolvedBy = "",
+  note = ""
+}) {
+  if (!discrepancyId) throw new Error("Discrepancy ID wajib diisi.");
+
+  await runTransaction(db, async (transaction) => {
+    // 1. Ambil dokumen discrepancy
+    const discRef = floorDoc(db, "barcodeDiscrepancies", discrepancyId, floorId);
+    const discSnap = await transaction.get(discRef);
+    if (!discSnap.exists) {
+      throw new Error("Dokumen selisih tidak ditemukan.");
+    }
+    const discData = discSnap.data();
+    if (discData.resolved) {
+      throw new Error("Dokumen selisih ini sudah diselesaikan sebelumnya.");
+    }
+
+    const barcodeId = discData.barcode;
+    const webLocation = discData.webLocation || "barang-display";
+
+    // 2. Ambil dokumen barcode
+    const barcodeRef = floorDoc(db, "barcodes", barcodeId, floorId);
+    const barcodeSnap = await transaction.get(barcodeRef);
+    if (!barcodeSnap.exists) {
+      throw new Error(`Barcode ${barcodeId} tidak ditemukan di database.`);
+    }
+    const barcodeData = barcodeSnap.data();
+
+    // 3. Ambil dokumen stok untuk webLocation
+    const stockRef = floorDoc(db, "stocks", webLocation, floorId);
+    const stockSnap = await transaction.get(stockRef);
+    const stockData = stockSnap.exists ? stockSnap.data() : {};
+
+    const category = barcodeData.category;
+    const detailType = barcodeData.detailType || "";
+
+    // 4. Update status barcode ke 'laku'
+    transaction.update(barcodeRef, {
+      location: "laku",
+      in_display: false,
+      in_mutasi: true,
+      lastUpdated: Timestamp.now()
+    });
+
+    // 5. Potong stok pada webLocation
+    const updatedStockData = { ...stockData };
+    const existingCat = updatedStockData[category] || { quantity: 0, lastUpdated: null, history: [] };
+    const currentQty = parseInt(existingCat.quantity, 10) || 0;
+    const newQty = Math.max(0, currentQty - 1);
+
+    const updatedCategory = {
+      quantity: newQty,
+      lastUpdated: new Date().toISOString(),
+      history: Array.isArray(existingCat.history) ? [...existingCat.history] : [],
+      details: { ...(existingCat.details || {}) }
+    };
+
+    // Update details (warna/kadar) jika ada
+    if (detailType) {
+      const currentDetailQty = parseInt(updatedCategory.details[detailType], 10) || 0;
+      updatedCategory.details[detailType] = Math.max(0, currentDetailQty - 1);
+    }
+
+    // Tambah log history ke dalam stok
+    updatedCategory.history.unshift({
+      date: new Date().toISOString(),
+      action: "Kurangi",
+      quantity: 1,
+      oldQuantity: currentQty,
+      newQuantity: newQty,
+      petugas: resolvedBy,
+      keterangan: `Resolusi Selisih: ${note}`,
+      barcodes: [{ barcode: barcodeId, detailType }],
+      totalBarcodesCount: 1,
+      origin: webLocation,
+      destination: "laku"
+    });
+
+    // Batasi riwayat stok maksimal 25 entri
+    if (updatedCategory.history.length > 25) {
+      updatedCategory.history = updatedCategory.history.slice(0, 25);
+    }
+
+    updatedStockData[category] = updatedCategory;
+    transaction.set(stockRef, updatedStockData, { merge: true });
+
+    // 6. Update status discrepancy
+    transaction.update(discRef, {
+      resolved: true,
+      resolvedAt: Timestamp.now(),
+      resolvedBy,
+      resolutionNote: note
+    });
+
+    // 7. Buat dokumen baru di barcodeMutationLogs
+    const logRef = doc(floorCollection(db, "barcodeMutationLogs", floorId));
+    transaction.set(logRef, {
+      id: logRef.id,
+      barcodeIds: [barcodeId],
+      barcodes: [{ barcode: barcodeId, category, detailType, origin: webLocation }],
+      barcode: barcodeId,
+      category,
+      detailType: detailType || null,
+      origin: webLocation,
+      destination: "laku",
+      pemindah: resolvedBy,
+      status: "approved",
+      notes: `Resolusi Selisih: ${note}`,
+      timestamp: Timestamp.now()
+    });
+
+    // 8. Tulis ke dailyStockLogs
+    const dateStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Makassar" });
+    const dailyLogRef = floorDoc(db, "dailyStockLogs", dateStr, floorId);
+    
+    const newLogItem = {
+      timestamp: Timestamp.now(),
+      jenis: category,
+      lokasi: webLocation,
+      action: "kurangi",
+      before: currentQty,
+      after: newQty,
+      quantity: 1,
+      userName: resolvedBy,
+      keterangan: `Resolusi Selisih: ${note}`
+    };
+
+    transaction.set(dailyLogRef, {
+      date: dateStr,
+      logs: arrayUnion(newLogItem)
+    }, { merge: true });
+  });
+}
+
+export async function fetchBarcodeCategory(floorId, barcodeId) {
+  try {
+    const docRef = floorDoc(db, "barcodes", barcodeId, floorId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data().category || "-";
+    }
+  } catch (e) {
+    console.error("Gagal mengambil kategori barcode:", e);
+  }
+  return "-";
+}
+
+export function subscribeBarcodeDiscrepancies(floorId, onData, onError) {
+  const colRef = floorCollection(db, "barcodeDiscrepancies", floorId);
+  const q = query(colRef, orderBy("detectedAt", "desc"));
+  return onSnapshot(q, (snap) => {
+    const results = [];
+    snap.forEach((docSnap) => {
+      results.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    onData(results);
+  }, onError);
+}
+
+
 

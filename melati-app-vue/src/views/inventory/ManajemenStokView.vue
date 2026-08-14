@@ -55,6 +55,22 @@
             <i class="bi bi-paperclip fs-6"></i>
             <span>Klip Barcode</span>
           </button>
+          <button
+            v-if="canAccessDiscrepancy"
+            class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2 position-relative"
+            :class="{ 'active': mainTab === 'selisihStok' }"
+            @click="mainTab = 'selisihStok'"
+          >
+            <i class="bi bi-shield-exclamation fs-6"></i>
+            <span>Laporan Selisih</span>
+            <span
+              v-if="unresolvedDiscrepanciesCount > 0"
+              class="badge bg-danger rounded-circle p-0 ms-1 d-inline-flex justify-content-center align-items-center"
+              style="width: 18px; height: 18px; font-size: 0.65rem; line-height: 1;"
+            >
+              {{ unresolvedDiscrepanciesCount }}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -249,6 +265,11 @@
           :hala-labels="HALA_LABELS"
         />
       </div>
+
+      <!-- Laporan Selisih Content -->
+      <div v-else-if="mainTab === 'selisihStok' && canAccessDiscrepancy">
+        <DiscrepancyDashboard />
+      </div>
     </template>
 
     <!-- Unified Modal for Manual Physical Stock Updates -->
@@ -346,6 +367,7 @@ import MovementQueue from "@/components/inventory/barcode-tracking/MovementQueue
 import MutationLog from "@/components/inventory/barcode-tracking/MutationLog.vue";
 import StockOpname from "@/components/inventory/barcode-tracking/StockOpname.vue";
 import ClipManager from "@/components/inventory/barcode-tracking/ClipManager.vue";
+import DiscrepancyDashboard from "@/components/inventory/barcode-tracking/DiscrepancyDashboard.vue";
 
 import {
   KETERANGAN_OPTS,
@@ -360,6 +382,7 @@ import {
   updateKomputerStock,
   updateStockItem,
   getCardDetailMode,
+  subscribeBarcodeDiscrepancies,
 } from "@/services/inventory-service";
 import {
   ensureInventorySettings,
@@ -423,6 +446,7 @@ const modalMap = new Map();
 
 let unsubRealtime = null;
 let unsubSettings = null;
+let unsubDiscrepancies = null;
 let snapshotTimer = null;
 
 const mainTab = ref("agregat"); // "agregat" or "lacakFisik"
@@ -478,6 +502,14 @@ const showRincianColumn = computed(() => {
   return mode === "color" || mode === "hala";
 });
 const isSupervisorOrAdmin = computed(() => ["supervisor", "admin"].includes(auth.userRole?.toLowerCase()));
+const canAccessDiscrepancy = computed(() => {
+  if (auth.userRole?.toLowerCase() === "supervisor") return true;
+  const allowedUsers = displaySettings.value?.discrepancyAccessUsers || [];
+  const currentUsername = auth.user?.username || auth.user?.email || "";
+  if (!currentUsername) return false;
+  return allowedUsers.some(u => String(u).toLowerCase() === currentUsername.toLowerCase());
+});
+const unresolvedDiscrepanciesCount = ref(0);
 
 const summaryGridStyle = computed(() => {
   const grid = displaySettings.value.summaryGrid || {};
@@ -728,6 +760,34 @@ function setupDisplaySettingsRealtime() {
   );
 }
 
+function setupDiscrepanciesSubscription() {
+  if (unsubDiscrepancies) {
+    unsubDiscrepancies();
+    unsubDiscrepancies = null;
+  }
+  if (!auth.activeFloor || !canAccessDiscrepancy.value) {
+    unresolvedDiscrepanciesCount.value = 0;
+    return;
+  }
+  unsubDiscrepancies = subscribeBarcodeDiscrepancies(
+    auth.activeFloor,
+    (list) => {
+      unresolvedDiscrepanciesCount.value = list.filter((item) => !item.resolved).length;
+    },
+    (err) => {
+      console.error("Gagal mendengarkan selisih stok:", err);
+    }
+  );
+}
+
+watch(
+  [() => auth.activeFloor, () => canAccessDiscrepancy.value],
+  () => {
+    setupDiscrepanciesSubscription();
+  },
+  { immediate: true }
+);
+
 async function refreshData() {
   await loadData({ force: true });
   toast("Data stok diperbarui");
@@ -831,7 +891,13 @@ function openHistoryModal(mainCat, sub) {
     mainCat,
     subLabel: sub.label,
   };
-  historyList.value = getItem(sub.key, mainCat)?.history || [];
+  const rawHistory = getItem(sub.key, mainCat)?.history || [];
+  historyList.value = rawHistory.filter(h => {
+    const petugas = String(h.petugas || "").toLowerCase();
+    const keterangan = String(h.keterangan || "").toLowerCase();
+    const isSync = petugas.includes("sync") || petugas.includes("desktop") || keterangan.includes("sync") || keterangan.includes("kasir desktop");
+    return !isSync;
+  });
   showModal("historyModal");
 }
 
@@ -1059,6 +1125,7 @@ watch(
 onUnmounted(() => {
   if (unsubRealtime) unsubRealtime();
   if (unsubSettings) unsubSettings();
+  if (unsubDiscrepancies) unsubDiscrepancies();
   if (snapshotTimer) clearTimeout(snapshotTimer);
   window.removeEventListener("storage", handleStorageSync);
   window.removeEventListener("melati-stock-reload", handleStockReload);

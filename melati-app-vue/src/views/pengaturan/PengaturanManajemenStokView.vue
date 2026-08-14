@@ -403,6 +403,38 @@
               </div>
             </div>
 
+            <!-- Hak Akses Laporan Selisih -->
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-header bg-white border-0 py-3">
+                <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                  <i class="bi bi-shield-lock text-warning"></i>
+                  <span>Akses Laporan Selisih</span>
+                </h6>
+              </div>
+              <div class="card-body pt-0 text-start">
+                <p class="small text-muted mb-2">
+                  Supervisor memiliki akses penuh secara default. Pilih user lain yang diberikan izin khusus untuk mengakses tab Laporan Selisih:
+                </p>
+                <div v-if="usersList.length === 0" class="text-muted small py-2">
+                  Tidak ada user lain terdaftar di lantai ini.
+                </div>
+                <div v-else class="user-access-list border rounded p-2 bg-light" style="max-height: 200px; overflow-y: auto;">
+                  <div v-for="user in usersList" :key="user.username" class="form-check mb-1">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      :id="`access-${user.username}`"
+                      :value="user.username"
+                      v-model="form.discrepancyAccessUsers"
+                    />
+                    <label class="form-check-label small fw-semibold text-dark" :for="`access-${user.username}`">
+                      {{ user.displayName }} <span class="text-muted small">({{ user.role }})</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="card border-0 shadow-sm mb-3 sticky-panel" v-if="activeSettingTab === 'layout'">
             <div class="card-header">
               <h6 class="mb-0 fw-semibold">Pengaturan Grid Card Summary</h6>
@@ -499,6 +531,9 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
+import { db } from "@/config/firebase";
+import { getDocs } from "firebase/firestore";
+import { floorCollection } from "@/services/floor-scope";
 import {
   buildDefaultInventorySettings,
   ensureInventorySettings,
@@ -534,6 +569,7 @@ const form = reactive({
   colorTypes: [],
   halaTypes: [],
   barcodeEnabled: false,
+  discrepancyAccessUsers: [],
   lastUpdated: null,
   updatedBy: "System",
 });
@@ -569,6 +605,9 @@ function applySettings(data = {}) {
   form.colorTypes = normalized.colorTypes.map((c) => ({ ...c }));
   form.halaTypes = normalized.halaTypes.map((h) => ({ ...h }));
   form.barcodeEnabled = !!normalized.barcodeEnabled;
+  form.discrepancyAccessUsers = Array.isArray(normalized.discrepancyAccessUsers)
+    ? [...normalized.discrepancyAccessUsers]
+    : [];
   form.lastUpdated = normalized.lastUpdated;
   form.updatedBy = normalized.updatedBy;
 
@@ -703,6 +742,7 @@ function getPayload() {
       label: String(h.label || "").trim(),
     })),
     barcodeEnabled: !!form.barcodeEnabled,
+    discrepancyAccessUsers: Array.isArray(form.discrepancyAccessUsers) ? form.discrepancyAccessUsers.map(String) : [],
   };
 }
 
@@ -789,6 +829,8 @@ function validatePayload(payload) {
   return true;
 }
 
+const usersList = ref([]);
+
 async function loadSettings() {
   loading.value = true;
   try {
@@ -796,6 +838,17 @@ async function loadSettings() {
     const data = await fetchInventorySettings(auth.activeFloor);
     applySettings(data);
     stockData.value = await fetchAllStockData(auth.activeFloor);
+    
+    // Load floor users
+    const usersSnap = await getDocs(floorCollection(db, "users", auth.activeFloor));
+    usersList.value = usersSnap.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        username: data.username || doc.id,
+        displayName: data.displayName || data.username || doc.id,
+        role: data.role || "staff"
+      };
+    }).filter(u => u.role?.toLowerCase() !== "supervisor");
   } catch (e) {
     showError("Gagal memuat pengaturan", e.message);
   } finally {

@@ -178,6 +178,7 @@ export function buildDefaultInventorySettings(floorId = "") {
     colorTypes: [...DEFAULT_COLOR_TYPES],
     halaTypes: [...DEFAULT_HALA_TYPES],
     barcodeEnabled: normalizedFloor === "L2",
+    discrepancyAccessUsers: [],
     lastUpdated: null,
     updatedBy: "System",
   };
@@ -247,6 +248,7 @@ export function normalizeInventorySettings(raw = {}, floorId = "") {
         })).filter(h => h.key)
       : defaults.halaTypes,
     barcodeEnabled: raw.barcodeEnabled !== undefined ? !!raw.barcodeEnabled : defaults.barcodeEnabled,
+    discrepancyAccessUsers: Array.isArray(raw.discrepancyAccessUsers) ? raw.discrepancyAccessUsers.map(String) : [],
     lastUpdated: raw.lastUpdated || null,
     updatedBy: raw.updatedBy || "System",
   };

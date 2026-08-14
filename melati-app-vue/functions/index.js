@@ -1,6 +1,6 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 import admin from "firebase-admin";
 import { createHash } from "node:crypto";
@@ -1606,7 +1606,7 @@ function parseBarcodeCategoryAndType(code) {
   return { mainCat, subType };
 }
 
-async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "", defaultCategory = "", allowCategoryOverride = false) {
+async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "", defaultCategory = "", allowCategoryOverride = false, bypassLockCheck = false) {
   const barcodeIds = barcodes.map(b => (typeof b === 'string' ? b : b.barcode).trim().toUpperCase());
   const barcodeRefs = barcodeIds.map(id => dbFloorRef.collection("barcodes").doc(id));
   
@@ -1639,7 +1639,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       category = allowCategoryOverride ? (inputCategory || defaultCategory || data.category) : (data.category || defaultCategory || parsed.mainCat);
       detailType = allowCategoryOverride ? (inputDetailType || defaultDetailType || data.detailType) : (data.detailType || defaultDetailType || parsed.subType);
       
-      if (data.in_mutasi) {
+      if (data.in_mutasi && !bypassLockCheck) {
         throw new HttpsError("failed-precondition", `Barcode ${id} terkunci (sudah laku/mutasi).`);
       }
     } else {
@@ -2872,4 +2872,261 @@ export const getSpeechTTS = onCall({ region: "asia-southeast2" }, async (request
     throw new HttpsError("internal", err.message || "Failed to generate TTS.");
   }
 });
+
+const parseDateSafe = (dateStr) => {
+  if (!dateStr) return new Date();
+  if (typeof dateStr === "number" || !isNaN(dateStr)) {
+    const num = Number(dateStr);
+    if (!isNaN(num)) return new Date(num);
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) return d;
+  
+  const clean = String(dateStr).replace(' ', 'T');
+  const d2 = new Date(clean);
+  if (!isNaN(d2.getTime())) return d2;
+  
+  return new Date();
+};
+
+export const syncDesktopSales = onRequest(
+  { region: "asia-southeast2", memory: "512MiB" },
+  async (req, res) => {
+    // 1. Validasi API Key
+    const apiKey = req.headers["x-api-key"] || req.query.apiKey;
+    const EXPECTED_API_KEY = "MelatiSecretToken123";
+    if (apiKey !== EXPECTED_API_KEY) {
+      logger.warn("Unauthorized sync request - invalid API key");
+      res.status(403).send("Forbidden: Invalid API Key");
+      return;
+    }
+
+    // 2. Parse payload
+    const { store_id, sales_data = [] } = req.body || {};
+    if (!store_id || !Array.isArray(sales_data) || sales_data.length === 0) {
+      res.status(200).json({ success: true, message: "No data to process" });
+      return;
+    }
+
+    // Map store_id to floorId
+    const floorId = store_id === "MELATI-ATAS" ? "L2" : "L1";
+    logger.info(`Processing ${sales_data.length} sales barcodes for store ${store_id} / floor ${floorId}`);
+
+    try {
+      const uniqueBarcodes = [...new Set(sales_data.map(item => item.barcode.trim().toUpperCase()))].filter(Boolean);
+      if (uniqueBarcodes.length === 0) {
+        res.status(200).json({ success: true, message: "No valid barcodes" });
+        return;
+      }
+
+      // Batch query status barcodes saat ini di Firestore
+      const dbFloorRef = db.collection("floors").doc(floorId);
+      const barcodeRefs = uniqueBarcodes.map(bc => dbFloorRef.collection("barcodes").doc(bc));
+      const snaps = await db.getAll(...barcodeRefs);
+
+      const barcodeStateMap = {};
+      snaps.forEach((snap, idx) => {
+        barcodeStateMap[uniqueBarcodes[idx]] = snap.exists ? snap.data() : null;
+      });
+
+      // Kelompokkan data untuk proses
+      const matchBarcodes = [];
+      const discrepancyBarcodes = [];
+      const ignoredBarcodes = [];
+
+      sales_data.forEach(item => {
+        const bc = item.barcode.trim().toUpperCase();
+        const state = barcodeStateMap[bc];
+
+        if (!state) {
+          ignoredBarcodes.push({ barcode: bc, reason: "unregistered" });
+        } else if (state.location === "laku") {
+          ignoredBarcodes.push({ barcode: bc, reason: "already sold" });
+        } else if (state.location === "barang-display") {
+          matchBarcodes.push(item);
+        } else {
+          discrepancyBarcodes.push({
+            item,
+            currentLocation: state.location || "unknown"
+          });
+        }
+      });
+
+      logger.info(`Sales Sync breakdown: match=${matchBarcodes.length}, discrepancy=${discrepancyBarcodes.length}, ignored=${ignoredBarcodes.length}`);
+
+      // 3. Jalankan Transaksi Mutasi untuk data yang MATCH
+      if (matchBarcodes.length > 0) {
+        const mutateItems = matchBarcodes.map(item => ({
+          barcode: item.barcode,
+          detailType: barcodeStateMap[item.barcode]?.detailType || "",
+          category: barcodeStateMap[item.barcode]?.category || ""
+        }));
+
+        await db.runTransaction(async (t) => {
+          const notesText = `Auto-Sync Penjualan Kasir Desktop. No Faktur: ${matchBarcodes.map(i => i.invoice_no).join(", ")}`;
+          await executeMutationLogic(
+            t, 
+            dbFloorRef, 
+            mutateItems, 
+            "laku", 
+            "Sync Agent Sales", 
+            notesText, 
+            "barang-display"
+          );
+        });
+      }
+
+      // 4. Jalankan Transaksi/Batch write untuk discrepancy docs
+      if (discrepancyBarcodes.length > 0) {
+        const batch = db.batch();
+        discrepancyBarcodes.forEach(({ item, currentLocation }) => {
+          const discId = `DISC_${item.barcode}_${item.desktop_item_id}`;
+          const discRef = dbFloorRef.collection("barcodeDiscrepancies").doc(discId);
+          batch.set(discRef, {
+            id: discId,
+            barcode: item.barcode,
+            invoice_no: item.invoice_no,
+            tanggalPenjualan: admin.firestore.Timestamp.fromDate(parseDateSafe(item.tanggal_penjualan)),
+            namaSales: item.nama_sales,
+            webLocation: currentLocation,
+            detectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            resolved: false,
+            resolvedAt: null,
+            resolvedBy: null,
+            resolutionNote: null
+          }, { merge: true });
+        });
+        await batch.commit();
+      }
+
+      res.status(200).json({
+        success: true,
+        stats: {
+          matched: matchBarcodes.length,
+          discrepancy: discrepancyBarcodes.length,
+          ignored: ignoredBarcodes.length
+        }
+      });
+    } catch (err) {
+      logger.error("Error in syncDesktopSales:", err);
+      res.status(500).send(`Internal Server Error: ${err.message}`);
+    }
+  }
+);
+
+export const syncDesktopVoid = onRequest(
+  { region: "asia-southeast2", memory: "512MiB" },
+  async (req, res) => {
+    // 1. Validasi API Key
+    const apiKey = req.headers["x-api-key"] || req.query.apiKey;
+    const EXPECTED_API_KEY = "MelatiSecretToken123";
+    if (apiKey !== EXPECTED_API_KEY) {
+      logger.warn("Unauthorized void request - invalid API key");
+      res.status(403).send("Forbidden: Invalid API Key");
+      return;
+    }
+
+    // 2. Parse payload
+    const { store_id, void_data = [] } = req.body || {};
+    if (!store_id || !Array.isArray(void_data) || void_data.length === 0) {
+      res.status(200).json({ success: true, message: "No data to process" });
+      return;
+    }
+
+    const floorId = store_id === "MELATI-ATAS" ? "L2" : "L1";
+    logger.info(`Processing ${void_data.length} void barcodes for store ${store_id} / floor ${floorId}`);
+
+    try {
+      const dbFloorRef = db.collection("floors").doc(floorId);
+
+      for (const voidItem of void_data) {
+        const bc = voidItem.barcode.trim().toUpperCase();
+
+        await db.runTransaction(async (t) => {
+          // Cari log mutasi terakhir barcode ini sebelum ia dijual (destination === 'laku')
+          const mutationLogsQuery = dbFloorRef.collection("barcodeMutationLogs")
+            .where("barcodeIds", "array-contains", bc);
+          
+          const mutationLogsSnap = await t.get(mutationLogsQuery);
+          let previousOrigin = "barang-display"; // default fallback
+          
+          if (!mutationLogsSnap.empty) {
+            const sortedLogs = mutationLogsSnap.docs
+              .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+              .filter(log => log.destination === "laku" && log.timestamp)
+              .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+
+            if (sortedLogs.length > 0) {
+              const lastLog = sortedLogs[0];
+              const itemInLog = (lastLog.barcodes || []).find(b => b.barcode === bc);
+              if (itemInLog && itemInLog.origin) {
+                previousOrigin = itemInLog.origin;
+              }
+            }
+          }
+
+          // Baca status barcode terkini di Firestore
+          const barcodeRef = dbFloorRef.collection("barcodes").doc(bc);
+          const barcodeSnap = await t.get(barcodeRef);
+
+          if (!barcodeSnap.exists) {
+            logger.warn(`Void failed: Barcode ${bc} does not exist in active barcodes`);
+            return;
+          }
+
+          const barcodeData = barcodeSnap.data();
+          if (barcodeData.location !== "laku") {
+            logger.warn(`Void bypass: Barcode ${bc} is currently at location ${barcodeData.location}, not 'laku'`);
+            return;
+          }
+
+          // Kembalikan lokasi barcode ke asal secara transaksional
+          const mutateItems = [{
+            barcode: bc,
+            detailType: barcodeData.detailType || "",
+            category: barcodeData.category || ""
+          }];
+
+          const notesText = `Pembatalan Transaksi Kasir Desktop (Void). No Faktur: ${voidItem.invoice_no}. Dihapus Oleh: ${voidItem.dihapus_oleh}`;
+          
+          await executeMutationLogic(
+            t,
+            dbFloorRef,
+            mutateItems,
+            previousOrigin,
+            "Sync Agent Void",
+            notesText,
+            "laku",
+            "",
+            "",
+            false,
+            true
+          );
+
+          // Selesaikan laporan discrepancy yang berasosiasi dengan barcode ini
+          const discrepanciesQuery = dbFloorRef.collection("barcodeDiscrepancies")
+            .where("barcode", "==", bc)
+            .where("resolved", "==", false)
+            .limit(10);
+          
+          const discrepanciesSnap = await t.get(discrepanciesQuery);
+          discrepanciesSnap.forEach(docSnap => {
+            t.update(docSnap.ref, {
+              resolved: true,
+              resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+              resolvedBy: "System (Void Sync)",
+              resolutionNote: `Pembatalan Transaksi Kasir Desktop (Void Faktur: ${voidItem.invoice_no})`
+            });
+          });
+        });
+      }
+
+      res.status(200).json({ success: true });
+    } catch (err) {
+      logger.error("Error in syncDesktopVoid:", err);
+      res.status(500).send(`Internal Server Error: ${err.message}`);
+    }
+  }
+);
+
 
