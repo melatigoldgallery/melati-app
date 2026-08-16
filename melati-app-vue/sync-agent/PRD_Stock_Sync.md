@@ -221,7 +221,7 @@ Jika Anda ingin langsung menggunakan kredensial database root/admin yang sudah a
 
 ### 9. PANDUAN DEPLOYMENT DI PC SERVER M3200 (DAEMON SERVICE - SINGLE CODEBASE, MULTI-INSTANCE)
 
-Karena kedua database lantai (`core_dbtokomasmelatiatas` dan `core_dbtokomasmelatibawah`) berada dalam **satu PC Server M3200**, Anda akan menggunakan pendekatan **Single Codebase, Multi-Instance**. Kita hanya meletakkan **satu file skrip** `sync-agent-inventory.js` di server, lalu menjalankannya sebagai **dua proses terpisah** di PM2 dengan melewatkan argumen lantai (`L1` atau `L2`).
+Karena kedua database lantai (`core_dbtokomasmelatiatas` dan `core_dbtokomasmelatibawah`) berada dalam **satu PC Server M3200**, Anda akan menggunakan pendekatan **Single Codebase, Multi-Instance**. Kita hanya meletakkan **satu file skrip** `sync-agent-inventory.cjs` di server, lalu menjalankannya sebagai **dua Windows Service terpisah** menggunakan **NSSM (Non-Sucking Service Manager)** dengan melewatkan argumen lantai (`L1` atau `L2`).
 
 #### Langkah 1: Install Node.js di PC Server M3200
 1. Unduh installer **Node.js LTS** (versi 20 atau 22) dari situs resmi [nodejs.org](https://nodejs.org/).
@@ -233,18 +233,18 @@ Karena kedua database lantai (`core_dbtokomasmelatiatas` dan `core_dbtokomasmela
    ```
 
 #### Langkah 2: Persiapkan Folder Project Sync Agent
-1. Buat folder baru di server, misalnya di `C:\melati-sync-agent\`.
+1. Buat folder baru di server di **`C:\Sync\`**.
 2. Buka terminal (CMD/PowerShell) di folder tersebut, inisialisasi project, dan install driver MySQL serta HTTP client:
    ```bash
-   cd C:\melati-sync-agent
+   cd C:\Sync
    npm init -y
    npm install mysql2 axios
    ```
 
-#### Langkah 3: Konfigurasi Berkas `sync-agent-inventory.js`
-Salin berkas `sync-agent-inventory.js` ke folder `C:\melati-sync-agent\`. Pastikan skrip dirancang untuk menerima argumen baris perintah (*CLI argument*) untuk menentukan target lantai secara dinamis:
+#### Langkah 3: Konfigurasi Berkas `sync-agent-inventory.cjs`
+Salin berkas `sync-agent-inventory.cjs` ke folder `C:\Sync\`. Pastikan skrip dirancang untuk menerima argumen baris perintah (*CLI argument*) untuk menentukan target lantai secara dinamis:
 
-* **Sintaks Logika Dinamis di dalam `sync-agent-inventory.js`:**
+* **Sintaks Logika Dinamis di dalam `sync-agent-inventory.cjs`:**
   ```javascript
   // Membaca argumen lantai dari command line (default ke 'L1' jika tidak diisi)
   const args = process.argv.slice(2);
@@ -269,55 +269,63 @@ Salin berkas `sync-agent-inventory.js` ke folder `C:\melati-sync-agent\`. Pastik
   };
   ```
 
-#### Langkah 4: Jalankan Kedua Instance menggunakan PM2
-Untuk menjalankan kedua instance secara terisolasi (Lantai 1 dan Lantai 2) pada background komputer M3200:
+#### Langkah 4: Jalankan Kedua Instance sebagai Windows Service Menggunakan NSSM
+Untuk memastikan kedua instance (Lantai 1 dan Lantai 2) berjalan secara otomatis di latar belakang saat Windows melakukan booting (sebelum user kasir login), kita menggunakan NSSM. Ini jauh lebih stabil daripada PM2 di platform Windows Server.
 
-1. Install PM2 secara global di server:
-   ```bash
-   npm install pm2 -g
+1. **Unduh dan Siapkan NSSM:**
+   * Unduh file ZIP NSSM dari [nssm.cc](https://nssm.cc/download).
+   * Ekstrak file zip, salin file `nssm.exe` (versi 64-bit jika menggunakan Windows 64-bit), dan tempel ke folder `C:\Sync\`.
+
+2. **Daftarkan Service Lantai 1 (Melati Bawah - L1):**
+   Buka Command Prompt (CMD) sebagai Administrator di server M3200, lalu jalankan perintah di bawah ini secara bersamaan:
+   ```cmd
+   C:\Sync\nssm.exe install MelatiSyncL1 "C:\Program Files\nodejs\node.exe" "sync-agent-inventory.cjs L1"
+   C:\Sync\nssm.exe set MelatiSyncL1 AppDirectory C:\Sync
+   C:\Sync\nssm.exe set MelatiSyncL1 AppStdout C:\Sync\l1_out.log
+   C:\Sync\nssm.exe set MelatiSyncL1 AppStderr C:\Sync\l1_error.log
+   C:\Sync\nssm.exe set MelatiSyncL1 AppRotateFiles 1
+   C:\Sync\nssm.exe set MelatiSyncL1 AppRotateOnline 1
+   C:\Sync\nssm.exe set MelatiSyncL1 AppRotateBytes 10485760
+   net start MelatiSyncL1
    ```
-2. Jalankan instance Lantai 1 (Bawah) dengan melewatkan argumen `L1` setelah tanda `--`:
-   ```bash
-   pm2 start sync-agent-inventory.cjs --name "melati-sync-bawah" -- L1
+
+3. **Daftarkan Service Lantai 2 (Melati Atas - L2):**
+   Jalankan perintah berikut di CMD Administrator yang sama untuk mendaftarkan instance Lantai 2:
+   ```cmd
+   C:\Sync\nssm.exe install MelatiSyncL2 "C:\Program Files\nodejs\node.exe" "sync-agent-inventory.cjs L2"
+   C:\Sync\nssm.exe set MelatiSyncL2 AppDirectory C:\Sync
+   C:\Sync\nssm.exe set MelatiSyncL2 AppStdout C:\Sync\l2_out.log
+   C:\Sync\nssm.exe set MelatiSyncL2 AppStderr C:\Sync\l2_error.log
+   C:\Sync\nssm.exe set MelatiSyncL2 AppRotateFiles 1
+   C:\Sync\nssm.exe set MelatiSyncL2 AppRotateOnline 1
+   C:\Sync\nssm.exe set MelatiSyncL2 AppRotateBytes 10485760
+   net start MelatiSyncL2
    ```
-3. Jalankan instance Lantai 2 (Atas) dengan melewatkan argumen `L2` setelah tanda `--`:
-   ```bash
-   pm2 start sync-agent-inventory.cjs --name "melati-sync-atas" -- L2
+
+4. **Verifikasi Service Berjalan:**
+   Untuk memastikan kedua service telah aktif dan terpantau oleh Windows, jalankan perintah:
+   ```cmd
+   sc query MelatiSyncL1
+   sc query MelatiSyncL2
    ```
-4. Pastikan kedua proses berjalan aktif dan berstatus `online`:
-   ```bash
-   pm2 status
-   ```
-5. Agar PM2 dan kedua instance otomatis berjalan saat Windows Server M3200 booting/restart, ikuti langkah-langkah **Windows Task Scheduler** berikut:
-   * **Simpan State PM2 Terkini:**
-     Jalankan perintah berikut di PowerShell/CMD untuk menyimpan daftar proses aktif saat ini:
-     ```bash
-     pm2 save
+   Status keduanya harus menunjukkan `STATE : 4 RUNNING`.
+
+5. **Cara Memantau Log Aktivitas:**
+   Anda dapat langsung memantau aktivitas proses sinkronisasi melalui berkas log masing-masing lantai:
+   * **Melihat Log Lantai 1:** Buka berkas `C:\Sync\l1_out.log` (menggunakan Notepad atau program teks editor).
+   * **Melihat Log Lantai 2:** Buka berkas `C:\Sync\l2_out.log`.
+   * **Melihat Log Error (jika ada):** Buka berkas `C:\Sync\l1_error.log` atau `C:\Sync\l2_error.log`.
+
+6. **Pengendalian Service (Start/Stop/Restart):**
+   Jika Anda memperbarui berkas `sync-agent-inventory.cjs` di kemudian hari, Anda perlu menghentikan dan memulai ulang service dengan perintah:
+   * **Menghentikan Layanan:**
+     ```cmd
+     net stop MelatiSyncL1
+     net stop MelatiSyncL2
      ```
-   * **Buka Task Scheduler:**
-     Tekan `Win + R`, ketik `taskschd.msc`, lalu tekan **Enter**.
-   * **Buat Tugas Baru (Create Basic Task):**
-     1. Di panel *Actions* sebelah kanan, klik **Create Basic Task...**
-     2. Beri nama tugas, misalnya: `PM2 Resurrect on Startup`
-     3. Klik *Next*.
-   * **Atur Trigger:**
-     1. Pilih **When the computer starts** (agar berjalan saat Windows booting sebelum user login).
-     2. Klik *Next*.
-   * **Atur Action:**
-     1. Pilih **Start a program**.
-     2. Klik *Next*.
-     3. Pada kolom **Program/script**, isi dengan: `cmd.exe`
-     4. Pada kolom **Add arguments (optional)**, isi dengan: `/c %APPDATA%\npm\pm2.cmd resurrect`
-     5. Klik *Next*, lalu klik *Finish*.
-   * **Pengaturan Tambahan (Properties Penting):**
-     1. Cari tugas `PM2 Resurrect on Startup` yang baru dibuat di daftar tengah, klik kanan, lalu pilih **Properties**.
-     2. Pada tab **General**:
-        * Pilih opsi **Run whether user is logged on or not** (agar script tetap jalan meskipun tidak ada user kasir yang login).
-        * Centang opsi **Run with highest privileges** (menghindari hambatan izin administrator).
-     3. Pada tab **Settings**:
-        * Hapus centang pada **Stop the task if it runs longer than: 3 days** (agar PM2 tidak dihentikan paksa setelah 3 hari berjalan).
-     4. Klik **OK**, lalu masukkan password user Windows Server jika diminta.
+   * **Menjalankan Layanan Kembali:**
+     ```cmd
+     net start MelatiSyncL1
+     net start MelatiSyncL2
+     ```
 
-6. Untuk memantau log aktivitas sinkronisasi masing-masing instance:
-   * Log Lantai 1: `pm2 logs "melati-sync-bawah"`
-   * Log Lantai 2: `pm2 logs "melati-sync-atas"`

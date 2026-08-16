@@ -37,7 +37,7 @@
           <div class="row g-2">
             <div v-for="link in desktopQuickLinks" :key="link.to" class="col-6 col-md-3">
               <RouterLink :to="resolveQuickLink(link.to)" class="text-decoration-none d-block">
-                <div class="quick-btn" :style="{ '--btn-bg': link.color }">
+                <div class="quick-btn" :style="{ '--btn-bg-start': link.bgStart, '--btn-bg-end': link.bgEnd }">
                   <i :class="['bi', link.icon]" aria-hidden="true"></i>
                   <span>{{ link.label }}</span>
                 </div>
@@ -222,11 +222,8 @@ const systems = [
     gradEnd: "#0d6efd",
     pageKey: "aksesoris.penjualan",
   },
-];
-
-const l2AdminSystems = [
   {
-    label: "Pesanan Online",
+    label: "Sistem Order Online",
     desc: "Kelola pesanan dan order dari customer online",
     to: "/order-online/data",
     icon: "bi-shop",
@@ -281,44 +278,70 @@ const hrdSystems = [
 ];
 
 const quickLinks = [
-  { label: "Admin Antrian", to: "/antrian/admin", icon: "bi-people-fill", color: "#2563eb", pageKey: "antrian.admin" },
+  {
+    label: "Admin Antrian",
+    to: "/antrian/admin",
+    icon: "bi-people-fill",
+    bgStart: "#2563eb",
+    bgEnd: "#dbeafe",
+    pageKey: "antrian.admin",
+  },
   {
     label: "Absensi",
     to: "/absensi/kehadiran",
     icon: "bi-person-check-fill",
-    color: "#f97316",
+    bgStart: "#f97316",
+    bgEnd: "#ffedd5",
     pageKey: "absensi.kehadiran",
   },
-  { label: "Input Service", to: "/servis/input", icon: "bi-tools", color: "#10b981", pageKey: "servis.input" },
+  {
+    label: "Input Service",
+    to: "/servis/input",
+    icon: "bi-tools",
+    bgStart: "#10b981",
+    bgEnd: "#d1fae5",
+    pageKey: "servis.input",
+  },
   {
     label: "Input Penjualan",
     to: "/aksesoris/penjualan",
     icon: "bi-gem",
-    color: "#8b5cf6",
+    bgStart: "#8b5cf6",
+    bgEnd: "#ede9fe",
     pageKey: "aksesoris.penjualan",
   },
   {
     label: "Manajemen Stok",
     to: "/inventory/manajemen",
     icon: "bi-archive-fill",
-    color: "#ec4899",
+    bgStart: "#ec4899",
+    bgEnd: "#fce7f3",
     pageKey: "inventory.manajemen",
   },
   {
     label: "Laporan Penjualan",
     to: "/aksesoris/laporan-penjualan",
     icon: "bi-bar-chart-fill",
-    color: "#f59e0b",
+    bgStart: "#f59e0b",
+    bgEnd: "#fef3c7",
     pageKey: "aksesoris.laporan-penjualan",
   },
   {
     label: "Display Antrian",
     to: "/antrian/display",
     icon: "bi-display",
-    color: "#ef4444",
+    bgStart: "#ef4444",
+    bgEnd: "#fee2e2",
     pageKey: "antrian.display",
   },
-  { label: "Data Servis", to: "/servis/data", icon: "bi-person-gear", color: "#06b6d4", pageKey: "servis.data" },
+  {
+    label: "Data Servis",
+    to: "/servis/data",
+    icon: "bi-person-gear",
+    bgStart: "#06b6d4",
+    bgEnd: "#e0f7fa",
+    pageKey: "servis.data",
+  },
 ];
 
 const l2AdminQuickLinks = [
@@ -326,7 +349,8 @@ const l2AdminQuickLinks = [
     label: "Order Online",
     to: "/order-online/data",
     icon: "bi-shop",
-    color: "#e11d48",
+    bgStart: "#e11d48",
+    bgEnd: "#ffe4e6",
     pageKey: "order-online.data",
   },
 ];
@@ -336,42 +360,40 @@ const hrdQuickLinks = [
     label: "Kehadiran",
     to: "/absensi/kehadiran",
     icon: "bi-person-check-fill",
-    color: "#3b82f6",
+    bgStart: "#3b82f6",
+    bgEnd: "#dbeafe",
     pageKey: "absensi.kehadiran",
   },
   {
     label: "Pengajuan Izin",
     to: "/absensi/pengajuan-izin",
     icon: "bi-calendar-plus-fill",
-    color: "#16a34a",
+    bgStart: "#16a34a",
+    bgEnd: "#dcfce7",
     pageKey: "absensi.pengajuan-izin",
   },
   {
     label: "Laporan Kehadiran",
     to: "/absensi/laporan-kehadiran",
     icon: "bi-clipboard-data-fill",
-    color: "#ea580c",
+    bgStart: "#ea580c",
+    bgEnd: "#ffedd5",
     pageKey: "absensi.laporan-kehadiran",
   },
   {
     label: "Laporan Izin",
     to: "/absensi/laporan-izin",
     icon: "bi-journal-check",
-    color: "#d946ef",
+    bgStart: "#d946ef",
+    bgEnd: "#fae8ff",
     pageKey: "absensi.laporan-izin",
   },
 ];
 
 const desktopSystems = computed(() => {
   const source = normalizedRole.value === "hrd" ? hrdSystems : systems;
-  let filtered = source.filter((item) => canOpen(item.pageKey));
-
-  // Tambahkan L2 admin systems jika kondisi terpenuhi
-  if (isL2Admin.value) {
-    filtered = filtered.concat(l2AdminSystems.filter((item) => canOpen(item.pageKey)));
-  }
-
-  return filtered;
+  const filtered = source.filter((item) => canOpen(item.pageKey));
+  return filtered.slice(0, 4);
 });
 
 const desktopQuickLinks = computed(() => {
@@ -603,7 +625,8 @@ const adminActionLinks = computed(() =>
 }
 
 .quick-btn {
-  --btn-bg: #ffa940;
+  --btn-bg-start: #ffa940;
+  --btn-bg-end: #ffe8cc;
   border-radius: 12px;
   padding: 0.85rem;
   min-height: 70px;
@@ -616,7 +639,7 @@ const adminActionLinks = computed(() =>
   transition:
     transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1),
     box-shadow 0.25s ease;
-  background: linear-gradient(135deg, var(--btn-bg) 0%, rgb(198, 225, 245) 100%);
+  background: linear-gradient(135deg, var(--btn-bg-start) 0%, var(--btn-bg-end) 100%);
   box-shadow: 0 8px 22px rgba(14, 35, 60, 0.08);
   border: none;
 }

@@ -634,15 +634,29 @@ function getSubDocLabel(key) {
 function formatDate(value) {
   if (!value) return "-";
   let d;
-  if (value.toDate) d = value.toDate();
-  else d = new Date(value);
+  if (value.toDate) {
+    d = value.toDate();
+  } else if (typeof value === "string") {
+    // Paksa parsing sebagai UTC jika string tanggal tidak memiliki offset zona waktu
+    if (!value.endsWith("Z") && !value.includes("+") && !value.includes("-", 10)) {
+      d = new Date(value.replace(" ", "T") + "Z");
+    } else {
+      d = new Date(value);
+    }
+  } else {
+    d = new Date(value);
+  }
   
   if (Number.isNaN(d.getTime())) return "-";
-  const dd = `${d.getDate()}`.padStart(2, "0");
-  const mm = `${d.getMonth() + 1}`.padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = `${d.getHours()}`.padStart(2, "0");
-  const mi = `${d.getMinutes()}`.padStart(2, "0");
+  
+  // Selalu geser waktu ke zona waktu WITA (UTC+8)
+  const utcMs = d.getTime() + d.getTimezoneOffset() * 60_000;
+  const witaDate = new Date(utcMs + (8 * 60 * 60 * 1000));
+  const dd = `${witaDate.getDate()}`.padStart(2, "0");
+  const mm = `${witaDate.getMonth() + 1}`.padStart(2, "0");
+  const yyyy = witaDate.getFullYear();
+  const hh = `${witaDate.getHours()}`.padStart(2, "0");
+  const mi = `${witaDate.getMinutes()}`.padStart(2, "0");
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
 }
 

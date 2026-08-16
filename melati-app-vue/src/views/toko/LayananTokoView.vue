@@ -86,14 +86,12 @@
               <!-- Service Cost Cards Grid -->
               <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3">
                 <div v-for="item in paginatedOngkos" :key="item.id" class="col">
-                  <div class="card service-cost-card h-100 border-0 p-3 shadow-sm rounded-3 interactive-card position-relative d-flex flex-column justify-content-between">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                      <span class="service-icon-bg d-flex align-items-center justify-content-center rounded-circle">
-                        <i class="bi bi-hammer text-gold"></i>
-                      </span>
-                      <div v-if="canEdit" class="dropdown">
-                        <button class="btn btn-link text-muted p-0 border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="bi bi-three-dots-vertical"></i>
+                  <div class="card service-cost-card h-100 border-0 p-3 shadow-sm rounded-4 interactive-card position-relative d-flex flex-column justify-content-between">
+                    <!-- Absolute Dropdown Actions -->
+                    <div v-if="canEdit" class="position-absolute top-0 end-0 m-2 z-1">
+                      <div class="dropdown">
+                        <button class="btn btn-link text-muted p-1 border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                          <i class="bi bi-three-dots-vertical fs-6"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                           <li><a class="dropdown-item" href="#" @click.prevent="openEditOngkosModal(item)"><i class="bi bi-pencil me-2 text-primary"></i> Edit</a></li>
@@ -102,9 +100,17 @@
                         </ul>
                       </div>
                     </div>
-                    <div class="flex-grow-1">
-                      <h6 class="service-name mb-1">{{ item.name }}</h6>
-                      <p class="service-cost mb-0">Rp {{ formatNumber(item.cost) }}</p>
+                    <!-- Card Body -->
+                    <div class="d-flex flex-column justify-content-between h-100 mt-2">
+                      <div class="mb-3">
+                        <h6 class="service-name fw-extrabold text-dark text-wrap mb-0" style="line-height: 1.4;">{{ item.name }}</h6>
+                      </div>
+                      <div class="pt-2 border-top border-light-subtle d-flex align-items-center justify-content-between">
+                        <div>
+                          <span class="text-muted d-block" style="font-size: 0.7rem;">Ongkos</span>
+                          <span class="service-cost fw-extrabold text-gold">Rp {{ formatNumber(item.cost) }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -204,7 +210,7 @@
                 <div class="d-none d-sm-flex row row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
                   <div v-for="item in paginatedBisa" :key="item.id" class="col">
                     <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
-                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center">
+                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center" :style="item.imageUrl ? 'cursor: pointer;' : ''" @click="item.imageUrl && showLargeImage(item.imageUrl)">
                         <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
                         <div v-else class="text-center text-muted p-5">
                           <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
@@ -220,7 +226,7 @@
                         </div>
                         <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
                           <div>
-                            <span class="text-muted small d-block">Estimasi Ongkos</span>
+                            <span class="text-muted small d-block">Ongkos Servis</span>
                             <span class="fw-bold text-gold">{{ item.cost || '-' }}</span>
                           </div>
                           <div v-if="canEdit" class="d-flex gap-2">
@@ -241,7 +247,7 @@
                 <div class="d-flex d-sm-none flex-column gap-3">
                   <div v-for="item in paginatedBisa" :key="item.id" class="card repair-card-mobile border-0 shadow-sm rounded-4 overflow-hidden p-3 position-relative">
                     <div class="d-flex gap-3">
-                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" style="width: 85px; height: 85px;">
+                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" :style="{ width: '85px', height: '85px', cursor: item.imageUrl ? 'pointer' : 'default' }" @click="item.imageUrl && showLargeImage(item.imageUrl)">
                         <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="w-100 h-100 object-fit-cover" />
                         <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
                           <i class="bi bi-image fs-4 text-gold-subtle"></i>
@@ -369,7 +375,7 @@
                 <div class="d-none d-sm-flex row row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
                   <div v-for="item in paginatedTidakBisa" :key="item.id" class="col">
                     <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
-                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center">
+                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center" :style="item.imageUrl ? 'cursor: pointer;' : ''" @click="item.imageUrl && showLargeImage(item.imageUrl)">
                         <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
                         <div v-else class="text-center text-muted p-5">
                           <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
@@ -400,7 +406,7 @@
                 <div class="d-flex d-sm-none flex-column gap-3">
                   <div v-for="item in paginatedTidakBisa" :key="item.id" class="card repair-card-mobile border-0 shadow-sm rounded-4 overflow-hidden p-3 position-relative">
                     <div class="d-flex gap-3">
-                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" style="width: 85px; height: 85px;">
+                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" :style="{ width: '85px', height: '85px', cursor: item.imageUrl ? 'pointer' : 'default' }" @click="item.imageUrl && showLargeImage(item.imageUrl)">
                         <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="w-100 h-100 object-fit-cover" />
                         <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
                           <i class="bi bi-image fs-4 text-gold-subtle"></i>
@@ -480,10 +486,10 @@
                   <table class="table table-hover align-middle mb-0 custom-accessories-table">
                     <thead class="bg-light">
                       <tr>
-                        <th class="px-4 py-3 fw-extrabold text-secondary small text-uppercase">Nama Aksesoris</th>
-                        <th class="px-4 py-3 fw-extrabold text-secondary small text-uppercase text-end">Harga</th>
-                        <th class="px-4 py-3 fw-extrabold text-secondary small text-uppercase">Keterangan</th>
-                        <th v-if="canEdit" class="px-4 py-3 fw-extrabold text-secondary small text-uppercase text-center" style="width: 120px">Aksi</th>
+                        <th class="px-4 py-3 fw-extrabold text-secondary small text-uppercase" style="width: 25%; min-width: 220px;">Nama Aksesoris</th>
+                        <th class="px-4 py-3 fw-extrabold text-secondary small text-uppercase text-end" style="width: 15%; min-width: 130px;">Harga</th>
+                        <th class="px-4 py-3 fw-extrabold text-secondary small text-uppercase ps-5" style="width: 45%; min-width: 200px;">Keterangan</th>
+                        <th v-if="canEdit" class="px-4 py-3 fw-extrabold text-secondary small text-uppercase text-center" style="width: 10%; min-width: 100px;">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -499,7 +505,7 @@
                         <td class="px-4 py-3.5 fw-extrabold text-gold text-end fs-6">
                           Rp {{ formatNumber(item.pricePerGram) }}
                         </td>
-                        <td class="px-4 py-3.5 text-muted small">
+                        <td class="px-4 py-3.5 text-muted small ps-5">
                           {{ item.notes || '-' }}
                         </td>
                         <td v-if="canEdit" class="px-4 py-3.5 text-center">
@@ -541,13 +547,13 @@
                     </div>
                   </div>
                   <div class="row g-2">
-                    <div class="col-6">
+                    <div class="col-4">
                       <span class="text-muted d-block" style="font-size: 0.72rem;">Harga</span>
-                      <span class="fw-extrabold text-gold" style="font-size: 0.95rem;">Rp {{ formatNumber(item.pricePerGram) }}</span>
+                      <span class="fw-extrabold text-gold" style="font-size: 0.9rem;">Rp {{ formatNumber(item.pricePerGram) }}</span>
                     </div>
-                    <div class="col-6 text-end">
+                    <div class="col-8 border-start border-light ps-3">
                       <span class="text-muted d-block" style="font-size: 0.72rem;">Keterangan</span>
-                      <span class="text-secondary small">{{ item.notes || '-' }}</span>
+                      <span class="text-secondary" style="font-size: 0.82rem; line-height: 1.3;">{{ item.notes || '-' }}</span>
                     </div>
                   </div>
                 </div>
@@ -633,7 +639,7 @@
                 <textarea v-model="formBisa.description" class="form-control" rows="3" placeholder="Jelaskan detail perbaikan..."></textarea>
               </div>
               <div class="mb-3">
-                <label class="form-label small fw-bold text-secondary">Estimasi Ongkos</label>
+                <label class="form-label small fw-bold text-secondary">Ongkos</label>
                 <input v-model="formBisa.cost" type="text" class="form-control" placeholder="Contoh: Rp 30.000 - Rp 50.000" required />
               </div>
               <div class="mb-2">
@@ -646,7 +652,10 @@
                   </div>
                   <div class="flex-grow-1">
                     <input type="file" ref="fileInputBisa" class="form-control form-control-sm" accept="image/*" @change="handleFileChange" />
-                    <span class="small text-muted" style="font-size: 0.72rem">Format: JPG, PNG. Maks: 3MB.</span>
+                    <span class="small text-muted d-block" style="font-size: 0.72rem">Format: JPG, PNG. Maks: 3MB.</span>
+                    <button v-if="imagePreview || formBisa.imageUrl" type="button" class="btn btn-sm btn-outline-danger mt-1.5 px-2 py-0.5 rounded" style="font-size: 0.75rem;" @click="clearPhotoBisa">
+                      <i class="bi bi-trash me-1"></i> Hapus Foto
+                    </button>
                   </div>
                 </div>
                 <div v-if="uploadProgress > 0" class="progress mt-2" style="height: 6px">
@@ -715,7 +724,10 @@
                   </div>
                   <div class="flex-grow-1">
                     <input type="file" ref="fileInputTidakBisa" class="form-control form-control-sm" accept="image/*" @change="handleFileChange" />
-                    <span class="small text-muted" style="font-size: 0.72rem">Format: JPG, PNG. Maks: 3MB.</span>
+                    <span class="small text-muted d-block" style="font-size: 0.72rem">Format: JPG, PNG. Maks: 3MB.</span>
+                    <button v-if="imagePreview || formTidakBisa.imageUrl" type="button" class="btn btn-sm btn-outline-danger mt-1.5 px-2 py-0.5 rounded" style="font-size: 0.75rem;" @click="clearPhotoTidakBisa">
+                      <i class="bi bi-trash me-1"></i> Hapus Foto
+                    </button>
                   </div>
                 </div>
                 <div v-if="uploadProgress > 0" class="progress mt-2" style="height: 6px">
@@ -769,6 +781,20 @@
         </div>
       </div>
     </div>
+
+    <!-- IMAGE PREVIEW MODAL -->
+    <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+          <div class="modal-body p-0 text-center position-relative">
+            <button type="button" class="btn btn-dark position-absolute top-0 end-0 m-3 shadow-lg rounded-circle d-flex align-items-center justify-content-center" data-bs-dismiss="modal" aria-label="Close" style="width: 36px; height: 36px; z-index: 1055; padding: 0;">
+              <i class="bi bi-x fs-3 text-white"></i>
+            </button>
+            <img :src="previewModalImageUrl" class="img-fluid rounded-4 shadow-lg" style="max-height: 85vh; object-fit: contain;" />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -794,7 +820,7 @@ const uploadProgress = ref(0);
 const activeTab = ref("ongkos");
 
 const tabs = [
-  { id: "ongkos", label: "Estimasi Ongkos", icon: "bi-tag-fill" },
+  { id: "ongkos", label: "Ongkos Servis", icon: "bi-tag-fill" },
   { id: "bisa", label: "Barang Bisa Servis", icon: "bi-check-circle-fill" },
   { id: "tidak_bisa", label: "Barang Tidak Bisa Servis", icon: "bi-x-circle-fill" },
   { id: "aksesoris", label: "Harga Aksesoris", icon: "bi-gem" }
@@ -988,6 +1014,9 @@ watch(searchQueryTidakBisa, () => {
 const editingId = ref(null);
 const fileToUpload = ref(null);
 const imagePreview = ref("");
+const fileInputBisa = ref(null);
+const fileInputTidakBisa = ref(null);
+const previewModalImageUrl = ref("");
 
 // Forms
 const formOngkos = reactive({ name: "", cost: 0 });
@@ -1066,6 +1095,36 @@ function handleFileChange(event) {
 
   fileToUpload.value = file;
   imagePreview.value = URL.createObjectURL(file);
+}
+
+function clearPhotoBisa() {
+  formBisa.imageUrl = "";
+  formBisa.imagePath = "";
+  imagePreview.value = "";
+  fileToUpload.value = null;
+  if (fileInputBisa.value) {
+    fileInputBisa.value.value = "";
+  }
+}
+
+function clearPhotoTidakBisa() {
+  formTidakBisa.imageUrl = "";
+  formTidakBisa.imagePath = "";
+  imagePreview.value = "";
+  fileToUpload.value = null;
+  if (fileInputTidakBisa.value) {
+    fileInputTidakBisa.value.value = "";
+  }
+}
+
+function showLargeImage(url) {
+  if (!url) return;
+  previewModalImageUrl.value = url;
+  const el = document.getElementById("imagePreviewModal");
+  if (el) {
+    const modal = Modal.getOrCreateInstance(el);
+    modal.show();
+  }
 }
 
 // ── ONGKOS SERVIS ACTIONS ──────────────────────────────────────────────────
@@ -1185,6 +1244,18 @@ async function saveBisa() {
       imagePath = uploadRes.path;
     }
 
+    if (editingId.value) {
+      const originalItem = data.value.barangBisaServis.find(i => i.id === editingId.value);
+      if (originalItem && originalItem.imagePath && !imagePath && !fileToUpload.value) {
+        // Photo was deleted completely and no new photo was selected
+        try {
+          await deleteLayananImage(originalItem.imagePath);
+        } catch (e) {
+          console.error("Gagal menghapus gambar lama dari storage:", e);
+        }
+      }
+    }
+
     const list = [...data.value.barangBisaServis];
     const itemData = {
       name: formBisa.name,
@@ -1293,6 +1364,18 @@ async function saveTidakBisa() {
       });
       imageUrl = uploadRes.url;
       imagePath = uploadRes.path;
+    }
+
+    if (editingId.value) {
+      const originalItem = data.value.barangTidakBisaServis.find(i => i.id === editingId.value);
+      if (originalItem && originalItem.imagePath && !imagePath && !fileToUpload.value) {
+        // Photo was deleted completely and no new photo was selected
+        try {
+          await deleteLayananImage(originalItem.imagePath);
+        } catch (e) {
+          console.error("Gagal menghapus gambar lama dari storage:", e);
+        }
+      }
     }
 
     const list = [...data.value.barangTidakBisaServis];

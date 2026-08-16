@@ -192,7 +192,7 @@
               <div class="card-body">
                 <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
                   <span 
-                    v-for="q in state.beli.skipList" 
+                    v-for="q in state.beli.skipList.slice(0, 3)" 
                     :key="q"
                     class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill d-inline-flex align-items-center gap-1"
                     style="font-size: 0.85rem; font-weight: 600; cursor: pointer;"
@@ -202,6 +202,7 @@
                     {{ q }}
                     <i class="fas fa-times text-danger ms-1" style="font-size: 0.75rem;"></i>
                   </span>
+                  <span v-if="state.beli.skipList.length > 3" class="text-muted fw-bold px-1" style="letter-spacing: 2px;">...</span>
                   <span v-if="state.beli.skipList.length === 0" class="text-muted small">-</span>
                 </div>
                 <div class="action-buttons">
@@ -222,13 +223,14 @@
               <div class="card-body">
                 <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
                   <span 
-                    v-for="q in state.beli.delayedQueue" 
+                    v-for="q in state.beli.delayedQueue.slice(0, 3)" 
                     :key="q"
                     class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill"
                     style="font-size: 0.85rem; font-weight: 600;"
                   >
                     {{ q }}
                   </span>
+                  <span v-if="state.beli.delayedQueue.length > 3" class="text-muted fw-bold px-1" style="letter-spacing: 2px;">...</span>
                   <span v-if="state.beli.delayedQueue.length === 0" class="text-muted small">-</span>
                 </div>
                 <div class="action-buttons">
@@ -320,7 +322,7 @@
               <div class="card-body">
                 <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
                   <span 
-                    v-for="q in state.jual.skipList" 
+                    v-for="q in state.jual.skipList.slice(0, 3)" 
                     :key="q"
                     class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill d-inline-flex align-items-center gap-1"
                     style="font-size: 0.85rem; font-weight: 600; cursor: pointer;"
@@ -330,6 +332,7 @@
                     {{ q }}
                     <i class="fas fa-times text-danger ms-1" style="font-size: 0.75rem;"></i>
                   </span>
+                  <span v-if="state.jual.skipList.length > 3" class="text-muted fw-bold px-1" style="letter-spacing: 2px;">...</span>
                   <span v-if="state.jual.skipList.length === 0" class="text-muted small">-</span>
                 </div>
                 <div class="action-buttons">
@@ -350,13 +353,14 @@
               <div class="card-body">
                 <div class="queue-display list-display mb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center py-2" style="min-height: 48px; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px;">
                   <span 
-                    v-for="q in state.jual.delayedQueue" 
+                    v-for="q in state.jual.delayedQueue.slice(0, 3)" 
                     :key="q"
                     class="badge bg-light text-dark border border-secondary-subtle px-2.5 py-1.5 rounded-pill"
                     style="font-size: 0.85rem; font-weight: 600;"
                   >
                     {{ q }}
                   </span>
+                  <span v-if="state.jual.delayedQueue.length > 3" class="text-muted fw-bold px-1" style="letter-spacing: 2px;">...</span>
                   <span v-if="state.jual.delayedQueue.length === 0" class="text-muted small">-</span>
                 </div>
                 <div class="action-buttons">
