@@ -1105,14 +1105,25 @@ async function ensureSnapshotForYesterdayByScope(triggerSource, scope = "global"
   });
 }
 
-async function ensureSnapshotsForAllScopes(triggerSource) {
+async function ensureSnapshotsForAllScopes(triggerSource, targetDate = "yesterday") {
   const scopes = getSnapshotScopes();
   const results = [];
 
   for (const scopeItem of scopes) {
     try {
-      // eslint-disable-next-line no-await-in-loop
-      const result = await ensureSnapshotForYesterdayByScope(triggerSource, scopeItem.scope, scopeItem.floorId);
+      let result;
+      if (targetDate === "today") {
+        const todayYmd = formatYmd(toWitaParts(new Date()));
+        result = await ensureSnapshotByDateYmdForScope({
+          triggerSource,
+          scope: scopeItem.scope,
+          floorId: scopeItem.floorId,
+          dateYmd: todayYmd,
+        });
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        result = await ensureSnapshotForYesterdayByScope(triggerSource, scopeItem.scope, scopeItem.floorId);
+      }
       results.push({ ...scopeItem, result });
     } catch (error) {
       logger.error("Failed snapshot for scope", {
@@ -1130,13 +1141,13 @@ async function ensureSnapshotsForAllScopes(triggerSource) {
 
 export const scheduledCreateDailySnapshot = onSchedule(
   {
-    schedule: "5 0 * * *",
+    schedule: "30 23 * * *",
     timeZone: "Asia/Makassar",
     region: "asia-southeast2",
     memory: "256MiB",
   },
   async () => {
-    await ensureSnapshotsForAllScopes("scheduler");
+    await ensureSnapshotsForAllScopes("scheduler", "today");
   },
 );
 
@@ -1173,13 +1184,13 @@ export const ensureYesterdaySnapshotOnFirstTxFloor = onDocumentWritten(
 
 export const scheduledCreateDailyStockReports = onSchedule(
   {
-    schedule: "10 0 * * *",
+    schedule: "40 23 * * *",
     timeZone: "Asia/Makassar",
     region: "asia-southeast2",
     memory: "256MiB",
   },
   async () => {
-    await ensureSnapshotsForAllScopes("scheduler-daily-reports");
+    await ensureSnapshotsForAllScopes("scheduler-daily-reports", "today");
   },
 );
 
@@ -2999,6 +3010,75 @@ export const syncDesktopSales = onRequest(
         await batch.commit();
       }
 
+      // 5. Update Daily Sync Stats (grouped by transaction date)
+      const dataByDate = {};
+      sales_data.forEach(item => {
+        let datePart = "";
+        if (item.tanggal_penjualan) {
+          datePart = String(item.tanggal_penjualan).split("T")[0];
+        }
+        if (!datePart) {
+          datePart = formatYmd(toWitaParts(new Date()));
+        }
+
+        if (!dataByDate[datePart]) {
+          dataByDate[datePart] = {
+            salesCount: 0,
+            salesMatched: 0,
+            salesDiscrepancy: 0,
+            salesIgnored: 0,
+            items: []
+          };
+        }
+
+        const bc = item.barcode.trim().toUpperCase();
+        
+        let status = "ignored";
+        let webLocation = undefined;
+        let reason = undefined;
+
+        if (matchBarcodes.some(m => m.barcode === bc)) {
+          status = "matched";
+          dataByDate[datePart].salesMatched++;
+        } else if (discrepancyBarcodes.some(d => d.item.barcode === bc)) {
+          status = "discrepancy";
+          const discInfo = discrepancyBarcodes.find(d => d.item.barcode === bc);
+          webLocation = discInfo ? discInfo.currentLocation : "unknown";
+          dataByDate[datePart].salesDiscrepancy++;
+        } else {
+          status = "ignored";
+          const ignInfo = ignoredBarcodes.find(i => i.barcode === bc);
+          reason = ignInfo ? ignInfo.reason : "unknown";
+          dataByDate[datePart].salesIgnored++;
+        }
+
+        dataByDate[datePart].salesCount++;
+        dataByDate[datePart].items.push({
+          id: item.desktop_item_id || "",
+          invoice_no: item.invoice_no || "",
+          barcode: bc,
+          timestamp: item.tanggal_penjualan || "",
+          salesName: item.nama_sales || "Unknown Sales",
+          status,
+          ...(webLocation ? { webLocation } : {}),
+          ...(reason ? { reason } : {})
+        });
+      });
+
+      // Write daily stats to Firestore
+      for (const [dateId, stats] of Object.entries(dataByDate)) {
+        const statsRef = dbFloorRef.collection("syncDailyStats").doc(dateId);
+        await statsRef.set({
+          date: dateId,
+          salesCount: admin.firestore.FieldValue.increment(stats.salesCount),
+          salesMatched: admin.firestore.FieldValue.increment(stats.salesMatched),
+          salesDiscrepancy: admin.firestore.FieldValue.increment(stats.salesDiscrepancy),
+          salesIgnored: admin.firestore.FieldValue.increment(stats.salesIgnored),
+          items: admin.firestore.FieldValue.arrayUnion(...stats.items),
+          lastSyncedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
       res.status(200).json({
         success: true,
         stats: {
@@ -3039,17 +3119,41 @@ export const syncDesktopVoid = onRequest(
     try {
       const dbFloorRef = db.collection("floors").doc(floorId);
 
+      const processedResults = [];
+
       for (const voidItem of void_data) {
         const bc = voidItem.barcode.trim().toUpperCase();
 
-        await db.runTransaction(async (t) => {
-          // Cari log mutasi terakhir barcode ini sebelum ia dijual (destination === 'laku')
+        const statusResult = await db.runTransaction(async (t) => {
+          // 1. READ: Cari log mutasi terakhir barcode ini sebelum ia dijual (destination === 'laku')
           const mutationLogsQuery = dbFloorRef.collection("barcodeMutationLogs")
             .where("barcodeIds", "array-contains", bc);
-          
           const mutationLogsSnap = await t.get(mutationLogsQuery);
-          let previousOrigin = "barang-display"; // default fallback
           
+          // 2. READ: Baca status barcode terkini di Firestore
+          const barcodeRef = dbFloorRef.collection("barcodes").doc(bc);
+          const barcodeSnap = await t.get(barcodeRef);
+
+          // 3. READ: Cari laporan discrepancy yang berasosiasi dengan barcode ini
+          const discrepanciesQuery = dbFloorRef.collection("barcodeDiscrepancies")
+            .where("barcode", "==", bc)
+            .where("resolved", "==", false)
+            .limit(10);
+          const discrepanciesSnap = await t.get(discrepanciesQuery);
+
+          // Evaluasi data barcode
+          if (!barcodeSnap.exists) {
+            logger.warn(`Void failed: Barcode ${bc} does not exist in active barcodes`);
+            return { status: "ignored", reason: "unregistered" };
+          }
+
+          const barcodeData = barcodeSnap.data();
+          if (barcodeData.location !== "laku") {
+            logger.warn(`Void bypass: Barcode ${bc} is currently at location ${barcodeData.location}, not 'laku'`);
+            return { status: "ignored", reason: `already ${barcodeData.location}` };
+          }
+
+          let previousOrigin = "barang-display"; // default fallback
           if (!mutationLogsSnap.empty) {
             const sortedLogs = mutationLogsSnap.docs
               .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
@@ -3065,22 +3169,7 @@ export const syncDesktopVoid = onRequest(
             }
           }
 
-          // Baca status barcode terkini di Firestore
-          const barcodeRef = dbFloorRef.collection("barcodes").doc(bc);
-          const barcodeSnap = await t.get(barcodeRef);
-
-          if (!barcodeSnap.exists) {
-            logger.warn(`Void failed: Barcode ${bc} does not exist in active barcodes`);
-            return;
-          }
-
-          const barcodeData = barcodeSnap.data();
-          if (barcodeData.location !== "laku") {
-            logger.warn(`Void bypass: Barcode ${bc} is currently at location ${barcodeData.location}, not 'laku'`);
-            return;
-          }
-
-          // Kembalikan lokasi barcode ke asal secara transaksional
+          // 4. WRITE: Kembalikan lokasi barcode ke asal secara transaksional
           const mutateItems = [{
             barcode: bc,
             detailType: barcodeData.detailType || "",
@@ -3103,13 +3192,7 @@ export const syncDesktopVoid = onRequest(
             true
           );
 
-          // Selesaikan laporan discrepancy yang berasosiasi dengan barcode ini
-          const discrepanciesQuery = dbFloorRef.collection("barcodeDiscrepancies")
-            .where("barcode", "==", bc)
-            .where("resolved", "==", false)
-            .limit(10);
-          
-          const discrepanciesSnap = await t.get(discrepanciesQuery);
+          // 5. WRITE: Selesaikan laporan discrepancy yang berasosiasi dengan barcode ini
           discrepanciesSnap.forEach(docSnap => {
             t.update(docSnap.ref, {
               resolved: true,
@@ -3118,7 +3201,53 @@ export const syncDesktopVoid = onRequest(
               resolutionNote: `Pembatalan Transaksi Kasir Desktop (Void Faktur: ${voidItem.invoice_no})`
             });
           });
+
+          return { status: "voided" };
         });
+
+        const finalStatus = statusResult || { status: "ignored", reason: "failed transaction" };
+        processedResults.push({
+          id: voidItem.void_item_id || "",
+          invoice_no: voidItem.invoice_no || "",
+          barcode: bc,
+          timestamp: voidItem.tanggal_void || "",
+          dihapus_oleh: voidItem.dihapus_oleh || "Unknown Admin",
+          status: finalStatus.status,
+          ...(finalStatus.reason ? { reason: finalStatus.reason } : {})
+        });
+      }
+
+      // Group void data by date
+      const dataByDate = {};
+      processedResults.forEach(item => {
+        let datePart = "";
+        if (item.timestamp) {
+          datePart = String(item.timestamp).split("T")[0];
+        }
+        if (!datePart) {
+          datePart = formatYmd(toWitaParts(new Date()));
+        }
+
+        if (!dataByDate[datePart]) {
+          dataByDate[datePart] = {
+            voidCount: 0,
+            items: []
+          };
+        }
+
+        dataByDate[datePart].voidCount++;
+        dataByDate[datePart].items.push(item);
+      });
+
+      // Write daily stats to Firestore
+      for (const [dateId, stats] of Object.entries(dataByDate)) {
+        const statsRef = dbFloorRef.collection("syncDailyStats").doc(dateId);
+        await statsRef.set({
+          date: dateId,
+          voidCount: admin.firestore.FieldValue.increment(stats.voidCount),
+          items: admin.firestore.FieldValue.arrayUnion(...stats.items),
+          lastSyncedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
       }
 
       res.status(200).json({ success: true });

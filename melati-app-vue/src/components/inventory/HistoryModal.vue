@@ -44,7 +44,7 @@
                     <td class="pe-3">
                       <div class="fw-bold text-dark-emphasis mb-1" style="font-size: 0.9rem;">
                         {{ formatHistoryNote(h) }}
-                        <span v-if="getHistoryFlow(h)" class="badge bg-primary-subtle text-primary border ms-2" style="font-size: 0.72rem;">
+                        <span v-if="getHistoryFlow(h)" class="badge bg-success-subtle text-success border ms-2" style="font-size: 0.72rem;">
                           <i class="bi bi-arrow-left-right me-1"></i>
                           {{ getHistoryFlow(h) }}
                         </span>
@@ -52,8 +52,8 @@
                       <div v-if="h.barcodes && h.barcodes.length" class="d-flex flex-wrap gap-1.5 align-items-center mt-1">
                         <span 
                           v-if="getHistoryRecordClassification(mainCat, h)"
-                          class="badge bg-info text-dark fw-bold border"
-                          style="font-size: 0.7rem; border-color: rgba(13, 202, 240, 0.4) !important;"
+                          :class="getHistoryRecordBadgeClass(mainCat, h)"
+                          :style="getHistoryRecordBadgeStyle(mainCat, h)"
                         >
                           {{ getHistoryRecordClassification(mainCat, h) }}
                         </span>
@@ -199,6 +199,60 @@ function getHistoryRecordClassification(mainCat, record) {
   const detailMode = getCardDetailMode(mainCat);
   const prefix = detailMode === "hala" ? "Jenis" : "Barcode";
   return `${prefix}: ${label}`;
+}
+
+function getHistoryRecordDetailType(mainCat, record) {
+  if (!record?.barcodes || !record.barcodes.length) return "";
+  const firstBc = record.barcodes[0];
+  let detailType = "";
+  if (typeof firstBc === "object") {
+    detailType = firstBc.detailType;
+  } else {
+    detailType = getFallbackDetailType(mainCat, firstBc);
+  }
+  return detailType ? String(detailType).trim().toUpperCase() : "";
+}
+
+function getHistoryRecordBadgeClass(mainCat, record) {
+  const detailMode = getCardDetailMode(mainCat);
+  const detailType = getHistoryRecordDetailType(mainCat, record);
+  const baseClass = "badge fw-bold border";
+
+  if (detailMode === "color") {
+    switch (detailType) {
+      case "PUTIH":
+        return `${baseClass} bg-light text-dark`;
+      case "BIRU":
+        return `${baseClass} bg-primary text-white border-primary`;
+      case "KUNING":
+        return `${baseClass} bg-warning text-dark border-warning`;
+      case "HIJAU":
+        return `${baseClass} bg-success text-white border-success`;
+      case "PINK":
+        return baseClass;
+      default:
+        return `${baseClass} bg-light text-dark`;
+    }
+  }
+  return `${baseClass} bg-light text-dark`;
+}
+
+function getHistoryRecordBadgeStyle(mainCat, record) {
+  const detailMode = getCardDetailMode(mainCat);
+  const detailType = getHistoryRecordDetailType(mainCat, record);
+
+  if (detailMode === "color") {
+    if (detailType === "PINK") {
+      return "font-size: 0.7rem; background-color: #fce4ec !important; border-color: #f8bbd0 !important; color: #c2185b !important;";
+    }
+    if (detailType === "PUTIH") {
+      return "font-size: 0.7rem; border-color: #dee2e6 !important;";
+    }
+    if (["BIRU", "KUNING", "HIJAU"].includes(detailType)) {
+      return "font-size: 0.7rem;";
+    }
+  }
+  return "font-size: 0.7rem; border-color: rgba(13, 202, 240, 0.4) !important;";
 }
 
 function formatHistoryQty(record) {

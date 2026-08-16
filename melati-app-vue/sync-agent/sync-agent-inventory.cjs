@@ -233,9 +233,15 @@ async function runSyncAgent() {
                 FROM tblpenjualan h
                 JOIN tblpenjualanitem d ON h.\`Primary\` = d.\`PrimaryTransaksi\`
                 LEFT JOIN tblpegawai p ON TRIM(h.\`ID Pegawai\`) = TRIM(p.\`Nomor Identitas Pegawai\`)
-                WHERE h.\`Primary\` > ?
+                WHERE h.\`Primary\` IN (
+                    SELECT \`Primary\` FROM (
+                        SELECT \`Primary\` FROM tblpenjualan 
+                        WHERE \`Primary\` > ? 
+                        ORDER BY \`Primary\` ASC 
+                        LIMIT 50
+                    ) tmp
+                )
                 ORDER BY h.\`Primary\` ASC
-                LIMIT 100
             `;
             salesQueryParams = [lastSalesId];
         }

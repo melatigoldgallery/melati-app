@@ -15,11 +15,16 @@
             <li v-for="tab in modalTabs" :key="tab.key" class="nav-item">
               <button
                 class="nav-link btn-sm py-1 px-3 me-2 rounded-pill fw-semibold d-flex align-items-center gap-1 border-0"
-                :class="activeModalTab === tab.key ? 'active bg-primary text-white' : 'text-secondary bg-transparent'"
+                :class="getTabClass(tab.key)"
+                :style="getTabStyle(tab.key)"
                 @click="selectModalTab(tab.key)"
               >
                 {{ tab.label }}
-                <span class="badge ms-1" :class="activeModalTab === tab.key ? 'bg-white text-primary' : 'bg-secondary text-white'">
+                <span 
+                  class="badge ms-1" 
+                  :class="getTabBadgeClass(tab.key)"
+                  :style="getTabBadgeStyle(tab.key)"
+                >
                   {{ getSubQty(tab.key) }}
                 </span>
               </button>
@@ -100,7 +105,12 @@
                         <td class="ps-3 text-muted small">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
                         <td>
                           <div class="d-flex align-items-center gap-2">
-                            <span class="monospace fw-bold text-dark fs-7 bg-light px-2.5 py-1 rounded border">{{ b.barcode }}</span>
+                            <span 
+                              :class="getBarcodeRowBadgeClass()"
+                              :style="getBarcodeRowBadgeStyle()"
+                            >
+                              {{ b.barcode }}
+                            </span>
                             <button 
                               type="button"
                               class="btn btn-link btn-xs p-1 text-secondary hover-primary border-0 bg-transparent rounded-circle d-inline-flex align-items-center justify-content-center transition-all hover-bg-light"
@@ -233,6 +243,110 @@ const modalTabs = computed(() => {
   }
   return baseTabs;
 });
+
+function getTabClass(tabKey) {
+  const isActive = activeModalTab.value === tabKey;
+  if (!isActive) return "text-secondary bg-transparent";
+
+  const detailMode = getCardDetailMode(props.mainCat);
+  if (detailMode === "color") {
+    switch (tabKey) {
+      case "PUTIH":
+        return "active bg-light text-dark border border-secondary-subtle shadow-sm";
+      case "BIRU":
+        return "active bg-primary text-white shadow-sm";
+      case "KUNING":
+        return "active bg-warning text-dark shadow-sm";
+      case "HIJAU":
+        return "active bg-success text-white shadow-sm";
+      case "PINK":
+        return "active shadow-sm"; // Handled by inline style
+      default:
+        return "active bg-primary text-white shadow-sm";
+    }
+  }
+  return "active bg-primary text-white shadow-sm";
+}
+
+function getTabStyle(tabKey) {
+  const isActive = activeModalTab.value === tabKey;
+  if (!isActive) return "";
+
+  const detailMode = getCardDetailMode(props.mainCat);
+  if (detailMode === "color" && tabKey === "PINK") {
+    return "background-color: #fce4ec !important; border: 1px solid #f8bbd0 !important; color: #c2185b !important;";
+  }
+  return "";
+}
+
+function getTabBadgeClass(tabKey) {
+  const isActive = activeModalTab.value === tabKey;
+  if (!isActive) return "bg-secondary text-white";
+
+  const detailMode = getCardDetailMode(props.mainCat);
+  if (detailMode === "color") {
+    switch (tabKey) {
+      case "PUTIH":
+        return "bg-secondary text-white";
+      case "BIRU":
+        return "bg-white text-primary";
+      case "KUNING":
+        return "bg-dark text-warning";
+      case "HIJAU":
+        return "bg-white text-success";
+      case "PINK":
+        return ""; // Handled by inline style
+      default:
+        return "bg-white text-primary";
+    }
+  }
+  return "bg-white text-primary";
+}
+
+function getTabBadgeStyle(tabKey) {
+  const isActive = activeModalTab.value === tabKey;
+  if (!isActive) return "";
+
+  const detailMode = getCardDetailMode(props.mainCat);
+  if (detailMode === "color" && tabKey === "PINK") {
+    return "background-color: #c2185b !important; color: #ffffff !important;";
+  }
+  return "";
+}
+
+function getBarcodeRowBadgeClass() {
+  const detailMode = getCardDetailMode(props.mainCat);
+  const activeColor = activeModalTab.value;
+  const baseClass = "monospace fw-bold fs-7 px-2.5 py-1 rounded border";
+
+  if (detailMode === "color") {
+    switch (activeColor) {
+      case "PUTIH":
+        return `${baseClass} bg-light text-dark border-secondary-subtle`;
+      case "BIRU":
+        return `${baseClass} bg-primary-subtle text-primary-emphasis border-primary-subtle`;
+      case "KUNING":
+        return `${baseClass} bg-warning-subtle text-warning-emphasis border-warning-subtle`;
+      case "HIJAU":
+        return `${baseClass} bg-success-subtle text-success-emphasis border-success-subtle`;
+      case "PINK":
+        return baseClass; // Handled by inline style
+      default:
+        return `${baseClass} bg-light text-dark`;
+    }
+  }
+  return `${baseClass} bg-light text-dark`;
+}
+
+function getBarcodeRowBadgeStyle() {
+  const detailMode = getCardDetailMode(props.mainCat);
+  const activeColor = activeModalTab.value;
+
+  if (detailMode === "color" && activeColor === "PINK") {
+    return "background-color: #fce4ec !important; border-color: #f8bbd0 !important; color: #c2185b !important;";
+  }
+  return "";
+}
 
 function getSubQty(subType) {
   const cat = props.mainCat;

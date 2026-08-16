@@ -245,7 +245,7 @@
               <div v-if="selectedLog" class="mb-3">
                 <div class="row g-2 bg-light rounded-2 small">
                   <div class="col-3"><strong>Waktu:</strong> {{ formatDate(selectedLog.timestamp) }}</div>
-                  <div class="col-3"><strong>Petugas:</strong> {{ selectedLog.pemindah }}</div>
+                  <div class="col-3"><strong>Sales:</strong> {{ selectedLog.pemindah }}</div>
                   <div class="col-6 text-end d-flex justify-content-end"><button 
                       type="button" 
                       class="btn btn-secondary  btn-sm rounded-pill px-2 py-1 d-flex align-items-center gap-2"
@@ -368,7 +368,7 @@
                     <div class="d-flex justify-content-between align-items-center text-muted small border-top pt-2" style="font-size: 0.78rem;">
                       <div>
                         <i class="bi bi-person me-1"></i>
-                        <span>Petugas: <strong>{{ log.pemindah }}</strong></span>
+                        <span>Sales: <strong>{{ log.pemindah }}</strong></span>
                       </div>
                       <div>
                         <i class="bi bi-clock me-1"></i>

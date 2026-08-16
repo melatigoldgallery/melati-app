@@ -59,9 +59,9 @@
                   <div class="d-flex align-items-start gap-3">
                     <span class="rule-num badge bg-danger rounded-circle mt-1">4</span>
                     <div class="rule-text text-start">
-                      <h6 class="fw-bold text-danger mb-1">Ketentuan Kelalaian (Tanpa Scan)</h6>
+                      <h6 class="fw-bold text-danger mb-1"> Kelalaian (Tanpa Scan)</h6>
                       <p class="mb-0 text-muted small">
-                        Jika diketahui ada sales yang mengambil/memindahkan barang tanpa melakukan scan barcode, <strong>nama sales yang bersangkutan akan diumumkan di grup toko</strong> sebagai pengingat untuk yang bersangkutan dan sales secara keseluruhan.
+                        Jika diketahui ada sales yang mengambil/memindahkan barang tanpa melakukan scan barcode, <strong> sales yang bersangkutan akan diingatkan di grup toko</strong> sebagai pengingat untuk yang bersangkutan dan sales secara keseluruhan.
                       </p>
                     </div>
                   </div>
@@ -144,7 +144,7 @@
                     <i class="bi bi-megaphone-fill text-danger fs-5 flex-shrink-0"></i>
                     <div>
                       <strong class="d-block text-danger mb-0.5">Lupa / Tidak Scan?</strong>
-                      <span class="text-muted" style="font-size: 0.75rem;">Nama sales yang bersangkutan akan diumumkan di grup toko.</span>
+                      <span class="text-muted" style="font-size: 0.75rem;">Sales yang bersangkutan akan diingatkan di grup toko.</span>
                     </div>
                   </div>
                 </div>

@@ -15,9 +15,9 @@
         </nav>
       </div>
       <div>
-        <button class="btn btn-sm btn-outline-secondary" @click="refreshData" :disabled="loading">
-          <i class="bi bi-arrow-clockwise me-1"></i>
-          Refresh
+        <button class="btn btn-sm btn-success d-none" @click="openQuickScanModal" :disabled="loading">
+          <i class="bi bi-qr-code-scan me-1"></i>
+          Scan Cepat
         </button>
       </div>
     </div>
@@ -307,6 +307,7 @@
       :main-cat="barcodeForm.mainCat"
       :sub-doc="barcodeForm.subDoc"
       :sub-label="barcodeForm.subLabel"
+      :is-quick-scan="barcodeForm.isQuickScan"
       :table-rows="tableRows"
       :staff-options="staffOptions"
       :keterangan-opts="KETERANGAN_OPTS"
@@ -373,10 +374,8 @@ import {
   KETERANGAN_OPTS,
   calcFisikTotal,
   fetchAllStockData,
-  fetchDailyReport,
   getStockStatus,
   mergeStockByLatest,
-  saveDailyReport,
   subscribeStocksRealtime,
   fetchStaffOptions,
   updateKomputerStock,
@@ -447,7 +446,6 @@ const modalMap = new Map();
 let unsubRealtime = null;
 let unsubSettings = null;
 let unsubDiscrepancies = null;
-let snapshotTimer = null;
 
 const mainTab = ref("agregat"); // "agregat" or "lacakFisik"
 const physicalTab = ref(ENABLE_MUTATION_QUEUE ? "antrian" : "log"); // "antrian" or "log"
@@ -475,6 +473,7 @@ const barcodeForm = ref({
   mainCat: "",
   subDoc: "",
   subLabel: "",
+  isQuickScan: false,
 });
 
 const historyInfo = ref({ mainCat: "", subLabel: "" });
@@ -841,9 +840,20 @@ function openUpdateModal(mainCat, sub) {
       mainCat,
       subDoc: sub.key,
       subLabel: sub.label,
+      isQuickScan: false,
     };
     showModal("barcodeUpdateModal");
   }
+}
+
+function openQuickScanModal() {
+  barcodeForm.value = {
+    mainCat: "",
+    subDoc: "any",
+    subLabel: "Scan Cepat",
+    isQuickScan: true,
+  };
+  showModal("barcodeUpdateModal");
 }
 
 function openKomputerModal(mainCat) {
@@ -1018,70 +1028,6 @@ function handleStorageSync(event) {
   } catch {}
 }
 
-function getNowWita() {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utc + 8 * 60 * 60000);
-}
-
-function formatDateKey(dateObj) {
-  const d = new Date(dateObj);
-  const y = d.getFullYear();
-  const m = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function scheduleNextDailySnapshot() {
-  if (snapshotTimer) clearTimeout(snapshotTimer);
-  const now = getNowWita();
-  const target = new Date(now);
-  target.setHours(0, 5, 0, 0);
-  if (now >= target) target.setDate(target.getDate() + 1);
-  const delay = target.getTime() - now.getTime();
-  snapshotTimer = setTimeout(async () => {
-    try {
-      await saveDailyReport(formatDateKey(getNowWita()), stockData.value, auth.activeFloor, displaySettings.value);
-    } catch {
-    } finally {
-      scheduleNextDailySnapshot();
-    }
-  }, delay);
-}
-
-async function initDailySnapshots() {
-  const now = getNowWita();
-  const todayKey = formatDateKey(now);
-  const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
-
-  if (sessionStorage.getItem(cacheKey) === "true") {
-    scheduleNextDailySnapshot();
-    return;
-  }
-
-  try {
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const yesterdayKey = formatDateKey(yesterday);
-    const yReport = await fetchDailyReport(yesterdayKey, auth.activeFloor);
-    if (yReport.source === "none") {
-      await saveDailyReport(yesterdayKey, stockData.value, auth.activeFloor, displaySettings.value);
-    }
-
-    const today005 = new Date(now);
-    today005.setHours(0, 5, 0, 0);
-    if (now >= today005) {
-      const tReport = await fetchDailyReport(todayKey, auth.activeFloor);
-      if (tReport.source === "none") {
-        await saveDailyReport(todayKey, stockData.value, auth.activeFloor, displaySettings.value);
-      }
-    }
-    sessionStorage.setItem(cacheKey, "true");
-  } catch {
-  } finally {
-    scheduleNextDailySnapshot();
-  }
-}
-
 async function handleStockReload() {
   await loadData({ force: true, silent: true });
 }
@@ -1090,28 +1036,6 @@ onMounted(async () => {
   await syncFloorScopedState();
   window.addEventListener("storage", handleStorageSync);
   window.addEventListener("melati-stock-reload", handleStockReload);
-
-  const now = getNowWita();
-  const todayKey = formatDateKey(now);
-  const cacheKey = `daily_snapshots_checked_${auth.activeFloor}_${todayKey}`;
-
-  if (sessionStorage.getItem(cacheKey) === "true") {
-    scheduleNextDailySnapshot();
-  } else {
-    if (stockData.value && Object.keys(stockData.value).length > 0) {
-      initDailySnapshots();
-    } else {
-      const unwatch = watch(
-        stockData,
-        (newData) => {
-          if (newData && Object.keys(newData).length > 0) {
-            initDailySnapshots();
-            unwatch();
-          }
-        }
-      );
-    }
-  }
 });
 
 watch(
@@ -1126,7 +1050,6 @@ onUnmounted(() => {
   if (unsubRealtime) unsubRealtime();
   if (unsubSettings) unsubSettings();
   if (unsubDiscrepancies) unsubDiscrepancies();
-  if (snapshotTimer) clearTimeout(snapshotTimer);
   window.removeEventListener("storage", handleStorageSync);
   window.removeEventListener("melati-stock-reload", handleStockReload);
 });

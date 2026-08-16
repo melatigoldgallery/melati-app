@@ -6,7 +6,8 @@
           <div class="modal-header py-3 bg-primary text-white border-0">
             <h6 class="modal-title fw-bold">
               <i class="bi bi-qr-code-scan me-2"></i>
-              Update Barcode: {{ mainCat }} - {{ subLabel }}
+              <span v-if="isQuickScan">Scan Cepat Barcode<span v-if="detectedMainCat">: {{ detectedMainCat }}</span></span>
+              <span v-else>Update Barcode: {{ mainCat }} - {{ subLabel }}</span>
             </h6>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
@@ -32,7 +33,7 @@
             <!-- Dropdown Klasifikasi Dinamis -->
             <div v-if="currentDetailOptions.length > 0" class="mb-3">
               <label class="form-label small fw-bold text-secondary">
-                {{ hasNewBarcode ? 'Klasifikasi Warna / Jenis (Wajib untuk Barcode Baru)' : 'Koreksi / Ubah Klasifikasi Warna / Jenis (Opsional)' }}
+                {{ hasNewBarcode ? 'Klasifikasi Warna / Jenis (Wajib untuk Barcode Baru)' : 'Ubah Klasifikasi Warna / Jenis (Opsional)' }}
               </label>
               <select v-model="detailType" class="form-select form-select-sm border-2 rounded-2" :required="hasNewBarcode">
                 <option value="">{{ hasNewBarcode ? '-- Pilih Klasifikasi --' : '-- Tetap (Tidak Ada Perubahan) --' }}</option>
@@ -54,7 +55,6 @@
                   {{ row.label }}
                 </option>
                 <option value="mutasi">Mutasi</option>
-                <option value="laku">Terjual</option>
               </select>
               <div class="form-text text-muted small mt-1">
                 <i class="bi bi-info-circle text-info me-1"></i>
@@ -110,7 +110,8 @@ import {
   parseBarcodes,
   executeBarcodeMutation,
   submitBarcodeMoveRequest,
-  checkBarcodesStatus
+  checkBarcodesStatus,
+  parseBarcodeDetails
 } from "@/services/barcode-service";
 import { getCardDetailMode } from "@/services/inventory-service";
 
@@ -118,6 +119,7 @@ const props = defineProps({
   mainCat: { type: String, default: "" },
   subDoc: { type: String, default: "" },
   subLabel: { type: String, default: "" },
+  isQuickScan: { type: Boolean, default: false },
   tableRows: { type: Array, default: () => [] },
   staffOptions: { type: Array, default: () => [] },
   keteranganOpts: { type: Array, default: () => [] },
@@ -141,27 +143,29 @@ const detailType = ref("");
 const saving = ref(false);
 const barcodeStatus = ref(null);
 
-const checkingBarcodes = ref(false);
-const hasNewBarcode = ref(false);
-const checkedBarcodesList = ref([]);
+const detectedMainCat = ref("");
 
 const barcodeCount = computed(() => {
   return parseBarcodes(barcodes.value).length;
 });
 
 const currentDetailOptions = computed(() => {
-  const detailMode = getCardDetailMode(props.mainCat);
+  const activeCat = props.isQuickScan ? detectedMainCat.value : props.mainCat;
+  if (!activeCat) return [];
+  const detailMode = getCardDetailMode(activeCat);
   if (detailMode === "color") return props.colorTypes;
   if (detailMode === "hala") return props.halaTypes;
   return [];
 });
 
 function getDetailLabel(opt) {
-  return getTypeLabel(props.mainCat, opt);
+  const activeCat = props.isQuickScan ? detectedMainCat.value : props.mainCat;
+  return getTypeLabel(activeCat, opt);
 }
 
 function getTypeLabel(mainCat, key) {
-  const detailMode = getCardDetailMode(mainCat);
+  const activeCat = props.isQuickScan ? detectedMainCat.value : mainCat;
+  const detailMode = getCardDetailMode(activeCat);
   if (detailMode === "color") return props.colorLabels[key] || key;
   if (detailMode === "hala") return props.halaLabels[key] || key;
   return key;
@@ -204,18 +208,23 @@ function getFallbackDetailType(mainCat, code) {
   return "";
 }
 
+const checkingBarcodes = ref(false);
+const hasNewBarcode = ref(false);
+const checkedBarcodesList = ref([]);
+
 // Reset modal state when triggered with a new location/category
 watch(
-  () => [props.subDoc, props.mainCat],
+  () => [props.subDoc, props.mainCat, props.isQuickScan],
   () => {
     barcodes.value = "";
-    destination.value = props.subDoc || ""; // Default to origin
+    destination.value = props.isQuickScan ? "" : (props.subDoc || "");
     petugas.value = "";
     keterangan.value = "";
     detailType.value = "";
     barcodeStatus.value = null;
     hasNewBarcode.value = false;
     checkedBarcodesList.value = [];
+    detectedMainCat.value = "";
   }
 );
 
@@ -230,6 +239,7 @@ watch(
       hasNewBarcode.value = false;
       checkedBarcodesList.value = [];
       barcodeStatus.value = null;
+      detectedMainCat.value = "";
       return;
     }
 
@@ -261,34 +271,62 @@ watch(
           checkedBarcodesList.value = res.results;
           hasNewBarcode.value = res.results.some(item => !item.exists);
 
+          let activeCategory = props.mainCat;
+
+          if (props.isQuickScan) {
+            // Resolve mainCat for each barcode
+            const categories = res.results.map(item => {
+              if (item.exists && item.category) return item.category;
+              const parsedDetails = parseBarcodeDetails(item.barcode);
+              return parsedDetails.mainCat;
+            });
+            const uniqueCategories = [...new Set(categories.filter(Boolean))];
+
+            if (uniqueCategories.length > 1) {
+              toast(`Gagal: Barcode berasal dari kategori berbeda (${uniqueCategories.join(", ")}). Harus dalam kategori yang sama!`, "warning");
+              barcodeStatus.value = `Gagal: Campuran kategori (${uniqueCategories.join(", ")}).`;
+              detectedMainCat.value = "";
+              return;
+            } else if (uniqueCategories.length === 1) {
+              detectedMainCat.value = uniqueCategories[0];
+              activeCategory = uniqueCategories[0];
+            } else {
+              detectedMainCat.value = "";
+              activeCategory = "";
+            }
+          }
+
           // 3. Deteksi jika sudah ada di lokasi tujuan
           const dest = destination.value;
-          const alreadyInDest = res.results.find(item => {
-            if (!item.exists || item.location !== dest) return false;
-            if (detailType.value && item.detailType !== detailType.value) {
-              return false;
+          if (dest) {
+            const alreadyInDest = res.results.find(item => {
+              if (!item.exists || item.location !== dest) return false;
+              if (detailType.value && item.detailType !== detailType.value) {
+                return false;
+              }
+              return true;
+            });
+            if (alreadyInDest) {
+              toast(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(activeCategory, alreadyInDest.location)})`, "warning");
+              barcodeStatus.value = `Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan.`;
+              return;
             }
-            return true;
-          });
-          if (alreadyInDest) {
-            toast(`Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan (${getTypeLabel(props.mainCat, alreadyInDest.location)})`, "warning");
-            barcodeStatus.value = `Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan.`;
-            return;
           }
 
           // 4. Deteksi ketidakcocokan kategori
-          const activeCategory = props.mainCat;
-          const mismatchedItem = res.results.find(item => item.exists && item.category && item.category !== activeCategory);
-          if (mismatchedItem) {
-            toast(`Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory}). Barcode ini terdaftar sebagai ${mismatchedItem.category}!`, "warning");
-            const cleanParsed = parsed.filter(bc => bc !== mismatchedItem.barcode);
-            barcodes.value = cleanParsed.join("\n");
-            return;
+          if (!props.isQuickScan && activeCategory) {
+            const mismatchedItem = res.results.find(item => item.exists && item.category && item.category !== activeCategory);
+            if (mismatchedItem) {
+              toast(`Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory}). Barcode ini terdaftar sebagai ${mismatchedItem.category}!`, "warning");
+              const cleanParsed = parsed.filter(bc => bc !== mismatchedItem.barcode);
+              barcodes.value = cleanParsed.join("\n");
+              return;
+            }
           }
 
           // 5. Auto-default classification
-          if (!detailType.value && parsed.length > 0) {
-            const detected = getFallbackDetailType(props.mainCat, parsed[0]);
+          if (!detailType.value && parsed.length > 0 && activeCategory) {
+            const detected = getFallbackDetailType(activeCategory, parsed[0]);
             if (detected) {
               detailType.value = detected;
             }
@@ -325,6 +363,11 @@ async function submitBarcodeUpdate() {
   const barcodesArray = parseBarcodes(barcodes.value);
   if (barcodesArray.length === 0) return toast("Tidak ada barcode yang valid", "warning");
 
+  const activeCategory = props.isQuickScan ? detectedMainCat.value : props.mainCat;
+  if (!activeCategory) {
+    return toast(props.isQuickScan ? "Silakan scan barcode terlebih dahulu dengan kategori/jenis perhiasan yang sama" : "Kategori/jenis perhiasan tidak valid", "warning");
+  }
+
   const dest = destination.value;
   const alreadyInDest = checkedBarcodesList.value.find(item => {
     if (!item.exists || item.location !== dest) return false;
@@ -337,7 +380,6 @@ async function submitBarcodeUpdate() {
     return swal(`Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan`, "warning");
   }
 
-  const activeCategory = props.mainCat;
   const mismatchedItem = checkedBarcodesList.value.find(item => item.exists && item.category && item.category !== activeCategory);
   if (mismatchedItem) {
     return swal(`Gagal: Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory})`, "warning");
@@ -368,7 +410,7 @@ async function submitBarcodeUpdate() {
           notes: keterangan.value?.trim() || "",
           floorId: props.activeFloor,
           defaultDetailType: detailType.value,
-          category: props.mainCat,
+          category: activeCategory,
           allowCategoryOverride: true
         });
       }
@@ -384,7 +426,7 @@ async function submitBarcodeUpdate() {
           notes: keterangan.value?.trim() || "",
           floorId: props.activeFloor,
           defaultDetailType: detailType.value,
-          category: props.mainCat,
+          category: activeCategory,
           allowCategoryOverride: true
         });
       }

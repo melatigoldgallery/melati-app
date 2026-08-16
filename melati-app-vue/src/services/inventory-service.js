@@ -846,5 +846,20 @@ export function subscribeBarcodeDiscrepancies(floorId, onData, onError) {
   }, onError);
 }
 
+export async function fetchDailySyncStatsByDate(floorId, dateId) {
+  if (!floorId || !dateId) throw new Error("Floor ID and Date ID are required.");
+  try {
+    const docRef = floorDoc(db, "syncDailyStats", dateId, floorId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (e) {
+    console.error("Gagal mengambil statistik sinkronisasi harian:", e);
+    throw e;
+  }
+  return null;
+}
+
 
 
