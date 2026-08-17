@@ -9,7 +9,7 @@
           </h6>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body p-4 bg-light-subtle">
+        <div class="modal-body p-4 bg-light-subtle" style="min-height: 460px;">
           <!-- Sub-tabs based on color / hala types -->
           <ul v-if="modalTabs.length > 0" class="nav nav-pills mb-3 justify-content-center scrollable-pills modal-pills">
             <li v-for="tab in modalTabs" :key="tab.key" class="nav-item">
@@ -40,11 +40,11 @@
 
           <!-- Physical locations (Barcode tracking enabled) -->
           <div v-else>
-            <div v-if="loadingBarcodes" class="text-center py-5">
+            <div v-if="loadingBarcodes && barcodes.length === 0" class="text-center py-5">
               <div class="spinner-border text-primary" role="status"></div>
               <p class="mt-2 text-muted small fw-semibold">Memuat daftar barcode...</p>
             </div>
-            <div v-else>
+            <div v-else :style="loadingBarcodes ? 'opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease;' : 'transition: opacity 0.15s ease;'">
               <!-- Control Toolbar -->
               <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <div>
@@ -317,7 +317,7 @@ function getTabBadgeStyle(tabKey) {
 function getBarcodeRowBadgeClass() {
   const detailMode = getCardDetailMode(props.mainCat);
   const activeColor = activeModalTab.value;
-  const baseClass = "monospace fw-bold fs-7 px-2.5 py-1 rounded border";
+  const baseClass = "monospace fw-bold fs-7 px-2 py-1 rounded border";
 
   if (detailMode === "color") {
     switch (activeColor) {
@@ -384,7 +384,6 @@ function selectModalTab(tabKey) {
   barcodeSearchQuery.value = "";
   pageDocs.value = [];
   currentPage.value = 1;
-  barcodes.value = [];
   hasMore.value = false;
   if (props.location !== "barang-display") {
     loadBarcodePage(1);
@@ -778,6 +777,10 @@ watch(
 .modal-header {
   background: linear-gradient(135deg, #5966e0 0%, #4c63d2 100%) !important;
   color: #fff;
+}
+.modal-dialog {
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .modal-header .btn-close {
   filter: invert(1);

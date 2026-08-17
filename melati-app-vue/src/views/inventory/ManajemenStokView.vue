@@ -382,6 +382,7 @@ import {
   updateStockItem,
   getCardDetailMode,
   subscribeBarcodeDiscrepancies,
+  verifyAndHealTabStocks,
 } from "@/services/inventory-service";
 import {
   ensureInventorySettings,
@@ -785,6 +786,35 @@ watch(
     setupDiscrepanciesSubscription();
   },
   { immediate: true }
+);
+
+// Watch activeTab to trigger background stock verification and healing
+watch(
+  () => activeTab.value,
+  async (newTab) => {
+    if (!newTab || !isBarcodeEnabled.value) return;
+
+    const floorId = auth.activeFloor;
+    if (!floorId) return;
+
+    const storageKey = `melati-stock-heal-time-${floorId}-${newTab}`;
+    const lastHealTime = localStorage.getItem(storageKey);
+    const now = Date.now();
+    const threshold = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+
+    if (!lastHealTime || now - parseInt(lastHealTime, 10) > threshold) {
+      console.log(`[Watcher] Triggering background barcode sync check for tab: ${newTab}`);
+      verifyAndHealTabStocks(floorId, newTab, stockData.value)
+        .then(() => {
+          localStorage.setItem(storageKey, String(Date.now()));
+        })
+        .catch((err) => {
+          console.error(`[Watcher Error] Failed to run background verification for ${newTab}:`, err);
+        });
+    } else {
+      console.log(`[Watcher] Verification skipped for tab: ${newTab} (last check was less than 12 hours ago)`);
+    }
+  }
 );
 
 async function refreshData() {

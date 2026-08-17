@@ -101,7 +101,7 @@
                 <th class="ps-3" style="width: 12%">Waktu</th>
                 <th style="width: 18%">Barcode</th>
                 <th style="width: 10%">Kategori</th>
-                <th>Rute Perpindahan</th>
+                <th class="text-center">Rute Perpindahan</th>
                 <th style="width: 12%">Staff</th>
                 <th style="width: 10%">Status</th>
                 <th :class="isSupervisorOnly ? 'text-start' : 'pe-3'" style="width: 15%">Catatan</th>
@@ -118,8 +118,6 @@
                     <button 
                       type="button" 
                       class="btn btn-link btn-sm p-0 monospace fw-bold text-primary text-decoration-none d-inline-flex align-items-center gap-1 align-baseline text-nowrap"
-                      data-bs-toggle="modal"
-                      data-bs-target="#bulkDetailModal"
                       @click="openBulkDetail(log)"
                     >
                       <i class="bi bi-layers text-secondary"></i>
@@ -136,7 +134,7 @@
                 <td>
                   <div class="d-flex align-items-center gap-2">
                     <span class="badge bg-secondary-subtle text-secondary border px-2 py-1 d-inline-block text-truncate text-center" style="width: 130px;">
-                      {{ getSubDocLabel(log.origin) }}
+                      {{ getSubDocLabel(log.origin === log.destination ? 'sistem_baru' : log.origin) }}
                     </span>
                     <i class="bi bi-arrow-right text-muted small flex-shrink-0"></i>
                     <span class="badge d-inline-block text-truncate text-center" :class="isStopLocation(log.destination) ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-primary-subtle text-primary border'" style="width: 130px;">
@@ -231,91 +229,7 @@
 
     <!-- Modal Detail Bulk Barcode (Teleported to body) -->
     <Teleport to="body">
-      <div class="modal fade" id="bulkDetailModal" tabindex="-1" aria-hidden="true" ref="bulkDetailModalRef">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-          <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-            <div class="modal-header py-3 bg-primary text-white border-0 d-flex justify-content-between align-items-center">
-              <h6 class="modal-title fw-bold mb-0">
-                <i class="bi bi-list-check me-2"></i>
-                Detail Perpindahan Gabungan ({{ selectedLog?.barcodes?.length || 0 }} Barang)
-              </h6>
-              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body bg-light-subtle">
-              <div v-if="selectedLog" class="mb-3">
-                <div class="row g-2 bg-light rounded-2 small">
-                  <div class="col-3"><strong>Waktu:</strong> {{ formatDate(selectedLog.timestamp) }}</div>
-                  <div class="col-3"><strong>Sales:</strong> {{ selectedLog.pemindah }}</div>
-                  <div class="col-6 text-end d-flex justify-content-end"><button 
-                      type="button" 
-                      class="btn btn-secondary  btn-sm rounded-pill px-2 py-1 d-flex align-items-center gap-2"
-                      style="font-size: 0.8rem;"
-                      @click="copyAllBarcodes"
-                      :disabled="!selectedLog?.barcodes?.length"
-                    >
-                      <i class="bi" :class="copiedAll ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
-                      <span>{{ copiedAll ? 'Copied' : 'Copy Barcode' }}</span>
-                    </button>
-                  </div>                  
-                </div>
-                <div class="row g-2 mb-3 bg-light rounded-2 small">
-                  <div class="col-3"><strong>Tujuan:</strong> {{ getSubDocLabel(selectedLog.destination) }}</div>
-                  <div class="col-4" v-if="selectedLog.notes"><strong>Catatan:</strong> {{ selectedLog.notes }}</div>
-                </div>
-                
- 
-
-                <div class="table-responsive border border-light rounded-4 shadow-sm bg-white custom-scrollbar" style="max-height: 350px; overflow-y: auto;">
-                  <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
-                    <thead class="table-secondary">
-                      <tr>
-                        <th class="ps-3" style="width: 60px;">No</th>
-                        <th>Barcode</th>
-                        <th>Detail/Warna</th>
-                        <th class="pe-3">Asal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(item, idx) in paginatedDetailBarcodes" :key="item.barcode">
-                        <td class="ps-3 text-muted">{{ (detailPage - 1) * detailPageSize + idx + 1 }}</td>
-                        <td class="monospace fw-bold text-primary">{{ item.barcode }}</td>
-                        <td>
-                          <span class="badge bg-light text-dark border">
-                            {{ item.detailType || '-' }}
-                          </span>
-                        </td>
-                        <td class="pe-3 text-muted">{{ getSubDocLabel(item.origin) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Pagination Controls client-side -->
-                <div v-if="selectedLog.barcodes.length > detailPageSize" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-light">
-                  <button
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
-                    :disabled="detailPage === 1"
-                    @click="detailPage--"
-                  >
-                    <i class="bi bi-chevron-left"></i>
-                    Sebelumnya
-                  </button>
-                  <span class="small fw-bold text-secondary">Halaman {{ detailPage }} dari {{ totalDetailPages }}</span>
-                  <button
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
-                    :disabled="detailPage >= totalDetailPages"
-                    @click="detailPage++"
-                  >
-                    Berikutnya
-                    <i class="bi bi-chevron-right"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
+      <BulkDetailModal ref="bulkDetailModalRef" />
 
       <!-- Modal Timeline Lacak Barcode (Teleported to body) -->
       <div class="modal fade" id="timelineModal" tabindex="-1" aria-hidden="true" ref="timelineModalRef">
@@ -403,6 +317,7 @@ import { db } from "@/config/firebase";
 import { useAuthStore } from "@/stores/auth";
 import { useAlert } from "@/composables/useAlert";
 import { Modal } from "bootstrap";
+import BulkDetailModal from "./BulkDetailModal.vue";
 import { revertMutationLog } from "@/services/barcode-service";
 import { subscribeInventorySettings } from "@/services/inventory-setting-service";
 
@@ -464,24 +379,6 @@ function formatCategory(cat) {
   return cat.split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
 }
 
-const selectedLog = ref(null);
-const copiedAll = ref(false);
-
-async function copyAllBarcodes() {
-  if (!selectedLog.value?.barcodes) return;
-  const barcodeList = selectedLog.value.barcodes.map(b => b.barcode).join("\n");
-  try {
-    await navigator.clipboard.writeText(barcodeList);
-    copiedAll.value = true;
-    toast("Semua barcode berhasil disalin ke clipboard", "success");
-    setTimeout(() => {
-      copiedAll.value = false;
-    }, 2000);
-  } catch (err) {
-    showError("Gagal menyalin barcode", err.message);
-  }
-}
-
 const currentPage = ref(1);
 const pageSize = ref(20);
 
@@ -494,31 +391,12 @@ const paginatedLogs = computed(() => {
   return filteredLogs.value.slice(start, start + pageSize.value);
 });
 
-const detailPage = ref(1);
-const detailPageSize = 10;
 const bulkDetailModalRef = ref(null);
-let bulkModalInstance = null;
 const timelineModalRef = ref(null);
 let timelineModalInstance = null;
 
-const totalDetailPages = computed(() => {
-  if (!selectedLog.value?.barcodes) return 0;
-  return Math.ceil(selectedLog.value.barcodes.length / detailPageSize);
-});
-
-const paginatedDetailBarcodes = computed(() => {
-  if (!selectedLog.value?.barcodes) return [];
-  const start = (detailPage.value - 1) * detailPageSize;
-  return selectedLog.value.barcodes.slice(start, start + detailPageSize);
-});
-
 function openBulkDetail(log) {
-  selectedLog.value = log;
-  detailPage.value = 1;
-  if (!bulkModalInstance && bulkDetailModalRef.value) {
-    bulkModalInstance = Modal.getOrCreateInstance(bulkDetailModalRef.value);
-  }
-  bulkModalInstance?.show();
+  bulkDetailModalRef.value?.show(log);
 }
 
 function openTimelineModal() {

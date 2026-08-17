@@ -16,6 +16,7 @@ import {
   deleteField,
   runTransaction,
   where,
+  getCountFromServer,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useWITA } from "@/composables/useWITA";
@@ -859,6 +860,90 @@ export async function fetchDailySyncStatsByDate(floorId, dateId) {
     throw e;
   }
   return null;
+}
+
+export async function repairStockItem(floorId, subDoc, mainCat, correctQty, correctDetails = null) {
+  try {
+    const ref = floorDoc(db, "stocks", subDoc, floorId);
+    const updated = {
+      quantity: correctQty,
+      lastUpdated: new Date().toISOString(),
+    };
+    if (correctDetails !== null) {
+      updated.details = correctDetails;
+    }
+    await setDoc(ref, { [mainCat]: updated }, { merge: true });
+    console.log(`[Auto-Heal Success] Updated stocks/${subDoc} for ${mainCat} to quantity ${correctQty}`);
+  } catch (err) {
+    console.error(`[Auto-Heal Error] Failed to update stocks/${subDoc} for ${mainCat}:`, err);
+  }
+}
+
+export async function verifyAndHealTabStocks(floorId, mainCat, currentStockData) {
+  if (!floorId || !mainCat) return;
+
+  const detailMode = getCardDetailMode(mainCat);
+  const hasDetails = detailMode === "color" || detailMode === "hala";
+  const subTypes = detailMode === "color" ? getDynamicColorTypes() : (detailMode === "hala" ? getDynamicHalaTypes() : []);
+  const physicalLocations = ["brankas", "posting", "barang-rusak", "batu-lepas", "manual", "admin", "DP", "lainnya"];
+
+  console.log(`[Verification] Starting background check for category: ${mainCat} on floor: ${floorId}`);
+
+  for (const loc of physicalLocations) {
+    try {
+      const existingNode = currentStockData[loc]?.[mainCat];
+      const existingQty = existingNode ? (parseInt(existingNode.quantity, 10) || 0) : 0;
+      const existingDetails = existingNode?.details || {};
+
+      if (!hasDetails) {
+        // Simple category: Cincin, Anting, etc.
+        const q = query(
+          collection(db, "floors", floorId, "barcodes"),
+          where("category", "==", mainCat),
+          where("location", "==", loc)
+        );
+        const countSnap = await getCountFromServer(q);
+        const serverCount = countSnap.data().count;
+
+        if (serverCount !== existingQty) {
+          console.warn(`[Discrepancy Detected] Location: ${loc}, Category: ${mainCat}. Stocks doc: ${existingQty}, Barcodes: ${serverCount}. Healing...`);
+          await repairStockItem(floorId, loc, mainCat, serverCount);
+        }
+      } else {
+        // Typed category: Kalung, Liontin, Hala, etc.
+        const serverDetails = {};
+        let totalServerCount = 0;
+        let detailsChanged = false;
+
+        for (const type of subTypes) {
+          const q = query(
+            collection(db, "floors", floorId, "barcodes"),
+            where("category", "==", mainCat),
+            where("location", "==", loc),
+            where("detailType", "==", type)
+          );
+          const countSnap = await getCountFromServer(q);
+          const serverCount = countSnap.data().count;
+
+          serverDetails[type] = serverCount;
+          totalServerCount += serverCount;
+
+          if (serverCount !== (parseInt(existingDetails[type], 10) || 0)) {
+            detailsChanged = true;
+          }
+        }
+
+        const qtyChanged = totalServerCount !== existingQty;
+
+        if (qtyChanged || detailsChanged) {
+          console.warn(`[Discrepancy Detected] Location: ${loc}, Category: ${mainCat}. Stocks doc: ${existingQty}, Barcodes: ${totalServerCount}. Details changed: ${detailsChanged}. Healing...`);
+          await repairStockItem(floorId, loc, mainCat, totalServerCount, serverDetails);
+        }
+      }
+    } catch (e) {
+      console.error(`[Verification Error] Failed checking location ${loc} for ${mainCat}:`, e);
+    }
+  }
 }
 
 

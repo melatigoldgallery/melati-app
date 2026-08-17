@@ -124,7 +124,7 @@
               BELI / TUKAR TAMBAH (B-C)
             </div>
             <div class="summary-label text-muted small mb-1" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px;">BELUM DILAYANI</div>
-            <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedBeliCount }} <span class="summary-unit">orang</span></div>
+            <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedBeliCount }} <span class="summary-unit">Customer</span></div>
           </div>
         </div>
 
@@ -254,7 +254,7 @@
               JUAL / SERVIS (A)
             </div>
             <div class="summary-label text-muted small mb-1" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px;">BELUM DILAYANI</div>
-            <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedJualCount }} <span class="summary-unit">orang</span></div>
+            <div class="summary-value" style="font-size: 2.1rem; font-weight: 800;">{{ unservedJualCount }} <span class="summary-unit">Customer</span></div>
           </div>
         </div>
 

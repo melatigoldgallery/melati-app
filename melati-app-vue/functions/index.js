@@ -1766,7 +1766,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
       barcode: info.id,
       category: info.category,
       detailType: info.detailType || null,
-      origin: info.resolvedOrigin,
+      origin: info.exists ? info.resolvedOrigin : "sistem_baru",
     })),
     destination,
     pemindah: petugas,
@@ -1780,7 +1780,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     logData.barcode = barcodeDetails[0].id;
     logData.category = barcodeDetails[0].category;
     logData.detailType = barcodeDetails[0].detailType || null;
-    logData.origin = barcodeDetails[0].resolvedOrigin;
+    logData.origin = barcodeDetails[0].exists ? barcodeDetails[0].resolvedOrigin : "sistem_baru";
   } else {
     logData.barcode = `GABUNGAN (${barcodeDetails.length} BARANG)`;
     logData.category = barcodeDetails[0].category; // Transactions are always per-category
@@ -1788,7 +1788,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
     const uniqueTypes = [...new Set(barcodeDetails.map(info => info.detailType).filter(Boolean))];
     logData.detailType = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
 
-    const uniqueOrigins = [...new Set(barcodeDetails.map(info => info.resolvedOrigin))];
+    const uniqueOrigins = [...new Set(barcodeDetails.map(info => info.exists ? info.resolvedOrigin : "sistem_baru"))];
     logData.origin = uniqueOrigins.length === 1 ? uniqueOrigins[0] : "MIXED";
   }
 
@@ -1824,7 +1824,7 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
           detailType: info.detailType || info.oldDetailType || ""
         }));
 
-        const historyOrigin = diffQty < 0 ? loc : (relevantBarcodes[0]?.resolvedOrigin || "any");
+        const historyOrigin = diffQty < 0 ? loc : (relevantBarcodes[0]?.exists ? relevantBarcodes[0].resolvedOrigin : "sistem_baru");
         const historyDest = destination;
 
         updatedCategory.history.unshift({

@@ -9,7 +9,7 @@
           </h6>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body p-4 bg-light-subtle">
+        <div class="modal-body p-4 bg-light-subtle" style="min-height: 460px;">
           <div v-if="filteredHistoryList.length === 0" class="text-center text-muted py-5">
             <i class="bi bi-journal-x fs-2 d-block mb-2 opacity-50"></i>
             <span>Belum ada riwayat update untuk lokasi ini.</span>
@@ -66,11 +66,13 @@
                           {{ getBarcodeKey(bc) }}
                         </span>
                         <span 
-                          v-if="h.barcodes.length > 5" 
+                          v-if="(h.totalBarcodesCount || h.barcodes.length) > 5" 
                           class="badge bg-secondary-subtle text-secondary border fw-semibold"
-                          style="font-size: 0.7rem;"
+                          style="font-size: 0.7rem; cursor: pointer;"
+                          @click="handleShowBulkDetail(h)"
+                          title="Lihat Detail Perpindahan Gabungan"
                         >
-                          +{{ h.barcodes.length - 5 }} lagi
+                          +{{ (h.totalBarcodesCount || h.barcodes.length) - 5 }} lagi
                         </span>
                       </div>
                     </td>
@@ -89,6 +91,7 @@
         </div>
       </div>
     </div>
+    <BulkDetailModal ref="bulkDetailModalRef" />
   </div>
 </template>
 
@@ -97,6 +100,9 @@ import { ref, watch, computed } from "vue";
 import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { getCardDetailMode } from "@/services/inventory-service";
+import BulkDetailModal from "@/components/inventory/barcode-tracking/BulkDetailModal.vue";
+
+const bulkDetailModalRef = ref(null);
 
 const props = defineProps({
   mainCat: { type: String, default: "" },
@@ -316,13 +322,53 @@ function findMatchedMutationLog(h) {
 
 function getHistoryFlow(h) {
   if (h.origin && h.destination) {
-    return `${getSubDocLabel(h.origin)} → ${getSubDocLabel(h.destination)}`;
+    const origin = h.origin === h.destination ? "sistem_baru" : h.origin;
+    return `${getSubDocLabel(origin)} → ${getSubDocLabel(h.destination)}`;
   }
   const matched = findMatchedMutationLog(h);
   if (matched) {
-    return `${getSubDocLabel(matched.origin)} → ${getSubDocLabel(matched.destination)}`;
+    const origin = matched.origin === matched.destination ? "sistem_baru" : matched.origin;
+    return `${getSubDocLabel(origin)} → ${getSubDocLabel(matched.destination)}`;
   }
   return "";
+}
+
+async function handleShowBulkDetail(h) {
+  if (!h.barcodes || !h.barcodes.length) return;
+  let matched = findMatchedMutationLog(h);
+  if (!matched) {
+    isFetchingLogs.value = true;
+    try {
+      const firstBc = getBarcodeKey(h.barcodes[0]);
+      const q = query(
+        collection(db, "floors", props.activeFloor, "barcodeMutationLogs"),
+        where("barcodeIds", "array-contains", firstBc),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        matched = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      }
+    } catch (e) {
+      console.warn("Gagal mengambil detail mutasi:", e);
+    } finally {
+      isFetchingLogs.value = false;
+    }
+  }
+
+  if (matched) {
+    bulkDetailModalRef.value?.show(matched);
+  } else {
+    const mockLog = {
+      timestamp: h.date,
+      pemindah: h.petugas || "Staff",
+      origin: h.origin || props.subLabel,
+      destination: h.destination || props.subLabel,
+      notes: h.keterangan || "",
+      barcodes: h.barcodes
+    };
+    bulkDetailModalRef.value?.show(mockLog);
+  }
 }
 
 // Watcher to fetch mutation logs from Firestore on history list load
@@ -369,6 +415,10 @@ watch(
 .modal-header {
   background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%) !important;
   color: #fff;
+}
+.modal-dialog {
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .modal-header .btn-close {
   filter: invert(1);
