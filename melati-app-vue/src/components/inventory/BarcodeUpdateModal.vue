@@ -1,5 +1,5 @@
 <template>
-  <div class="modal fade" id="barcodeUpdateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="barcodeUpdateModal" ref="modalRef" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg rounded-3">
         <form @submit.prevent="submitBarcodeUpdate" @keydown.enter="handleBarcodeFormEnter">
@@ -103,7 +103,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { Modal } from "bootstrap";
 import { useAlert } from "@/composables/useAlert";
 import {
@@ -136,6 +136,7 @@ const emit = defineEmits(["success"]);
 const { toast, error: showError, swal } = useAlert();
 
 const barcodes = ref("");
+const modalRef = ref(null);
 const destination = ref("");
 const petugas = ref("");
 const keterangan = ref("");
@@ -446,6 +447,30 @@ async function submitBarcodeUpdate() {
     saving.value = false;
   }
 }
+
+const handleModalHidden = () => {
+  barcodes.value = "";
+  destination.value = props.isQuickScan ? "" : (props.subDoc || "");
+  petugas.value = "";
+  keterangan.value = "";
+  detailType.value = "";
+  barcodeStatus.value = null;
+  hasNewBarcode.value = false;
+  checkedBarcodesList.value = [];
+  detectedMainCat.value = "";
+};
+
+onMounted(() => {
+  if (modalRef.value) {
+    modalRef.value.addEventListener("hidden.bs.modal", handleModalHidden);
+  }
+});
+
+onUnmounted(() => {
+  if (modalRef.value) {
+    modalRef.value.removeEventListener("hidden.bs.modal", handleModalHidden);
+  }
+});
 </script>
 
 <style scoped>
