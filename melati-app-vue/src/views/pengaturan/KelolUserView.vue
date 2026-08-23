@@ -288,7 +288,7 @@ const PERMISSION_GROUPS = {
   toko: [
     { key: "profil", label: "Profil Toko" },
     { key: "sop", label: "SOP Operasional" },
-    { key: "layanan", label: "Layanan & Ongkos" },
+    { key: "layanan", label: "Informasi Operasional" },
   ],
   admin: [
     { key: "kelola-user", label: "Kelola User" },

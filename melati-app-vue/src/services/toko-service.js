@@ -120,6 +120,7 @@ export async function saveStoreSOP(payload, updatedBy = "System") {
     staffSOP: payload.staffSOP || "",
     goldKnowledge: payload.goldKnowledge || "",
     diamondKnowledge: payload.diamondKnowledge || "",
+    opsSOP: payload.opsSOP || "",
     migratedFromL2: true,
     lastUpdated: now,
     updatedBy: updatedBy || auth.currentUser?.email || "System",

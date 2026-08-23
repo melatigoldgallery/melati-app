@@ -149,7 +149,7 @@ export const menuStructure = [
     children: [
       { label: "Profil Toko", to: "/toko/profil", pageKey: "toko.profil", roles: ALL },
       { label: "SOP Operasional", to: "/toko/sop", pageKey: "toko.sop", roles: ALL },
-      { label: "Layanan & Ongkos", to: "/toko/layanan", pageKey: "toko.layanan", roles: ALL },
+      { label: "Informasi Operasional", to: "/toko/informasi-operasional", pageKey: "toko.layanan", roles: ALL },
     ],
   },
   {

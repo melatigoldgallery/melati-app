@@ -5,7 +5,7 @@
       <div>
         <h1 class="page-title d-flex align-items-center gap-2">
           <i class="bi bi-wrench-adjustable-circle text-gold"></i>
-          Layanan &amp; Ongkos Toko
+          Informasi Toko
         </h1>
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb mb-0">
@@ -33,7 +33,10 @@
             v-for="tab in tabs"
             :key="tab.id"
             class="btn tab-btn px-4 py-2.5 fw-bold d-flex align-items-center gap-2 transition-all text-nowrap"
-            :class="activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg'"
+            :class="[
+              activeTab === tab.id ? 'active-tab shadow-sm' : 'text-secondary hover-bg',
+              { 'd-none': tab.id === 'bisa' || tab.id === 'tidak_bisa' }
+            ]"
             @click="activeTab = tab.id"
           >
             <i :class="['bi', tab.icon]"></i>
@@ -53,8 +56,59 @@
 
         <template v-else>
           <transition name="tab-fade" mode="out-in">
-            <!-- TAB 1: ONGKOS SERVIS -->
-            <div v-if="activeTab === 'ongkos'" key="ongkos" class="tab-pane-content">
+            <!-- TAB 1: INFORMASI OPERASIONAL -->
+            <div v-if="activeTab === 'ops'" key="ops" class="tab-pane-content">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
+                <div>
+                  <h5 class="fw-extrabold text-dark mb-1 text-nowrap">
+                    <i class="bi bi-journal-check text-gold me-2"></i>Alur Kerja Harian & Informasi Operasional
+                  </h5>
+                  <p class="text-muted small mb-0">Ketentuan harian yang menjadi patokan staf untuk melakukan pekerjaan setiap hari.</p>
+                </div>
+                <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-between justify-content-md-end ms-0 ms-md-auto">
+                  <!-- Search Input -->
+                  <div v-if="!editingStateOps" class="input-group input-group-sm position-relative flex-grow-1 flex-md-grow-0 search-input-container">
+                    <span class="input-group-text bg-transparent border-end-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                    <input
+                      v-model="searchQueryOps"
+                      type="text"
+                      class="form-control border-start-0 ps-2 form-control-sm border-gold-subtle rounded-end-pill pe-5 search-input-custom"
+                      placeholder="Cari Topik..."
+                    />
+                    <button v-if="searchQueryOps" class="btn btn-link text-muted border-0 p-1 px-2 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQueryOps = ''">
+                      <i class="bi bi-x fs-6"></i>
+                    </button>
+                  </div>
+                  <!-- Edit Button -->
+                  <button
+                    v-if="canEdit"
+                    class="btn btn-sm btn-outline-gold px-3 d-flex align-items-center gap-1 rounded-pill text-nowrap btn-edit-responsive d-none d-md-flex"
+                    @click="toggleEditOps"
+                  >
+                    <i :class="['bi', editingStateOps ? 'bi-eye' : 'bi-pencil-square']"></i>
+                    {{ editingStateOps ? 'Selesai Edit' : 'Edit' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Text Area Editor (Supervisor) -->
+              <div v-if="editingStateOps" class="mb-3">
+                <textarea v-model="formOpsSOP" class="form-control font-monospace mb-2" rows="18"></textarea>
+                <div class="d-flex justify-content-end gap-2">
+                  <button class="btn btn-secondary btn-sm px-3" @click="cancelEditOps">Batal</button>
+                  <button class="btn btn-gold btn-sm px-3" :disabled="saving" @click="saveOpsSOP">
+                    <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                    Simpan
+                  </button>
+                </div>
+              </div>
+
+              <!-- Display Content (Structured Cards Layout) -->
+              <div v-else class="content-preview" v-html="parsedOpsSOP"></div>
+            </div>
+
+            <!-- TAB 2: ONGKOS SERVIS -->
+            <div v-else-if="activeTab === 'ongkos'" key="ongkos" class="tab-pane-content">
               <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
                 <div>
                   <h5 class="fw-extrabold text-dark mb-1">
@@ -108,7 +162,7 @@
                       <div class="pt-2 border-top border-light-subtle d-flex align-items-center justify-content-between">
                         <div>
                           <span class="text-muted d-block" style="font-size: 0.7rem;">Ongkos</span>
-                          <span class="service-cost fw-extrabold text-gold">Rp {{ formatNumber(item.cost) }}</span>
+                          <span class="service-cost fw-extrabold text-gold">{{ item.cost == 0 ? 'Free' : 'Rp ' + formatNumber(item.cost) }}</span>
                         </div>
                       </div>
                     </div>
@@ -145,7 +199,7 @@
 
             <!-- TAB 2: BARANG BISA DISERVIS -->
             <div v-else-if="activeTab === 'bisa'" key="bisa" class="tab-pane-content">
-              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3"> 
                 <div>
                   <h5 class="fw-extrabold text-dark mb-1">
                     <i class="bi bi-check-circle-fill text-success me-2"></i>Barang Bisa Diservis
@@ -222,7 +276,7 @@
                       <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
                         <div>
                           <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
-                          <p class="text-secondary small mb-3">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
+                          <p class="text-secondary small mb-3" style="white-space: pre-line;">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
                         </div>
                         <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
                           <div>
@@ -266,7 +320,7 @@
                               </button>
                             </div>
                           </div>
-                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3;">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
+                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3; white-space: pre-line;">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
                         </div>
                         <div class="d-flex justify-content-between align-items-end pt-1 border-top border-light-subtle">
                           <div>
@@ -387,7 +441,7 @@
                       <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
                         <div>
                           <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
-                          <p class="text-secondary small mb-3">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
+                          <p class="text-secondary small mb-3" style="white-space: pre-line;">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
                         </div>
                         <div v-if="canEdit" class="pt-3 border-top border-light d-flex justify-content-end align-items-center gap-2">
                           <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="openEditTidakBisaModal(item)" title="Edit">
@@ -425,7 +479,7 @@
                               </button>
                             </div>
                           </div>
-                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3;">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
+                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3; white-space: pre-line;">{{ item.reason || 'Tidak ada keterangan tambahan.' }}</p>
                         </div>
                         <div class="d-flex justify-content-between align-items-end pt-1 border-top border-light-subtle">
                           <div>
@@ -457,6 +511,171 @@
                       </li>
                       <li class="page-item" :class="{ disabled: currentPageTidakBisa === totalPagesTidakBisa }">
                         <a class="page-link" href="#" @click.prevent="currentPageTidakBisa++">
+                          <i class="bi bi-chevron-right"></i>
+                        </a>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              </template>
+            </div>
+
+            <!-- TAB 5: ONGKOS CUSTOM -->
+            <div v-else-if="activeTab === 'custom'" key="custom" class="tab-pane-content">
+              <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-3">
+                <div>
+                  <h5 class="fw-extrabold text-dark mb-1">
+                    <i class="bi bi-hammer text-gold me-2"></i>Ongkos Custom
+                  </h5>
+                  <p class="text-muted small mb-0">Contoh estimasi biaya pembuatan / custom perhiasan berdasarkan model dan tingkat kerumitan.</p>
+                </div>
+                <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 w-100 w-md-auto justify-content-md-end">
+                  <div class="d-flex gap-2 flex-grow-1 flex-md-grow-0">
+                    <!-- Search Input -->
+                    <div class="input-group position-relative shadow-sm rounded-pill flex-grow-1" style="max-width: 240px; height: 38px;">
+                      <span class="input-group-text bg-white border-0 text-muted rounded-start-pill"><i class="bi bi-search"></i></span>
+                      <input
+                        v-model="searchQueryCustom"
+                        type="text"
+                        class="form-control border-0 ps-1 rounded-end-pill pe-5 search-input-custom bg-white"
+                        style="height: 38px; font-size: 0.9rem;"
+                        placeholder="Cari barang..."
+                      />
+                      <button v-if="searchQueryCustom" class="btn btn-link text-muted border-0 p-1 px-2.5 position-absolute end-0 top-50 translate-middle-y z-3" @click="searchQueryCustom = ''">
+                        <i class="bi bi-x fs-5"></i>
+                      </button>
+                    </div>
+
+                    <!-- Filter Dropdown -->
+                    <div class="dropdown-custom-container position-relative flex-grow-1" style="max-width: 160px;">
+                      <button type="button" class="form-select soft-select shadow-sm d-flex align-items-center justify-content-between ps-3 gap-2 w-100" style="height: 38px; text-align: left;" @click.stop="isOpenCustom = !isOpenCustom">
+                        <span class="text-truncate d-inline-block" style="max-width: 80px;">{{ getJenisLabel(filterJenisCustom) || 'Semua Jenis' }}</span>
+                      </button>
+                      <transition name="dropdown-fade">
+                        <ul v-if="isOpenCustom" class="custom-dropdown-menu shadow border-0 py-2 position-absolute start-0 mt-2 z-3 rounded-3 list-unstyled m-0">
+                          <li class="px-3 py-2 dropdown-item-custom" :class="{ active: filterJenisCustom === '' }" @click="selectJenisCustom('')">Semua Jenis</li>
+                          <li v-for="opt in jenisOptions" :key="opt.value" class="px-3 py-2 dropdown-item-custom" :class="{ active: filterJenisCustom === opt.value }" @click="selectJenisCustom(opt.value)">
+                            {{ opt.label }}
+                          </li>
+                        </ul>
+                      </transition>
+                    </div>
+                  </div>
+                  <button v-if="canEdit" class="btn btn-gold btn-add-responsive px-3 d-flex align-items-center gap-2" style="height: 38px" @click="openAddCustomModal">
+                    <i class="bi bi-plus-circle"></i> Tambah Informasi
+                  </button>
+                </div>
+              </div>
+
+              <!-- Case 1: Belum ada data di database -->
+              <div v-if="!data.barangCustomServis?.length" class="text-center py-5 border rounded-4 bg-light shadow-sm">
+                <i class="bi bi-info-circle fs-1 text-gold-subtle d-block mb-3"></i>
+                <h6 class="fw-bold text-secondary">Belum ada data informasi barang custom</h6>
+                <p class="text-muted small mb-0">Klik tombol "Tambah Informasi" untuk menambahkan data baru.</p>
+              </div>
+
+              <!-- Case 2: Ada data, tapi tidak cocok dengan filter pencarian -->
+              <div v-else-if="!filteredCustom.length" class="text-center py-5 border rounded-4 bg-light shadow-sm">
+                <i class="bi bi-search fs-1 text-gold-subtle d-block mb-3"></i>
+                <h6 class="fw-bold text-secondary">Tidak ada data barang untuk jenis "{{ getJenisLabel(filterJenisCustom) }}"</h6>
+                <p class="text-muted small mb-0">Coba pilih filter jenis lainnya.</p>
+              </div>
+
+              <!-- Case 3: Grid Loop -->
+              <template v-else>
+                <!-- Desktop view (hidden on mobile) -->
+                <div class="d-none d-sm-flex row row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+                  <div v-for="item in paginatedCustom" :key="item.id" class="col">
+                    <div class="card repair-card h-100 border-0 shadow-sm rounded-4 overflow-hidden interactive-card d-flex flex-column">
+                      <div class="position-relative repair-image-wrapper bg-light d-flex align-items-center justify-content-center" :style="item.imageUrl ? 'cursor: pointer;' : ''" @click="item.imageUrl && showLargeImage(item.imageUrl)">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="img-fluid repair-image w-100 h-100 object-fit-cover" />
+                        <div v-else class="text-center text-muted p-5">
+                          <i class="bi bi-image fs-1 text-gold-subtle d-block mb-2"></i>
+                          <span class="small text-secondary">Belum ada foto</span>
+                        </div>
+                        <span class="badge bg-success position-absolute top-3 start-3 px-3 py-1.5 rounded-pill shadow-sm"><i class="bi bi-check2"></i> Custom Servis</span>
+                        <span v-if="item.jenis" class="badge bg-dark-glass position-absolute bottom-0 start-0 m-2 px-2 py-1 rounded text-capitalize image-overlay-badge">Jenis: {{ item.jenis }}</span>
+                      </div>
+                      <div class="card-body p-4 d-flex flex-column justify-content-between flex-grow-1">
+                        <div>
+                          <h6 class="fw-extrabold text-dark mb-2">{{ item.name }}</h6>
+                          <p class="text-secondary small mb-3" style="white-space: pre-line;">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
+                        </div>
+                        <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
+                          <div>
+                            <span class="text-muted small d-block">Ongkos Custom</span>
+                            <span class="fw-bold text-gold">{{ item.cost || '-' }}</span>
+                          </div>
+                          <div v-if="canEdit" class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="openEditCustomModal(item)" title="Edit">
+                              <i class="bi bi-pencil-fill small"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px" @click="deleteCustomItem(item)" title="Hapus">
+                              <i class="bi bi-trash-fill small"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Mobile view (hidden on desktop) -->
+                <div class="d-flex d-sm-none flex-column gap-3">
+                  <div v-for="item in paginatedCustom" :key="item.id" class="card repair-card-mobile border-0 shadow-sm rounded-4 overflow-hidden p-3 position-relative">
+                    <div class="d-flex gap-3">
+                      <div class="repair-image-wrapper-mobile bg-light rounded-3 overflow-hidden flex-shrink-0" :style="{ width: '85px', height: '85px', cursor: item.imageUrl ? 'pointer' : 'default' }" @click="item.imageUrl && showLargeImage(item.imageUrl)">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="w-100 h-100 object-fit-cover" />
+                        <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                          <i class="bi bi-image fs-4 text-gold-subtle"></i>
+                        </div>
+                      </div>
+                      <div class="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
+                        <div class="w-100 min-w-0">
+                          <div class="d-flex justify-content-between align-items-start gap-1">
+                            <h6 class="fw-extrabold text-dark mb-1 text-wrap flex-grow-1 min-w-0" style="font-size: 0.95rem;">{{ item.name }}</h6>
+                            <div v-if="canEdit" class="d-flex gap-1 flex-shrink-0 ms-auto">
+                              <button class="btn btn-link text-primary p-0 border-0" @click="openEditCustomModal(item)" title="Edit">
+                                <i class="bi bi-pencil-square fs-6"></i>
+                              </button>
+                              <button class="btn btn-link text-danger p-0 border-0 ms-2" @click="deleteCustomItem(item)" title="Hapus">
+                                <i class="bi bi-trash fs-6"></i>
+                              </button>
+                            </div>
+                          </div>
+                          <p class="text-secondary small mb-2 text-truncate-2" style="font-size: 0.78rem; line-height: 1.3; white-space: pre-line;">{{ item.description || 'Tidak ada deskripsi tambahan.' }}</p>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-end pt-1 border-top border-light-subtle">
+                          <div>
+                            <span class="text-muted d-block" style="font-size: 0.7rem;">Estimasi Ongkos</span>
+                            <span class="fw-bold text-gold small">{{ item.cost || '-' }}</span>
+                          </div>
+                          <span v-if="item.jenis" class="badge bg-gold-light text-gold text-capitalize px-2 py-1 rounded" style="font-size: 0.7rem;">{{ item.jenis }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pagination Custom -->
+                <div v-if="totalPagesCustom > 1" class="d-flex justify-content-center mt-4">
+                  <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                      <li class="page-item" :class="{ disabled: currentPageCustom === 1 }">
+                        <a class="page-link" href="#" @click.prevent="currentPageCustom--">
+                          <i class="bi bi-chevron-left"></i>
+                        </a>
+                      </li>
+                      <li
+                        v-for="page in totalPagesCustom"
+                        :key="page"
+                        class="page-item"
+                        :class="{ active: currentPageCustom === page }"
+                      >
+                        <a class="page-link" href="#" @click.prevent="currentPageCustom = page">{{ page }}</a>
+                      </li>
+                      <li class="page-item" :class="{ disabled: currentPageCustom === totalPagesCustom }">
+                        <a class="page-link" href="#" @click.prevent="currentPageCustom++">
                           <i class="bi bi-chevron-right"></i>
                         </a>
                       </li>
@@ -562,6 +781,7 @@
                 </div>
               </div>
             </div>
+
           </transition>
         </template>
       </div>
@@ -747,6 +967,78 @@
       </div>
     </div>
 
+    <!-- MODAL 5: CRUD BARANG CUSTOM SERVIS -->
+    <div class="modal fade" id="customModal" ref="customModalRef" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+          <div class="modal-header border-bottom border-light">
+            <h5 class="modal-title fw-extrabold text-dark">{{ editingId ? 'Edit Info Barang Custom' : 'Tambah Info Barang Custom' }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form @submit.prevent="saveCustom">
+            <div class="modal-body py-3">
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Nama Barang / Masalah</label>
+                <input v-model="formCustom.name" type="text" class="form-control" placeholder="Contoh: Custom Cincin Nama" required />
+              </div>
+              <div class="mb-3 dropdown-form-custom-container position-relative">
+                <label class="form-label small fw-bold text-secondary">Jenis Barang</label>
+                <div class="position-relative">
+                  <button type="button" class="form-select soft-select w-100 d-flex align-items-center justify-content-between text-start" style="height: 38px;" @click.stop="isOpenFormCustom = !isOpenFormCustom">
+                    <span :class="formCustom.jenis ? 'text-capitalize text-dark' : 'text-muted'">
+                      {{ getJenisLabel(formCustom.jenis) || 'Pilih jenis barang...' }}
+                    </span>
+                  </button>
+                  <transition name="dropdown-fade">
+                    <ul v-if="isOpenFormCustom" class="custom-dropdown-menu shadow border-0 py-2 position-absolute start-0 mt-1 z-3 rounded-3 list-unstyled m-0" style="max-height: 200px; overflow-y: auto;">
+                      <li v-for="opt in jenisOptions" :key="opt.value" class="px-3 py-2 dropdown-item-custom" :class="{ active: formCustom.jenis === opt.value }" @click="selectFormCustom(opt.value)">
+                        {{ opt.label }}
+                      </li>
+                    </ul>
+                  </transition>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Deskripsi Custom</label>
+                <textarea v-model="formCustom.description" class="form-control" rows="3" placeholder="Jelaskan detail custom..."></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">Ongkos</label>
+                <input v-model="formCustom.cost" type="text" class="form-control" placeholder="Contoh: Rp 1.000.000 - Rp 2.000.0000" required />
+              </div>
+              <div class="mb-2">
+                <label class="form-label small fw-bold text-secondary">Contoh Gambar</label>
+                <div class="d-flex align-items-center gap-3">
+                  <div class="upload-preview bg-light border rounded d-flex align-items-center justify-content-center overflow-hidden" style="width: 80px; height: 80px">
+                    <img v-if="imagePreview" :src="imagePreview" class="img-fluid object-fit-cover w-100 h-100" />
+                    <img v-else-if="formCustom.imageUrl" :src="formCustom.imageUrl" class="img-fluid object-fit-cover w-100 h-100" />
+                    <i v-else class="bi bi-image text-muted fs-3"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <input type="file" ref="fileInputCustom" class="form-control form-control-sm" accept="image/*" @change="handleFileChange" />
+                    <span class="small text-muted d-block" style="font-size: 0.72rem">Format: JPG, PNG. Maks: 3MB.</span>
+                    <button v-if="imagePreview || formCustom.imageUrl" type="button" class="btn btn-sm btn-outline-danger mt-1.5 px-2 py-0.5 rounded" style="font-size: 0.75rem;" @click="clearPhotoCustom">
+                      <i class="bi bi-trash me-1"></i> Hapus Foto
+                    </button>
+                  </div>
+                </div>
+                <div v-if="uploadProgress > 0" class="progress mt-2" style="height: 6px">
+                  <div class="progress-bar bg-gold" role="progressbar" :style="{ width: uploadProgress + '%' }"></div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer border-top border-light">
+              <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+              <button type="submit" class="btn btn-gold px-4" :disabled="saving">
+                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                Simpan
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL 4: CRUD HARGA AKSESORIS -->
     <div class="modal fade" id="aksesorisModal" ref="aksesorisModalRef" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -786,11 +1078,13 @@
     <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-transparent border-0">
-          <div class="modal-body p-0 text-center position-relative">
-            <button type="button" class="btn btn-dark position-absolute top-0 end-0 m-3 shadow-lg rounded-circle d-flex align-items-center justify-content-center" data-bs-dismiss="modal" aria-label="Close" style="width: 36px; height: 36px; z-index: 1055; padding: 0;">
-              <i class="bi bi-x fs-3 text-white"></i>
-            </button>
-            <img :src="previewModalImageUrl" class="img-fluid rounded-4 shadow-lg" style="max-height: 85vh; object-fit: contain;" />
+          <div class="modal-body p-0 text-center">
+            <div class="position-relative d-inline-block">
+              <button type="button" class="btn btn-dark position-absolute top-0 end-0 m-3 shadow-lg rounded-circle d-flex align-items-center justify-content-center" data-bs-dismiss="modal" aria-label="Close" style="width: 36px; height: 36px; z-index: 1055; padding: 0;">
+                <i class="bi bi-x fs-3 text-white"></i>
+              </button>
+              <img :src="previewModalImageUrl" class="img-fluid rounded-4 shadow-lg" style="max-height: 85vh; object-fit: contain;" />
+            </div>
           </div>
         </div>
       </div>
@@ -809,6 +1103,7 @@ import {
   uploadLayananImage,
   deleteLayananImage
 } from "@/services/layanan-toko-service";
+import { fetchStoreSOP } from "@/services/toko-service";
 
 const auth = useAuthStore();
 const { error: showError, confirm: confirmAlert, success: showSuccess } = useAlert();
@@ -817,12 +1112,14 @@ const { error: showError, confirm: confirmAlert, success: showSuccess } = useAle
 const loading = ref(true);
 const saving = ref(false);
 const uploadProgress = ref(0);
-const activeTab = ref("ongkos");
+const activeTab = ref("ops");
 
 const tabs = [
+  { id: "ops", label: "Informasi Operasional", icon: "bi-journal-check" },
   { id: "ongkos", label: "Ongkos Servis", icon: "bi-tag-fill" },
   { id: "bisa", label: "Barang Bisa Servis", icon: "bi-check-circle-fill" },
   { id: "tidak_bisa", label: "Barang Tidak Bisa Servis", icon: "bi-x-circle-fill" },
+  { id: "custom", label: "Ongkos Custom", icon: "bi-hammer" },
   { id: "aksesoris", label: "Harga Aksesoris", icon: "bi-gem" }
 ];
 
@@ -831,7 +1128,9 @@ const data = ref({
   ongkosServis: [],
   barangBisaServis: [],
   barangTidakBisaServis: [],
-  hargaAksesoris: []
+  barangCustomServis: [],
+  hargaAksesoris: [],
+  opsSOP: ""
 });
 
 const meta = ref({
@@ -845,13 +1144,20 @@ const canEdit = computed(() => ["supervisor", "hrd", "admin", "admin_custom"].in
 // Filter & Categories Options
 const filterJenisBisa = ref("");
 const filterJenisTidakBisa = ref("");
+const filterJenisCustom = ref("");
 const searchQueryOngkos = ref("");
 const searchQueryBisa = ref("");
 const searchQueryTidakBisa = ref("");
+const searchQueryCustom = ref("");
+const searchQueryOps = ref("");
 const isOpenBisa = ref(false);
 const isOpenTidakBisa = ref(false);
+const isOpenCustom = ref(false);
 const isOpenFormBisa = ref(false);
 const isOpenFormTidakBisa = ref(false);
+const isOpenFormCustom = ref(false);
+const editingStateOps = ref(false);
+const formOpsSOP = ref("");
 
 const jenisOptions = [
   { value: "kalung", label: "Kalung" },
@@ -869,6 +1175,21 @@ const filteredBisa = computed(() => {
   }
   if (searchQueryBisa.value.trim()) {
     const q = searchQueryBisa.value.toLowerCase().trim();
+    list = list.filter(item => 
+      item.name.toLowerCase().includes(q) || 
+      (item.description && item.description.toLowerCase().includes(q))
+    );
+  }
+  return list;
+});
+
+const filteredCustom = computed(() => {
+  let list = data.value.barangCustomServis || [];
+  if (filterJenisCustom.value) {
+    list = list.filter(item => item.jenis === filterJenisCustom.value);
+  }
+  if (searchQueryCustom.value.trim()) {
+    const q = searchQueryCustom.value.toLowerCase().trim();
     list = list.filter(item => 
       item.name.toLowerCase().includes(q) || 
       (item.description && item.description.toLowerCase().includes(q))
@@ -895,6 +1216,12 @@ function selectJenisTidakBisa(val) {
   currentPageTidakBisa.value = 1;
 }
 
+function selectJenisCustom(val) {
+  filterJenisCustom.value = val;
+  isOpenCustom.value = false;
+  currentPageCustom.value = 1;
+}
+
 function selectFormBisa(val) {
   formBisa.jenis = val;
   isOpenFormBisa.value = false;
@@ -906,11 +1233,18 @@ function selectFormTidakBisa(val) {
   isOpenFormTidakBisa.value = false;
 }
 
+function selectFormCustom(val) {
+  formCustom.jenis = val;
+  isOpenFormCustom.value = false;
+}
+
 function handleDocumentClick(e) {
   const dropdownBisa = document.querySelector(".dropdown-bisa-container");
   const dropdownTidakBisa = document.querySelector(".dropdown-tidakbisa-container");
+  const dropdownCustom = document.querySelector(".dropdown-custom-container");
   const dropdownFormBisa = document.querySelector(".dropdown-form-bisa-container");
   const dropdownFormTidakBisa = document.querySelector(".dropdown-form-tidakbisa-container");
+  const dropdownFormCustom = document.querySelector(".dropdown-form-custom-container");
   
   if (dropdownBisa && !dropdownBisa.contains(e.target)) {
     isOpenBisa.value = false;
@@ -918,11 +1252,17 @@ function handleDocumentClick(e) {
   if (dropdownTidakBisa && !dropdownTidakBisa.contains(e.target)) {
     isOpenTidakBisa.value = false;
   }
+  if (dropdownCustom && !dropdownCustom.contains(e.target)) {
+    isOpenCustom.value = false;
+  }
   if (dropdownFormBisa && !dropdownFormBisa.contains(e.target)) {
     isOpenFormBisa.value = false;
   }
   if (dropdownFormTidakBisa && !dropdownFormTidakBisa.contains(e.target)) {
     isOpenFormTidakBisa.value = false;
+  }
+  if (dropdownFormCustom && !dropdownFormCustom.contains(e.target)) {
+    isOpenFormCustom.value = false;
   }
 }
 
@@ -951,6 +1291,9 @@ const itemsPerPageBisa = 12;
 
 const currentPageTidakBisa = ref(1);
 const itemsPerPageTidakBisa = 12;
+
+const currentPageCustom = ref(1);
+const itemsPerPageCustom = 12;
 
 const filteredOngkos = computed(() => {
   if (!searchQueryOngkos.value.trim()) return data.value.ongkosServis || [];
@@ -988,14 +1331,28 @@ const totalPagesTidakBisa = computed(() => {
   return Math.ceil(filteredTidakBisa.value.length / itemsPerPageTidakBisa) || 1;
 });
 
+const paginatedCustom = computed(() => {
+  const start = (currentPageCustom.value - 1) * itemsPerPageCustom;
+  const end = start + itemsPerPageCustom;
+  return filteredCustom.value.slice(start, end);
+});
+
+const totalPagesCustom = computed(() => {
+  return Math.ceil(filteredCustom.value.length / itemsPerPageCustom) || 1;
+});
+
 // Reset active pages when tab changes
 watch(activeTab, () => {
   currentPageOngkos.value = 1;
   currentPageBisa.value = 1;
   currentPageTidakBisa.value = 1;
+  currentPageCustom.value = 1;
   searchQueryOngkos.value = "";
   searchQueryBisa.value = "";
   searchQueryTidakBisa.value = "";
+  searchQueryCustom.value = "";
+  searchQueryOps.value = "";
+  editingStateOps.value = false;
 });
 
 watch(searchQueryOngkos, () => {
@@ -1010,24 +1367,31 @@ watch(searchQueryTidakBisa, () => {
   currentPageTidakBisa.value = 1;
 });
 
+watch(searchQueryCustom, () => {
+  currentPageCustom.value = 1;
+});
+
 // Modal refs & editing states
 const editingId = ref(null);
 const fileToUpload = ref(null);
 const imagePreview = ref("");
 const fileInputBisa = ref(null);
 const fileInputTidakBisa = ref(null);
+const fileInputCustom = ref(null);
 const previewModalImageUrl = ref("");
 
 // Forms
 const formOngkos = reactive({ name: "", cost: 0 });
 const formBisa = reactive({ name: "", description: "", cost: "", imageUrl: "", imagePath: "", jenis: "" });
 const formTidakBisa = reactive({ name: "", kadar: "", reason: "", imageUrl: "", imagePath: "", jenis: "" });
+const formCustom = reactive({ name: "", description: "", cost: "", imageUrl: "", imagePath: "", jenis: "" });
 const formAksesoris = reactive({ name: "", pricePerGram: 0, notes: "" });
 
 // DOM refs for Modals
 const ongkosModalRef = ref(null);
 const bisaModalRef = ref(null);
 const tidakBisaModalRef = ref(null);
+const customModalRef = ref(null);
 const aksesorisModalRef = ref(null);
 
 let modalInstances = {};
@@ -1060,12 +1424,34 @@ async function loadData() {
   loading.value = true;
   try {
     const res = await fetchLayananToko();
+    let opsSOPVal = res.opsSOP || "";
+
+    // Dynamic fallback migration: if opsSOP is not in layananToko document, try to fetch storeSOP
+    if (!opsSOPVal) {
+      try {
+        const sopData = await fetchStoreSOP();
+        opsSOPVal = sopData.opsSOP || "";
+        // If opsSOP is also not in storeSOP, but staffSOP contains Bagian 2 (combined legacy format)
+        if (!opsSOPVal && sopData.staffSOP && sopData.staffSOP.includes("### ALUR KERJA HARIAN")) {
+          const parts = sopData.staffSOP.split(/###  ALUR KERJA HARIAN/i);
+          opsSOPVal = "### ALUR KERJA HARIAN\n\n" + (parts[1] || "").trim();
+        }
+      } catch (sopErr) {
+        console.warn("Gagal fetch fallback storeSOP:", sopErr);
+      }
+    }
+
     data.value = {
       ongkosServis: res.ongkosServis || [],
       barangBisaServis: res.barangBisaServis || [],
       barangTidakBisaServis: res.barangTidakBisaServis || [],
-      hargaAksesoris: res.hargaAksesoris || []
+      barangCustomServis: res.barangCustomServis || [],
+      hargaAksesoris: res.hargaAksesoris || [],
+      opsSOP: opsSOPVal
     };
+
+    formOpsSOP.value = opsSOPVal;
+
     meta.value.lastUpdated = res.lastUpdated || null;
     meta.value.updatedBy = res.updatedBy || "";
   } catch (err) {
@@ -1317,6 +1703,137 @@ async function deleteBisaItem(item) {
   }
 }
 
+// ── BARANG CUSTOM SERVIS ACTIONS ─────────────────────────────────────────────
+function openAddCustomModal() {
+  editingId.value = null;
+  fileToUpload.value = null;
+  imagePreview.value = "";
+  uploadProgress.value = 0;
+  formCustom.name = "";
+  formCustom.description = "";
+  formCustom.cost = "";
+  formCustom.imageUrl = "";
+  formCustom.imagePath = "";
+  formCustom.jenis = "";
+  initModal("custom", customModalRef.value).show();
+}
+
+function openEditCustomModal(item) {
+  editingId.value = item.id;
+  fileToUpload.value = null;
+  imagePreview.value = "";
+  uploadProgress.value = 0;
+  formCustom.name = item.name;
+  formCustom.description = item.description || "";
+  formCustom.cost = item.cost;
+  formCustom.imageUrl = item.imageUrl || "";
+  formCustom.imagePath = item.imagePath || "";
+  formCustom.jenis = item.jenis || "";
+  initModal("custom", customModalRef.value).show();
+}
+
+async function saveCustom() {
+  if (saving.value) return;
+  saving.value = true;
+
+  try {
+    let imageUrl = formCustom.imageUrl;
+    let imagePath = formCustom.imagePath;
+
+    // Upload image if a new one is selected
+    if (fileToUpload.value) {
+      if (imagePath) {
+        await deleteLayananImage(imagePath);
+      }
+      const uploadRes = await uploadLayananImage(fileToUpload.value, "custom_servis", (pct) => {
+        uploadProgress.value = pct;
+      });
+      imageUrl = uploadRes.url;
+      imagePath = uploadRes.path;
+    }
+
+    if (editingId.value) {
+      const originalItem = data.value.barangCustomServis.find(i => i.id === editingId.value);
+      if (originalItem && originalItem.imagePath && !imagePath && !fileToUpload.value) {
+        try {
+          await deleteLayananImage(originalItem.imagePath);
+        } catch (e) {
+          console.error("Gagal menghapus gambar lama dari storage:", e);
+        }
+      }
+    }
+
+    const list = [...(data.value.barangCustomServis || [])];
+    const itemData = {
+      name: formCustom.name,
+      description: formCustom.description,
+      cost: formCustom.cost,
+      imageUrl,
+      imagePath,
+      jenis: formCustom.jenis
+    };
+
+    if (editingId.value) {
+      const idx = list.findIndex(i => i.id === editingId.value);
+      if (idx !== -1) {
+        list[idx] = { id: editingId.value, ...itemData };
+      }
+    } else {
+      list.push({ id: crypto.randomUUID(), ...itemData });
+    }
+
+    const payload = { ...data.value, barangCustomServis: list };
+    const updatedBy = auth.currentUser?.displayName || auth.currentUser?.email || "Supervisor";
+    await saveLayananToko(payload, updatedBy);
+
+    data.value.barangCustomServis = list;
+    initModal("custom", customModalRef.value).hide();
+    showSuccess("Informasi barang custom servis berhasil disimpan.");
+    await loadData();
+  } catch (err) {
+    showError("Gagal Menyimpan", err.message);
+  } finally {
+    saving.value = false;
+    uploadProgress.value = 0;
+  }
+}
+
+async function deleteCustomItem(item) {
+  const conf = await confirmAlert({
+    title: "Hapus Informasi?",
+    text: "Apakah Anda yakin ingin menghapus data barang custom servis ini?",
+    icon: "warning"
+  });
+  if (!conf.isConfirmed) return;
+
+  try {
+    if (item.imagePath) {
+      await deleteLayananImage(item.imagePath);
+    }
+
+    const list = (data.value.barangCustomServis || []).filter(i => i.id !== item.id);
+    const payload = { ...data.value, barangCustomServis: list };
+    const updatedBy = auth.currentUser?.displayName || auth.currentUser?.email || "Supervisor";
+    await saveLayananToko(payload, updatedBy);
+
+    data.value.barangCustomServis = list;
+    showSuccess("Informasi berhasil dihapus.");
+    await loadData();
+  } catch (err) {
+    showError("Gagal Menghapus", err.message);
+  }
+}
+
+function clearPhotoCustom() {
+  formCustom.imageUrl = "";
+  formCustom.imagePath = "";
+  imagePreview.value = "";
+  fileToUpload.value = null;
+  if (fileInputCustom.value) {
+    fileInputCustom.value.value = "";
+  }
+}
+
 // ── BARANG TIDAK BISA SERVIS ACTIONS ─────────────────────────────────────────
 function openAddTidakBisaModal() {
   editingId.value = null;
@@ -1506,6 +2023,279 @@ async function deleteAksesorisItem(id) {
   } catch (err) {
     showError("Gagal Menghapus", err.message);
   }
+}
+
+// Computed property for parsing Informasi Operasional SOP
+const parsedOpsSOP = computed(() => highlightText(parseOpsSOP(data.value.opsSOP, searchQueryOps.value), searchQueryOps.value));
+
+function toggleEditOps() {
+  editingStateOps.value = !editingStateOps.value;
+  if (editingStateOps.value) {
+    formOpsSOP.value = data.value.opsSOP || "";
+  }
+}
+
+function cancelEditOps() {
+  editingStateOps.value = false;
+  formOpsSOP.value = data.value.opsSOP || "";
+}
+
+async function saveOpsSOP() {
+  if (saving.value) return;
+  saving.value = true;
+
+  const payload = {
+    ...data.value,
+    opsSOP: formOpsSOP.value
+  };
+
+  try {
+    const updatedBy = auth.currentUser?.displayName || auth.currentUser?.email || "Supervisor";
+    await saveLayananToko(payload, updatedBy);
+
+    data.value.opsSOP = formOpsSOP.value;
+    editingStateOps.value = false;
+    showSuccess("Informasi Operasional berhasil disimpan.");
+    await loadData();
+  } catch (err) {
+    showError("Gagal Menyimpan", err.message);
+  } finally {
+    saving.value = false;
+  }
+}
+
+// Helper to highlight matching search query in HTML content safely
+function highlightText(html, query) {
+  if (!html || !query || !query.trim()) return html;
+  
+  const q = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const regex = new RegExp(`(${q})`, 'gi');
+  const parts = html.split(/(<[^>]+>)/);
+  
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] && !parts[i].startsWith('<')) {
+      parts[i] = parts[i].replace(regex, '<mark style="background-color: #ffd54f; color: #000; padding: 1px 4px; border-radius: 4px; font-weight: bold;">$1</mark>');
+    }
+  }
+  
+  return parts.join('');
+}
+
+// Inner markdown parsing helper
+function parseInnerMarkdown(text) {
+  const lines = text.split(/\r?\n/);
+  let inTable = false;
+  let tableHeader = true;
+  let tableHTML = "";
+  const processedLines = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    // Check if line is a table row
+    if (trimmed.startsWith("|") || (trimmed.includes("|") && !trimmed.startsWith("http") && !trimmed.includes("class="))) {
+      if (!inTable) {
+        inTable = true;
+        tableHeader = true;
+        tableHTML = '<div class="table-responsive my-3 shadow-sm border rounded"><table class="table table-hover table-striped align-middle mb-0"><thead class="table-dark">';
+      }
+      
+      const cells = trimmed.split("|").map(c => c.trim()).filter((c, idx, arr) => {
+        if (idx === 0 && c === "") return false;
+        if (idx === arr.length - 1 && c === "") return false;
+        return true;
+      });
+      
+      if (cells.every(c => /^:-{1,}:*|:-{1,}|-{1,}:*|-{1,}$/.test(c))) {
+        if (tableHeader) {
+          tableHTML += '</thead><tbody>';
+          tableHeader = false;
+        }
+        continue;
+      }
+      
+      tableHTML += '<tr>';
+      cells.forEach(cell => {
+        const cleanCell = cell.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        if (tableHeader) {
+          tableHTML += `<th class="fw-bold px-3 py-2" style="font-size: 0.82rem;">${cleanCell}</th>`;
+        } else {
+          tableHTML += `<td class="px-3 py-2 text-secondary font-monospace" style="font-size: 0.8rem;">${cleanCell}</td>`;
+        }
+      });
+      tableHTML += '</tr>';
+      
+      const nextLine = lines[i + 1] ? lines[i + 1].trim() : "";
+      if (!nextLine.includes("|")) {
+        inTable = false;
+        if (tableHeader) {
+          tableHTML += '</thead>';
+        }
+        tableHTML += '</tbody></table></div>';
+        processedLines.push(tableHTML);
+        tableHTML = "";
+      }
+      continue;
+    }
+    
+    // Bullets
+    if (trimmed.startsWith("●") || trimmed.startsWith("○") || trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("✔") || trimmed.startsWith("✅")) {
+      const char = trimmed[0];
+      const content = trimmed.slice(1).trim().replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      let icon = "bi-dot";
+      let colorClass = "text-gold";
+      const isIndented = line.startsWith("  ") || line.startsWith("\t");
+      const paddingClass = isIndented ? "ps-4" : "ps-2";
+      
+      if (char === "✔" || char === "✅") {
+        icon = "bi-check-circle-fill";
+        colorClass = "text-success";
+      } else if (char === "○" || isIndented) {
+        icon = "bi-circle-fill small-circle";
+        colorClass = "text-muted";
+      } else if (char === "●") {
+        icon = "bi-patch-check-fill";
+      } else {
+        icon = "bi-arrow-right-short";
+      }
+      
+      processedLines.push(`<div class="d-flex align-items-start gap-2 my-2 ${paddingClass}">
+        <i class="bi ${icon} mt-1 fs-7 ${colorClass}"></i>
+        <span class="flex-grow-1 text-dark-emphasis">${content}</span>
+      </div>`);
+      continue;
+    }
+    
+    // Numbered lists
+    const numListMatch = trimmed.match(/^(\d+|[a-zA-Z])\.\s+(.*)$/);
+    if (numListMatch) {
+      const num = numListMatch[1];
+      const content = numListMatch[2].replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      const isIndented = line.startsWith("  ") || line.startsWith("\t");
+      const paddingClass = isIndented ? "ps-4" : "";
+      processedLines.push(`<div class="d-flex align-items-start gap-2 my-2 ${paddingClass}">
+        <span class="badge bg-gold-gradient rounded-pill mt-1" style="font-size: 0.72rem; min-width: 1.6rem; text-shadow: 0 1px 1px rgba(0,0,0,0.1);">${num}</span>
+        <span class="flex-grow-1 text-dark-emphasis">${content}</span>
+      </div>`);
+      continue;
+    }
+    
+    if (trimmed === "") {
+      processedLines.push('<div class="py-1"></div>');
+      continue;
+    }
+    
+    const parsedLine = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    processedLines.push(`<p class="mb-2 text-dark-emphasis text-justify leading-relaxed">${parsedLine}</p>`);
+  }
+  
+  return processedLines.join("\n");
+}
+
+// Parser for Operational Info Cards Grid
+function parseOpsSOP(text, query = "") {
+  if (!text) return "";
+  
+  const q = String(query).trim().toLowerCase();
+
+  const parsePartToHTML = (rawText) => {
+    const blocks = rawText.split(/[\r\n]+(?=####(?![#]))/);
+    const cards = [];
+    
+    blocks.forEach(block => {
+      const lines = block.trim().split(/\r?\n/);
+      if (lines.length === 0) return;
+      
+      const titleLine = lines[0] ? lines[0].trim() : "";
+      if (!titleLine.startsWith("####")) {
+        return;
+      }
+      
+      const title = titleLine.replace(/^####\s*(?:📌\s*)?/, "").trim();
+      const contentLines = lines.slice(1).join("\n");
+      
+      if (q && !title.toLowerCase().includes(q) && !contentLines.toLowerCase().includes(q)) {
+        return;
+      }
+
+      let icon = "bi-journal-check";
+      let borderClass = "border-left-gold";
+      if (title.toLowerCase().includes("buka") || title.toLowerCase().includes("opening")) {
+        icon = "bi-door-open-fill text-success";
+        borderClass = "border-left-success";
+      } else if (title.toLowerCase().includes("transaksi") || title.toLowerCase().includes("penjualan") || title.toLowerCase().includes("buyback")) {
+        icon = "bi-cash-coin text-success";
+        borderClass = "border-left-success";
+      } else if (title.toLowerCase().includes("stok") || title.toLowerCase().includes("keep")) {
+        icon = "bi-box-seam-fill text-warning";
+        borderClass = "border-left-warning";
+      } else if (title.toLowerCase().includes("rusak") || title.toLowerCase().includes("cacat")) {
+        icon = "bi-tools text-danger";
+        borderClass = "border-left-danger";
+      } else if (title.toLowerCase().includes("tutup") || title.toLowerCase().includes("closing")) {
+        icon = "bi-lock-fill text-secondary";
+        borderClass = "border-left-secondary";
+      }
+      
+      cards.push({
+        title,
+        rawContent: contentLines,
+        html: `
+          <div class="sop-block-card p-2 rounded-4 shadow-sm border border-light bg-white position-relative overflow-hidden interactive-card ${borderClass}">
+            <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-light pb-2">
+              <div class="sop-icon-circle bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
+                <i class="bi ${icon} fs-5"></i>
+              </div>
+              <h5 class="fw-extrabold text-dark mb-0" style="font-size: 0.95rem;">${title}</h5>
+            </div>
+            <div class="sop-card-body small text-secondary-emphasis lh-relaxed">
+              ${parseInnerMarkdown(contentLines)}
+            </div>
+          </div>
+        `
+      });
+    });
+    
+    if (cards.length === 0) {
+      return q ? `<div class="col-12 py-4 text-center text-muted small"><i class="bi bi-search me-1.5"></i>Tidak ada topik yang cocok dengan pencarian "${query}"</div>` : "";
+    }
+
+    const col1Cards = [];
+    const col2Cards = [];
+    let col1Height = 0;
+    let col2Height = 0;
+    
+    cards.forEach((card) => {
+      // Estimate card height by character length of title and raw content
+      const estimatedHeight = card.title.length + card.rawContent.length;
+      
+      if (col1Height <= col2Height) {
+        col1Cards.push(card.html);
+        col1Height += estimatedHeight;
+      } else {
+        col2Cards.push(card.html);
+        col2Height += estimatedHeight;
+      }
+    });
+    
+    return `
+      <div class="row g-4">
+        <div class="col-md-6 d-flex flex-column gap-4">
+          ${col1Cards.join("\n")}
+        </div>
+        <div class="col-md-6 d-flex flex-column gap-4">
+          ${col2Cards.join("\n")}
+        </div>
+      </div>
+    `;
+  };
+  
+  return `
+    <div class="bagian-sop-section mb-5">
+      ${parsePartToHTML(text.trim())}
+    </div>
+  `;
 }
 
 onMounted(() => {
@@ -1897,5 +2687,68 @@ onUnmounted(() => {
     width: 100% !important;
     justify-content: center !important;
   }
+}
+
+/* SOP Block Cards & Highlight styles */
+:deep(.interactive-card) {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+:deep(.interactive-card:hover) {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 15px 30px rgba(170, 124, 17, 0.08) !important;
+  border-color: rgba(170, 124, 17, 0.3) !important;
+}
+
+.border-left-gold,
+:deep(.border-left-gold) {
+  border-left: 4px solid #aa7c11 !important;
+}
+.border-left-success,
+:deep(.border-left-success) {
+  border-left: 4px solid #198754 !important;
+}
+.border-left-warning,
+:deep(.border-left-warning) {
+  border-left: 4px solid #ffc107 !important;
+}
+.border-left-danger,
+:deep(.border-left-danger) {
+  border-left: 4px solid #dc3545 !important;
+}
+.border-left-secondary,
+:deep(.border-left-secondary) {
+  border-left: 4px solid #6c757d !important;
+}
+.border-left-primary,
+:deep(.border-left-primary) {
+  border-left: 4px solid #0d6efd !important;
+}
+.border-left-info,
+:deep(.border-left-info) {
+  border-left: 4px solid #0dcaf0 !important;
+}
+.bg-gold-gradient,
+:deep(.bg-gold-gradient) {
+  background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%) !important;
+  color: #fff !important;
+}
+
+:deep(.sop-icon-circle) {
+  background-color: rgba(170, 124, 17, 0.05) !important;
+  border: 1px solid rgba(170, 124, 17, 0.1);
+}
+
+:deep(.small-circle) {
+  font-size: 0.45rem !important;
+}
+
+:deep(p.leading-relaxed) {
+  line-height: 1.75;
+}
+
+.search-input-container {
+  max-width: 250px;
 }
 </style>

@@ -231,7 +231,7 @@ const routes = [
     meta: { requiresAuth: true, pageKey: "toko.sop" },
   },
   {
-    path: "/toko/layanan",
+    path: "/toko/informasi-operasional",
     component: LayananTokoView,
     meta: { requiresAuth: true, pageKey: "toko.layanan" },
   },

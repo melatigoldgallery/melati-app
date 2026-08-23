@@ -57,6 +57,8 @@ export async function saveLayananToko(payload, updatedBy = "System") {
     barangBisaServis: payload.barangBisaServis || [],
     barangTidakBisaServis: payload.barangTidakBisaServis || [],
     hargaAksesoris: payload.hargaAksesoris || [],
+    barangCustomServis: payload.barangCustomServis || [],
+    opsSOP: payload.opsSOP || "",
     migratedFromL2: true,
     lastUpdated: now,
     updatedBy: updatedBy || auth.currentUser?.email || "System",

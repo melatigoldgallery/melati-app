@@ -85,7 +85,7 @@ export const PAGE_ACCESS_SECTIONS = [
     pages: [
       { key: "toko.profil", label: "Profil Toko", route: "/toko/profil" },
       { key: "toko.sop", label: "SOP Operasional", route: "/toko/sop" },
-      { key: "toko.layanan", label: "Layanan & Ongkos", route: "/toko/layanan" },
+      { key: "toko.layanan", label: "Informasi Operasional", route: "/toko/informasi-operasional" },
     ],
   },
   {

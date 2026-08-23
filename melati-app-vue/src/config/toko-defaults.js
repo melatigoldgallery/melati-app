@@ -158,67 +158,7 @@ Bagian ini mengatur kedisiplinan, hak, kewajiban, dan etika kerja harian seluruh
     *   Penghuni wajib menjaga kebersihan kamar dan dilarang mengubah eksterior maupun interior kamar tanpa persetujuan tertulis dari Owner/pengelola mess. Pelanggaran aturan ini akan dikenakan sanksi tegas.
 28. **Pemeliharaan Alat Kantor**: Wajib menjaga fasilitas toko dan menggunakan peralatan elektronik (PC, printer, dll.) hanya untuk kepentingan pekerjaan.
 29. **Larangan Meminjam Barang Toko**: Dilarang membawa pulang atau meminjam fasilitas toko untuk kepentingan pribadi, kecuali telah mendapatkan izin tertulis dari Owner untuk menunjang pekerjaan.
-30. **Sanksi SP & PHK**: Setiap kesalahan atau pelanggaran aturan kerja oleh staff akan ditindaklanjuti dengan Surat Peringatan (SP). Bagi staff yang tidak menunjukkan perubahan sikap positif setelah pembinaan, manajemen berhak melakukan Pemutusan Hubungan Kerja (PHK) tanpa pesangon.
-
----
-
-### BAGIAN 2: SOP ALUR KERJA HARIAN
-
-#### 📌 A. Buka Toko (Opening)
-*   **Jam Kedatangan**: Staff shift pagi wajib hadir paling lambat pukul 08.45, staff shift sore paling lambat pukul 14.20 (detail sanksi keterlambatan lihat Bagian 1 Point 1).
-*   **Persiapan Display**: Pukul 08.50, staff mulai memajang baki perhiasan ke etalase pajangan secara teliti.
-*   **Jam Operasional**: Pukul 09.00, pintu toko dibuka dan siap melayani customer.
-
-#### 📌 B. Transaksi Penjualan & Buyback (Pembelian Kembali)
-1.  **Aturan Biaya Tambahan (Surcharge) Kartu & Transfer**:
-    *   **Kartu Kredit**: Tambahan biaya sebesar 3% dari total transaksi (wajib menggunakan EDC BCA).
-    *   **Kartu Debit (Non-BCA)**: Tambahan biaya sebesar 1% dari total transaksi (wajib menggunakan EDC BCA).
-    *   **Kartu Debit (Khusus Logam Mulia/LM)**: Tambahan biaya sebesar 0.3% dari total transaksi LM.
-    *   **Transfer Bank (Khusus Logam Mulia/LM)**: Customer wajib menulis berita transfer: *"Pembayaran ANTAM/LM"*. Verifikasi mutasi wajib divalidasi oleh kasir sebelum menerbitkan surat jaminan Logam Mulia.
-    *   **Transfer Bank (Perhiasan Emas)**: Pengiriman transfer tidak diperbolehkan memberikan keterangan transfer (kosongkan berita transfer).
-2.  **Input Data Customer**: Setiap menginput transaksi penjualan dan pembelian, wajib melengkapi data nama dan nomor telepon customer guna memudahkan komunikasi apabila terjadi kesalahan pencatatan di kemudian hari.
-3.  **SOP Tukar Tambah & Penjualan Kembali (Buyback)**:
-    *   **Buyback/Tukar di Hari yang Sama (1x24 Jam)**: 
-        *   Tukar tambah ke perhiasan lain: Bebas potongan dengan catatan kondisi barang mulus/tidak rusak. Jika rusak, tetap dikenakan potongan normal (bukan potongan leburan).
-        *   Hanya dijual kembali (tidak tukar tambah): Dikenakan potongan normal.
-    *   **Buyback/Tukar Setelah 24 Jam**:
-        *   Tukar tambah dengan berat yang sama atau lebih besar: Bebas potongan.
-        *   Tukar tambah dengan berat lebih ringan: Dikenakan potongan 10% (kadar muda) dan 5% (kadar tua).
-        *   Hanya dijual kembali: Dikenakan potongan normal (10% kadar tua dan 15% kadar muda).
-    *   **Buyback Barang dari Melati Hasanudin / Sakura**:
-        *   Tukar tambah: Pastikan perhiasan mulus. Potongan tetap berlaku 10% / 15% meskipun transaksi tambah berat telah melebihi 1 gram. Harga beli dihitung di bawah standar harga pasaran Melati 3.
-        *   Hanya jual (Model Best Seller/Basic seperti rantai italy, lilit, polos): Bisa diterima jika barang mulus dengan harga beli di bawah pasaran Melati 3.
-        *   Hanya jual (Model Lama/Perputaran Lambat): Arahkan customer untuk menjual langsung ke cabang asal (Melati Hasanudin / Sakura).
-    *   **Buyback Barang Toko Lain / Tanpa Surat**:
-        *   Penerimaan tergantung penilaian model and kondisi fisik perhiasan. Kasir wajib menanyakan persetujuan harga beli langsung kepada Owner.
-        *   If harga disetujui: Customer wajib menyerahkan identitas diri (KTP) untuk difotokopi, mengisi formulir penjualan barang, dan pembayaran wajib dilakukan melalui transfer bank. Nama di identitas diri wajib sama dengan nama pemilik rekening tujuan transfer.
-4.  **Aturan Reparasi / Perbaikan Barang**:
-    *   **Biaya Sepuh (Chrome)**: Gold/Seleb Rp50.000, Rose Rp60.000, Putih Rp80.000.
-    *   Jika perhiasan baru dibeli di hari yang sama: Chrome gold/seleb gratis. Chrome putih untuk perhiasan non-putih tetap dikenakan biaya normal. Jika sudah lewat hari, biaya chrome berlaku normal.
-    *   **Ketentuan Servis**:
-        *   Jika ada komponen rusak dekat mainan/aksesoris dan akan dipatri, beri tahu customer terlebih dahulu bahwa warna/cat hiasan tersebut akan hilang/pudar.
-        *   Perhiasan rantai lilit 1 gram, rantai italy santa kadar muda, dan patri dekat batu Van Cleef tidak bisa diservis.
-
-#### 📌 C. Manajemen Stok & Keep Barang
-1.  **Pencatatan & Alur Stok**:
-    *   Setelah proses input barang selesai, data wajib segera dimasukkan ke sistem manajemen stok agar sinkron dengan fisik barang.
-    *   Untuk barang model baru, pisahkan beberapa pcs per model untuk keperluan promosi/posting, sedangkan sisanya langsung dipajang atau dimasukkan ke dalam brankas stok (kalung, gelang, dll.).
-2.  **Konfirmasi Pemajangan**: Sebelum memajang perhiasan baru ke etalase, wajib melakukan konfirmasi ke penanggung jawab divisi barang terkait (misal bagian kalung/gelang) dan melakukan scan barcode di sistem untuk pencatatan pengurangan stok brankas.
-3.  **Aturan Keep Barang**:
-    *   **Keep Hari yang Sama**: Berlaku maksimal hingga pukul 20.30. Jika tidak ada konfirmasi pelunasan/transaksi dari customer, barang harus dipajang kembali ke etalase.
-    *   **Keep Lebih dari 1 Hari**: Customer wajib membayar Down Payment (DP) minimal 30%. Batas waktu simpan maksimal adalah 3 hari. Jika lewat 3 hari dan belum dilunasi, admin wajib menghubungi customer untuk konfirmasi: melanjutkan transaksi, menukar barang lain, atau me-refund DP jika batal (aturan umum keep lihat Bagian 1 Point 16).
-
-#### 📌 D. Penanganan Barang Rusak atau Cacat
-1.  **Pemisahan Barang**: Barang rusak (penyok, putus, pengait rusak) harus segera dipisahkan dan diletakkan di wadah khusus yang tersedia di masing-masing divisi barang.
-2.  **Proses Perbaikan**:
-    *   Barang dengan kerusakan minor (seperti batu lepas) harus segera dibawa ke tukang servis secara bertahap.
-    *   Jika label/bandrol terlepas, bawa perhiasan ke bagian input untuk dicetak ulang bandrol barunya (aturan bandrol lihat Bagian 1 Point 12).
-3.  **Pelaporan**: Laporkan dan serahkan daftar barang rusak kepada divisi input untuk dilakukan mutasi status barang di sistem.
-
-#### 📌 E. Tutup Toko (Closing)
-*   **Penghitungan Stok Fisik**: Setiap staff bertanggung jawab menghitung fisik perhiasan di divisinya masing-masing dan mencocokkannya dengan data sistem inventory (laporan selisih lihat Bagian 1 Point 13).
-*   **Saling Membantu (Teamwork)**: Staff yang telah selesai merapikan dan menghitung barang di divisinya diwajibkan membantu divisi lain yang belum selesai (misalnya, membantu perhitungan di lantai bawah atau mengecek keamanan brankas).
-*   **Pengecekan Area & Uang Harian**: Setelah seluruh stok klop, seluruh staff bersama-sama memeriksa area depan toko, meja kasir, meja admin, dan ruang input untuk memastikan tidak ada barang berharga atau dokumen yang tertinggal. Staff yang meninggalkan toko sebelum proses pengecekan closing selesai tanpa izin/konfirmasi ke kasir tidak berhak menerima uang harian pada hari itu (aturan lengkap lihat Bagian 1 Point 1).`,
+30. **Sanksi SP & PHK**: Setiap kesalahan atau pelanggaran aturan kerja oleh staff akan ditindaklanjuti dengan Surat Peringatan (SP). Bagi staff yang tidak menunjukkan perubahan sikap positif setelah pembinaan, manajemen berhak melakukan Pemutusan Hubungan Kerja (PHK) tanpa pesangon.`,
   
   goldKnowledge: `📌 Pengetahuan Dasar Mengenai Perhiasan Emas
 
@@ -403,6 +343,66 @@ export const DEFAULT_LAYANAN_TOKO = {
     { id: "aks_1", name: "Kotak Cincin Velvet", pricePerGram: 35000, notes: "Harga per pcs" },
     { id: "aks_2", name: "Dompet Kalung Satin", pricePerGram: 15000, notes: "Harga per pcs" },
     { id: "aks_3", name: "Aksesoris Tambahan (Per Gram)", pricePerGram: 15000, notes: "Harga per gram perhiasan" }
-  ]
+  ],
+  barangCustomServis: [],
+  opsSOP: `### BAGIAN 2: SOP ALUR KERJA HARIAN
+
+#### 📌 A. Buka Toko (Opening)
+*   **Jam Kedatangan**: Staff shift pagi wajib hadir paling lambat pukul 08.45, staff shift sore paling lambat pukul 14.20 (detail sanksi keterlambatan lihat Bagian 1 Point 1).
+*   **Persiapan Display**: Pukul 08.50, staff mulai memajang baki perhiasan ke etalase pajangan secara teliti.
+*   **Jam Operasional**: Pukul 09.00, pintu toko dibuka dan siap melayani customer.
+
+#### 📌 B. Transaksi Penjualan & Buyback (Pembelian Kembali)
+1.  **Aturan Biaya Tambahan (Surcharge) Kartu & Transfer**:
+    *   **Kartu Kredit**: Tambahan biaya sebesar 3% dari total transaksi (wajib menggunakan EDC BCA).
+    *   **Kartu Debit (Non-BCA)**: Tambahan biaya sebesar 1% dari total transaksi (wajib menggunakan EDC BCA).
+    *   **Kartu Debit (Khusus Logam Mulia/LM)**: Tambahan biaya sebesar 0.3% dari total transaksi LM.
+    *   **Transfer Bank (Khusus Logam Mulia/LM)**: Customer wajib menulis berita transfer: *"Pembayaran ANTAM/LM"*. Verifikasi mutasi wajib divalidasi oleh kasir sebelum menerbitkan surat jaminan Logam Mulia.
+    *   **Transfer Bank (Perhiasan Emas)**: Pengiriman transfer tidak diperbolehkan memberikan keterangan transfer (kosongkan berita transfer).
+2.  **Input Data Customer**: Setiap menginput transaksi penjualan and pembelian, wajib melengkapi data nama dan nomor telepon customer guna memudahkan komunikasi apabila terjadi kesalahan pencatatan di kemudian hari.
+3.  **SOP Tukar Tambah & Penjualan Kembali (Buyback)**:
+    *   **Buyback/Tukar di Hari yang Sama (1x24 Jam)**: 
+        *   Tukar tambah ke perhiasan lain: Bebas potongan dengan catatan kondisi barang mulus/tidak rusak. Jika rusak, tetap dikenakan potongan normal (bukan potongan leburan).
+        *   Hanya dijual kembali (tidak tukar tambah): Dikenakan potongan normal.
+    *   **Buyback/Tukar Setelah 24 Jam**:
+        *   Tukar tambah dengan berat yang sama atau lebih besar: Bebas potongan.
+        *   Tukar tambah dengan berat lebih ringan: Dikenakan potongan 10% (kadar muda) dan 5% (kadar tua).
+        *   Hanya dijual kembali: Dikenakan potongan normal (10% kadar tua dan 15% kadar muda).
+    *   **Buyback Barang dari Melati Hasanudin / Sakura**:
+        *   Tukar tambah: Pastikan perhiasan mulus. Potongan tetap berlaku 10% / 15% meskipun transaksi tambah berat telah melebihi 1 gram. Harga beli dihitung di bawah standar harga pasaran Melati 3.
+        *   Hanya jual (Model Best Seller/Basic seperti rantai italy, lilit, polos): Bisa diterima jika barang mulus dengan harga beli di bawah pasaran Melati 3.
+        *   Hanya jual (Model Lama/Perputaran Lambat): Arahkan customer untuk menjual langsung ke cabang asal (Melati Hasanudin / Sakura).
+    *   **Buyback Barang Toko Lain / Tanpa Surat**:
+        *   Penerimaan tergantung penilaian model and kondisi fisik perhiasan berdasarkan persetujuan dan konfirmasi harga beli langsung kepada Owner.
+        *   Jika harga disetujui: Customer wajib menyerahkan identitas diri (KTP) untuk difotokopi, mengisi formulir penjualan barang, dan pembayaran wajib dilakukan melalui transfer bank. Nama di identitas diri wajib sama dengan nama pemilik rekening tujuan transfer.
+4.  **Aturan Reparasi / Perbaikan Barang**:
+    *   **Biaya Sepuh (Chrome)**: Gold/Seleb Rp50.000, Rose Rp60.000, Putih Rp80.000.
+    *   Jika perhiasan baru dibeli di hari yang sama: Chrome gold/seleb gratis. Chrome putih untuk perhiasan non-putih tetap dikenakan biaya normal. Jika sudah lewat hari, biaya chrome berlaku normal.
+    *   **Ketentuan Servis**:
+        *   Jika ada komponen rusak dekat mainan/aksesoris dan akan dipatri, beri tahu customer terlebih dahulu bahwa warna/cat hiasan tersebut akan hilang/pudar.
+        *   Perhiasan rantai lilit 1 gram, rantai italy santa kadar muda, dan patri dekat batu Van Cleef tidak bisa diservis.
+        *   Jika batu lepas dalam jangka waktu 1 bulan dari waktu pembelian maka ganti batu free, jika batu tidak tersedia di toko maka tawarkan opsi barang diservis dengan kirim ke pabrik.
+        *   Jika batu lepas lebih 1 bulan maka free ganti hanya untuk batu kecil maksimal 3 pcs dan selebihnya berbayar.
+
+#### 📌 C. Manajemen Stok & Keep Barang
+1.  **Pencatatan & Alur Stok**:
+    *   Setelah proses input barang selesai, data wajib segera dimasukkan ke sistem manajemen stok agar sinkron dengan fisik barang.
+    *   Untuk barang model baru, pisahkan beberapa pcs per model untuk keperluan promosi/posting, sedangkan sisanya langsung dipajang atau dimasukkan ke dalam brankas stok (kalung, gelang, dll.).
+2.  **Konfirmasi Pemajangan**: Sebelum memajang perhiasan baru ke etalase, wajib melakukan konfirmasi ke penanggung jawab divisi barang terkait (misal bagian kalung/gelang) dan melakukan scan barcode di sistem untuk pencatatan pengurangan stok brankas.
+3.  **Aturan Keep Barang**:
+    *   **Keep Hari yang Sama**: Berlaku maksimal hingga pukul 20.30. Jika tidak ada konfirmasi pelunasan/transaksi dari customer, barang harus dipajang kembali ke etalase.
+    *   **Keep Lebih dari 1 Hari**: Customer wajib membayar Down Payment (DP) minimal 30%. Batas waktu simpan maksimal adalah 3 hari. Jika lewat 3 hari dan belum dilunasi, admin wajib menghubungi customer untuk konfirmasi: melanjutkan transaksi, menukar barang lain, atau me-refund DP jika batal (aturan umum keep lihat Bagian 1 Point 16).
+
+#### 📌 D. Penanganan Barang Rusak atau Cacat
+1.  **Pemisahan Barang**: Barang rusak (penyok, putus, pengait rusak) harus segera dipisahkan dan diletakkan di wadah khusus yang tersedia di masing-masing divisi barang.
+2.  **Proses Perbaikan**:
+    *   Barang dengan kerusakan minor (seperti batu lepas) harus segera dibawa ke tukang servis secara bertahap.
+    *   Jika label/bandrol terlepas, bawa perhiasan ke bagian input untuk dicetak ulang bandrol barunya (aturan bandrol lihat Bagian 1 Point 12).
+3.  **Pelaporan**: Laporkan dan serahkan daftar barang rusak kepada divisi input untuk dilakukan mutasi status barang di sistem.
+
+#### 📌 E. Tutup Toko (Closing)
+*   **Penghitungan Stok Fisik**: Setiap staff bertanggung jawab menghitung fisik perhiasan di divisinya masing-masing dan mencocokkannya dengan data sistem inventory (laporan selisih lihat Bagian 1 Point 13).
+*   **Saling Membantu (Teamwork)**: Staff yang telah selesai merapikan dan menghitung barang di divisinya diwajibkan membantu divisi lain yang belum selesai (misalnya, membantu perhitungan di lantai bawah atau mengecek keamanan brankas).
+*   **Pengecekan Area & Uang Harian**: Setelah seluruh stok klop, seluruh staff bersama-sama memeriksa area depan toko, meja kasir, meja admin, dan ruang input untuk memastikan tidak ada barang berharga atau dokumen yang tertinggal. Staff yang meninggalkan toko sebelum proses pengecekan closing selesai tanpa izin/konfirmasi ke kasir tidak berhak menerima uang harian pada hari itu (aturan lengkap lihat Bagian 1 Point 1).`
 };
 

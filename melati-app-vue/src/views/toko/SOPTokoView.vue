@@ -103,7 +103,9 @@
               </div>
             </div>
 
-            <!-- TAB 2: PANDUAN EMAS -->
+
+
+            <!-- TAB 3: PANDUAN EMAS -->
             <div v-else-if="activeTab === 'gold'" key="gold" class="tab-pane-content">
               <div class="profile-section-card p-4 border rounded-4 position-relative bg-white">
                 <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 border-bottom pb-2 gap-3">
@@ -391,15 +393,10 @@ function parseInnerMarkdown(text) {
 function parseStaffSOP(text, query = "") {
   if (!text) return "";
   
-  const parts = text.split(/### BAGIAN 2: SOP ALUR KERJA HARIAN/i);
-  const part1Raw = parts[0] || "";
-  const part2Raw = parts[1] || "";
-  
   const q = String(query).trim().toLowerCase();
 
-  const parsePartToHTML = (rawText, isPart1 = true) => {
+  const parsePartToHTML = (rawText) => {
     const blocks = rawText.split(/[\r\n]+(?=####(?![#]))/);
-    let introHtml = "";
     const cards = [];
     
     blocks.forEach(block => {
@@ -430,19 +427,8 @@ function parseStaffSOP(text, query = "") {
         icon = "bi-calendar2-check-fill text-info";
       } else if (title.toLowerCase().includes("fasilitas") || title.toLowerCase().includes("sanksi")) {
         icon = "bi-exclamation-triangle-fill text-warning";
-      } else if (title.toLowerCase().includes("buka") || title.toLowerCase().includes("opening")) {
-        icon = "bi-door-open-fill text-success";
-        borderClass = "border-left-success";
-      } else if (title.toLowerCase().includes("stok") || title.toLowerCase().includes("keep")) {
-        icon = "bi-box-seam-fill text-warning";
-        borderClass = "border-left-warning";
-      } else if (title.toLowerCase().includes("rusak") || title.toLowerCase().includes("cacat")) {
-        icon = "bi-tools text-danger";
-        borderClass = "border-left-danger";
-      } else if (title.toLowerCase().includes("tutup") || title.toLowerCase().includes("closing")) {
-        icon = "bi-lock-fill text-secondary";
-        borderClass = "border-left-secondary";
       }
+      
       cards.push({
         title,
         html: `
@@ -461,7 +447,7 @@ function parseStaffSOP(text, query = "") {
       });
     });
     
-    if (cards.length === 0 && !introHtml) {
+    if (cards.length === 0) {
       return q ? `<div class="col-12 py-4 text-center text-muted small"><i class="bi bi-search me-1.5"></i>Tidak ada topik yang cocok dengan pencarian "${query}"</div>` : "";
     }
 
@@ -472,14 +458,8 @@ function parseStaffSOP(text, query = "") {
       const titleLower = card.title.toLowerCase();
       let col = 1;
       
-      if (isPart1) {
-        if (titleLower.startsWith("d.") || titleLower.startsWith("e.")) {
-          col = 2;
-        }
-      } else {
-        if (titleLower.startsWith("c.") || titleLower.startsWith("d.") || titleLower.startsWith("e.")) {
-          col = 2;
-        }
+      if (titleLower.startsWith("d.") || titleLower.startsWith("e.")) {
+        col = 2;
       }
       
       if (col === 1) {
@@ -490,7 +470,6 @@ function parseStaffSOP(text, query = "") {
     });
     
     return `
-      ${introHtml}
       <div class="row g-4">
         <div class="col-md-6 d-flex flex-column gap-4">
           ${col1Cards.join("\n")}
@@ -502,21 +481,12 @@ function parseStaffSOP(text, query = "") {
     `;
   };
   
-  const cleanPart1 = part1Raw.trim();
-  
   return `
     <div class="bagian-sop-section mb-5">
       <div class="section-title-badge mb-4">
         <span class="badge bg-gold-gradient text-white px-3 py-2 rounded-pill fw-bold text-uppercase tracking-wider" style="font-size: 0.95rem;">Bagian 1: Peraturan & Tata Tertib</span>
       </div>
-      ${parsePartToHTML(cleanPart1, true)}
-    </div>
-    
-    <div class="bagian-sop-section mt-5">
-      <div class="section-title-badge mb-4">
-        <span class="badge bg-gold-gradient text-white px-3 py-2 rounded-pill fw-bold text-uppercase tracking-wider" style="font-size: 0.95rem;">Bagian 2: SOP Alur Kerja Harian</span>
-      </div>
-      ${parsePartToHTML(part2Raw, false)}
+      ${parsePartToHTML(text.trim())}
     </div>
   `;
 }
@@ -790,8 +760,16 @@ async function loadSOP() {
   loading.value = true;
   try {
     const data = await fetchStoreSOP();
+    let staffSOPVal = data.staffSOP || "";
+
+    // If staffSOP contains Bagian 2 (old legacy combined format), strip it out so Tata Tertib only shows Bagian 1
+    if (staffSOPVal.includes("### BAGIAN 2: SOP ALUR KERJA HARIAN")) {
+      const parts = staffSOPVal.split(/### BAGIAN 2: SOP ALUR KERJA HARIAN/i);
+      staffSOPVal = parts[0].trim();
+    }
+
     sopData.value = {
-      staffSOP: data.staffSOP || "",
+      staffSOP: staffSOPVal,
       goldKnowledge: data.goldKnowledge || "",
       diamondKnowledge: data.diamondKnowledge || ""
     };
