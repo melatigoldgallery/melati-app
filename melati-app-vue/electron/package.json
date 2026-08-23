@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "dist-linux": "electron-builder --linux"
   },
   "dependencies": {
     "bwip-js": "^4.2.0",
@@ -36,10 +37,24 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": false
     },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Utility",
+      "icon": "assets/png.png"
+    },
+    "deb": {
+      "depends": [
+        "libnotify4",
+        "libxtst6",
+        "libnss3"
+      ]
+    },
     "asar": true,
     "asarUnpack": [
       "**/node_modules/loudness/**/*"
     ]
   }
-
 }
