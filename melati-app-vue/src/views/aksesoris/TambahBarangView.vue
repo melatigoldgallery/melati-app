@@ -374,6 +374,7 @@
                 <thead class="table-light sticky-top">
                   <tr>
                     <th>No</th>
+                    <th style="width: 45px" class="text-center">Foto</th>
                     <th>Kode</th>
                     <th>Nama</th>
                     <th v-if="activeKodeTab === 'kotak'">Harga</th>
@@ -385,6 +386,10 @@
                 <tbody>
                   <tr v-for="(k, i) in filteredKodeList" :key="k.id">
                     <td class="small text-muted">{{ i + 1 }}</td>
+                    <td class="text-center align-middle">
+                      <img v-if="k.foto" :src="k.foto" class="img-thumbnail" style="width: 32px; height: 32px; object-fit: cover;" />
+                      <span v-else class="text-muted small">-</span>
+                    </td>
                     <td class="small fw-semibold">{{ k.kode || k.text }}</td>
                     <td class="small">{{ k.nama }}</td>
                     <td v-if="activeKodeTab === 'kotak'" class="small">{{ k.harga || "-" }}</td>
@@ -466,6 +471,22 @@
             <div v-if="activeKodeTab === 'kotak'" class="mb-3">
               <label class="form-label small fw-semibold">Harga</label>
               <input v-model="kodeForm.harga" type="number" class="form-control form-control-sm" placeholder="Harga" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold d-block">Foto Barang</label>
+              <div class="d-flex align-items-center gap-2">
+                <div v-if="kodeForm.foto" class="position-relative">
+                  <img :src="kodeForm.foto" class="img-thumbnail" style="width: 60px; height: 60px; object-fit: cover;" />
+                  <button type="button" @click="kodeForm.foto = ''" class="btn btn-danger btn-xs position-absolute top-0 end-0 p-0" style="font-size: 8px; width: 16px; height: 16px; line-height: 16px;">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </div>
+                <div class="flex-grow-1">
+                  <input type="file" ref="photoInput" class="form-control form-control-sm" accept="image/*" @change="handleFotoFileChange" :disabled="isUploadingFoto" />
+                  <span v-if="isUploadingFoto" class="small text-primary"><span class="spinner-border spinner-border-sm me-1"></span>Mengunggah foto...</span>
+                  <span v-else class="form-text text-muted small">Upload gambar produk (JPG/PNG/WEBP)</span>
+                </div>
+              </div>
             </div>
           </div>
           <div class="modal-footer py-2">
@@ -568,9 +589,10 @@ import {
   orderBy,
   limit,
 } from "firebase/firestore";
-import { floorCollection, floorDoc, floorSubCollection, floorSegmentsWithFloorId } from "@/services/floor-scope";
+import { floorCollection, floorDoc, floorSubCollection, floorSegmentsWithFloorId, scopeStoragePath } from "@/services/floor-scope";
 import { Modal } from "bootstrap";
-import { db } from "@/config/firebase";
+import { db, storage } from "@/config/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAccessoriesStore } from "@/stores/accessories";
 import {
   addStock,
@@ -952,9 +974,68 @@ async function loadKodeBarang(kategori) {
 
 // ── Form Kode (Tambah / Edit) ─────────────────────────────────────────────────
 const kodeFormMode = ref("add");
-const kodeForm = ref({ id: null, kode: "", nama: "", kadar: "", berat: "", harga: "" });
+const kodeForm = ref({ id: null, kode: "", nama: "", kadar: "", berat: "", harga: "", foto: "" });
 const isKodeSaving = ref(false);
+const isUploadingFoto = ref(false);
+const photoInput = ref(null);
 let formKodeModal = null;
+
+function compressImage(file, maxWidth = 600, maxHeight = 600, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFotoFileChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    swal("File harus berupa gambar (JPG, PNG, WEBP)", "warning");
+    return;
+  }
+  isUploadingFoto.value = true;
+  try {
+    const compressedBlob = await compressImage(file);
+    const kodeClean = (kodeForm.value.kode || "item_" + Date.now()).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "_");
+    const filename = `${kodeClean}_${Date.now()}.jpg`;
+    const path = scopeStoragePath(`kode-aksesoris/${activeKodeTab.value}/${filename}`, activeFloor.value);
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, compressedBlob, { contentType: "image/jpeg" });
+    const downloadUrl = await getDownloadURL(fileRef);
+    kodeForm.value.foto = downloadUrl;
+  } catch (err) {
+    showError("Gagal mengunggah foto", err.message || err.toString());
+  } finally {
+    isUploadingFoto.value = false;
+    if (e.target) e.target.value = "";
+  }
+}
 
 function buildStokKodeData(data) {
   const isSilver = activeKodeTab.value === "silver";
@@ -966,6 +1047,7 @@ function buildStokKodeData(data) {
     kadar: isSilver ? data.kadar || null : null,
     berat: isSilver ? data.berat || null : null,
     harga: isKotak ? data.harga || null : null,
+    foto: data.foto || null,
     isActive: true,
     updatedAt: serverTimestamp(),
   };
@@ -973,7 +1055,7 @@ function buildStokKodeData(data) {
 
 function openTambahKode() {
   kodeFormMode.value = "add";
-  kodeForm.value = { id: null, kode: "", nama: "", kadar: "", berat: "", harga: "" };
+  kodeForm.value = { id: null, kode: "", nama: "", kadar: "", berat: "", harga: "", foto: "" };
   if (!formKodeModal) formKodeModal = new Modal(document.getElementById("modalFormKode"));
   formKodeModal.show();
 }
@@ -987,6 +1069,7 @@ function openEditKode(k) {
     kadar: k.kadar || "",
     berat: k.berat || "",
     harga: k.harga || "",
+    foto: k.foto || "",
   };
   if (!formKodeModal) formKodeModal = new Modal(document.getElementById("modalFormKode"));
   formKodeModal.show();
@@ -1002,6 +1085,7 @@ async function simpanKode() {
     const data = {
       text: kodeForm.value.kode.trim().toUpperCase(),
       nama: kodeForm.value.nama.trim(),
+      foto: kodeForm.value.foto || null,
       ...(activeKodeTab.value === "silver" ? { kadar: kodeForm.value.kadar, berat: kodeForm.value.berat } : {}),
       ...(activeKodeTab.value === "kotak" ? { harga: kodeForm.value.harga } : {}),
     };

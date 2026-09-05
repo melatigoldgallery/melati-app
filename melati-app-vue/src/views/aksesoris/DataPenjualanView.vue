@@ -178,8 +178,8 @@
                 <td class="small text-muted" style="max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="row.item ? row.item.keterangan : row.trx.keterangan">
                   <div class="d-flex align-items-center justify-content-between gap-2">
                     <span class="text-truncate" style="flex: 1;">{{ row.item ? row.item.keterangan || "—" : row.trx.keterangan || "—" }}</span>
-                    <!-- Photo edit trigger button (for manual transactions only) -->
-                    <template v-if="row.trx.jenisPenjualan === 'manual' && row.item">
+                    <!-- Photo trigger button -->
+                    <template v-if="(row.trx.jenisPenjualan === 'manual' || row.item?.foto) && row.item">
                       <button 
                         @click="openDirectPhotoModal(row.trx, row.item)"
                         type="button"

@@ -284,7 +284,10 @@ const PERMISSION_GROUPS = {
     { key: "data-order", label: "Data Order" },
     { key: "manajemen-order", label: "Manajemen Order" },
   ],
-  promosi: [{ key: "setting-promosi", label: "Setting Promosi" }],
+  promosi: [
+    { key: "setting-promosi", label: "Setting Promosi" },
+    { key: "display-harga", label: "Display Harga Emas" },
+  ],
   toko: [
     { key: "profil", label: "Profil Toko" },
     { key: "sop", label: "SOP Operasional" },
@@ -299,6 +302,7 @@ const PERMISSION_GROUPS = {
     { key: "maintenance", label: "Maintenance" },
     { key: "setting-manajemen-stok", label: "Setting Manajemen Stok" },
     { key: "printer", label: "Setting Printer" },
+    { key: "setting-harga-display", label: "Setting Display Harga" },
   ],
 };
 
@@ -335,6 +339,7 @@ const PERMISSION_TO_PAGE = {
   "order-online.data-order": "order-online.data",
   "order-online.manajemen-order": "order-online.manajemen",
   "promosi.setting-promosi": "promosi.setting",
+  "promosi.display-harga": "promosi.display-harga",
   "toko.profil": "toko.profil",
   "toko.sop": "toko.sop",
   "toko.layanan": "toko.layanan",
@@ -346,6 +351,7 @@ const PERMISSION_TO_PAGE = {
   "admin.maintenance": "admin.maintenance",
   "admin.setting-manajemen-stok": "admin.inventory-manajemen-stok",
   "admin.printer": "admin.printer",
+  "admin.setting-harga-display": "admin.setting-harga-display",
 };
 
 function defaultPermissions() {

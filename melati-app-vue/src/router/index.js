@@ -50,6 +50,7 @@ const BuybackView = () => import("@/views/inventory/BuybackView.vue");
 // Promosi
 const SettingPromosiView = () => import("@/views/promosi/SettingPromosiView.vue");
 const DisplayPromosiView = () => import("@/views/promosi/DisplayPromosiView.vue");
+const DisplayHargaView = () => import("@/views/promosi/DisplayHargaView.vue");
 
 // Informasi Toko
 const ProfilTokoView = () => import("@/views/toko/ProfilTokoView.vue");
@@ -65,6 +66,7 @@ const TemaWarnaView = () => import("@/views/pengaturan/TemaWarnaView.vue");
 const MaintenanceView = () => import("@/views/pengaturan/MaintenanceView.vue");
 const PengaturanManajemenStokView = () => import("@/views/pengaturan/PengaturanManajemenStokView.vue");
 const PrinterSettingView = () => import("@/views/pengaturan/PrinterSettingView.vue");
+const SettingHargaDisplayView = () => import("@/views/pengaturan/SettingHargaDisplayView.vue");
 
 // ─── Route definitions ────────────────────────────────────────────────────────
 const routes = [
@@ -72,10 +74,11 @@ const routes = [
   { path: "/", component: LoginView, meta: { layout: "blank", public: true } },
   { path: "/login", component: LoginView, meta: { layout: "blank", public: true } },
 
-  // Display-only (no sidebar, no login)
+// Display-only (no sidebar, no login)
   { path: "/antrian/display", component: DisplayAntrianView, meta: { layout: "blank", public: true } },
   { path: "/antrian/ambil", component: AmbilAntrianView, meta: { layout: "blank", public: true } },
   { path: "/promosi/display", component: DisplayPromosiView, meta: { layout: "blank", public: true } },
+  { path: "/promosi/display-harga", component: DisplayHargaView, meta: { layout: "blank", public: true } },
 
   // Dashboard
   { path: "/dashboard", component: DashboardView, meta: { requiresAuth: true, pageKey: "dashboard" } },
@@ -272,6 +275,11 @@ const routes = [
     path: "/pengaturan/manajemen-stok",
     component: PengaturanManajemenStokView,
     meta: { requiresAuth: true, pageKey: "admin.inventory-manajemen-stok" },
+  },
+  {
+    path: "/pengaturan/setting-harga-display",
+    component: SettingHargaDisplayView,
+    meta: { requiresAuth: true, pageKey: "admin.setting-harga-display" },
   },
 
   // Backward-compatible redirects

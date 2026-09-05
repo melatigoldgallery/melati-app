@@ -77,7 +77,10 @@ export const PAGE_ACCESS_SECTIONS = [
   {
     key: "promosi",
     label: "Promosi",
-    pages: [{ key: "promosi.setting", label: "Setting Promosi", route: "/promosi/setting" }],
+    pages: [
+      { key: "promosi.setting", label: "Setting Promosi", route: "/promosi/setting" },
+      { key: "promosi.display-harga", label: "Display Harga Emas", route: "/promosi/display-harga" },
+    ],
   },
   {
     key: "toko",
@@ -120,6 +123,11 @@ export const PAGE_ACCESS_SECTIONS = [
         label: "Setting Printer",
         route: "/pengaturan/printer",
       },
+      {
+        key: "admin.setting-harga-display",
+        label: "Setting Display Harga",
+        route: "/pengaturan/setting-harga-display",
+      },
     ],
   },
 ];
@@ -153,6 +161,7 @@ const SENSITIVE_PAGE_KEYS = new Set([
   "admin.maintenance",
   "admin.inventory-manajemen-stok",
   "admin.printer",
+  "admin.setting-harga-display",
 ]);
 
 const LEGACY_PERMISSION_TO_PAGE = {
@@ -191,6 +200,7 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "order-online.laporan-order": "order-online.manajemen",
   "order-online.laporan": "order-online.manajemen",
   "promosi.setting-promosi": "promosi.setting",
+  "promosi.display-harga": "promosi.display-harga",
   "toko.profil": "toko.profil",
   "toko.sop": "toko.sop",
   "toko.layanan": "toko.layanan",
@@ -204,6 +214,7 @@ const LEGACY_PERMISSION_TO_PAGE = {
   "admin.setting-manajemen-stok": "admin.inventory-manajemen-stok",
   "admin.inventory-manajemen-stok": "admin.inventory-manajemen-stok",
   "admin.printer": "admin.printer",
+  "admin.setting-harga-display": "admin.setting-harga-display",
 };
 
 export function getDefaultPageAccess(pageKey, role = "staff") {

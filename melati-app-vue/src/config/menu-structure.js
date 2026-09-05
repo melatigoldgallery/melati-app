@@ -140,7 +140,10 @@ export const menuStructure = [
     label: "Promosi",
     icon: "bi-megaphone",
     roles: ALL,
-    children: [{ label: "Setting Promosi", to: "/promosi/setting", pageKey: "promosi.setting", roles: ALL }],
+    children: [
+      { label: "Setting Promosi", to: "/promosi/setting", pageKey: "promosi.setting", roles: ALL },
+      { label: "Display Harga Emas", to: "/promosi/display-harga", pageKey: "promosi.display-harga", roles: ALL },
+    ],
   },
   {
     label: "Informasi Toko",
@@ -188,6 +191,12 @@ export const menuStructure = [
         label: "Setting Printer",
         to: "/pengaturan/printer",
         pageKey: "admin.printer",
+        roles: ALL,
+      },
+      {
+        label: "Setting Display Harga",
+        to: "/pengaturan/setting-harga-display",
+        pageKey: "admin.setting-harga-display",
         roles: ALL,
       },
     ],

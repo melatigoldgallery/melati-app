@@ -112,6 +112,7 @@
             <thead class="table-primary">
               <tr>
                 <th style="width: 40px">No</th>
+                <th style="width: 50px" class="text-center">Foto</th>
                 <th>Barcode</th>
                 <th>Nama Barang</th>
                 <th style="width: 70px">Jumlah</th>
@@ -124,12 +125,18 @@
             </thead>
             <tbody>
               <tr v-if="!aksesorisRows.length">
-                <td colspan="9" class="text-center text-muted py-3">
+                <td colspan="10" class="text-center text-muted py-3">
                   Belum ada barang. Klik "Pilih Kode" untuk menambahkan.
                 </td>
               </tr>
               <tr v-for="(row, i) in aksesorisRows" :key="i">
                 <td class="text-center align-middle">{{ i + 1 }}</td>
+                <td class="text-center align-middle">
+                  <a v-if="row.foto" :href="row.foto" target="_blank">
+                    <img :src="row.foto" class="img-thumbnail" style="width: 36px; height: 36px; object-fit: cover;" />
+                  </a>
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td class="align-middle small">{{ row.kode }}</td>
                 <td class="align-middle small">{{ row.nama }}</td>
                 <td>
@@ -196,6 +203,7 @@
             <thead class="table-primary">
               <tr>
                 <th style="width: 40px">No</th>
+                <th style="width: 50px" class="text-center">Foto</th>
                 <th>Barcode</th>
                 <th>Nama Barang</th>
                 <th style="width: 70px">Jumlah</th>
@@ -210,6 +218,10 @@
               <!-- Inline input row for adding silver by kode -->
               <tr class="table-light">
                 <td></td>
+                <td class="text-center align-middle">
+                  <img v-if="silverInput.foto" :src="silverInput.foto" class="img-thumbnail" style="width: 32px; height: 32px; object-fit: cover;" />
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td>
                   <input
                     v-model="silverInput.kode"
@@ -273,12 +285,18 @@
               </tr>
 
               <tr v-if="!silverRows.length">
-                <td colspan="9" class="text-center text-muted py-3">
+                <td colspan="10" class="text-center text-muted py-3">
                   Belum ada barang. Ketik kode di baris atas dan tekan Enter untuk menambahkan.
                 </td>
               </tr>
               <tr v-for="(row, i) in silverRows" :key="i">
                 <td class="text-center align-middle">{{ i + 1 }}</td>
+                <td class="text-center align-middle">
+                  <a v-if="row.foto" :href="row.foto" target="_blank">
+                    <img :src="row.foto" class="img-thumbnail" style="width: 36px; height: 36px; object-fit: cover;" />
+                  </a>
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td class="align-middle small">{{ row.kode }}</td>
                 <td class="align-middle small">{{ row.nama }}</td>
                 <td>
@@ -338,7 +356,7 @@
             </tbody>
             <tfoot v-if="silverRows.length">
               <tr class="table-light fw-bold">
-                <td colspan="7" class="text-end">Grand Total:</td>
+                <td colspan="8" class="text-end">Grand Total:</td>
                 <td class="text-primary">{{ formatCurrency(grandTotalSilver) }}</td>
                 <td></td>
               </tr>
@@ -352,6 +370,7 @@
             <thead class="table-primary">
               <tr>
                 <th style="width: 40px">No</th>
+                <th style="width: 50px" class="text-center">Foto</th>
                 <th>Kode</th>
                 <th>Jenis Kotak</th>
                 <th style="width: 70px">Jumlah</th>
@@ -362,12 +381,18 @@
             </thead>
             <tbody>
               <tr v-if="!kotakRows.length">
-                <td colspan="7" class="text-center text-muted py-3">
+                <td colspan="8" class="text-center text-muted py-3">
                   Belum ada barang. Klik "Pilih Kode" untuk menambahkan.
                 </td>
               </tr>
               <tr v-for="(row, i) in kotakRows" :key="i">
                 <td class="text-center align-middle">{{ i + 1 }}</td>
+                <td class="text-center align-middle">
+                  <a v-if="row.foto" :href="row.foto" target="_blank">
+                    <img :src="row.foto" class="img-thumbnail" style="width: 36px; height: 36px; object-fit: cover;" />
+                  </a>
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td class="align-middle small">{{ row.kode }}</td>
                 <td class="align-middle small">{{ row.nama }}</td>
                 <td>
@@ -401,7 +426,7 @@
             </tbody>
             <tfoot v-if="kotakRows.length">
               <tr class="table-light fw-bold">
-                <td colspan="5" class="text-end">Grand Total:</td>
+                <td colspan="6" class="text-end">Grand Total:</td>
                 <td class="text-primary">{{ formatCurrency(grandTotalKotak) }}</td>
                 <td></td>
               </tr>
@@ -672,6 +697,7 @@
           <table class="table table-hover table-striped table-sm">
             <thead class="table-primary sticky-top">
               <tr>
+                <th style="width: 45px" class="text-center">Foto</th>
                 <th>Kode</th>
                 <th>Nama Barang</th>
                 <th class="text-end">Stok</th>
@@ -679,7 +705,7 @@
             </thead>
             <tbody>
               <tr v-if="!filteredCatalog.length">
-                <td colspan="3" class="text-center text-muted py-3">Tidak ada data</td>
+                <td colspan="4" class="text-center text-muted py-3">Tidak ada data</td>
               </tr>
               <tr
                 v-for="item in filteredCatalog"
@@ -687,6 +713,10 @@
                 @click="pickFromCatalog(item)"
                 style="cursor: pointer"
               >
+                <td class="text-center align-middle">
+                  <img v-if="item.foto" :src="item.foto" class="img-thumbnail" style="width: 32px; height: 32px; object-fit: cover;" />
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td class="align-middle">{{ item.kode }}</td>
                 <td class="align-middle">
                   {{ item.nama }}
@@ -782,6 +812,7 @@
           <table class="table table-hover table-striped table-sm">
             <thead class="table-primary sticky-top">
               <tr>
+                <th style="width: 45px" class="text-center">Foto</th>
                 <th>Kode</th>
                 <th>Nama Barang</th>
                 <th class="text-end">Stok</th>
@@ -789,9 +820,13 @@
             </thead>
             <tbody>
               <tr v-if="!filteredLockCatalog.length">
-                <td colspan="3" class="text-center text-muted py-3">Tidak ada data</td>
+                <td colspan="4" class="text-center text-muted py-3">Tidak ada data</td>
               </tr>
               <tr v-for="item in filteredLockCatalog" :key="item.kode" @click="pickLock(item)" style="cursor: pointer">
+                <td class="text-center align-middle">
+                  <img v-if="item.foto" :src="item.foto" class="img-thumbnail" style="width: 32px; height: 32px; object-fit: cover;" />
+                  <span v-else class="text-muted small">-</span>
+                </td>
                 <td class="align-middle small">{{ item.kode }}</td>
                 <td class="align-middle">{{ item.nama }}</td>
                 <td class="text-end align-middle">{{ item.stok ?? 0 }}</td>
@@ -1326,6 +1361,7 @@ function resetSilverInput() {
     berat: "",
     hargaPerGram: 0,
     totalHargaStr: "",
+    foto: "",
   });
 }
 
@@ -1333,6 +1369,7 @@ function fillSilverInputFromCatalog(found) {
   silverInput.nama = found.nama || "";
   silverInput.kadar = found.kadar || "";
   silverInput.berat = found.berat ? String(found.berat) : "";
+  silverInput.foto = found.foto || "";
   silverInput.hargaPerGram = 0;
   // if there's a reference price set, prefill totalHargaStr and auto-calculate harga per gram
   const ref = silverPriceMap.value[String(found.kode || "").toLowerCase()];
@@ -1400,6 +1437,7 @@ function commitSilverRowFromInput() {
     _beratSatuan: found.berat || 0,
     hargaPerGram: silverInput.hargaPerGram || 0,
     totalHargaStr: formatCurrency(totalHarga),
+    foto: found.foto || silverInput.foto || "",
   });
 
   resetSilverInput();
@@ -1415,6 +1453,7 @@ watch(
       silverInput.kadar = "";
       silverInput.berat = "";
       silverInput.hargaPerGram = 0;
+      silverInput.foto = "";
       return;
     }
     const found = store.activeSalesItems.find(
@@ -1551,6 +1590,7 @@ function pickFromCatalog(item) {
       berat: "",
       hargaPerGram: 0,
       totalHargaStr: "",
+      foto: item.foto || "",
     });
   } else if (form.tipe === "silver") {
     silverRows.value.push({
@@ -1564,6 +1604,7 @@ function pickFromCatalog(item) {
       _beratSatuan: item.berat || 0,
       hargaPerGram: 0,
       totalHargaStr: "",
+      foto: item.foto || "",
     });
   } else if (form.tipe === "kotak") {
     const hargaSatuan = item.hargaJual || item.harga || 0;
@@ -1574,6 +1615,7 @@ function pickFromCatalog(item) {
       hargaSatuanStr: formatCurrency(hargaSatuan),
       hargaSatuan,
       totalHarga: hargaSatuan,
+      foto: item.foto || "",
     });
   }
   showCatalogModal.value = false;
@@ -2000,6 +2042,7 @@ function buildCartItems() {
       totalHarga: parseNum(row.totalHargaStr),
       harga: parseNum(row.totalHargaStr),
       subtotal: parseNum(row.totalHargaStr),
+      foto: row.foto || "",
     }));
   }
   if (form.tipe === "silver") {
@@ -2016,6 +2059,7 @@ function buildCartItems() {
       totalHarga: parseNum(row.totalHargaStr),
       harga: parseNum(row.totalHargaStr),
       subtotal: parseNum(row.totalHargaStr),
+      foto: row.foto || "",
     }));
   }
   if (form.tipe === "kotak") {
@@ -2029,6 +2073,7 @@ function buildCartItems() {
       totalHarga: row.totalHarga || 0,
       harga: row.hargaSatuan || 0,
       subtotal: row.totalHarga || 0,
+      foto: row.foto || "",
     }));
   }
   // manual

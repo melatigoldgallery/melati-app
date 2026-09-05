@@ -15,7 +15,7 @@
         </nav>
       </div>
       <div>
-        <button class="btn btn-sm btn-success d-none" @click="openQuickScanModal" :disabled="loading">
+        <button class="btn btn-sm btn-success" @click="openQuickScanModal" :disabled="loading">
           <i class="bi bi-qr-code-scan me-1"></i>
           Scan Cepat
         </button>
