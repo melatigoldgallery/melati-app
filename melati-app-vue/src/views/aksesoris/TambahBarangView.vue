@@ -420,7 +420,14 @@
     </div>
 
     <!-- ── Modal: Form Kode ── -->
-    <div class="modal fade" id="modalFormKode" tabindex="-1" aria-labelledby="modalFormKodeLabel" aria-hidden="true">
+    <div
+      class="modal fade"
+      id="modalFormKode"
+      tabindex="-1"
+      aria-labelledby="modalFormKodeLabel"
+      aria-hidden="true"
+      style="z-index: 1065;"
+    >
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header py-2">
@@ -474,18 +481,57 @@
             </div>
             <div class="mb-3">
               <label class="form-label small fw-semibold d-block">Foto Barang</label>
-              <div class="d-flex align-items-center gap-2">
-                <div v-if="kodeForm.foto" class="position-relative">
-                  <img :src="kodeForm.foto" class="img-thumbnail" style="width: 60px; height: 60px; object-fit: cover;" />
-                  <button type="button" @click="kodeForm.foto = ''" class="btn btn-danger btn-xs position-absolute top-0 end-0 p-0" style="font-size: 8px; width: 16px; height: 16px; line-height: 16px;">
+              
+              <!-- Existing Image Thumbnail -->
+              <div v-if="kodeForm.foto" class="mb-2 d-flex align-items-center gap-2">
+                <div class="position-relative">
+                  <img :src="kodeForm.foto" class="img-thumbnail" style="width: 70px; height: 70px; object-fit: cover;" />
+                  <button
+                    type="button"
+                    @click="kodeForm.foto = ''"
+                    class="btn btn-danger btn-xs position-absolute top-0 end-0 p-0"
+                    style="font-size: 8px; width: 18px; height: 18px; line-height: 18px;"
+                    title="Hapus foto"
+                  >
                     <i class="bi bi-x"></i>
                   </button>
                 </div>
-                <div class="flex-grow-1">
-                  <input type="file" ref="photoInput" class="form-control form-control-sm" accept="image/*" @change="handleFotoFileChange" :disabled="isUploadingFoto" />
-                  <span v-if="isUploadingFoto" class="small text-primary"><span class="spinner-border spinner-border-sm me-1"></span>Mengunggah foto...</span>
-                  <span v-else class="form-text text-muted small">Upload gambar produk (JPG/PNG/WEBP)</span>
+                <span class="small text-success fw-semibold"><i class="bi bi-check-circle me-1"></i> Foto terpasang</span>
+              </div>
+
+              <!-- Camera Live Stream Area -->
+              <div v-if="isCameraActive" class="mb-2 p-2 border rounded bg-dark text-center">
+                <video ref="videoElement" autoplay playsinline style="width: 100%; max-height: 240px; object-fit: cover; border-radius: 4px;"></video>
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                  <button type="button" @click="captureCameraPhoto" class="btn btn-success btn-sm" :disabled="isUploadingFoto">
+                    <span v-if="isUploadingFoto" class="spinner-border spinner-border-sm me-1"></span>
+                    <i v-else class="bi bi-camera-fill me-1"></i>
+                    Ambil Foto
+                  </button>
+                  <button type="button" @click="stopCamera" class="btn btn-outline-light btn-sm" :disabled="isUploadingFoto">
+                    Batal Kamera
+                  </button>
                 </div>
+              </div>
+
+              <!-- Options: Upload vs Camera -->
+              <div class="d-flex gap-2 align-items-center flex-wrap">
+                <button type="button" @click="triggerFileInput" class="btn btn-outline-primary btn-sm" :disabled="isUploadingFoto">
+                  <i class="bi bi-upload me-1"></i>
+                  Upload File
+                </button>
+                <button type="button" @click="toggleCamera" class="btn btn-outline-secondary btn-sm" :disabled="isUploadingFoto">
+                  <i class="bi bi-camera me-1"></i>
+                  {{ isCameraActive ? "Tutup Kamera" : "Gunakan Kamera" }}
+                </button>
+                <input type="file" ref="photoInput" class="d-none" accept="image/*" @change="handleFotoFileChange" :disabled="isUploadingFoto" />
+              </div>
+              
+              <div v-if="isUploadingFoto" class="mt-2 small text-primary">
+                <span class="spinner-border spinner-border-sm me-1"></span>Mengunggah foto...
+              </div>
+              <div v-else-if="!isCameraActive && !kodeForm.foto" class="form-text text-muted small mt-1">
+                Pilih file gambar atau gunakan kamera langsung.
               </div>
             </div>
           </div>
@@ -502,7 +548,7 @@
     </div>
 
     <!-- ── Modal: Hapus Kode ── -->
-    <div class="modal fade" id="modalHapusKode" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="modalHapusKode" tabindex="-1" aria-hidden="true" style="z-index: 1065;">
       <div class="modal-dialog modal-sm">
         <div class="modal-content">
           <div class="modal-header bg-danger text-white py-2">
@@ -576,7 +622,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { getLocalPrinters, printJob } from "@/utils/printHelper";
 import {
   doc,
@@ -972,13 +1018,118 @@ async function loadKodeBarang(kategori) {
   }
 }
 
-// ── Form Kode (Tambah / Edit) ─────────────────────────────────────────────────
+// ── Form Kode (Tambah / Edit) & Camera ───────────────────────────────────────
 const kodeFormMode = ref("add");
 const kodeForm = ref({ id: null, kode: "", nama: "", kadar: "", berat: "", harga: "", foto: "" });
 const isKodeSaving = ref(false);
 const isUploadingFoto = ref(false);
 const photoInput = ref(null);
+const isCameraActive = ref(false);
+const videoElement = ref(null);
+let mediaStream = null;
 let formKodeModal = null;
+
+function setupStackedModal(modalEl, parentModalId = "modalKelolaKode") {
+  if (!modalEl || modalEl.dataset.stackedSetup) return;
+  modalEl.dataset.stackedSetup = "true";
+
+  modalEl.addEventListener("show.bs.modal", () => {
+    setTimeout(() => {
+      const backdrops = document.querySelectorAll(".modal-backdrop");
+      if (backdrops.length > 1) {
+        backdrops[backdrops.length - 1].style.zIndex = "1060";
+      }
+    }, 10);
+  });
+
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    stopCamera();
+    const parentEl = document.getElementById(parentModalId);
+    if (parentEl && parentEl.classList.contains("show")) {
+      document.body.classList.add("modal-open");
+    }
+  });
+}
+
+async function startCamera() {
+  try {
+    isCameraActive.value = true;
+    await nextTick();
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    if (videoElement.value) {
+      videoElement.value.srcObject = mediaStream;
+    }
+  } catch (err) {
+    isCameraActive.value = false;
+    showError("Gagal Mengakses Kamera", err.message || "Pastikan izin akses kamera diberikan pada browser.");
+  }
+}
+
+function stopCamera() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+  isCameraActive.value = false;
+}
+
+function toggleCamera() {
+  if (isCameraActive.value) {
+    stopCamera();
+  } else {
+    startCamera();
+  }
+}
+
+function triggerFileInput() {
+  stopCamera();
+  if (photoInput.value) {
+    photoInput.value.click();
+  }
+}
+
+async function captureCameraPhoto() {
+  if (!videoElement.value || !mediaStream) return;
+  isUploadingFoto.value = true;
+  try {
+    const video = videoElement.value;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Gagal menginisialisasi canvas");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        showError("Gagal Mengambil Foto", "Gambar tidak valid");
+        isUploadingFoto.value = false;
+        return;
+      }
+      try {
+        const file = new File([blob], `camera_${Date.now()}.jpg`, { type: "image/jpeg" });
+        const compressedBlob = await compressImage(file);
+        const kodeClean = (kodeForm.value.kode || "item_" + Date.now()).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "_");
+        const filename = `${kodeClean}_${Date.now()}.jpg`;
+        const path = scopeStoragePath(`kode-aksesoris/${activeKodeTab.value}/${filename}`, activeFloor.value);
+        const fileRef = storageRef(storage, path);
+        await uploadBytes(fileRef, compressedBlob, { contentType: "image/jpeg" });
+        const downloadUrl = await getDownloadURL(fileRef);
+        kodeForm.value.foto = downloadUrl;
+        stopCamera();
+      } catch (uploadErr) {
+        showError("Gagal Mengunggah Foto Kamera", uploadErr.message || uploadErr.toString());
+      } finally {
+        isUploadingFoto.value = false;
+      }
+    }, "image/jpeg", 0.85);
+  } catch (err) {
+    showError("Gagal Mengambil Foto", err.message || err.toString());
+    isUploadingFoto.value = false;
+  }
+}
 
 function compressImage(file, maxWidth = 600, maxHeight = 600, quality = 0.8) {
   return new Promise((resolve, reject) => {
@@ -1054,13 +1205,17 @@ function buildStokKodeData(data) {
 }
 
 function openTambahKode() {
+  stopCamera();
   kodeFormMode.value = "add";
   kodeForm.value = { id: null, kode: "", nama: "", kadar: "", berat: "", harga: "", foto: "" };
-  if (!formKodeModal) formKodeModal = new Modal(document.getElementById("modalFormKode"));
+  const modalEl = document.getElementById("modalFormKode");
+  if (modalEl) setupStackedModal(modalEl, "modalKelolaKode");
+  if (!formKodeModal) formKodeModal = Modal.getOrCreateInstance(modalEl);
   formKodeModal.show();
 }
 
 function openEditKode(k) {
+  stopCamera();
   kodeFormMode.value = "edit";
   kodeForm.value = {
     id: k.id,
@@ -1071,7 +1226,9 @@ function openEditKode(k) {
     harga: k.harga || "",
     foto: k.foto || "",
   };
-  if (!formKodeModal) formKodeModal = new Modal(document.getElementById("modalFormKode"));
+  const modalEl = document.getElementById("modalFormKode");
+  if (modalEl) setupStackedModal(modalEl, "modalKelolaKode");
+  if (!formKodeModal) formKodeModal = Modal.getOrCreateInstance(modalEl);
   formKodeModal.show();
 }
 
@@ -1132,6 +1289,7 @@ async function simpanKode() {
         }
       });
     }
+    stopCamera();
     formKodeModal.hide();
     swal("Kode berhasil disimpan");
     await loadKodeBarang(activeKodeTab.value);
@@ -1152,7 +1310,9 @@ let deleteKodeModal = null;
 
 function openHapusKode(k) {
   deleteKodeTarget.value = k;
-  if (!deleteKodeModal) deleteKodeModal = new Modal(document.getElementById("modalHapusKode"));
+  const modalEl = document.getElementById("modalHapusKode");
+  if (modalEl) setupStackedModal(modalEl, "modalKelolaKode");
+  if (!deleteKodeModal) deleteKodeModal = Modal.getOrCreateInstance(modalEl);
   deleteKodeModal.show();
 }
 

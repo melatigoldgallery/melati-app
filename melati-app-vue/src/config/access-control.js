@@ -79,7 +79,7 @@ export const PAGE_ACCESS_SECTIONS = [
     label: "Promosi",
     pages: [
       { key: "promosi.setting", label: "Setting Promosi", route: "/promosi/setting" },
-      { key: "promosi.display-harga", label: "Display Harga Emas", route: "/promosi/display-harga" },
+      { key: "promosi.display-harga", label: "Display Harga", route: "/promosi/display-harga" },
     ],
   },
   {
@@ -125,7 +125,7 @@ export const PAGE_ACCESS_SECTIONS = [
       },
       {
         key: "admin.setting-harga-display",
-        label: "Setting Display Harga",
+        label: "Display Harga",
         route: "/pengaturan/setting-harga-display",
       },
     ],

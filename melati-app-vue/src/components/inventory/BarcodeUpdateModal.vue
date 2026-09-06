@@ -6,7 +6,7 @@
           <div class="modal-header py-3 bg-primary text-white border-0">
             <h6 class="modal-title fw-bold">
               <i class="bi bi-qr-code-scan me-2"></i>
-              <span v-if="isQuickScan">Scan Cepat Barcode<span v-if="detectedMainCat">: {{ detectedMainCat }}</span></span>
+              <span v-if="isQuickScan">Scan Barcode<span v-if="detectedMainCat">: {{ detectedMainCat }}</span></span>
               <span v-else>Update Barcode: {{ mainCat }} - {{ subLabel }}</span>
             </h6>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

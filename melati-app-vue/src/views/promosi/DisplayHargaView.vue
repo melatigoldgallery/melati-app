@@ -354,6 +354,31 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding-bottom: 2rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+}
+
+/* Custom Scrollbar Transparan */
+.display-page::-webkit-scrollbar,
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.display-page::-webkit-scrollbar-track,
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.display-page::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 10px;
+}
+
+.display-page::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.6);
 }
 
 .max-w-1600 {
@@ -428,7 +453,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .current-date {
-  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+  font-size: clamp(1.1rem, 2.8vw, 2rem);
   font-weight: 500;
   font-family: "Playfair Display", serif;
   color: #e5e7eb;
@@ -519,7 +544,7 @@ onUnmounted(() => {
 .kadar-badge {
   display: inline-block;
   font-family: "Playfair Display", serif;
-  font-size: clamp(1.6rem, 2.8vw, 2.25rem);
+  font-size: clamp(1.6rem, 2.8vw, 2.9rem);
   font-weight: 800;
   color: #fce788;
   background: linear-gradient(135deg, #614523 0%, #1e170e 100%);
@@ -597,7 +622,7 @@ onUnmounted(() => {
 
 .price-value {
   font-family: "Poppins", sans-serif;
-  font-size: clamp(1.5rem, 3.2vw, 3rem);
+  font-size: clamp(1.5rem, 3.2vw, 3.2rem);
   font-weight: 700;
   color: #313131;
   white-space: nowrap;
@@ -608,7 +633,7 @@ onUnmounted(() => {
  
 .price-value-branded {
   font-family: "Poppins", sans-serif;
-  font-size: clamp(1.5rem, 3.2vw, 2.9rem);
+  font-size: clamp(1.5rem, 3.2vw, 3.1rem);
   font-weight: 800;
   color: #ffffff;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -645,7 +670,7 @@ onUnmounted(() => {
 }
 .price-value-buyback {
   font-family: "Poppins", sans-serif;
-  font-size: clamp(1.5rem, 3.2vw, 2.7rem);
+  font-size: clamp(1.5rem, 3.2vw, 3.2rem);
   font-weight: 800;
   color: #027d08;
   text-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);

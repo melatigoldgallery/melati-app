@@ -1,25 +1,17 @@
 <template>
   <div class="container-fluid py-3 stock-page">
-    <div class="page-header d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <h1>
-          <i class="bi bi-archive me-2 text-dark"></i>
-          Manajemen Stok
-        </h1>
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
-            <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
-            <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
-          </ol>
-        </nav>
-      </div>
-      <div>
-        <button class="btn btn-sm btn-success" @click="openQuickScanModal" :disabled="loading">
-          <i class="bi bi-qr-code-scan me-1"></i>
-          Scan Cepat
-        </button>
-      </div>
+    <div class="page-header mb-3">
+      <h1>
+        <i class="bi bi-archive me-2 text-dark"></i>
+        Manajemen Stok
+      </h1>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+          <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
+          <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
+        </ol>
+      </nav>
     </div>
 
     <div v-if="loading" class="text-center py-5">
@@ -86,120 +78,156 @@
           </div>
         </div>
 
-        <ul v-if="hasTabs" class="nav nav-tabs compact justify-content-center overflow-auto mb-0">
-          <li v-for="tab in tabs" :key="tab.id" class="nav-item">
-            <button
-              class="nav-link text-nowrap small text-dark fw-bold"
-              :class="{ active: activeTab === tab.id }"
-              @click="activeTab = tab.id"
-            >
-              {{ tab.label }}
-            </button>
-          </li>
-        </ul>
+        <!-- Section Stok Fisik per Kategori & Data Sales Tidak Scan Barcode (2 Kolom 7:5) -->
+        <div v-if="isBarcodeEnabled" class="row g-3 mb-4">
+          <!-- Kolom Kiri: Stok Fisik per Kategori (col-8) -->
+          <div class="col-12 col-lg-8 d-flex flex-column">
+            <div class="card border-0 shadow-sm rounded-3 overflow-hidden h-100 d-flex flex-column">
+              <!-- Card Header -->
+              <div class="card-header bg-white border-0 pt-3 pb-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="icon-box bg-primary-subtle text-primary rounded-2 p-2 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                    <i class="bi bi-box-seam fs-5"></i>
+                  </div>
+                  <div>
+                    <h6 class="mb-0 fw-bold text-dark fs-6">Data Stok per Kategori</h6>
+                    <small class="text-muted" style="font-size: 0.75rem;">Rincian Stok Barang Realtime</small>
+                  </div>
+                </div>
+                <button class="btn btn-success btn-sm px-3 fw-bold d-inline-flex align-items-center gap-1 shadow-sm p-2" @click="openQuickScanModal" :disabled="loading">
+                  <i class="bi bi-qr-code-scan"></i>
+                  <span>Scan Barcode di Sini</span>
+                </button>
+              </div>
 
-        <div v-if="hasTabs" class="card border-0 shadow-sm rounded-0 rounded-bottom">
-          <div class="card-body p-0">
-            <div v-if="!isComputerTab" class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width: 44px">No</th>
-                    <th>Jenis</th>
-                    <th v-if="isBarcodeEnabled" class="text-center">Rincian Barcode</th>
-                    <th class="text-center">Jumlah</th>
-                    <th class="text-center">Aksi</th>
-                    <th class="text-center">Riwayat</th>
-                    <th class="text-center">Terakhir Update</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(sub, idx) in tableRows" :key="sub.key">
-                    <td class="fw-semibold">{{ idx + 1 }}</td>
-                    <td class="fw-semibold">{{ sub.label }}</td>
-                    <td v-if="isBarcodeEnabled" class="text-center">
-                      <button
-                        v-if="sub.key !== 'barang-display' || showRincianColumn"
-                        class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1"
-                        @click="openBarcodeRincianModal(activeTab, sub)"
-                      >
-                        <i class="bi bi-qr-code-scan"></i>
-                        <span>Lihat</span>
-                      </button>
-                      <span v-else class="text-muted small">-</span>
-                    </td>
-                    <td class="text-center">
-                      <span class="badge bg-success fs-6 px-2">{{ getQty(activeTab, sub.key) }}</span>
-                    </td>
-                    <td class="text-center">
-                      <button class="btn btn-success btn-sm" @click="openUpdateModal(activeTab, sub)">
-                        <i class="bi bi-pencil me-1"></i>
-                        Update
-                      </button>
-                    </td>
-                    <td class="text-center">
-                      <button class="btn btn-info btn-sm text-white" @click="openHistoryModal(activeTab, sub)">
-                        <i class="bi bi-clock-history"></i>
-                      </button>
-                    </td>
-                    <td class="text-center text-muted small">
-                      {{ formatDate(getItem(sub.key, activeTab)?.lastUpdated) }}
-                    </td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr class="table-light fw-bold">
-                    <td :colspan="isBarcodeEnabled ? 3 : 2">Total Fisik</td>
-                    <td class="text-center">{{ summary[activeTab]?.fisik ?? 0 }}</td>
-                    <td colspan="3" class="text-center">
-                      <span class="badge" :class="`bg-${summary[activeTab]?.status.cls ?? 'secondary'}`">
-                        {{ summary[activeTab]?.status.label ?? "-" }}
-                      </span>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+              <!-- Card Body -->
+              <div class="card-body p-3 d-flex flex-column gap-2 flex-grow-1">
+                <ul v-if="hasTabs" class="nav nav-tabs compact justify-content-center overflow-auto mb-0">
+                  <li v-for="tab in tabs" :key="tab.id" class="nav-item">
+                    <button
+                      class="nav-link text-nowrap small text-dark fw-bold"
+                      :class="{ active: activeTab === tab.id }"
+                      @click="activeTab = tab.id"
+                    >
+                      {{ tab.label }}
+                    </button>
+                  </li>
+                </ul>
 
-            <div v-else class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width: 44px">No</th>
-                    <th>Jenis Barang</th>
-                    <th class="text-center">Jumlah</th>
-                    <th class="text-center">Aksi</th>
-                    <th class="text-center">Terakhir Update</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(card, idx) in nonComputerCards" :key="card.id">
-                    <td class="fw-semibold">{{ idx + 1 }}</td>
-                    <td class="fw-semibold">{{ card.label }}</td>
-                    <td class="text-center">
-                      <span class="badge bg-primary fs-6 px-2">{{ getQty(card.id, "stok-komputer") }}</span>
-                    </td>
-                    <td class="text-center">
-                      <button class="btn btn-primary btn-sm" @click="openKomputerModal(card.id)">
-                        <i class="bi bi-pencil me-1"></i>
-                        Update
-                      </button>
-                    </td>
-                    <td class="text-center text-muted small">
-                      {{ formatDate(getItem("stok-komputer", card.id)?.lastUpdated) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                <div v-if="hasTabs" class="border rounded-3 overflow-hidden flex-grow-1">
+                  <div v-if="!isComputerTab" class="table-responsive">
+                    <table class="table table-hover mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th style="width: 44px">No</th>
+                          <th>Jenis</th>
+                          <th v-if="isBarcodeEnabled" class="text-center">Rincian Barcode</th>
+                          <th class="text-center">Jumlah</th>
+                          <th class="text-center">Aksi</th>
+                          <th class="text-center">Riwayat</th>
+                          <th class="text-center">Terakhir Update</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(sub, idx) in tableRows" :key="sub.key">
+                          <td class="fw-semibold">{{ idx + 1 }}</td>
+                          <td class="fw-semibold">{{ sub.label }}</td>
+                          <td v-if="isBarcodeEnabled" class="text-center">
+                            <button
+                              v-if="sub.key !== 'barang-display' || showRincianColumn"
+                              class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1"
+                              @click="openBarcodeRincianModal(activeTab, sub)"
+                            >
+                              <i class="bi bi-qr-code-scan"></i>
+                              <span>Lihat</span>
+                            </button>
+                            <span v-else class="text-muted small">-</span>
+                          </td>
+                          <td class="text-center">
+                            <span class="badge bg-success fs-6 px-2">{{ getQty(activeTab, sub.key) }}</span>
+                          </td>
+                          <td class="text-center">
+                            <button
+                              v-if="!isBarcodeEnabled || sub.key === 'barang-display'"
+                              class="btn btn-success btn-sm"
+                              @click="openUpdateModal(activeTab, sub)"
+                            >
+                              <i class="bi bi-pencil me-1"></i>
+                              Update
+                            </button>
+                            <span v-else class="text-muted small">-</span>
+                          </td>
+                          <td class="text-center">
+                            <button class="btn btn-info btn-sm text-white" @click="openHistoryModal(activeTab, sub)">
+                              <i class="bi bi-clock-history"></i>
+                            </button>
+                          </td>
+                          <td class="text-center text-muted small">
+                            {{ formatDate(getItem(sub.key, activeTab)?.lastUpdated) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="table-light fw-bold">
+                          <td :colspan="isBarcodeEnabled ? 3 : 2">Total Fisik</td>
+                          <td class="text-center">{{ summary[activeTab]?.fisik ?? 0 }}</td>
+                          <td colspan="3" class="text-center">
+                            <span class="badge" :class="`bg-${summary[activeTab]?.status.cls ?? 'secondary'}`">
+                              {{ summary[activeTab]?.status.label ?? "-" }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <div v-else class="table-responsive">
+                    <table class="table table-hover mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th style="width: 44px">No</th>
+                          <th>Jenis Barang</th>
+                          <th class="text-center">Jumlah</th>
+                          <th class="text-center">Aksi</th>
+                          <th class="text-center">Terakhir Update</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(card, idx) in nonComputerCards" :key="card.id">
+                          <td class="fw-semibold">{{ idx + 1 }}</td>
+                          <td class="fw-semibold">{{ card.label }}</td>
+                          <td class="text-center">
+                            <span class="badge bg-primary fs-6 px-2">{{ getQty(card.id, "stok-komputer") }}</span>
+                          </td>
+                          <td class="text-center">
+                            <button class="btn btn-primary btn-sm" @click="openKomputerModal(card.id)">
+                              <i class="bi bi-pencil me-1"></i>
+                              Update
+                            </button>
+                          </td>
+                          <td class="text-center text-muted small">
+                            {{ formatDate(getItem("stok-komputer", card.id)?.lastUpdated) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div v-else class="alert alert-warning mb-0">
+                  Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <div v-else class="alert alert-warning mb-0">
-          Belum ada tab aktif. Silakan aktifkan card di halaman pengaturan.
+
+          <!-- Kolom Kanan: Data Sales Tidak Scan Barcode (col-4) -->
+          <div class="col-12 col-lg-4 d-flex flex-column">
+            <UnscannedSalesWidget class="flex-grow-1" />
+          </div>
         </div>
 
         <!-- Section Panduan & Alur Kerja Pelacakan Stok (Barcode Tracking) -->
-        <StockGuideBoard v-if="isBarcodeEnabled" />
+        <StockGuideBoard v-if="isBarcodeEnabled" class="d-none" />
       </div>
 
       <!-- Lacak Fisik (Barcode) Content -->
@@ -369,6 +397,8 @@ import MutationLog from "@/components/inventory/barcode-tracking/MutationLog.vue
 import StockOpname from "@/components/inventory/barcode-tracking/StockOpname.vue";
 import ClipManager from "@/components/inventory/barcode-tracking/ClipManager.vue";
 import DiscrepancyDashboard from "@/components/inventory/barcode-tracking/DiscrepancyDashboard.vue";
+import UnscannedSalesWidget from "@/components/inventory/barcode-tracking/UnscannedSalesWidget.vue";
+import { useBarcodeDiscrepancies } from "@/composables/useBarcodeDiscrepancies";
 
 import {
   KETERANGAN_OPTS,
@@ -509,7 +539,8 @@ const canAccessDiscrepancy = computed(() => {
   if (!currentUsername) return false;
   return allowedUsers.some(u => String(u).toLowerCase() === currentUsername.toLowerCase());
 });
-const unresolvedDiscrepanciesCount = ref(0);
+const barcodeDiscrepanciesStore = useBarcodeDiscrepancies();
+const unresolvedDiscrepanciesCount = barcodeDiscrepanciesStore.unresolvedCount;
 
 const summaryGridStyle = computed(() => {
   const grid = displaySettings.value.summaryGrid || {};
@@ -760,30 +791,10 @@ function setupDisplaySettingsRealtime() {
   );
 }
 
-function setupDiscrepanciesSubscription() {
-  if (unsubDiscrepancies) {
-    unsubDiscrepancies();
-    unsubDiscrepancies = null;
-  }
-  if (!auth.activeFloor || !canAccessDiscrepancy.value) {
-    unresolvedDiscrepanciesCount.value = 0;
-    return;
-  }
-  unsubDiscrepancies = subscribeBarcodeDiscrepancies(
-    auth.activeFloor,
-    (list) => {
-      unresolvedDiscrepanciesCount.value = list.filter((item) => !item.resolved).length;
-    },
-    (err) => {
-      console.error("Gagal mendengarkan selisih stok:", err);
-    }
-  );
-}
-
 watch(
-  [() => auth.activeFloor, () => canAccessDiscrepancy.value],
-  () => {
-    setupDiscrepanciesSubscription();
+  () => auth.activeFloor,
+  (newFloor) => {
+    barcodeDiscrepanciesStore.initSubscription(newFloor);
   },
   { immediate: true }
 );
@@ -823,57 +834,46 @@ async function refreshData() {
 }
 
 function openUpdateModal(mainCat, sub) {
-  if (!isBarcodeEnabled.value || sub.key === "barang-display") {
-    const detailMode = getCardDetailMode(mainCat);
-    const item = getItem(sub.key, mainCat) || {};
-    let originalDetails = {};
-    let quantity = 0;
+  const detailMode = getCardDetailMode(mainCat);
+  const item = getItem(sub.key, mainCat) || {};
+  let originalDetails = {};
+  let quantity = 0;
 
-    if (detailMode === "color") {
-      COLOR_TYPES.value.forEach((k) => {
-        originalDetails[k] = toInt(item.details?.[k]);
+  if (detailMode === "color") {
+    COLOR_TYPES.value.forEach((k) => {
+      originalDetails[k] = toInt(item.details?.[k]);
+    });
+    if (item.details) {
+      Object.keys(item.details).forEach((k) => {
+        if (toInt(item.details[k]) > 0 && !COLOR_TYPES.value.includes(k)) {
+          originalDetails[k] = toInt(item.details[k]);
+        }
       });
-      if (item.details) {
-        Object.keys(item.details).forEach((k) => {
-          if (toInt(item.details[k]) > 0 && !COLOR_TYPES.value.includes(k)) {
-            originalDetails[k] = toInt(item.details[k]);
-          }
-        });
-      }
-    } else if (detailMode === "hala") {
-      HALA_TYPES.value.forEach((k) => {
-        originalDetails[k] = toInt(item.details?.[k]);
-      });
-      if (item.details) {
-        Object.keys(item.details).forEach((k) => {
-          if (toInt(item.details[k]) > 0 && !HALA_TYPES.value.includes(k)) {
-            originalDetails[k] = toInt(item.details[k]);
-          }
-        });
-      }
-    } else {
-      quantity = getQty(mainCat, sub.key);
     }
-
-    updateForm.value = {
-      mainCat,
-      subDoc: sub.key,
-      subLabel: sub.label,
-      quantity,
-      originalDetails,
-      detailMode,
-    };
-    showModal("stockUpdateModal");
+  } else if (detailMode === "hala") {
+    HALA_TYPES.value.forEach((k) => {
+      originalDetails[k] = toInt(item.details?.[k]);
+    });
+    if (item.details) {
+      Object.keys(item.details).forEach((k) => {
+        if (toInt(item.details[k]) > 0 && !HALA_TYPES.value.includes(k)) {
+          originalDetails[k] = toInt(item.details[k]);
+        }
+      });
+    }
   } else {
-    // Open barcode update modal
-    barcodeForm.value = {
-      mainCat,
-      subDoc: sub.key,
-      subLabel: sub.label,
-      isQuickScan: false,
-    };
-    showModal("barcodeUpdateModal");
+    quantity = getQty(mainCat, sub.key);
   }
+
+  updateForm.value = {
+    mainCat,
+    subDoc: sub.key,
+    subLabel: sub.label,
+    quantity,
+    originalDetails,
+    detailMode,
+  };
+  showModal("stockUpdateModal");
 }
 
 function openQuickScanModal() {

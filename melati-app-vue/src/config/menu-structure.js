@@ -137,12 +137,12 @@ export const menuStructure = [
     ],
   },
   {
-    label: "Promosi",
+    label: "Display",
     icon: "bi-megaphone",
     roles: ALL,
     children: [
       { label: "Setting Promosi", to: "/promosi/setting", pageKey: "promosi.setting", roles: ALL },
-      { label: "Display Harga Emas", to: "/promosi/display-harga", pageKey: "promosi.display-harga", roles: ALL },
+      { label: "Display Harga", to: "/promosi/display-harga", pageKey: "promosi.display-harga", roles: ALL },
     ],
   },
   {
@@ -194,7 +194,7 @@ export const menuStructure = [
         roles: ALL,
       },
       {
-        label: "Setting Display Harga",
+        label: "Display Harga",
         to: "/pengaturan/setting-harga-display",
         pageKey: "admin.setting-harga-display",
         roles: ALL,
