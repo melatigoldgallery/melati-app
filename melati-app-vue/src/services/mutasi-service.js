@@ -19,12 +19,28 @@ import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
 import { floorCollection, floorDoc } from "./floor-scope";
 import { verifyStoredSecret } from "@/utils/security";
 
+import { getCachedSettings } from "./inventory-setting-service";
+import { batchAdjustManualStock } from "./inventory-service";
+import { runTransaction } from "firebase/firestore";
+
 const CACHE_KEY = "kodeDataCache";
 const CACHE_TTL_STANDARD = 60 * 60 * 1000;
 const CACHE_TTL_TODAY = 5 * 60 * 1000;
 const CACHE_VERSION = "v4.0";
 const SAVE_DEBOUNCE_MS = 1000;
 const MAX_STORAGE_SIZE = 4 * 1024 * 1024;
+
+export const CATEGORY_DEFINITIONS = {
+  KALUNG: { label: "Kalung", prefixes: ["KM", "KB", "KP", "K"], detailMode: "color" },
+  GELANG: { label: "Gelang", prefixes: ["GM", "GB", "GP", "G"], detailMode: "default" },
+  CINCIN: { label: "Cincin", prefixes: ["CP", "CM", "CB", "C"], detailMode: "default" },
+  LIONTIN: { label: "Liontin", prefixes: ["LP", "LM", "L"], detailMode: "color" },
+  ANTING: { label: "Anting", prefixes: ["AP", "AM", "A"], detailMode: "default" },
+  GIWANG: { label: "Giwang", prefixes: ["SP", "SM", "S"], detailMode: "default" },
+  "HALA & SDW": { label: "HALA & SDW", prefixes: ["HL", "Z", "V"], detailMode: "hala" },
+  "KENDARI & EMAS BALI": { label: "Kendari & Emas Bali", prefixes: ["KL"], detailMode: "hala" },
+  BERLIAN: { label: "Berlian", prefixes: ["BL", "B"], detailMode: "default" },
+};
 
 export const JENIS_BARANG = {
   C: "Cincin",
@@ -35,39 +51,254 @@ export const JENIS_BARANG = {
   S: "Giwang",
   Z: "HALA & SDW",
   V: "HALA & SDW",
+  KM: "Kalung",
+  KP: "Kalung",
+  KB: "Kalung",
+  GM: "Gelang",
+  GP: "Gelang",
+  GB: "Gelang",
+  CP: "Cincin",
+  CM: "Cincin",
+  CB: "Cincin",
+  LP: "Liontin",
+  LM: "Liontin",
+  AP: "Anting",
+  AM: "Anting",
+  SP: "Giwang",
+  SM: "Giwang",
+  HL: "HALA & SDW",
+  KL: "Kendari & Emas Bali",
+  BL: "Berlian",
+  B: "Berlian",
 };
 
-// Coba deteksi prefix jenis barang dari nama produk jika kode tidak memiliki prefix yang valid
-function detectPrefixFromNama(nama) {
-  const text = String(nama || "").toLowerCase();
-  if (!text) return null;
+/**
+ * Mengambil definisi kategori yang diperkaya secara dinamis dengan custom cards dari Pengaturan Manajemen Stok
+ */
+export function getDynamicCategoryDefinitions() {
+  const definitions = {};
 
-  // Periksa apakah nama mengandung salah satu label jenis barang
-  for (const [key, label] of Object.entries(JENIS_BARANG)) {
-    if (!label) continue;
-    const token = String(label).toLowerCase();
-    if (token && text.includes(token)) return key;
+  // 1. Masukkan presets default
+  for (const [catKey, def] of Object.entries(CATEGORY_DEFINITIONS)) {
+    definitions[catKey] = {
+      label: def.label,
+      prefixes: [...def.prefixes],
+      detailMode: def.detailMode || "default",
+    };
   }
 
-  // Coba beberapa kata kunci pendek (mis. 'kalung', 'liontin', 'cincin') untuk akurasi
-  const keywords = {
-    C: ["cincin"],
-    K: ["kalung"],
-    L: ["liontin"],
-    A: ["anting"],
-    G: ["gelang"],
-    S: ["giwang"],
-    Z: ["hala", "sdw"],
-    V: ["hala", "sdw"],
-  };
+  // 2. Perkaya dengan custom cards dari Pengaturan Manajemen Stok
+  const settings = getCachedSettings();
+  if (settings && Array.isArray(settings.cards)) {
+    settings.cards.forEach((card) => {
+      const cardId = String(card.id || "").trim().toUpperCase();
+      if (!cardId || card.type === "computer" || card.enabled === false) return;
 
-  for (const [key, keys] of Object.entries(keywords)) {
-    for (const k of keys) {
-      if (text.includes(k)) return key;
+      const prefixes = Array.isArray(card.prefixes)
+        ? card.prefixes.map((p) => String(p || "").trim().toUpperCase()).filter(Boolean)
+        : [];
+
+      if (definitions[cardId]) {
+        definitions[cardId].label = card.label || definitions[cardId].label;
+        definitions[cardId].prefixes = [...new Set([...prefixes, ...definitions[cardId].prefixes])];
+        if (card.detailMode) definitions[cardId].detailMode = card.detailMode;
+      } else {
+        definitions[cardId] = {
+          label: card.label || cardId,
+          prefixes,
+          detailMode: card.detailMode || (card.type === "color" || card.type === "hala" ? card.type : "default"),
+        };
+      }
+    });
+  }
+
+  return definitions;
+}
+
+/**
+ * Deteksi kategori utama, prefix, label, dan subtype dari kode/nama barang secara dinamis & DRY
+ */
+export function resolveCategoryFromPrefix(code, name = "", explicitPrefix = "") {
+  const cleanCode = String(code || "").trim().toUpperCase();
+  const cleanExplicit = String(explicitPrefix || "").trim().toUpperCase();
+  const textName = String(name || "").toLowerCase();
+
+  const defs = getDynamicCategoryDefinitions();
+
+  // Ekstrak kandidat prefix berdasarkan tanda strip / huruf
+  const prefixByDash = cleanCode.includes("-") ? cleanCode.split("-")[0].trim() : "";
+  const lettersOnly = cleanCode.replace(/[^A-Z]/g, "");
+
+  const candidatePrefixes = [
+    cleanExplicit,
+    prefixByDash,
+    lettersOnly.substring(0, 3),
+    lettersOnly.substring(0, 2),
+    lettersOnly.substring(0, 1),
+  ].filter(Boolean);
+
+  let matchedCat = null;
+  let matchedPrefix = "";
+
+  // 1. Prioritas pencocokan prefix dengan definisi
+  for (const cand of candidatePrefixes) {
+    for (const [catKey, def] of Object.entries(defs)) {
+      if (def.prefixes.includes(cand)) {
+        matchedCat = catKey;
+        matchedPrefix = cand;
+        break;
+      }
+    }
+    if (matchedCat) break;
+  }
+
+  // 2. Fallback startsWith pada kode bersih (misal prefix "TM" pada "TM00010")
+  if (!matchedCat) {
+    for (const [catKey, def] of Object.entries(defs)) {
+      const found = def.prefixes.find((p) => p && cleanCode.startsWith(p));
+      if (found) {
+        matchedCat = catKey;
+        matchedPrefix = found;
+        break;
+      }
     }
   }
 
-  return null;
+  // 3. Fallback deteksi dari kata kunci nama barang jika kode tidak berpola standar
+  if (!matchedCat && textName) {
+    for (const [catKey, def] of Object.entries(defs)) {
+      const catLabel = String(def.label || "").toLowerCase();
+      const catName = catKey.toLowerCase();
+      if ((catLabel && textName.includes(catLabel)) || (catName && textName.includes(catName))) {
+        matchedCat = catKey;
+        matchedPrefix = def.prefixes[0] || "LAIN";
+        break;
+      }
+    }
+  }
+
+  if (!matchedCat) {
+    matchedCat = "LAINNYA";
+    matchedPrefix = candidatePrefixes[0] || "LAIN";
+  }
+
+  const def = defs[matchedCat] || { label: "Lainnya", detailMode: "default" };
+  const jenisNama = def.label;
+
+  // Resolve detailType (warna untuk Kalung/Liontin, tipe untuk Hala)
+  let detailType = null;
+  if (def.detailMode === "color") {
+    if (textName.includes("hijau") || cleanCode.includes("HIJAU")) detailType = "HIJAU";
+    else if (textName.includes("biru") || cleanCode.includes("BIRU")) detailType = "BIRU";
+    else if (textName.includes("pink") || cleanCode.includes("PINK")) detailType = "PINK";
+    else if (textName.includes("kuning") || cleanCode.includes("KUNING")) detailType = "KUNING";
+    else if (cleanCode.includes("-")) {
+      const parts = cleanCode.split("-");
+      if (parts.length >= 3 && ["HIJAU", "BIRU", "PUTIH", "PINK", "KUNING"].includes(parts[parts.length - 2])) {
+        detailType = parts[parts.length - 2];
+      }
+    }
+    if (!detailType) detailType = "PUTIH";
+  } else if (def.detailMode === "hala") {
+    if (cleanCode.includes("-")) {
+      const parts = cleanCode.split("-");
+      if (parts.length >= 3 && ["KA", "LA", "AN", "CA", "SA", "GA"].includes(parts[parts.length - 2])) {
+        detailType = parts[parts.length - 2];
+      }
+    }
+    if (!detailType) {
+      if (cleanCode.includes("KA") || textName.includes("kalung")) detailType = "KA";
+      else if (cleanCode.includes("LA") || textName.includes("liontin")) detailType = "LA";
+      else if (cleanCode.includes("AN") || textName.includes("anting")) detailType = "AN";
+      else if (cleanCode.includes("CA") || textName.includes("cincin")) detailType = "CA";
+      else if (cleanCode.includes("SA") || textName.includes("giwang")) detailType = "SA";
+      else if (cleanCode.includes("GA") || textName.includes("gelang")) detailType = "GA";
+      else detailType = "KA";
+    }
+  }
+
+  return {
+    mainCat: matchedCat,
+    jenisNama,
+    jenisPrefix: matchedPrefix,
+    detailType,
+  };
+}
+
+/**
+ * Sinkronisasi data mutasiKode aktif ke koleksi barcodes (lokasi: manual)
+ * Berguna jika ada barcode yang didaftarkan sebelum setting custom prefix diperbarui.
+ */
+export async function syncActiveMutasiKodeToBarcodes(floorId = "") {
+  try {
+    const q = query(
+      floorCollection(db, "mutasiKode", floorId),
+      where("isMutated", "==", false)
+    );
+    const snap = await getDocs(q);
+
+    const batchPromises = [];
+    const catCounts = {};
+    const activeBarcodeSet = new Set();
+
+    snap.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      const rawKode = String(data.kode || "").trim();
+      if (!rawKode || rawKode === "-") return;
+
+      const cleanBarcode = rawKode.toUpperCase();
+      activeBarcodeSet.add(cleanBarcode);
+      const resolved = resolveCategoryFromPrefix(cleanBarcode, data.namaBarang, data.jenisPrefix);
+
+      const mainCat = resolved.mainCat || "LAINNYA";
+      if (!catCounts[mainCat]) {
+        catCounts[mainCat] = { total: 0, details: {} };
+      }
+      catCounts[mainCat].total += 1;
+      if (resolved.detailType) {
+        catCounts[mainCat].details[resolved.detailType] = (catCounts[mainCat].details[resolved.detailType] || 0) + 1;
+      }
+
+      if (data.mainCat !== resolved.mainCat || data.jenisPrefix !== resolved.jenisPrefix) {
+        batchPromises.push(
+          updateDoc(docSnap.ref, {
+            mainCat: resolved.mainCat,
+            detailType: resolved.detailType || null,
+            jenisPrefix: resolved.jenisPrefix,
+            jenisNama: resolved.jenisNama,
+            lastUpdated: serverTimestamp(),
+          }).catch(() => {})
+        );
+      }
+
+      const barcodeRef = floorDoc(db, "barcodes", cleanBarcode, floorId);
+      batchPromises.push(
+        setDoc(
+          barcodeRef,
+          {
+            barcode: cleanBarcode,
+            category: resolved.mainCat,
+            detailType: resolved.detailType || null,
+            location: "manual",
+            in_display: false,
+            in_mutasi: false,
+            lastUpdated: serverTimestamp(),
+          },
+          { merge: true }
+        ).catch(() => {})
+      );
+    });
+
+    await Promise.all(batchPromises);
+  } catch (err) {
+    console.error("[syncActiveMutasiKodeToBarcodes Error]:", err);
+  }
+}
+
+// Coba deteksi prefix jenis barang dari nama produk jika kode tidak memiliki prefix yang valid
+function detectPrefixFromNama(nama) {
+  const resolved = resolveCategoryFromPrefix("", nama);
+  return resolved.jenisPrefix !== "LAIN" ? resolved.jenisPrefix : null;
 }
 
 const kodeDataCache = new Map();
@@ -310,15 +541,7 @@ function processPenjualanData(docs) {
       if (!kodeRaw || kodeRaw === "-" || !kodeRaw.trim()) return;
 
       const kode = kodeRaw.trim();
-      let prefix = kode.charAt(0).toUpperCase();
-      const detectedFromName = detectPrefixFromNama(item.nama);
-
-      if (!(prefix in JENIS_BARANG)) {
-        if (detectedFromName) prefix = detectedFromName;
-        else prefix = "LAIN"; // tetap masukkan data, beri label Lainnya
-      }
-
-      const jenisNama = JENIS_BARANG[prefix] || (detectedFromName ? JENIS_BARANG[detectedFromName] : "Lainnya");
+      const resolved = resolveCategoryFromPrefix(kode, item.nama);
 
       processedData.active.push({
         id: `${data.id}_${index}`,
@@ -328,8 +551,10 @@ function processPenjualanData(docs) {
         berat: item.berat || 0,
         tanggalInput: data.tanggal || formatTimestamp(data.timestamp),
         keterangan: item.keterangan || "",
-        jenisPrefix: prefix,
-        jenisNama,
+        mainCat: resolved.mainCat,
+        detailType: resolved.detailType,
+        jenisPrefix: resolved.jenisPrefix,
+        jenisNama: resolved.jenisNama,
         penjualanId: data.id,
         isMutated: false,
         tanggalMutasi: null,
@@ -355,20 +580,12 @@ function processMutasiKodeData(docs) {
     if (!data.namaBarang) return;
 
     const kode = String(data.kode || "").trim() || "-";
-    const kodePrefix = kode !== "-" ? kode.charAt(0).toUpperCase() : "";
-    const explicitPrefix = String(data.jenisPrefix || "")
-      .trim()
-      .toUpperCase();
+    const resolved = resolveCategoryFromPrefix(kode, data.namaBarang, data.jenisPrefix || "");
 
-    let resolvedPrefix = explicitPrefix;
-    const detectedFromName = detectPrefixFromNama(data.namaBarang);
-    if (!resolvedPrefix) {
-      if (kodePrefix && kodePrefix in JENIS_BARANG) resolvedPrefix = kodePrefix;
-      else resolvedPrefix = detectedFromName || "LAIN";
-    }
-
-    const resolvedJenisNama =
-      data.jenisNama || JENIS_BARANG[resolvedPrefix] || (detectedFromName ? JENIS_BARANG[detectedFromName] : "Lainnya");
+    const resolvedMainCat = data.mainCat || resolved.mainCat;
+    const resolvedDetailType = data.detailType || resolved.detailType;
+    const resolvedPrefix = data.jenisPrefix || resolved.jenisPrefix;
+    const resolvedJenisNama = data.jenisNama || resolved.jenisNama;
 
     const kodeItem = {
       id: data.id,
@@ -378,6 +595,8 @@ function processMutasiKodeData(docs) {
       berat: data.berat || 0,
       tanggalInput: data.tanggalInput || formatTimestamp(data.timestamp || data.createdAt),
       keterangan: data.keterangan || "",
+      mainCat: resolvedMainCat,
+      detailType: resolvedDetailType,
       jenisPrefix: resolvedPrefix,
       jenisNama: resolvedJenisNama,
       penjualanId: data.penjualanId || data.id,
@@ -464,9 +683,30 @@ export function sortKodeData(data) {
 
 export function filterKodeData(data, jenisFilter, searchText) {
   const queryText = (searchText || "").toLowerCase();
+  const filterUpper = (jenisFilter || "").toUpperCase();
+  const defs = getDynamicCategoryDefinitions();
 
   return (data || []).filter((item) => {
-    if (jenisFilter && item.jenisPrefix !== jenisFilter) return false;
+    if (filterUpper) {
+      const itemPrefix = String(item.jenisPrefix || "").toUpperCase();
+      const itemMainCat = String(item.mainCat || "").toUpperCase();
+
+      const matchesPrefix = itemPrefix === filterUpper || itemPrefix.startsWith(filterUpper);
+      const matchesMainCat = itemMainCat === filterUpper;
+
+      let matchesSingleLetter = false;
+      if (filterUpper.length === 1) {
+        const targetCatDef = Object.entries(defs).find(([_, def]) =>
+          def.prefixes.includes(filterUpper),
+        );
+        if (targetCatDef && itemMainCat === targetCatDef[0]) {
+          matchesSingleLetter = true;
+        }
+      }
+
+      if (!matchesPrefix && !matchesMainCat && !matchesSingleLetter) return false;
+    }
+
     if (queryText) {
       const matchesKode = String(item.kode || "")
         .toLowerCase()
@@ -541,25 +781,21 @@ function handlePenjualanChanges(baseData, changes) {
         if (!item?.kodeText || item.kodeText === "-") return;
 
         const itemId = `${docData.id}_${index}`;
-        let prefix = item.kodeText.charAt(0).toUpperCase();
-        const detectedFromName = detectPrefixFromNama(item.nama);
-        if (!(prefix in JENIS_BARANG)) {
-          if (detectedFromName) prefix = detectedFromName;
-          else prefix = "LAIN";
-        }
-
-        const jenisNama = JENIS_BARANG[prefix] || (detectedFromName ? JENIS_BARANG[detectedFromName] : "Lainnya");
+        const kode = item.kodeText.trim();
+        const resolved = resolveCategoryFromPrefix(kode, item.nama);
 
         const kodeItem = {
           id: itemId,
-          kode: item.kodeText.trim(),
+          kode,
           nama: item.nama || "Tidak ada nama",
           kadar: item.kadar || "-",
           berat: item.berat || 0,
           tanggalInput: docData.tanggal || formatTimestamp(docData.timestamp),
           keterangan: item.keterangan || "",
-          jenisPrefix: prefix,
-          jenisNama,
+          mainCat: resolved.mainCat,
+          detailType: resolved.detailType,
+          jenisPrefix: resolved.jenisPrefix,
+          jenisNama: resolved.jenisNama,
           penjualanId: docData.id,
           isMutated: false,
           tanggalMutasi: null,
@@ -588,27 +824,24 @@ function handlePenjualanChanges(baseData, changes) {
 function handleMutasiKodeChanges(baseData, changes) {
   changes.forEach((change) => {
     const docData = { id: change.doc.id, ...change.doc.data() };
-    const prefix = docData.kode?.charAt(0).toUpperCase();
-    // Jika prefix tidak valid, coba deteksi dari jenisPrefix eksplisit atau nama barang
-    let resolvedPrefix = String(docData.jenisPrefix || "")
-      .trim()
-      .toUpperCase();
-    if (!resolvedPrefix) {
-      const kodePrefix = prefix || "";
-      if (kodePrefix && kodePrefix in JENIS_BARANG) resolvedPrefix = kodePrefix;
-      else resolvedPrefix = detectPrefixFromNama(docData.namaBarang) || "LAIN";
-    }
+    const kode = String(docData.kode || "").trim() || "-";
+    const resolved = resolveCategoryFromPrefix(kode, docData.namaBarang, docData.jenisPrefix || "");
 
-    const resolvedJenisNama = docData.jenisNama || JENIS_BARANG[resolvedPrefix] || "Lainnya";
+    const resolvedMainCat = docData.mainCat || resolved.mainCat;
+    const resolvedDetailType = docData.detailType || resolved.detailType;
+    const resolvedPrefix = docData.jenisPrefix || resolved.jenisPrefix;
+    const resolvedJenisNama = docData.jenisNama || resolved.jenisNama;
 
     const kodeItem = {
       id: docData.id,
-      kode: docData.kode,
+      kode,
       nama: docData.namaBarang || "Tidak ada nama",
       kadar: docData.kadar || "-",
       berat: docData.berat || 0,
       tanggalInput: docData.tanggalInput || formatTimestamp(docData.timestamp || docData.createdAt),
       keterangan: docData.keterangan || "",
+      mainCat: resolvedMainCat,
+      detailType: resolvedDetailType,
       jenisPrefix: resolvedPrefix,
       jenisNama: resolvedJenisNama,
       penjualanId: docData.penjualanId || docData.id,
@@ -706,60 +939,120 @@ export async function mutateSelectedKodes({
   tanggalMutasi,
   keteranganMutasi,
   floorId = "",
+  petugas = "Staff",
 }) {
+  if (!Array.isArray(selectedItems) || selectedItems.length === 0) return;
+
   const currentTimestamp = Timestamp.now();
 
-  const updatePromises = selectedItems.map(async (item) => {
-    const mutasiHistory = {
-      tanggal: tanggalMutasi,
-      status: "Mutasi",
-      keterangan: keteranganMutasi,
-      timestamp: currentTimestamp,
+  const deltas = selectedItems.map((item) => {
+    const resolved = resolveCategoryFromPrefix(item.kode, item.nama, item.jenisPrefix);
+    return {
+      mainCat: item.mainCat || resolved.mainCat,
+      detailType: item.detailType || resolved.detailType,
+      diff: -1,
+      barcode: item.kode && item.kode !== "-" ? String(item.kode).trim().toUpperCase() : undefined,
+      sales: item.sales || petugas,
+      keterangan: item.keterangan ? `Catatan Barang: ${item.keterangan}` : "",
+      nama: item.nama || "",
     };
-
-    const updateData = {
-      isMutated: true,
-      tanggalMutasi,
-      mutasiKeterangan: keteranganMutasi,
-      mutasiHistory: [mutasiHistory, ...(item.mutasiHistory || [])],
-      lastUpdated: serverTimestamp(),
-    };
-
-    if (currentDataSource === "mutasiKode") {
-      const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
-      await updateDoc(floorRef, updateData);
-      return;
-    }
-
-    const newMutasiData = {
-      kode: item.kode,
-      namaBarang: item.nama,
-      kadar: item.kadar || "-",
-      berat: item.berat || 0,
-      tanggalInput: item.tanggalInput || formatTimestamp(item.timestamp),
-      keterangan: item.keterangan || "",
-      penjualanId: item.penjualanId || item.id,
-      sales: item.sales || "",
-      hargaPerGram: item.hargaPerGram || 0,
-      totalHarga: item.totalHarga || 0,
-      sourceTransactionId: item.penjualanId || item.id,
-      timestamp: serverTimestamp(),
-      ...updateData,
-    };
-
-    const floorRef = doc(floorCollection(db, "mutasiKode", floorId));
-    await setDoc(floorRef, newMutasiData, { merge: true });
   });
 
-  await Promise.all(updatePromises);
+  const mainKeterangan = keteranganMutasi
+    ? `Mutasi Kode (${keteranganMutasi})`
+    : "Mutasi Kode (Pindah ke Sudah Dimutasi)";
+
+  await runTransaction(db, async (t) => {
+    // 1. Kurangi stok manual di stocks/manual dan dailyStockLogs secara atomik
+    await batchAdjustManualStock({
+      floorId,
+      deltas,
+      petugas,
+      keterangan: mainKeterangan,
+      transaction: t,
+    });
+
+    // 2. Update dokumen mutasiKode (isMutated: true) dan hapus dari koleksi barcodes
+    for (const item of selectedItems) {
+      const mutasiHistory = {
+        tanggal: tanggalMutasi,
+        status: "Mutasi",
+        keterangan: keteranganMutasi,
+        timestamp: currentTimestamp,
+      };
+
+      const updateData = {
+        isMutated: true,
+        tanggalMutasi,
+        mutasiKeterangan: keteranganMutasi,
+        mutasiHistory: [mutasiHistory, ...(item.mutasiHistory || [])],
+        lastUpdated: serverTimestamp(),
+      };
+
+      if (currentDataSource === "mutasiKode") {
+        const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
+        t.update(floorRef, updateData);
+      } else {
+        const newMutasiData = {
+          kode: item.kode,
+          namaBarang: item.nama,
+          kadar: item.kadar || "-",
+          berat: item.berat || 0,
+          tanggalInput: item.tanggalInput || formatTimestamp(item.timestamp),
+          keterangan: item.keterangan || "",
+          penjualanId: item.penjualanId || item.id,
+          sales: item.sales || "",
+          hargaPerGram: item.hargaPerGram || 0,
+          totalHarga: item.totalHarga || 0,
+          sourceTransactionId: item.penjualanId || item.id,
+          timestamp: serverTimestamp(),
+          ...updateData,
+        };
+        const floorRef = doc(floorCollection(db, "mutasiKode", floorId));
+        t.set(floorRef, newMutasiData, { merge: true });
+      }
+
+      // Hapus barcode dari lokasi manual di koleksi barcodes
+      if (item.kode && item.kode !== "-") {
+        const cleanBarcode = String(item.kode).trim().toUpperCase();
+        const barcodeRef = floorDoc(db, "barcodes", cleanBarcode, floorId);
+        t.delete(barcodeRef);
+      }
+    }
+  });
 }
 
-export async function restoreSelectedKodes(selectedItems, floorId = "") {
+export async function restoreSelectedKodes(selectedItems, floorId = "", petugas = "Staff") {
+  if (!Array.isArray(selectedItems) || selectedItems.length === 0) return;
+
   const currentTimestamp = Timestamp.now();
   const formattedDate = getCurrentDateDDMMYYYY();
 
-  await Promise.all(
-    selectedItems.map((item) => {
+  const deltas = selectedItems.map((item) => {
+    const resolved = resolveCategoryFromPrefix(item.kode, item.nama, item.jenisPrefix);
+    return {
+      mainCat: item.mainCat || resolved.mainCat,
+      detailType: item.detailType || resolved.detailType,
+      diff: 1,
+      barcode: item.kode && item.kode !== "-" ? String(item.kode).trim().toUpperCase() : undefined,
+      sales: item.sales || petugas,
+      keterangan: "Kembalikan Kode ke Status Aktif",
+      nama: item.nama || "",
+    };
+  });
+
+  await runTransaction(db, async (t) => {
+    // 1. Tambah stok manual di stocks/manual dan dailyStockLogs secara atomik
+    await batchAdjustManualStock({
+      floorId,
+      deltas,
+      petugas,
+      keterangan: "Kembalikan Kode ke Status Aktif",
+      transaction: t,
+    });
+
+    // 2. Update dokumen mutasiKode (isMutated: false) dan daftarkan kembali ke koleksi barcodes
+    for (const item of selectedItems) {
       const restoreHistory = {
         tanggal: formattedDate,
         status: "Dikembalikan",
@@ -768,13 +1061,32 @@ export async function restoreSelectedKodes(selectedItems, floorId = "") {
       };
 
       const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
-      return updateDoc(floorRef, {
+      t.update(floorRef, {
         isMutated: false,
         mutasiHistory: [restoreHistory, ...(item.mutasiHistory || [])],
         lastUpdated: serverTimestamp(),
       });
-    }),
-  );
+
+      if (item.kode && item.kode !== "-") {
+        const cleanBarcode = String(item.kode).trim().toUpperCase();
+        const resolved = resolveCategoryFromPrefix(cleanBarcode, item.nama, item.jenisPrefix);
+        const barcodeRef = floorDoc(db, "barcodes", cleanBarcode, floorId);
+        t.set(
+          barcodeRef,
+          {
+            barcode: cleanBarcode,
+            category: resolved.mainCat,
+            detailType: resolved.detailType || null,
+            location: "manual",
+            in_display: false,
+            in_mutasi: false,
+            lastUpdated: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+    }
+  });
 }
 
 export async function verifyDeleteMutasiKodePassword(inputPassword, floorId = "") {
@@ -786,13 +1098,44 @@ export async function verifyDeleteMutasiKodePassword(inputPassword, floorId = ""
   return verifyStoredSecret(inputPassword, stored, { allowLegacyBase64: true });
 }
 
-export async function deleteSelectedKodes(selectedItems, floorId = "") {
-  await Promise.all(
-    selectedItems.map((item) => {
+export async function deleteSelectedKodes(selectedItems, floorId = "", petugas = "Supervisor") {
+  if (!Array.isArray(selectedItems) || selectedItems.length === 0) return;
+
+  const deltas = selectedItems.map((item) => {
+    const resolved = resolveCategoryFromPrefix(item.kode, item.nama, item.jenisPrefix);
+    return {
+      mainCat: item.mainCat || resolved.mainCat,
+      detailType: item.detailType || resolved.detailType,
+      diff: -1,
+      barcode: item.kode && item.kode !== "-" ? String(item.kode).trim().toUpperCase() : undefined,
+      sales: item.sales || petugas,
+      keterangan: item.keterangan || "Hapus dari Mutasi Kode",
+      nama: item.nama || "",
+    };
+  });
+
+  await runTransaction(db, async (t) => {
+    // 1. Adjust stocks/manual and dailyStockLogs atomically (1 Read + 1 Write)
+    await batchAdjustManualStock({
+      floorId,
+      deltas,
+      petugas,
+      keterangan: "Hapus dari Mutasi Kode",
+      transaction: t,
+    });
+
+    // 2. Delete mutasiKode and barcodes documents in the same transaction
+    for (const item of selectedItems) {
       const floorRef = floorDoc(db, "mutasiKode", item.id, floorId);
-      return deleteDoc(floorRef);
-    }),
-  );
+      t.delete(floorRef);
+
+      if (item.kode && item.kode !== "-") {
+        const cleanBarcode = String(item.kode).trim().toUpperCase();
+        const barcodeRef = floorDoc(db, "barcodes", cleanBarcode, floorId);
+        t.delete(barcodeRef);
+      }
+    }
+  });
 }
 export function exportToExcel(data, filename, sheetName, currentDataSource) {
   const exportData = (data || []).map((item) => ({

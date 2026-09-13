@@ -24,6 +24,87 @@ export const CATEGORY_TO_PREFIX = {
 };
 
 /**
+ * Mendeteksi jenis/kategori barang berdasarkan prefix barcode dan konfigurasi cards dinamis
+ */
+export function detectCategoryByPrefix(barcode, cards = []) {
+  const clean = String(barcode || "").trim().toUpperCase();
+  if (!clean) return null;
+
+  // Ekstrak prefix 2 huruf dan 1 huruf
+  const lettersOnly = clean.replace(/[^A-Z]/g, "");
+  const p2 = lettersOnly.substring(0, 2);
+  const p1 = lettersOnly.substring(0, 1);
+
+  // 1. Cek terhadap konfigurasi cards dinamis dari settings
+  if (Array.isArray(cards) && cards.length > 0) {
+    // Prioritaskan kecocokan prefix 2 huruf
+    if (p2) {
+      const match2 = cards.find(
+        (c) => Array.isArray(c.prefixes) && c.prefixes.includes(p2)
+      );
+      if (match2) {
+        return { categoryId: match2.id, label: match2.label || match2.id, matchedPrefix: p2 };
+      }
+    }
+    // Fallback ke kecocokan prefix 1 huruf
+    if (p1) {
+      const match1 = cards.find(
+        (c) => Array.isArray(c.prefixes) && c.prefixes.includes(p1)
+      );
+      if (match1) {
+        return { categoryId: match1.id, label: match1.label || match1.id, matchedPrefix: p1 };
+      }
+    }
+  }
+
+  // 2. Fallback aturan standar perhiasan jika cards belum diset
+  if (p2 === "HL" || p1 === "Z" || p1 === "V") {
+    return { categoryId: "HALA & SDW", label: "Hala & SDW", matchedPrefix: p2 || p1 };
+  }
+  if (p2 === "KL") {
+    return { categoryId: "KENDARI & EMAS BALI", label: "Kendari & Emas Bali", matchedPrefix: "KL" };
+  }
+  if (p2 === "BL" || p1 === "B") {
+    return { categoryId: "BERLIAN", label: "Berlian", matchedPrefix: p2 || p1 };
+  }
+  if (p1 === "C") return { categoryId: "CINCIN", label: "Cincin", matchedPrefix: p2 || "C" };
+  if (p1 === "K") return { categoryId: "KALUNG", label: "Kalung", matchedPrefix: p2 || "K" };
+  if (p1 === "L") return { categoryId: "LIONTIN", label: "Liontin", matchedPrefix: p2 || "L" };
+  if (p1 === "A") return { categoryId: "ANTING", label: "Anting", matchedPrefix: p2 || "A" };
+  if (p1 === "G") return { categoryId: "GELANG", label: "Gelang", matchedPrefix: p2 || "G" };
+  if (p1 === "S") return { categoryId: "GIWANG", label: "Giwang", matchedPrefix: p2 || "S" };
+
+  return null;
+}
+
+/**
+ * Memvalidasi apakah sekumpulan barcode cocok dengan kategori klip target
+ */
+export function validateBarcodesForCategory(barcodes = [], targetCategoryId = "", cards = []) {
+  const target = String(targetCategoryId || "").trim().toUpperCase();
+  const invalidItems = [];
+
+  for (const rawBc of barcodes) {
+    const bc = String(rawBc || "").trim().toUpperCase();
+    if (!bc) continue;
+    const detected = detectCategoryByPrefix(bc, cards);
+    if (detected && detected.categoryId && detected.categoryId !== target) {
+      invalidItems.push({
+        barcode: bc,
+        detectedCategory: detected.label || detected.categoryId,
+        expectedCategory: target,
+        prefix: detected.matchedPrefix,
+      });
+    }
+  }
+
+  return {
+    isValid: invalidItems.length === 0,
+    invalidItems,
+  };
+}
+
+/**
  * Gets prefix for a category card ID/label dynamically
  */
 export function getCategoryPrefix(cardId) {

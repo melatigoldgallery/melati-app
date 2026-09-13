@@ -429,6 +429,178 @@ export async function updateStockItem({
   }
 }
 
+/**
+ * Atomically adjust stock in stocks/manual for one or more items/categories.
+ * Aggregates changes in memory, reads stocks/manual exactly 1 time,
+ * and updates multiple categories in a single write. 0 Cloud Functions overhead.
+ *
+ * @param {Object} opts
+ * @param {string} opts.floorId
+ * @param {Array<{ mainCat: string, detailType?: string, diff: number, barcode?: string }>} opts.deltas
+ * @param {string} opts.petugas
+ * @param {string} opts.keterangan
+ * @param {import("firebase/firestore").Transaction} [opts.transaction]
+ */
+export async function batchAdjustManualStock({
+  floorId = "",
+  deltas = [],
+  petugas = "System",
+  keterangan = "Update Stok Manual",
+  transaction = null,
+}) {
+  if (!Array.isArray(deltas) || deltas.length === 0) return;
+
+  const { todayStringWITA } = useWITA();
+  const dateStr = todayStringWITA();
+  const now = new Date().toISOString();
+
+  // 1. Group deltas by mainCat and detailType in memory first (KISS & DRY)
+  const categoryDeltas = {};
+  deltas.forEach((d) => {
+    const cat = String(d.mainCat || "LAINNYA").toUpperCase();
+    const diff = Number(d.diff) || 0;
+    const detailType = d.detailType ? String(d.detailType).toUpperCase() : "";
+
+    if (!categoryDeltas[cat]) {
+      categoryDeltas[cat] = {
+        totalDiff: 0,
+        detailDiffs: {},
+        barcodes: [],
+        salesList: new Set(),
+        notesList: new Set(),
+      };
+    }
+
+    categoryDeltas[cat].totalDiff += diff;
+    if (detailType) {
+      categoryDeltas[cat].detailDiffs[detailType] = (categoryDeltas[cat].detailDiffs[detailType] || 0) + diff;
+    }
+    if (d.sales) {
+      categoryDeltas[cat].salesList.add(String(d.sales).trim());
+    }
+    if (d.keterangan && d.keterangan !== keterangan) {
+      categoryDeltas[cat].notesList.add(String(d.keterangan).trim());
+    }
+    if (d.barcode) {
+      categoryDeltas[cat].barcodes.push({
+        barcode: d.barcode,
+        detailType,
+        sales: d.sales || "",
+        keterangan: d.keterangan || "",
+        nama: d.nama || "",
+      });
+    }
+  });
+
+  const executeLogic = async (t) => {
+    const stockRef = floorDoc(db, "stocks", "manual", floorId);
+    const snap = await t.get(stockRef);
+    const stockData = snap.exists() ? snap.data() : {};
+    const updatedStockData = { ...stockData };
+    const dailyLogs = [];
+
+    Object.keys(categoryDeltas).forEach((cat) => {
+      const catInfo = categoryDeltas[cat];
+      const existing = stockData[cat] || { quantity: 0, lastUpdated: null, history: [] };
+      const beforeQty = toInt(existing.quantity);
+      const newQty = Math.max(0, beforeQty + catInfo.totalDiff);
+      const detailMode = getCardDetailMode(cat);
+      const detailTypes = resolveDetailTypes(cat, detailMode);
+
+      const updatedCategory = {
+        quantity: newQty,
+        lastUpdated: now,
+        history: Array.isArray(existing.history) ? [...existing.history] : [],
+      };
+
+      // Handle typed categories (details)
+      if (detailTypes && Object.keys(catInfo.detailDiffs).length > 0) {
+        const existingDetails = sanitizeDetails(detailTypes, existing.details || {});
+        const nextDetails = { ...existingDetails };
+
+        Object.keys(catInfo.detailDiffs).forEach((dt) => {
+          const curDtQty = toInt(nextDetails[dt]);
+          const dtDiff = catInfo.detailDiffs[dt];
+          nextDetails[dt] = Math.max(0, curDtQty + dtDiff);
+        });
+
+        updatedCategory.details = nextDetails;
+        updatedCategory.quantity = Object.values(nextDetails).reduce((s, v) => s + toInt(v), 0);
+      } else if (existing.details) {
+        updatedCategory.details = existing.details;
+      }
+
+      // Add history entry
+      const netChange = updatedCategory.quantity - beforeQty;
+      if (petugas && netChange !== 0) {
+        const salesStr = catInfo.salesList.size > 0 ? Array.from(catInfo.salesList).join(", ") : "";
+        const itemNotesStr = catInfo.notesList.size > 0 ? Array.from(catInfo.notesList).join("; ") : "";
+
+        const historyEntry = {
+          date: now,
+          action: netChange > 0 ? "Tambah" : "Kurangi",
+          quantity: Math.abs(netChange),
+          oldQuantity: beforeQty,
+          newQuantity: updatedCategory.quantity,
+          petugas,
+          sales: salesStr || petugas,
+          keterangan,
+          itemNotes: itemNotesStr || "",
+        };
+
+        if (catInfo.barcodes.length > 0) {
+          historyEntry.barcodes = catInfo.barcodes.slice(0, 10);
+          historyEntry.totalBarcodesCount = catInfo.barcodes.length;
+        }
+
+        updatedCategory.history.unshift(historyEntry);
+        if (updatedCategory.history.length > 25) {
+          updatedCategory.history = updatedCategory.history.slice(0, 25);
+        }
+
+        dailyLogs.push({
+          timestamp: Timestamp.now(),
+          jenis: cat,
+          lokasi: "manual",
+          action: netChange > 0 ? "tambah" : "kurangi",
+          before: beforeQty,
+          after: updatedCategory.quantity,
+          quantity: Math.abs(netChange),
+          userName: petugas,
+          sales: salesStr || petugas,
+          keterangan: itemNotesStr ? `${keterangan} - ${itemNotesStr}` : keterangan,
+        });
+      }
+
+      updatedStockData[cat] = updatedCategory;
+    });
+
+    // Write updated stocks/manual
+    t.set(stockRef, updatedStockData, { merge: true });
+
+    // Write dailyStockLogs
+    if (dailyLogs.length > 0) {
+      const dailyLogRef = floorDoc(db, "dailyStockLogs", dateStr, floorId);
+      t.set(
+        dailyLogRef,
+        {
+          date: dateStr,
+          logs: arrayUnion(...dailyLogs),
+        },
+        { merge: true },
+      );
+    }
+  };
+
+  if (transaction) {
+    await executeLogic(transaction);
+  } else {
+    await runTransaction(db, async (t) => {
+      await executeLogic(t);
+    });
+  }
+}
+
 export async function updateKomputerStock({ mainCat, newQuantity, newDetails = null, detailType = "", floorId = "" }) {
   const ref = floorDoc(db, "stocks", "stok-komputer", floorId);
   const snap = await getDoc(ref);
@@ -930,6 +1102,23 @@ export async function verifyAndHealTabStocks(floorId, mainCat, currentStockData)
           if (serverCount !== (parseInt(existingDetails[type], 10) || 0)) {
             detailsChanged = true;
           }
+        }
+
+        // Cek apakah ada barcode tanpa detailType yang belum terhitung
+        const totalQ = query(
+          collection(db, "floors", floorId, "barcodes"),
+          where("category", "==", mainCat),
+          where("location", "==", loc)
+        );
+        const totalCountSnap = await getCountFromServer(totalQ);
+        const actualTotalCount = totalCountSnap.data().count;
+
+        if (actualTotalCount > totalServerCount) {
+          const fallbackType = detailMode === "color" ? "PUTIH" : "KA";
+          const diff = actualTotalCount - totalServerCount;
+          serverDetails[fallbackType] = (serverDetails[fallbackType] || 0) + diff;
+          totalServerCount = actualTotalCount;
+          detailsChanged = true;
         }
 
         const qtyChanged = totalServerCount !== existingQty;

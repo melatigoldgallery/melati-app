@@ -40,14 +40,27 @@
                         {{ formatHistoryQty(h) }}
                       </span>
                     </td>
-                    <td class="fw-semibold text-dark">{{ h.petugas || "-" }}</td>
+                    <td class="fw-semibold text-dark">
+                      <small v-if="h.sales && h.petugas && h.sales !== h.petugas" class="text-muted d-block" style="font-size: 0.9rem;">
+                        <i class="bi bi-person me-1"></i>{{ h.sales }}
+                      </small>
+                    </td>
                     <td class="pe-3">
-                      <div class="fw-bold text-dark-emphasis mb-1" style="font-size: 0.9rem;">
-                        {{ formatHistoryNote(h) }}
-                        <span v-if="getHistoryFlow(h)" class="badge bg-success-subtle text-success border ms-2" style="font-size: 0.72rem;">
+                      <div class="fw-bold text-dark-emphasis mb-1 d-flex align-items-center flex-wrap gap-1" style="font-size: 0.9rem;">
+                        <span v-if="h.action === 'Kurangi'" class="badge bg-danger-subtle text-danger border" style="font-size: 0.72rem;">
+                          <i class="bi bi-dash-circle me-1"></i>Kurangi
+                        </span>
+                        <span v-else-if="h.action === 'Tambah'" class="badge bg-success-subtle text-success border" style="font-size: 0.72rem;">
+                          <i class="bi bi-plus-circle me-1"></i>Tambah
+                        </span>
+                        <span>{{ formatHistoryNote(h) }}</span>
+                        <span v-if="getHistoryFlow(h)" class="badge bg-secondary-subtle text-secondary-emphasis border ms-1" style="font-size: 0.72rem;">
                           <i class="bi bi-arrow-left-right me-1"></i>
                           {{ getHistoryFlow(h) }}
                         </span>
+                      </div>
+                      <div v-if="getHistoryItemNotes(h)" class="small text-secondary mb-1">
+                        <i class="bi bi-chat-left-text me-1"></i><span class="text-dark-emphasis">{{ getHistoryItemNotes(h) }}</span>
                       </div>
                       <div v-if="h.barcodes && h.barcodes.length" class="d-flex flex-wrap gap-1.5 align-items-center mt-1">
                         <span 
@@ -60,8 +73,9 @@
                         <span 
                           v-for="bc in h.barcodes.slice(0, 5)" 
                           :key="getBarcodeKey(bc)" 
-                          class="badge bg-light text-primary border monospace fw-bold" 
-                          style="font-size: 0.7rem;"
+                          class="badge bg-light text-dark border monospace fw-bold" 
+                          style="font-size: 0.9rem;"
+                          :title="getBarcodeTooltip(bc)"
                         >
                           {{ getBarcodeKey(bc) }}
                         </span>
@@ -278,6 +292,29 @@ function formatHistoryNote(record) {
     .join(", ");
   if (!summaryText) return base;
   return `${summaryText} | ${base}`;
+}
+
+function getBarcodeTooltip(bc) {
+  if (typeof bc === "object" && bc !== null) {
+    const parts = [
+      bc.nama ? `Barang: ${bc.nama}` : "",
+      bc.keterangan ? `Catatan: ${bc.keterangan}` : "",
+      bc.sales ? `Sales: ${bc.sales}` : "",
+    ].filter(Boolean);
+    return parts.length ? parts.join(" | ") : bc.barcode || "";
+  }
+  return String(bc || "");
+}
+
+function getHistoryItemNotes(record) {
+  if (record?.itemNotes) return record.itemNotes;
+  if (Array.isArray(record?.barcodes)) {
+    const notes = record.barcodes
+      .map((b) => (typeof b === "object" ? b.keterangan : ""))
+      .filter((k) => k && k !== record.keterangan);
+    if (notes.length) return Array.from(new Set(notes)).join("; ");
+  }
+  return "";
 }
 
 function formatDate(value) {

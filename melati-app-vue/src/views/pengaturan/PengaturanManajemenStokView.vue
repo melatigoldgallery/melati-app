@@ -69,6 +69,7 @@
                       <th style="width: 52px">No</th>
                       <th style="min-width: 140px">ID Card</th>
                       <th style="min-width: 180px">Nama Card / Tab</th>
+                      <th style="min-width: 150px">Prefix Barcode</th>
                       <th style="width: 120px">Tipe</th>
                       <th style="width: 140px">Modal</th>
                       <th style="width: 130px">Warna</th>
@@ -95,6 +96,16 @@
                           type="text"
                           class="form-control form-control-sm"
                           placeholder="Nama tampilan"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="card.prefixesText"
+                          type="text"
+                          class="form-control form-control-sm font-monospace text-uppercase"
+                          placeholder="Contoh: KM, KB, KP"
+                          :disabled="card.type === 'computer'"
+                          title="Daftar prefix barcode dipisahkan dengan koma"
                         />
                       </td>
                       <td>
@@ -599,7 +610,10 @@ const summaryPreviewStyle = computed(() => {
 
 function applySettings(data = {}) {
   const normalized = normalizeInventorySettings(data, auth.activeFloor);
-  form.cards = normalized.cards.map((card) => ({ ...card }));
+  form.cards = normalized.cards.map((card) => ({
+    ...card,
+    prefixesText: (card.prefixes || []).join(", ")
+  }));
   form.tableRows = normalized.tableRows.map((row) => ({ ...row }));
   form.summaryGrid = { ...normalized.summaryGrid };
   form.colorTypes = normalized.colorTypes.map((c) => ({ ...c }));
@@ -621,6 +635,8 @@ function addCard() {
     label: "",
     type: "simple",
     detailMode: "default",
+    prefixes: [],
+    prefixesText: "",
     enabled: true,
     showInSummary: true,
     colorStart: "#eef7ff",
@@ -715,6 +731,9 @@ function getPayload() {
         .trim()
         .toUpperCase(),
       label: String(card.label || "").trim(),
+      prefixes: card.prefixesText !== undefined
+        ? card.prefixesText.split(/[\s,;]+/).map(p => p.trim().toUpperCase()).filter(Boolean)
+        : (card.prefixes || []),
       order: index + 1,
       showInSummary: card.type === "computer" ? false : !!card.showInSummary,
       detailMode: String(card.detailMode || "default")

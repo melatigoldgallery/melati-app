@@ -4,16 +4,16 @@ import { getActiveFloor, normalizeFloorId } from "@/config/floor-config";
 import { floorDoc } from "@/services/floor-scope";
 
 const DEFAULT_CARD_PRESETS = {
-  KALUNG: { type: "color", detailMode: "color", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
-  LIONTIN: { type: "color", detailMode: "color", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
-  ANTING: { type: "simple", detailMode: "default", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
-  CINCIN: { type: "simple", detailMode: "default", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
-  GELANG: { type: "simple", detailMode: "default", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
-  GIWANG: { type: "simple", detailMode: "default", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
-  "HALA & SDW": { type: "hala", detailMode: "hala", colorStart: "#eef7ff", colorEnd: "#8cc8ff" },
-  BERLIAN: { type: "simple", detailMode: "default", colorStart: "#f1f8e9", colorEnd: "#b7ea72" },
-  "KENDARI & EMAS BALI": { type: "hala", detailMode: "hala", colorStart: "#fff3e0", colorEnd: "#ffd06d" },
-  "STOK KOMPUTER": { type: "computer", detailMode: "default", colorStart: "#e3f2fd", colorEnd: "#90caf9" },
+  KALUNG: { type: "color", detailMode: "color", colorStart: "#eef7ff", colorEnd: "#8cc8ff", prefixes: ["KM", "KB", "KP", "K"] },
+  LIONTIN: { type: "color", detailMode: "color", colorStart: "#f1f8e9", colorEnd: "#b7ea72", prefixes: ["LP", "LM", "L"] },
+  ANTING: { type: "simple", detailMode: "default", colorStart: "#fff3e0", colorEnd: "#ffd06d", prefixes: ["AP", "AM", "A"] },
+  CINCIN: { type: "simple", detailMode: "default", colorStart: "#eef7ff", colorEnd: "#8cc8ff", prefixes: ["CP", "CM", "CB", "C"] },
+  GELANG: { type: "simple", detailMode: "default", colorStart: "#f1f8e9", colorEnd: "#b7ea72", prefixes: ["GM", "GB", "GP", "G"] },
+  GIWANG: { type: "simple", detailMode: "default", colorStart: "#fff3e0", colorEnd: "#ffd06d", prefixes: ["SP", "SM", "S"] },
+  "HALA & SDW": { type: "hala", detailMode: "hala", colorStart: "#eef7ff", colorEnd: "#8cc8ff", prefixes: ["HL", "Z", "V"] },
+  BERLIAN: { type: "simple", detailMode: "default", colorStart: "#f1f8e9", colorEnd: "#b7ea72", prefixes: ["BL", "B"] },
+  "KENDARI & EMAS BALI": { type: "hala", detailMode: "hala", colorStart: "#fff3e0", colorEnd: "#ffd06d", prefixes: ["KL"] },
+  "STOK KOMPUTER": { type: "computer", detailMode: "default", colorStart: "#e3f2fd", colorEnd: "#90caf9", prefixes: [] },
 };
 
 const DEFAULT_TABLE_ROWS = [
@@ -118,6 +118,18 @@ function normalizeSummaryGrid(input = {}) {
   };
 }
 
+export function normalizePrefixes(input, fallback = []) {
+  if (Array.isArray(input)) {
+    const list = input.map(p => String(p || "").trim().toUpperCase()).filter(Boolean);
+    return [...new Set(list)];
+  }
+  if (typeof input === "string") {
+    const list = input.split(/[\s,;]+/).map(p => p.trim().toUpperCase()).filter(Boolean);
+    return [...new Set(list)];
+  }
+  return Array.isArray(fallback) ? [...fallback] : [];
+}
+
 function normalizeCard(input = {}, fallback = {}, index = 0, floorId = "") {
   const fallbackId = normalizeText(fallback.id || "", `CARD_${index + 1}`);
   const id = normalizeText(input.id, fallbackId).toUpperCase();
@@ -134,6 +146,7 @@ function normalizeCard(input = {}, fallback = {}, index = 0, floorId = "") {
     label,
     type,
     detailMode: type === "computer" ? "default" : detailMode,
+    prefixes: normalizePrefixes(input.prefixes, fallback.prefixes || preset.prefixes || []),
     enabled: input.enabled !== false,
     showInSummary: type === "computer" ? false : input.showInSummary !== false,
     order: normalizeOrder(input.order, normalizeOrder(fallback.order, index + 1)),

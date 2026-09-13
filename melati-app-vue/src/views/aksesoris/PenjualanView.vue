@@ -920,6 +920,8 @@ import AppModal from "@/components/common/AppModal.vue";
 import PrintFailedModal from "@/components/common/PrintFailedModal.vue";
 import { getSafeAmount, resolveReceiptPayment } from "@/utils/print-payment";
 import { printJob } from "@/utils/printHelper";
+import { resolveCategoryFromPrefix } from "@/services/mutasi-service";
+import { batchAdjustManualStock } from "@/services/inventory-service";
 
 const store = useAccessoriesStore();
 const authStore = useAuthStore();
@@ -1957,29 +1959,28 @@ async function savePenjualan() {
 
     // Write mutasiKode if manual + perlu-mutasi
     if (form.tipe === "manual" && form.jenisManual === "perlu-mutasi") {
-      const jenisBarang = {
-        C: "Cincin",
-        K: "Kalung",
-        L: "Liontin",
-        A: "Anting",
-        G: "Gelang",
-        S: "Giwang",
-        Z: "HALA & SDW",
-        V: "HALA & SDW",
-      };
-
       const mutasiItems = cartItems;
+      const deltas = [];
+
       await Promise.all(
         mutasiItems.map((item) => {
           const rawKode = String(item.kode || item.kodeText || "").trim();
-          const prefix = rawKode.charAt(0).toUpperCase();
-          const hasKnownPrefix = !!jenisBarang[prefix];
-          const jenisPrefix = hasKnownPrefix ? prefix : "LAIN";
+          const resolved = resolveCategoryFromPrefix(rawKode, item.namaBarang);
+
+          deltas.push({
+            mainCat: resolved.mainCat,
+            detailType: resolved.detailType,
+            diff: 1,
+            barcode: rawKode && rawKode !== "-" ? rawKode.toUpperCase() : undefined,
+            sales: form.salesName || "Kasir",
+            keterangan: item.keterangan || form.keterangan || "",
+            nama: item.namaBarang || "",
+          });
 
           // Create floor doc ref with generated id.
           const floorRef = doc(floorCollection(db, "mutasiKode", activeFloor.value));
 
-          return setDoc(
+          const mutasiDocPromise = setDoc(
             floorRef,
             {
               kode: rawKode || "-",
@@ -1998,13 +1999,47 @@ async function savePenjualan() {
               mutasiHistory: [],
               timestamp: serverTimestamp(),
               lastUpdated: serverTimestamp(),
-              jenisPrefix,
-              jenisNama: jenisBarang[prefix] || "Lainnya",
+              mainCat: resolved.mainCat,
+              detailType: resolved.detailType,
+              jenisPrefix: resolved.jenisPrefix,
+              jenisNama: resolved.jenisNama,
             },
             { merge: true },
           );
+
+          if (rawKode && rawKode !== "-") {
+            const cleanBarcode = rawKode.toUpperCase();
+            const barcodeRef = doc(floorCollection(db, "barcodes", activeFloor.value), cleanBarcode);
+            const barcodePromise = setDoc(
+              barcodeRef,
+              {
+                barcode: cleanBarcode,
+                category: resolved.mainCat,
+                detailType: resolved.detailType || null,
+                location: "manual",
+                in_display: false,
+                in_mutasi: false,
+                createdAt: serverTimestamp(),
+                lastUpdated: serverTimestamp(),
+              },
+              { merge: true },
+            );
+            return Promise.all([mutasiDocPromise, barcodePromise]);
+          }
+
+          return mutasiDocPromise;
         }),
       );
+
+      // Atomically increment stocks/manual for all items in 1 single write
+      if (deltas.length > 0) {
+        await batchAdjustManualStock({
+          floorId: activeFloor.value,
+          deltas,
+          petugas: form.salesName || "Kasir",
+          keterangan: "Input Penjualan Manual (Mutasi Kode)",
+        });
+      }
     }
 
     lastSaleData.value = {

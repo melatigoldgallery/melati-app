@@ -175,6 +175,16 @@
                     {{ barcodeInputCount }} Barcode
                   </span>
                 </div>
+
+                <!-- Alert Peringatan Mismatch Kategori / Prefix -->
+                <div v-if="!inputValidationResult.isValid" class="alert alert-danger py-2 px-3 mt-2 mb-0 small border-0 rounded-3 d-flex align-items-center gap-2">
+                  <i class="bi bi-exclamation-triangle-fill fs-6 text-danger flex-shrink-0"></i>
+                  <div class="text-start">
+                    <strong>Peringatan Jenis Tidak Sesuai:</strong>
+                    <span> Barcode <code class="text-danger fw-bold">{{ inputValidationResult.invalidItems.map(i => i.barcode).join(', ') }}</code> terdeteksi sebagai <strong>{{ inputValidationResult.invalidItems[0].detectedCategory }}</strong>, tidak sesuai dengan klip <strong>{{ selectedClip.category }}</strong>!</span>
+                  </div>
+                </div>
+
                 <!-- Form Petugas (Staff) Input Barcode -->
                 <div class="row g-3 align-items-end mt-0 pt-2 border-light-subtle">
                   <div class="col-md-3 text-start">
@@ -190,7 +200,7 @@
                     <button 
                       class="btn btn-success btn-sm rounded-pill px-4 py-2 text-white fw-bold d-flex align-items-center gap-2 shadow-sm"
                       @click="addBarcodesToClip"
-                      :disabled="saving || !barcodeTextInput.trim()"
+                      :disabled="saving || !barcodeTextInput.trim() || !inputValidationResult.isValid"
                     >
                       <span v-if="saving" class="spinner-border spinner-border-sm" role="status"></span>
                       <i v-else class="bi bi-clipboard-plus"></i>
@@ -408,6 +418,8 @@ import {
   updateClip,
   deleteClip,
   getCategoryPrefix,
+  detectCategoryByPrefix,
+  validateBarcodesForCategory,
 } from "@/services/clip-service";
 
 import {
@@ -423,6 +435,7 @@ import {
   getDynamicColorTypes,
   getDynamicHalaTypes,
 } from "@/services/inventory-service";
+import { playScanFeedback } from "@/services/audio-service";
 
 const props = defineProps({
   staffOptions: { type: Array, required: true },
@@ -450,6 +463,17 @@ const barcodeTextInput = ref("");
 const barcodeInputCount = computed(() => {
   return parseBarcodes(barcodeTextInput.value).length;
 });
+
+const inputValidationResult = computed(() => {
+  if (!selectedClip.value || !barcodeTextInput.value.trim()) {
+    return { isValid: true, invalidItems: [] };
+  }
+  const parsed = parseBarcodes(barcodeTextInput.value);
+  if (parsed.length === 0) return { isValid: true, invalidItems: [] };
+  const targetCategory = selectedClip.value.category || "KALUNG";
+  return validateBarcodesForCategory(parsed, targetCategory, props.cards);
+});
+
 const checkingStatus = ref(false);
 const barcodeStatuses = ref({}); // barcode -> { exists, location, category, detailType }
 const inputDetailType = ref("");
@@ -792,6 +816,25 @@ async function addBarcodesToClip() {
   const parsed = parseBarcodes(barcodeTextInput.value);
   if (parsed.length === 0) return toast("Tidak ada barcode valid", "warning");
 
+  const category = selectedClip.value.category || "KALUNG"; // Fallback to KALUNG for legacy docs
+
+  // 1. Validasi kecocokan jenis / prefix barcode
+  const validation = validateBarcodesForCategory(parsed, category, props.cards);
+  if (!validation.isValid) {
+    const firstInvalid = validation.invalidItems[0];
+    playScanFeedback({
+      success: false,
+      errorMessage: `Pindah barang gagal, barcode bukan jenis ${category.toLowerCase()}`
+    });
+    return Swal.fire({
+      icon: "error",
+      title: "Jenis Barcode Tidak Sesuai",
+      text: `Barcode ${firstInvalid.barcode} terdeteksi sebagai ${firstInvalid.detectedCategory}, tidak dapat dimasukkan ke klip ${category}!`,
+      confirmButtonText: "Mengerti",
+      confirmButtonColor: "#dc3545"
+    });
+  }
+
   if (!inputPetugasName.value) {
     return toast("Silakan pilih petugas terlebih dahulu", "warning");
   }
@@ -809,9 +852,6 @@ async function addBarcodesToClip() {
     }
 
     const nextList = [...currentList, ...addedList];
-
-    // Automatically register added barcodes to "Belum Posting" first
-    const category = selectedClip.value.category || "KALUNG"; // Fallback to KALUNG for legacy docs
     
     // Check barcode status to filter out those already in the target location
     let barcodesToRegister = [...addedList];
@@ -868,12 +908,23 @@ async function addBarcodesToClip() {
     // Save clip document with updated list
     await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
     toast(`Berhasil menambahkan ${addedList.length} barcode ke klip.`);
+
+    // Mainkan audio & suara feedback sukses
+    playScanFeedback({
+      success: true,
+      salesName: inputPetugasName.value.trim(),
+      count: addedList.length,
+      category: category,
+      destination: belumPostingKey.value
+    });
+
     barcodeTextInput.value = "";
 
     // Trigger state reload in parent stock page to sync aggregates
     triggerParentReload();
     inputPetugasName.value = "";
   } catch (e) {
+    playScanFeedback({ success: false, errorMessage: "Tambah barcode klip gagal" });
     showError("Gagal menambahkan barcode ke klip", e.message);
   } finally {
     saving.value = false;
@@ -1106,6 +1157,15 @@ async function executeMoveData() {
 
     toast(`Data klip ${selectedClip.value.code} berhasil dipindahkan.`);
 
+    // Mainkan audio & suara feedback sukses
+    playScanFeedback({
+      success: true,
+      salesName: petugasName.value.trim(),
+      count: barcodesToMutate.length,
+      category: category,
+      destination: sudahPostingKey.value
+    });
+
     // Auto delete or clear clip code document
     if (autoDeleteClip.value) {
       const deletedCode = selectedClip.value.code;
@@ -1121,6 +1181,7 @@ async function executeMoveData() {
     triggerParentReload();
     petugasName.value = "";
   } catch (e) {
+    playScanFeedback({ success: false });
     showError("Gagal memindahkan data klip", e.message);
   } finally {
     saving.value = false;

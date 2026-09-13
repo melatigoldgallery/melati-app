@@ -36,17 +36,12 @@
         <div class="row g-3">
           <div class="col-md-3 col-lg-2">
             <label for="filterJenis" class="form-label">Jenis Barang</label>
-            <select id="filterJenis" v-model="filterJenis" class="form-select">
-              <option value="">Semua Jenis</option>
-              <option value="C">Cincin (C)</option>
-              <option value="K">Kalung (K)</option>
-              <option value="L">Liontin (L)</option>
-              <option value="A">Anting (A)</option>
-              <option value="G">Gelang (G)</option>
-              <option value="S">Giwang (S)</option>
-              <option value="Z">HALA (Z)</option>
-              <option value="V">HALA (V)</option>
-            </select>
+              <select id="filterJenis" v-model="filterJenis" class="form-select">
+                <option value="">Semua Jenis</option>
+                <option v-for="opt in categoryFilterOptions" :key="opt.key" :value="opt.key">
+                  {{ opt.label }}
+                </option>
+              </select>
           </div>
           <div class="col-md-4 col-lg-3">
             <label for="searchKode" class="form-label">Cari Kode</label>
@@ -568,7 +563,10 @@ import {
   restoreSelectedKodes,
   setupRealtimeListener,
   verifyDeleteMutasiKodePassword,
+  getDynamicCategoryDefinitions,
+  syncActiveMutasiKodeToBarcodes,
 } from "@/services/mutasi-service";
+import { fetchInventorySettings } from "@/services/inventory-setting-service";
 
 const { error: showError, success, toast } = useAlert();
 const auth = useAuthStore();
@@ -630,6 +628,17 @@ const selectedItemsForMutasi = computed(() => {
   return (kodeData.value.active || []).filter((item) => ids.has(item.id));
 });
 
+const categoryFilterOptions = computed(() => {
+  const defs = getDynamicCategoryDefinitions();
+  return Object.entries(defs).map(([catKey, def]) => {
+    const prefixStr = def.prefixes && def.prefixes.length > 0 ? ` (${def.prefixes.join(" / ")})` : "";
+    return {
+      key: catKey,
+      label: `${def.label}${prefixStr}`,
+    };
+  });
+});
+
 const detailHistory = computed(() =>
   Array.isArray(detailItem.value?.mutasiHistory) ? detailItem.value.mutasiHistory : [],
 );
@@ -660,6 +669,8 @@ async function loadData(forceRefresh = false) {
   selectedMutatedIds.value = new Set();
 
   try {
+    await fetchInventorySettings(activeFloor.value);
+    await syncActiveMutasiKodeToBarcodes(activeFloor.value);
     const result = await fetchKodeData({ forceRefresh, floorId: activeFloor.value });
     kodeData.value = result.data;
     currentDataSource.value = result.source;
@@ -768,12 +779,14 @@ async function saveMutasi() {
 
   processing.value = true;
   try {
+    const operatorName = auth.user?.username || auth.user?.nama || "Staff";
     await mutateSelectedKodes({
       selectedItems,
       currentDataSource: currentDataSource.value,
       tanggalMutasi: tanggalMutasi.value,
       keteranganMutasi: keteranganMutasi.value.trim(),
       floorId: activeFloor.value,
+      petugas: operatorName,
     });
 
     mutasiModal?.hide();
@@ -811,7 +824,8 @@ async function confirmRestoreSelected() {
 
   processing.value = true;
   try {
-    await restoreSelectedKodes(selectedItems, activeFloor.value);
+    const operatorName = auth.user?.username || auth.user?.nama || "Staff";
+    await restoreSelectedKodes(selectedItems, activeFloor.value, operatorName);
     selectedMutatedIds.value = new Set();
     await loadData(true);
     success(`${selectedItems.length} kode berhasil dikembalikan`);
@@ -862,7 +876,8 @@ async function submitValidasiDelete() {
       return;
     }
 
-    await deleteSelectedKodes(pendingDeleteItems.value, activeFloor.value);
+    const operatorName = auth.user?.username || auth.user?.nama || "Supervisor";
+    await deleteSelectedKodes(pendingDeleteItems.value, activeFloor.value, operatorName);
     validasiModal?.hide();
     selectedMutatedIds.value = new Set();
     pendingDeleteItems.value = [];

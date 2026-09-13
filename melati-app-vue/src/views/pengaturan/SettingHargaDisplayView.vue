@@ -1,13 +1,21 @@
 <template>
   <div class="container-fluid py-3">
     <!-- Header -->
-    <div class="mb-3">
-      <h4 class="fw-bold mb-0">
-        <i class="bi bi-tags me-2 text-warning"></i>
-        Setting Display Harga Emas
-      </h4>
-      <div class="small text-muted mt-1">
-        Pengaturan global untuk tampilan Harga Emas Hari Ini & Harga Buyback (Customer Jual Kembali).
+    <div class="mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <h4 class="fw-bold mb-0">
+          <i class="bi bi-tags me-2 text-warning"></i>
+          Setting Display Harga Emas
+        </h4>
+        <div class="small text-muted mt-1">
+          Pengaturan global untuk tampilan Harga Emas Hari Ini, Mode Tema (Dark/Light), dan Running Text Promosi.
+        </div>
+      </div>
+      <div>
+        <router-link to="/promosi/display-harga" target="_blank" class="btn btn-outline-warning btn-sm fw-semibold">
+          <i class="bi bi-tv me-1"></i>
+          Buka Display Kiosk
+        </router-link>
       </div>
     </div>
 
@@ -19,16 +27,111 @@
     </div>
 
     <div v-else class="row g-3">
-      <!-- Section 1: Pengaturan Header Display -->
+      <!-- Section 1: Pilihan Tema Display (Dark vs Light) -->
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-2 fw-semibold border-bottom">
+            <i class="bi bi-palette me-2 text-primary"></i>
+            Pilihan Mode Tema Tampilan
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <!-- Dark Luxury Option -->
+              <div class="col-md-6">
+                <div
+                  :class="[
+                    'theme-select-card p-3 rounded-3 border cursor-pointer h-100 transition-all',
+                    form.theme === 'dark' ? 'active border-warning shadow-sm' : 'border-secondary-subtle'
+                  ]"
+                  @click="form.theme = 'dark'"
+                >
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="fs-4">🌙</span>
+                      <div>
+                        <div class="fw-bold text-dark">Dark Luxury Edition</div>
+                        <div class="small text-muted">Nuansa Obsidian Hitam Elegan & Gold Glow</div>
+                      </div>
+                    </div>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        name="themeRadio"
+                        value="dark"
+                        v-model="form.theme"
+                      />
+                    </div>
+                  </div>
+                  <!-- Preview Box -->
+                  <div class="theme-preview-box dark-preview p-2.5 rounded-2 mt-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="badge bg-gold-tag">18K (75%)</span>
+                      <span class="text-gold-light fw-bold small">Rp 2.125.000</span>
+                      <span class="badge bg-purple-badge">BRANDED</span>
+                    </div>
+                    <div class="small text-gold-muted text-center" style="font-size: 10px;">
+                      ✦ HARGA EMAS HARI INI • MELATI GOLD SHOP
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Light Editorial Option -->
+              <div class="col-md-6">
+                <div
+                  :class="[
+                    'theme-select-card p-3 rounded-3 border cursor-pointer h-100 transition-all',
+                    form.theme === 'light' ? 'active border-warning shadow-sm' : 'border-secondary-subtle'
+                  ]"
+                  @click="form.theme = 'light'"
+                >
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="fs-4">☀️</span>
+                      <div>
+                        <div class="fw-bold text-dark">Editorial Light Edition</div>
+                        <div class="small text-muted">Nuansa Ivory Putih Bersih & Classic Gold</div>
+                      </div>
+                    </div>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        name="themeRadio"
+                        value="light"
+                        v-model="form.theme"
+                      />
+                    </div>
+                  </div>
+                  <!-- Preview Box -->
+                  <div class="theme-preview-box light-preview p-2.5 rounded-2 mt-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="badge bg-gold-tag-light">18K (75%)</span>
+                      <span class="text-dark fw-bold small">Rp 2.125.000</span>
+                      <span class="badge bg-purple-badge">BRANDED</span>
+                    </div>
+                    <div class="small text-stone-muted text-center" style="font-size: 10px;">
+                      ✦ HARGA EMAS HARI INI • MELATI GOLD SHOP
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Pengaturan Header & Tagline Display -->
       <div class="col-12">
         <div class="card border-0 shadow-sm">
           <div class="card-header bg-white py-2 fw-semibold border-bottom">
             <i class="bi bi-layout-text-window-reverse me-2 text-primary"></i>
-            Judul & Subjudul Header Display
+            Judul & Teks Header Display
           </div>
           <div class="card-body">
             <div class="row g-3">
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label class="form-label small fw-bold">Judul Utama Display</label>
                 <input
                   v-model="form.title"
@@ -37,7 +140,7 @@
                   placeholder="Contoh: HARGA EMAS HARI INI"
                 />
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label class="form-label small fw-bold">Subjudul / Nama Toko</label>
                 <input
                   v-model="form.subtitle"
@@ -46,12 +149,21 @@
                   placeholder="Contoh: Melati Gold Shop"
                 />
               </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold">Tagline Slogan</label>
+                <input
+                  v-model="form.tagline"
+                  type="text"
+                  class="form-control form-control-sm"
+                  placeholder="Contoh: Transparan • Harga dan Kualitas terbaik"
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Section 2: Daftar Harga Per Kadar -->
+      <!-- Section 3: Daftar Harga Per Kadar -->
       <div class="col-12">
         <div class="card border-0 shadow-sm">
           <div class="card-header bg-white py-2 d-flex align-items-center justify-content-between border-bottom">
@@ -94,7 +206,7 @@
                         v-model="item.kadar"
                         type="text"
                         class="form-control form-control-sm fw-bold"
-                        placeholder="e.g. 8K"
+                        placeholder="e.g. 18K"
                       />
                     </td>
 
@@ -206,13 +318,49 @@
         </div>
       </div>
 
-      <!-- Section 3: Catatan & Disclaimer Footer -->
+      <!-- Section 4: Running Ticker (Pesan Berjalan Promosi) -->
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-2 d-flex align-items-center justify-content-between border-bottom">
+            <div class="fw-semibold">
+              <i class="bi bi-megaphone me-2 text-warning"></i>
+              Pesan Running Ticker (Teks Berjalan)
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" @click="addTicker">
+              <i class="bi bi-plus-circle me-1"></i>
+              Tambah Pesan Ticker
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="small text-muted mb-2">
+              Teks ini akan bergerak mendatar pada pita ticker di layar TV di bawah judul utama.
+            </div>
+            <div v-if="!form.tickerMessages || form.tickerMessages.length === 0" class="text-muted small fst-italic">
+              Belum ada pesan ticker. Klik tombol "Tambah Pesan Ticker".
+            </div>
+            <div v-for="(msg, tIdx) in form.tickerMessages" :key="tIdx" class="input-group input-group-sm mb-2">
+              <span class="input-group-text bg-light text-muted">✦ {{ tIdx + 1 }}</span>
+              <input
+                v-model="form.tickerMessages[tIdx]"
+                type="text"
+                class="form-control"
+                placeholder="Contoh: MENYEDIAKAN PERHIASAN MODEL TERBARU YANG ELEGAN DAN STYLISH"
+              />
+              <button class="btn btn-outline-danger" @click="removeTicker(tIdx)" title="Hapus pesan">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: Catatan & Disclaimer Footer -->
       <div class="col-12">
         <div class="card border-0 shadow-sm">
           <div class="card-header bg-white py-2 d-flex align-items-center justify-content-between border-bottom">
             <div class="fw-semibold">
               <i class="bi bi-info-circle me-2 text-info"></i>
-              Catatan & Syarat Ketentuan
+              Catatan & Syarat Ketentuan Buyback
             </div>
             <button class="btn btn-outline-secondary btn-sm" @click="addNote">
               <i class="bi bi-plus-circle me-1"></i>
@@ -238,10 +386,10 @@
 
       <!-- Bottom Save Action -->
       <div class="col-12 text-end mt-2 mb-4">
-        <button class="btn btn-success fw-semibold px-4" :disabled="saving" @click="saveSettings">
+        <button class="btn btn-success fw-semibold px-4 py-2" :disabled="saving" @click="saveSettings">
           <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
           <i v-else class="bi bi-save me-1"></i>
-          Simpan Pengaturan
+          Simpan Pengaturan Display
         </button>
       </div>
     </div>
@@ -263,8 +411,11 @@ const loading = ref(true);
 const saving = ref(false);
 
 const form = ref({
+  theme: DEFAULT_HARGA_DISPLAY_SETTINGS.theme,
   title: DEFAULT_HARGA_DISPLAY_SETTINGS.title,
   subtitle: DEFAULT_HARGA_DISPLAY_SETTINGS.subtitle,
+  tagline: DEFAULT_HARGA_DISPLAY_SETTINGS.tagline,
+  tickerMessages: [...DEFAULT_HARGA_DISPLAY_SETTINGS.tickerMessages],
   items: [],
   notes: [],
 });
@@ -307,6 +458,15 @@ function moveKadarDown(idx) {
   form.value.items[idx + 1] = temp;
 }
 
+function addTicker() {
+  if (!form.value.tickerMessages) form.value.tickerMessages = [];
+  form.value.tickerMessages.push("");
+}
+
+function removeTicker(idx) {
+  form.value.tickerMessages.splice(idx, 1);
+}
+
 function addNote() {
   form.value.notes.push("");
 }
@@ -320,8 +480,11 @@ async function loadData() {
   try {
     const data = await fetchHargaDisplaySettings();
     form.value = {
-      title: data.title,
-      subtitle: data.subtitle,
+      theme: data.theme || "dark",
+      title: data.title || DEFAULT_HARGA_DISPLAY_SETTINGS.title,
+      subtitle: data.subtitle || DEFAULT_HARGA_DISPLAY_SETTINGS.subtitle,
+      tagline: data.tagline || DEFAULT_HARGA_DISPLAY_SETTINGS.tagline,
+      tickerMessages: (data.tickerMessages || []).map((t) => t),
       items: (data.items || []).map((item) => ({ ...item })),
       notes: (data.notes || []).map((note) => note),
     };
@@ -349,6 +512,77 @@ onMounted(loadData);
 </script>
 
 <style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.transition-all {
+  transition: all 0.2s ease-in-out;
+}
+
+.theme-select-card {
+  background: #ffffff;
+  border-width: 2px !important;
+}
+
+.theme-select-card:hover {
+  transform: translateY(-2px);
+}
+
+.theme-select-card.active {
+  border-color: #d4af37 !important;
+  background-color: #fffdf7;
+}
+
+/* Theme Preview Boxes */
+.theme-preview-box {
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.dark-preview {
+  background: radial-gradient(circle at 50% 12%, #141724 0%, #090A0F 100%);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.light-preview {
+  background: radial-gradient(circle at 50% 8%, #FFFFFF 0%, #FAF8F5 100%);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+.bg-gold-tag {
+  background-color: #d4af37;
+  color: #1a1500;
+  font-weight: 700;
+}
+
+.bg-gold-tag-light {
+  background-color: #f5eed8;
+  color: #7a5b10;
+  border: 1px solid #dfca86;
+  font-weight: 700;
+}
+
+.bg-purple-badge {
+  background-color: #5b1e8a;
+  color: #ffffff;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.text-gold-light {
+  color: #fce788;
+}
+
+.text-gold-muted {
+  color: #dfca86;
+  opacity: 0.8;
+}
+
+.text-stone-muted {
+  color: #78716c;
+}
+
 /* PURPLE BACKGROUND STYLING FOR BRANDED HEADER AND CELLS */
 .purple-header-th {
   background-color: #6b21a8 !important;

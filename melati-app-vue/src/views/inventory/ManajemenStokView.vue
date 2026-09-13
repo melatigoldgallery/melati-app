@@ -78,10 +78,10 @@
           </div>
         </div>
 
-        <!-- Section Stok Fisik per Kategori & Data Sales Tidak Scan Barcode (2 Kolom 7:5) -->
-        <div v-if="isBarcodeEnabled" class="row g-3 mb-4">
-          <!-- Kolom Kiri: Stok Fisik per Kategori (col-8) -->
-          <div class="col-12 col-lg-8 d-flex flex-column">
+        <!-- Section Stok Fisik per Kategori & Data Sales Tidak Scan Barcode -->
+        <div class="row g-3 mb-4">
+          <!-- Kolom Kiri: Stok Fisik per Kategori (col-8 jika barcode aktif, col-12 jika nonaktif) -->
+          <div :class="isBarcodeEnabled ? 'col-12 col-lg-8 d-flex flex-column' : 'col-12 d-flex flex-column'">
             <div class="card border-0 shadow-sm rounded-3 overflow-hidden h-100 d-flex flex-column">
               <!-- Card Header -->
               <div class="card-header bg-white border-0 pt-3 pb-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -94,7 +94,7 @@
                     <small class="text-muted" style="font-size: 0.75rem;">Rincian Stok Barang Realtime</small>
                   </div>
                 </div>
-                <button class="btn btn-success btn-sm px-3 fw-bold d-inline-flex align-items-center gap-1 shadow-sm p-2" @click="openQuickScanModal" :disabled="loading">
+                <button v-if="isBarcodeEnabled" class="btn btn-success btn-sm px-3 fw-bold d-inline-flex align-items-center gap-1 shadow-sm p-2" @click="openQuickScanModal" :disabled="loading">
                   <i class="bi bi-qr-code-scan"></i>
                   <span>Scan Barcode di Sini</span>
                 </button>
@@ -221,7 +221,7 @@
           </div>
 
           <!-- Kolom Kanan: Data Sales Tidak Scan Barcode (col-4) -->
-          <div class="col-12 col-lg-4 d-flex flex-column">
+          <div v-if="isBarcodeEnabled" class="col-12 col-lg-4 d-flex flex-column">
             <UnscannedSalesWidget class="flex-grow-1" />
           </div>
         </div>
@@ -420,6 +420,7 @@ import {
   normalizeInventorySettings,
   subscribeInventorySettings,
 } from "@/services/inventory-setting-service";
+import { syncActiveMutasiKodeToBarcodes } from "@/services/mutasi-service";
 
 const { toast, error: showError } = useAlert();
 const auth = useAuthStore();
@@ -748,6 +749,7 @@ async function loadStaffOptions() {
 
 async function syncFloorScopedState() {
   await loadDisplaySettings();
+  await syncActiveMutasiKodeToBarcodes(auth.activeFloor);
   await loadData({ force: true });
   await loadStaffOptions();
   setupRealtimeListener();
@@ -799,6 +801,15 @@ watch(
   { immediate: true }
 );
 
+watch(
+  () => isBarcodeEnabled.value,
+  (enabled) => {
+    if (!enabled && mainTab.value !== "agregat") {
+      mainTab.value = "agregat";
+    }
+  }
+);
+
 // Watch activeTab to trigger background stock verification and healing
 watch(
   () => activeTab.value,
@@ -808,27 +819,18 @@ watch(
     const floorId = auth.activeFloor;
     if (!floorId) return;
 
-    const storageKey = `melati-stock-heal-time-${floorId}-${newTab}`;
-    const lastHealTime = localStorage.getItem(storageKey);
-    const now = Date.now();
-    const threshold = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-
-    if (!lastHealTime || now - parseInt(lastHealTime, 10) > threshold) {
-      console.log(`[Watcher] Triggering background barcode sync check for tab: ${newTab}`);
-      verifyAndHealTabStocks(floorId, newTab, stockData.value)
-        .then(() => {
-          localStorage.setItem(storageKey, String(Date.now()));
-        })
-        .catch((err) => {
-          console.error(`[Watcher Error] Failed to run background verification for ${newTab}:`, err);
-        });
-    } else {
-      console.log(`[Watcher] Verification skipped for tab: ${newTab} (last check was less than 12 hours ago)`);
-    }
-  }
+    verifyAndHealTabStocks(floorId, newTab, stockData.value).catch((err) => {
+      console.error(`[Watcher Error] Failed to run background verification for ${newTab}:`, err);
+    });
+  },
+  { immediate: true }
 );
 
 async function refreshData() {
+  await syncActiveMutasiKodeToBarcodes(auth.activeFloor);
+  if (activeTab.value && isBarcodeEnabled.value) {
+    await verifyAndHealTabStocks(auth.activeFloor, activeTab.value, stockData.value);
+  }
   await loadData({ force: true });
   toast("Data stok diperbarui");
 }
@@ -1004,6 +1006,9 @@ async function submitKomputerUpdate({ quantity: qty, details: dets }) {
 }
 
 async function handleBarcodeUpdateSuccess() {
+  if (activeTab.value && isBarcodeEnabled.value) {
+    await verifyAndHealTabStocks(auth.activeFloor, activeTab.value, stockData.value);
+  }
   await loadData({ force: true, silent: true });
 }
 

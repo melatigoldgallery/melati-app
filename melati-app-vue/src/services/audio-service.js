@@ -4,6 +4,7 @@ import informasiAudio from "@/public/audio/informasi.mp3?url";
 import antrianAudio from "@/public/audio/antrian.mp3?url";
 import informasiEndAudio from "@/public/audio/informasiEnd.mp3?url";
 import notifOnAudio from "@/public/audio/notifOn.mp3?url";
+import failedAudio from "@/public/audio/failed.mp3?url";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/config/firebase";
 import { subscribeClosingAnnouncementSettings } from "@/services/antrian-closing-service";
@@ -14,6 +15,7 @@ const AUDIO_PATHS = {
   antrian: antrianAudio,
   informasiEnd: informasiEndAudio,
   notifOn: notifOnAudio,
+  failed: failedAudio,
 };
 
 let isAudioPlaying = false;
@@ -326,6 +328,82 @@ export async function playQueueAnnouncement(queueNumber) {
       return false;
     }
   });
+}
+
+// Helper untuk normalisasi penyebutan kategori barang
+export function formatCategorySpeech(category) {
+  if (!category) return "barang";
+  const clean = String(category).trim().toUpperCase();
+  const map = {
+    "CINCIN": "cincin",
+    "GELANG": "gelang",
+    "KALUNG": "kalung",
+    "LIONTIN": "liontin",
+    "ANTING": "anting",
+    "GIWANG": "giwang",
+    "HALA & SDW": "hala",
+    "KENDARI & EMAS BALI": "emas kendari",
+    "BERLIAN": "berlian",
+  };
+  if (map[clean]) return map[clean];
+  return clean.toLowerCase();
+}
+
+// Helper untuk normalisasi penyebutan lokasi tujuan
+export function formatDestinationSpeech(destination) {
+  if (!destination) return "";
+  const clean = String(destination).trim().toLowerCase();
+  const map = {
+    "barang-display": "display",
+    "display": "display",
+    "brankas": "brankas",
+    "stok-brankas": "stok brankas",
+    "posting": "belum posting",
+    "belum-posting": "belum posting",
+    "belum_posting": "belum posting",
+    "admin": "sudah posting",
+    "sudah-posting": "sudah posting",
+    "sudah_posting": "sudah posting",
+    "mutasi": "mutasi",
+    "laku": "laku",
+    "barang-rusak": "barang rusak",
+    "batu-lepas": "batu lepas",
+    "manual": "manual",
+    "dp": "D P",
+  };
+  if (map[clean]) return map[clean];
+  return clean.replace(/[-_]/g, " ");
+}
+
+// Fungsi tunggal notifikasi audio untuk scan & mutasi inventaris
+export async function playScanFeedback({
+  success = true,
+  salesName = "",
+  count = 1,
+  category = "barang",
+  destination = "",
+  errorMessage = "Pindah barang gagal"
+} = {}) {
+  try {
+    if (success) {
+      // 1. Putar chime notifOn
+      await playAudio(AUDIO_PATHS.notifOn);
+      // 2. Susun teks ucapan
+      const catLabel = formatCategorySpeech(category);
+      const namePart = salesName ? `Oke ${salesName}, ` : "";
+      const destLabel = destination ? ` ke ${formatDestinationSpeech(destination)}` : "";
+      const text = `${namePart}${count} ${catLabel} berhasil dipindahkan${destLabel}`;
+      // 3. Ucapkan kalimat
+      await speak(text);
+    } else {
+      // 1. Putar chime failed
+      await playAudio(AUDIO_PATHS.failed);
+      // 2. Ucapkan teks kegagalan
+      await speak(errorMessage || "Pindah barang gagal");
+    }
+  } catch (err) {
+    console.warn("playScanFeedback error:", err);
+  }
 }
 
 // Prime AudioContext agar audio bisa diputar setelah interaksi user

@@ -114,6 +114,8 @@ import {
   parseBarcodeDetails
 } from "@/services/barcode-service";
 import { getCardDetailMode } from "@/services/inventory-service";
+import { resolveCategoryFromPrefix } from "@/services/mutasi-service";
+import { playScanFeedback } from "@/services/audio-service";
 
 const props = defineProps({
   mainCat: { type: String, default: "" },
@@ -174,37 +176,15 @@ function getTypeLabel(mainCat, key) {
 
 function getFallbackDetailType(mainCat, code) {
   const cleanCode = String(code || "").trim().toUpperCase();
+  const resolved = resolveCategoryFromPrefix(cleanCode);
+  if (resolved.detailType) return resolved.detailType;
+
   const detailMode = getCardDetailMode(mainCat);
-  
   if (detailMode === "color") {
-    const types = props.colorTypes;
-    if (cleanCode.includes("-")) {
-      const parts = cleanCode.split("-");
-      if (parts.length >= 3) {
-        const parsedType = parts[parts.length - 2];
-        if (types.includes(parsedType)) return parsedType;
-      }
-    }
-    for (const key of types) {
-      if (cleanCode.includes(key)) return key;
-    }
-    return types[2] || "PUTIH";
+    return props.colorTypes[2] || "PUTIH";
   }
-  
   if (detailMode === "hala") {
-    const types = props.halaTypes;
-    if (cleanCode.includes("-")) {
-      const parts = cleanCode.split("-");
-      if (parts.length >= 3) {
-        const parsedType = parts[parts.length - 2];
-        if (types.includes(parsedType)) return parsedType;
-      }
-    }
-    for (const key of types) {
-      const parts = [`-${key}-`, key];
-      if (parts.some(p => cleanCode.includes(p))) return key;
-    }
-    return types[0] || "KA";
+    return props.halaTypes[0] || "KA";
   }
   return "";
 }
@@ -353,19 +333,33 @@ function handleBarcodeFormEnter(event) {
 
 async function submitBarcodeUpdate() {
   if (document.querySelector(".swal2-container")) return;
-  if (!petugas.value.trim()) return toast("Petugas wajib diisi", "warning");
-  if (!destination.value) return toast("Lokasi tujuan wajib dipilih", "warning");
-  if (!barcodes.value.trim()) return toast("Barcode tidak boleh kosong", "warning");
+  if (!petugas.value.trim()) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, petugas belum dipilih" });
+    return toast("Petugas wajib diisi", "warning");
+  }
+  if (!destination.value) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, lokasi tujuan belum dipilih" });
+    return toast("Lokasi tujuan wajib dipilih", "warning");
+  }
+  if (!barcodes.value.trim()) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, barcode kosong" });
+    return toast("Barcode tidak boleh kosong", "warning");
+  }
   
   if (currentDetailOptions.value.length > 0 && hasNewBarcode.value && !detailType.value) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, klasifikasi belum dipilih" });
     return toast("Klasifikasi warna/jenis wajib dipilih", "warning");
   }
 
   const barcodesArray = parseBarcodes(barcodes.value);
-  if (barcodesArray.length === 0) return toast("Tidak ada barcode yang valid", "warning");
+  if (barcodesArray.length === 0) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, tidak ada barcode valid" });
+    return toast("Tidak ada barcode yang valid", "warning");
+  }
 
   const activeCategory = props.isQuickScan ? detectedMainCat.value : props.mainCat;
   if (!activeCategory) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, kategori tidak valid" });
     return toast(props.isQuickScan ? "Silakan scan barcode terlebih dahulu dengan kategori/jenis perhiasan yang sama" : "Kategori/jenis perhiasan tidak valid", "warning");
   }
 
@@ -378,11 +372,13 @@ async function submitBarcodeUpdate() {
     return true;
   });
   if (alreadyInDest) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, barcode sudah di lokasi tujuan" });
     return swal(`Gagal: Barcode ${alreadyInDest.barcode} sudah berada di lokasi tujuan`, "warning");
   }
 
   const mismatchedItem = checkedBarcodesList.value.find(item => item.exists && item.category && item.category !== activeCategory);
   if (mismatchedItem) {
+    playScanFeedback({ success: false, errorMessage: "Pindah barang gagal, jenis barang tidak sesuai" });
     return swal(`Gagal: Barcode ${mismatchedItem.barcode} tidak sesuai dengan jenis (${activeCategory})`, "warning");
   }
 
@@ -434,6 +430,15 @@ async function submitBarcodeUpdate() {
       toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
     }
 
+    // Mainkan audio & suara sukses
+    playScanFeedback({
+      success: true,
+      salesName: petugas.value.trim(),
+      count: barcodesArray.length,
+      category: activeCategory,
+      destination: destination.value
+    });
+
     emit("success");
     // Close modal dynamically
     const el = document.getElementById("barcodeUpdateModal");
@@ -441,6 +446,7 @@ async function submitBarcodeUpdate() {
       Modal.getInstance(el)?.hide();
     }
   } catch (e) {
+    playScanFeedback({ success: false });
     showError("Gagal memproses mutasi barcode", e.message);
     barcodeStatus.value = `Gagal: ${e.message}`;
   } finally {
