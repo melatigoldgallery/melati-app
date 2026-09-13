@@ -41,6 +41,7 @@
                       </span>
                     </td>
                     <td class="fw-semibold text-dark">
+                      {{ h.petugas || "-" }}
                       <small v-if="h.sales && h.petugas && h.sales !== h.petugas" class="text-muted d-block" style="font-size: 0.9rem;">
                         <i class="bi bi-person me-1"></i>{{ h.sales }}
                       </small>

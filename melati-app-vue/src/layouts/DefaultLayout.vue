@@ -6,7 +6,7 @@
     <AppSidebar :collapsed="sidebarCollapsed" :mobile-open="mobileOpen" @close-mobile="mobileOpen = false" />
     <div class="main-content d-flex flex-column">
       <AppHeader @toggle-sidebar="toggleSidebar" />
-      <main class="flex-grow-1 p-1">
+      <main class="flex-grow-1 p-1 d-flex flex-column">
         <slot />
       </main>
     </div>

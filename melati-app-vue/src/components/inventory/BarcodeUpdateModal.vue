@@ -132,10 +132,30 @@ const props = defineProps({
   activeFloor: { type: String, default: "" },
   userRole: { type: String, default: "" },
   enableMutationQueue: { type: Boolean, default: false },
+  cards: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(["success"]);
 const { toast, error: showError, swal } = useAlert();
+
+function getCategoryLabel(catId) {
+  if (!catId) return "";
+  const foundCard = props.cards?.find(
+    (c) => String(c.id).toUpperCase() === String(catId).toUpperCase()
+  );
+  if (foundCard && foundCard.label) return foundCard.label;
+  return catId;
+}
+
+function getDestinationLabel(destKey) {
+  if (!destKey) return "";
+  if (destKey === "mutasi") return "Mutasi";
+  const foundRow = props.tableRows?.find(
+    (r) => String(r.key).toLowerCase() === String(destKey).toLowerCase()
+  );
+  if (foundRow && foundRow.label) return foundRow.label;
+  return destKey;
+}
 
 const barcodes = ref("");
 const modalRef = ref(null);
@@ -430,13 +450,15 @@ async function submitBarcodeUpdate() {
       toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
     }
 
-    // Mainkan audio & suara sukses
+    // Mainkan audio & suara sukses menggunakan nama jenis / label tampilan
+    const categoryName = getCategoryLabel(activeCategory);
+    const destinationName = getDestinationLabel(destination.value);
     playScanFeedback({
       success: true,
       salesName: petugas.value.trim(),
       count: barcodesArray.length,
-      category: activeCategory,
-      destination: destination.value
+      category: categoryName,
+      destination: destinationName
     });
 
     emit("success");

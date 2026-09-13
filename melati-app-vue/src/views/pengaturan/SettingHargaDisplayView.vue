@@ -12,9 +12,9 @@
         </div>
       </div>
       <div>
-        <router-link to="/promosi/display-harga" target="_blank" class="btn btn-outline-warning btn-sm fw-semibold">
+        <router-link to="/promosi/display-harga" target="_blank" class="btn btn-primary btn-sm fw-semibold">
           <i class="bi bi-tv me-1"></i>
-          Buka Display Kiosk
+          Buka Display Harga Emas
         </router-link>
       </div>
     </div>
@@ -28,16 +28,16 @@
 
     <div v-else class="row g-3">
       <!-- Section 1: Pilihan Tema Display (Dark vs Light) -->
-      <div class="col-12">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white py-2 fw-semibold border-bottom">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="bg-white px-3 py-2 fw-semibold border-bottom d-flex align-items-center">
             <i class="bi bi-palette me-2 text-primary"></i>
-            Pilihan Mode Tema Tampilan
+            <span>Pilihan Mode Tema</span>
           </div>
           <div class="card-body">
             <div class="row g-3">
               <!-- Dark Luxury Option -->
-              <div class="col-md-6">
+              <div class="col-sm-6 col-12">
                 <div
                   :class="[
                     'theme-select-card p-3 rounded-3 border cursor-pointer h-100 transition-all',
@@ -49,8 +49,7 @@
                     <div class="d-flex align-items-center gap-2">
                       <span class="fs-4">🌙</span>
                       <div>
-                        <div class="fw-bold text-dark">Dark Luxury Edition</div>
-                        <div class="small text-muted">Nuansa Obsidian Hitam Elegan & Gold Glow</div>
+                        <div class="fw-bold text-dark">Dark Mode</div>
                       </div>
                     </div>
                     <div class="form-check">
@@ -78,7 +77,7 @@
               </div>
 
               <!-- Light Editorial Option -->
-              <div class="col-md-6">
+              <div class="col-sm-6 col-12">
                 <div
                   :class="[
                     'theme-select-card p-3 rounded-3 border cursor-pointer h-100 transition-all',
@@ -90,8 +89,7 @@
                     <div class="d-flex align-items-center gap-2">
                       <span class="fs-4">☀️</span>
                       <div>
-                        <div class="fw-bold text-dark">Editorial Light Edition</div>
-                        <div class="small text-muted">Nuansa Ivory Putih Bersih & Classic Gold</div>
+                        <div class="fw-bold text-dark">Light Mode</div>
                       </div>
                     </div>
                     <div class="form-check">
@@ -123,15 +121,15 @@
       </div>
 
       <!-- Section 2: Pengaturan Header & Tagline Display -->
-      <div class="col-12">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white py-2 fw-semibold border-bottom">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="bg-white px-3 py-2 fw-semibold border-bottom d-flex align-items-center">
             <i class="bi bi-layout-text-window-reverse me-2 text-primary"></i>
-            Judul & Teks Header Display
+            <span>Judul & Teks Header Display</span>
           </div>
           <div class="card-body">
-            <div class="row g-3">
-              <div class="col-md-4">
+            <div class="row g-2.5">
+              <div class="col-12">
                 <label class="form-label small fw-bold">Judul Utama Display</label>
                 <input
                   v-model="form.title"
@@ -140,7 +138,7 @@
                   placeholder="Contoh: HARGA EMAS HARI INI"
                 />
               </div>
-              <div class="col-md-4">
+              <div class="col-12">
                 <label class="form-label small fw-bold">Subjudul / Nama Toko</label>
                 <input
                   v-model="form.subtitle"
@@ -149,7 +147,7 @@
                   placeholder="Contoh: Melati Gold Shop"
                 />
               </div>
-              <div class="col-md-4">
+              <div class="col-12">
                 <label class="form-label small fw-bold">Tagline Slogan</label>
                 <input
                   v-model="form.tagline"
@@ -319,8 +317,8 @@
       </div>
 
       <!-- Section 4: Running Ticker (Pesan Berjalan Promosi) -->
-      <div class="col-12">
-        <div class="card border-0 shadow-sm">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
           <div class="card-header bg-white py-2 d-flex align-items-center justify-content-between border-bottom">
             <div class="fw-semibold">
               <i class="bi bi-megaphone me-2 text-warning"></i>
@@ -355,8 +353,8 @@
       </div>
 
       <!-- Section 5: Catatan & Disclaimer Footer -->
-      <div class="col-12">
-        <div class="card border-0 shadow-sm">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
           <div class="card-header bg-white py-2 d-flex align-items-center justify-content-between border-bottom">
             <div class="fw-semibold">
               <i class="bi bi-info-circle me-2 text-info"></i>

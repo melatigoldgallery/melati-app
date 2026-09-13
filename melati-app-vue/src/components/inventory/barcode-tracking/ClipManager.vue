@@ -573,6 +573,24 @@ const sudahPostingKey = computed(() => {
   return "admin";
 });
 
+function getCardLabel(catId) {
+  if (!catId) return "";
+  const found = props.cards?.find(
+    (c) => String(c.id).toUpperCase() === String(catId).toUpperCase()
+  );
+  if (found && found.label) return found.label;
+  return catId;
+}
+
+function getDestinationLabel(destKey) {
+  if (!destKey) return "";
+  const found = props.tableRows?.find(
+    (r) => String(r.key).toLowerCase() === String(destKey).toLowerCase()
+  );
+  if (found && found.label) return found.label;
+  return destKey;
+}
+
 const filteredClips = computed(() => {
   let list = clips.value;
   
@@ -824,7 +842,7 @@ async function addBarcodesToClip() {
     const firstInvalid = validation.invalidItems[0];
     playScanFeedback({
       success: false,
-      errorMessage: `Pindah barang gagal, barcode bukan jenis ${category.toLowerCase()}`
+      errorMessage: `Pindah barang gagal, barcode bukan jenis ${getCardLabel(category)}`
     });
     return Swal.fire({
       icon: "error",
@@ -909,13 +927,13 @@ async function addBarcodesToClip() {
     await updateClip(auth.activeFloor, selectedClip.value.id, { barcodes: nextList });
     toast(`Berhasil menambahkan ${addedList.length} barcode ke klip.`);
 
-    // Mainkan audio & suara feedback sukses
+    // Mainkan audio & suara feedback sukses menggunakan nama jenis / label tampilan
     playScanFeedback({
       success: true,
       salesName: inputPetugasName.value.trim(),
       count: addedList.length,
-      category: category,
-      destination: belumPostingKey.value
+      category: getCardLabel(category),
+      destination: getDestinationLabel(belumPostingKey.value)
     });
 
     barcodeTextInput.value = "";
@@ -1157,13 +1175,13 @@ async function executeMoveData() {
 
     toast(`Data klip ${selectedClip.value.code} berhasil dipindahkan.`);
 
-    // Mainkan audio & suara feedback sukses
+    // Mainkan audio & suara feedback sukses menggunakan nama jenis / label tampilan
     playScanFeedback({
       success: true,
       salesName: petugasName.value.trim(),
       count: barcodesToMutate.length,
-      category: category,
-      destination: sudahPostingKey.value
+      category: getCardLabel(category),
+      destination: getDestinationLabel(sudahPostingKey.value)
     });
 
     // Auto delete or clear clip code document

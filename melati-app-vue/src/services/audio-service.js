@@ -330,34 +330,55 @@ export async function playQueueAnnouncement(queueNumber) {
   });
 }
 
-// Helper untuk normalisasi penyebutan kategori barang
+// Helper untuk normalisasi penyebutan kategori / nama jenis barang
 export function formatCategorySpeech(category) {
   if (!category) return "barang";
-  const clean = String(category).trim().toUpperCase();
-  const map = {
+  let clean = String(category).trim();
+  const upper = clean.toUpperCase();
+  
+  // Kamus fallback jika yang dikirimkan adalah key/ID teknis
+  const keyMap = {
     "CINCIN": "cincin",
     "GELANG": "gelang",
     "KALUNG": "kalung",
     "LIONTIN": "liontin",
     "ANTING": "anting",
     "GIWANG": "giwang",
-    "HALA & SDW": "hala",
-    "KENDARI & EMAS BALI": "emas kendari",
+    "HALA": "hala",
+    "HALA & SDW": "hala dan S D W",
+    "HALA_SDW": "hala dan S D W",
+    "KENDARI & EMAS BALI": "kendari dan emas bali",
+    "KENDARI": "emas kendari",
     "BERLIAN": "berlian",
   };
-  if (map[clean]) return map[clean];
+  if (keyMap[upper]) return keyMap[upper];
+
+  // Normalisasi karakter untuk sintesis suara TTS bahasa Indonesia yang fasih
+  clean = clean
+    .replace(/&/g, " dan ")
+    .replace(/[-_]+/g, " ")
+    .replace(/\bSDW\b/gi, "S D W")
+    .replace(/\bDP\b/gi, "D P")
+    .replace(/\s+/g, " ")
+    .trim();
+
   return clean.toLowerCase();
 }
 
-// Helper untuk normalisasi penyebutan lokasi tujuan
+// Helper untuk normalisasi penyebutan lokasi / nama jenis tabel tujuan
 export function formatDestinationSpeech(destination) {
   if (!destination) return "";
-  const clean = String(destination).trim().toLowerCase();
+  let clean = String(destination).trim();
+  const lower = clean.toLowerCase();
+
+  // Kamus fallback jika yang dikirimkan adalah key teknis
   const map = {
     "barang-display": "display",
+    "barang_display": "display",
     "display": "display",
-    "brankas": "brankas",
+    "brankas": "stok brankas",
     "stok-brankas": "stok brankas",
+    "stok_brankas": "stok brankas",
     "posting": "belum posting",
     "belum-posting": "belum posting",
     "belum_posting": "belum posting",
@@ -367,12 +388,23 @@ export function formatDestinationSpeech(destination) {
     "mutasi": "mutasi",
     "laku": "laku",
     "barang-rusak": "barang rusak",
+    "barang_rusak": "barang rusak",
     "batu-lepas": "batu lepas",
+    "batu_lepas": "batu lepas",
     "manual": "manual",
     "dp": "D P",
   };
-  if (map[clean]) return map[clean];
-  return clean.replace(/[-_]/g, " ");
+  if (map[lower]) return map[lower];
+
+  // Normalisasi string label agar TTS ramah didengar
+  clean = clean
+    .replace(/&/g, " dan ")
+    .replace(/[-_]+/g, " ")
+    .replace(/\bDP\b/gi, "D P")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return clean.toLowerCase();
 }
 
 // Fungsi tunggal notifikasi audio untuk scan & mutasi inventaris

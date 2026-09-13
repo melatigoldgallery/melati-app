@@ -1,58 +1,97 @@
 <template>
-  <div class="container-fluid py-3 dashboard-page">
-    <div class="dashboard-desktop-content" :class="{ 'd-none d-md-block': showMobileRoleLayout }">
-      <header class="page-header mb-4">
-        <div class="header-content">
-          <h4 class="page-title mb-1">Dashboard</h4>
-          <p class="page-subtitle mb-0">Selamat datang di Sistem Manajemen Melati Gold Shop</p>
-        </div>
-      </header>
-
-      <section class="mb-4">
-        <div class="row g-3 dashboard-stats-grid">
-          <div v-for="sys in desktopSystems" :key="sys.label" class="col-12 col-sm-6 col-xl-3">
-            <RouterLink :to="sys.to" class="text-decoration-none d-block h-100 system-link">
-              <article class="system-card" :style="{ '--grad-start': sys.gradStart, '--grad-end': sys.gradEnd }">
-                <div class="system-icon" :style="{ background: sys.iconColor }">
-                  <i :class="['bi', sys.icon]"></i>
+  <div class="container-fluid py-3 dashboard-page d-flex flex-column flex-grow-1">
+    <div class="dashboard-desktop-content d-flex flex-column flex-grow-1" :class="{ 'd-none d-md-block': showMobileRoleLayout }">
+      <div class="row g-3 g-lg-4 mb-2 align-items-stretch flex-grow-1">
+        <!-- Kolom Kiri: Dashboard Sistem, Akses Cepat & Harga Emas (col-12 col-lg-8) -->
+        <div class="col-12 col-lg-9 d-flex flex-column gap-3 gap-lg-4">
+          <!-- 1. Bagian Dashboard Sistem -->
+          <section class="card border-0 shadow-sm rounded-3 bg-white main-systems-card flex-shrink-0">
+            <div class="card-header bg-white border-bottom py-3 px-3.5 d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <div class="main-system-icon-box bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center">
+                  <i class="bi bi-grid-fill"></i>
                 </div>
-                <div class="system-info">
-                  <h5>{{ sys.label }}</h5>
-                  <p>{{ sys.desc }}</p>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark section-heading">Dashboard Sistem</h6>
+                  <small class="text-muted">Pilih modul operasional utama</small>
                 </div>
-              </article>
-            </RouterLink>
-          </div>
-        </div>
-      </section>
-
-      <section class="card border-0 shadow-sm quick-access-card mb-4">
-        <div class="card-header bg-white border-0 py-3">
-          <h5 class="fw-semibold mb-0">
-            <i class="bi bi-lightning-charge-fill text-warning me-1"></i>
-            Akses Cepat
-          </h5>
-        </div>
-        <div class="card-body pt-1">
-          <div class="row g-2">
-            <div v-for="link in desktopQuickLinks" :key="link.to" class="col-6 col-md-3">
-              <RouterLink :to="resolveQuickLink(link.to)" class="text-decoration-none d-block">
-                <div class="quick-btn" :style="{ '--btn-bg-start': link.bgStart, '--btn-bg-end': link.bgEnd }">
-                  <i :class="['bi', link.icon]" aria-hidden="true"></i>
-                  <span>{{ link.label }}</span>
-                </div>
-              </RouterLink>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <div class="footer-info text-muted small text-end">
-        Masuk sebagai:
-        <span class="badge ms-1 text-capitalize role-badge">{{ auth.userRole }}</span>
+            <div class="card-body p-3.5">
+              <div class="row g-3 dashboard-stats-grid">
+                <div v-for="sys in desktopSystems" :key="sys.label" class="col-12 col-sm-6">
+                  <RouterLink :to="sys.to" class="text-decoration-none d-block h-100 system-link">
+                    <article class="system-card shadow-sm border bg-white rounded-3 h-100 d-flex flex-column justify-content-between" :style="{ '--top-color': sys.topBorderColor || sys.gradStart }">
+                      <div class="system-card-body p-3">
+                        <div class="d-flex align-items-start gap-3">
+                          <div class="system-icon-box rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" :style="{ background: sys.iconBg }">
+                            <i :class="['bi', sys.icon]"></i>
+                          </div>
+                          <div class="system-info flex-grow-1 min-w-0">
+                            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                              <h6 class="fw-bold text-dark mb-0">{{ sys.label }}</h6>
+                              <span v-if="sys.tag" :class="['badge rounded-pill small fw-semibold', sys.tagClass]">
+                                {{ sys.tag }}
+                              </span>
+                            </div>
+                            <p class="text-secondary mb-0 text-truncate-2">{{ sys.desc }}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="system-card-footer px-3 py-2 border-top bg-light-subtle d-flex justify-content-between align-items-center">
+                        <span class="action-text small fw-semibold" :style="{ color: sys.actionColor || sys.gradStart }">
+                          {{ sys.actionLabel || 'Buka Modul' }}
+                        </span>
+                        <i class="bi bi-chevron-right small" :style="{ color: sys.actionColor || sys.gradStart }"></i>
+                      </div>
+                    </article>
+                  </RouterLink>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Bagian Akses Cepat -->
+          <section class="card border-0 shadow-sm rounded-3 bg-white quick-access-card flex-shrink-0">
+            <div class="card-header bg-white border-bottom py-3 px-3.5 d-flex justify-content-between align-items-center flex-wrap gap-2 flex-shrink-0">
+              <div class="d-flex align-items-center gap-2">
+                <div class="quick-icon-title-box rounded-2 d-flex align-items-center justify-content-center">
+                  <i class="bi bi-lightning-charge-fill text-warning"></i>
+                </div>
+                <h6 class="mb-0 fw-bold text-dark section-heading">Akses Cepat</h6>
+              </div>
+            </div>
+
+            <div class="card-body p-3.5">
+              <div class="row g-2.5">
+                <div v-for="link in desktopQuickLinks" :key="link.to" class="col-6 col-md-3 mb-3">
+                  <RouterLink :to="resolveQuickLink(link.to)" class="text-decoration-none d-block h-100">
+                    <div class="quick-btn-item p-3 rounded-3 bg-white border h-100 d-flex align-items-center gap-2 transition-all">
+                      <div class="quick-btn-icon rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" :style="{ background: link.iconBg, color: link.iconColor }">
+                        <i :class="['bi', link.icon]" aria-hidden="true"></i>
+                      </div>
+                      <div class="quick-btn-content min-w-0">
+                        <span class="quick-btn-title d-block fw-bold text-dark mb-1">{{ link.label }}</span>
+                        <small class="quick-btn-desc d-block text-muted">{{ link.desc }}</small>
+                      </div>
+                    </div>
+                  </RouterLink>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Kolom Kanan: Update Fitur Terbaru (col-12 col-lg-4) -->
+        <div class="col-12 col-lg-3 d-flex flex-column mb-3 mb-lg-0">
+          <FeatureUpdatesWidget class="w-100 flex-grow-1 h-100" />
+        </div>
       </div>
     </div>
 
+    <!-- Mobile Variant untuk Staff -->
     <div v-if="mobileDashboardVariant === 'staff'" class="dashboard-mobile-content d-md-none">
       <div class="app-intro-container">
         <div class="app-intro-header text-center mb-4">
@@ -100,6 +139,7 @@
       </div>
     </div>
 
+    <!-- Mobile Variant untuk Admin -->
     <div v-else-if="mobileDashboardVariant === 'admin'" class="dashboard-mobile-content d-md-none">
       <div class="app-intro-container">
         <div class="app-intro-header text-center mb-4">
@@ -160,6 +200,7 @@ import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { normalizeUserRole } from "@/config/access-control";
 import { normalizeFloorId } from "@/config/floor-config";
+import FeatureUpdatesWidget from "@/components/dashboard/FeatureUpdatesWidget.vue";
 
 const auth = useAuthStore();
 const activeFloor = computed(() => normalizeFloorId(auth.activeFloor, "L1"));
@@ -181,55 +222,67 @@ function resolveQuickLink(to) {
   return { path: to, query: { floor: activeFloor.value } };
 }
 
+// 4 Sistem Utama dengan Badge dan Action Text sesuai Desain Gambar
 const systems = [
   {
     label: "Sistem Antrian",
-    desc: "Manajemen pelayanan customer",
+    tagClass: "bg-primary-subtle text-primary border border-primary-subtle",
+    desc: "Manajemen pelayanan customer & loket pelayanan kasir.",
+    actionLabel: "Buka Antrian Customer",
     to: "/antrian/admin",
     icon: "bi-arrow-left-right",
-    iconColor: "linear-gradient(135deg,#0d6efd 0%,#6610f2 100%)",
-    gradStart: "#0d6efd",
-    gradEnd: "#6610f2",
+    iconBg: "linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)",
+    topBorderColor: "#3b82f6",
+    actionColor: "#2563eb",
     pageKey: "antrian.admin",
   },
   {
     label: "Sistem Absensi",
-    desc: "Monitoring kehadiran dan izin staf",
+    tagClass: "bg-warning-subtle text-warning-emphasis border border-warning-subtle",
+    desc: "Monitoring kehadiran, scan wajah, shift kerja & izin staf.",
+    actionLabel: "Kelola Presensi Staf",
     to: "/absensi/kehadiran",
-    icon: "bi-person-badge",
-    iconColor: "linear-gradient(135deg,#ffc107 0%,#fd7e14 100%)",
-    gradStart: "#ffc107",
-    gradEnd: "#fd7e14",
+    icon: "bi-qr-code-scan",
+    iconBg: "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
+    topBorderColor: "#f59e0b",
+    actionColor: "#d97706",
     pageKey: "absensi.kehadiran",
   },
   {
     label: "Sistem Service",
-    desc: "Pencatatan servis barang customer",
+    tagClass: "bg-success-subtle text-success border border-success-subtle",
+    desc: "Pencatatan reparasi, patri, cuci & servis perhiasan emas.",
+    actionLabel: "Kelola Order Servis",
     to: "/servis/input",
-    icon: "bi-tools",
-    iconColor: "linear-gradient(135deg,#198754 0%,#20c997 100%)",
-    gradStart: "#198754",
-    gradEnd: "#20c997",
+    icon: "bi-gear-fill",
+    iconBg: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+    topBorderColor: "#10b981",
+    actionColor: "#059669",
     pageKey: "servis.input",
   },
   {
     label: "Penjualan Aksesoris",
-    desc: "Input penjualan kotak, aksesoris, dan silver",
+    tagClass: "bg-info-subtle text-info-emphasis border border-info-subtle",
+    desc: "Input penjualan kotak, dompet, rantai perak & pouch.",
+    actionLabel: "Input Transaksi Baru",
     to: "/aksesoris/penjualan",
-    icon: "bi-bag-check",
-    iconColor: "linear-gradient(135deg,#0dcaf0 0%,#0d6efd 100%)",
-    gradStart: "#0dcaf0",
-    gradEnd: "#0d6efd",
+    icon: "bi-bag-fill",
+    iconBg: "linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)",
+    topBorderColor: "#38bdf8",
+    actionColor: "#0284c7",
     pageKey: "aksesoris.penjualan",
   },
   {
     label: "Sistem Order Online",
-    desc: "Kelola pesanan dan order dari customer online",
+    tag: "Online",
+    tagClass: "bg-danger-subtle text-danger border border-danger-subtle",
+    desc: "Kelola pesanan dan order dari customer online.",
+    actionLabel: "Buka Order Online",
     to: "/order-online/data",
     icon: "bi-shop",
-    iconColor: "linear-gradient(135deg,#dc3545 0%,#fd7e14 100%)",
-    gradStart: "#dc3545",
-    gradEnd: "#fd7e14",
+    iconBg: "linear-gradient(135deg, #dc2626 0%, #f87171 100%)",
+    topBorderColor: "#dc2626",
+    actionColor: "#dc2626",
     pageKey: "order-online.data",
   },
 ];
@@ -237,109 +290,130 @@ const systems = [
 const hrdSystems = [
   {
     label: "Kehadiran Harian",
+    tag: "Presensi",
+    tagClass: "bg-primary-subtle text-primary border border-primary-subtle",
     desc: "Pantau absensi masuk dan pulang karyawan setiap hari.",
+    actionLabel: "Kelola Kehadiran Staf",
     to: "/absensi/kehadiran",
-    icon: "bi-person-check",
-    iconColor: "linear-gradient(135deg,#0d6efd 0%,#3b5bdb 100%)",
-    gradStart: "#0d6efd",
-    gradEnd: "#3b5bdb",
+    icon: "bi-person-check-fill",
+    iconBg: "linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)",
+    topBorderColor: "#3b82f6",
+    actionColor: "#2563eb",
     pageKey: "absensi.kehadiran",
   },
   {
     label: "Pengajuan Izin",
+    tag: "Persetujuan",
+    tagClass: "bg-success-subtle text-success border border-success-subtle",
     desc: "Tinjau dan dokumentasikan pengajuan izin karyawan.",
+    actionLabel: "Tinjau Pengajuan Izin",
     to: "/absensi/pengajuan-izin",
-    icon: "bi-calendar-plus",
-    iconColor: "linear-gradient(135deg,#2f9e44 0%,#12b886 100%)",
-    gradStart: "#2f9e44",
-    gradEnd: "#12b886",
+    icon: "bi-calendar-plus-fill",
+    iconBg: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+    topBorderColor: "#10b981",
+    actionColor: "#059669",
     pageKey: "absensi.pengajuan-izin",
   },
   {
     label: "Laporan Kehadiran",
+    tag: "Rekap",
+    tagClass: "bg-warning-subtle text-warning-emphasis border border-warning-subtle",
     desc: "Analisis ringkasan kehadiran karyawan per periode.",
+    actionLabel: "Lihat Rekap Presensi",
     to: "/absensi/laporan-kehadiran",
-    icon: "bi-clipboard-data",
-    iconColor: "linear-gradient(135deg,#f59f00 0%,#f76707 100%)",
-    gradStart: "#f59f00",
-    gradEnd: "#f76707",
+    icon: "bi-clipboard-data-fill",
+    iconBg: "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
+    topBorderColor: "#f59e0b",
+    actionColor: "#d97706",
     pageKey: "absensi.laporan-kehadiran",
   },
   {
     label: "Laporan Izin",
+    tag: "Arsip",
+    tagClass: "bg-info-subtle text-info-emphasis border border-info-subtle",
     desc: "Lihat histori dan status persetujuan izin karyawan.",
+    actionLabel: "Lihat Arsip Izin",
     to: "/absensi/laporan-izin",
     icon: "bi-journal-check",
-    iconColor: "linear-gradient(135deg,#845ef7 0%,#5f3dc4 100%)",
-    gradStart: "#845ef7",
-    gradEnd: "#5f3dc4",
+    iconBg: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+    topBorderColor: "#a855f7",
+    actionColor: "#7c3aed",
     pageKey: "absensi.laporan-izin",
   },
 ];
 
+// 8 Akses Cepat sesuai Desain Mockup Gambar
 const quickLinks = [
   {
     label: "Admin Antrian",
+    desc: "Panggil nomor",
     to: "/antrian/admin",
     icon: "bi-people-fill",
-    bgStart: "#2563eb",
-    bgEnd: "#dbeafe",
+    iconBg: "#eff6ff",
+    iconColor: "#2563eb",
     pageKey: "antrian.admin",
   },
   {
     label: "Absensi",
+    desc: "Check-in staf",
     to: "/absensi/kehadiran",
     icon: "bi-person-check-fill",
-    bgStart: "#f97316",
-    bgEnd: "#ffedd5",
+    iconBg: "#fffbeb",
+    iconColor: "#d97706",
     pageKey: "absensi.kehadiran",
   },
   {
     label: "Input Service",
+    desc: "Form penerimaan",
     to: "/servis/input",
-    icon: "bi-tools",
-    bgStart: "#10b981",
-    bgEnd: "#d1fae5",
+    icon: "bi-pencil-square",
+    iconBg: "#ecfdf5",
+    iconColor: "#059669",
     pageKey: "servis.input",
   },
   {
     label: "Input Penjualan",
+    desc: "Kasir aksesoris",
     to: "/aksesoris/penjualan",
-    icon: "bi-gem",
-    bgStart: "#8b5cf6",
-    bgEnd: "#ede9fe",
+    icon: "bi-box-seam-fill",
+    iconBg: "#f5f3ff",
+    iconColor: "#7c3aed",
     pageKey: "aksesoris.penjualan",
   },
   {
     label: "Manajemen Stok",
+    desc: "Opname & barcode",
     to: "/inventory/manajemen",
     icon: "bi-archive-fill",
-    bgStart: "#ec4899",
-    bgEnd: "#fce7f3",
+    iconBg: "#fdf2f8",
+    iconColor: "#db2777",
     pageKey: "inventory.manajemen",
   },
   {
     label: "Laporan Penjualan",
+    desc: "Rekap omset harian",
     to: "/aksesoris/laporan-penjualan",
     icon: "bi-bar-chart-fill",
-    bgStart: "#f59e0b",
-    bgEnd: "#fef3c7",
+    iconBg: "#fffbeb",
+    iconColor: "#d97706",
     pageKey: "aksesoris.laporan-penjualan",
   },
   {
     label: "Display Antrian",
+    desc: "Layar TV antrian",
     to: "/antrian/display",
     icon: "bi-display",
-    bgStart: "#ef4444",
-    bgEnd: "#fee2e2",
+    iconBg: "#fef2f2",
+    iconColor: "#dc2626",
     pageKey: "antrian.display",
   },
   {
     label: "Data Servis",
+    desc: "Riwayat & status servis",
     to: "/servis/data",
-    icon: "bi-person-gear",
-    bgStart: "#06b6d4",
-    bgEnd: "#e0f7fa",
+    icon: "bi-clipboard2-check-fill",
+    iconBg: "#ecfeff",
+    iconColor: "#0891b2",
     pageKey: "servis.data",
   },
 ];
@@ -347,10 +421,11 @@ const quickLinks = [
 const l2AdminQuickLinks = [
   {
     label: "Order Online",
+    desc: "Kelola order web",
     to: "/order-online/data",
     icon: "bi-shop",
-    bgStart: "#e11d48",
-    bgEnd: "#ffe4e6",
+    iconBg: "#fff1f2",
+    iconColor: "#e11d48",
     pageKey: "order-online.data",
   },
 ];
@@ -358,34 +433,38 @@ const l2AdminQuickLinks = [
 const hrdQuickLinks = [
   {
     label: "Kehadiran",
+    desc: "Presensi harian",
     to: "/absensi/kehadiran",
     icon: "bi-person-check-fill",
-    bgStart: "#3b82f6",
-    bgEnd: "#dbeafe",
+    iconBg: "#eff6ff",
+    iconColor: "#2563eb",
     pageKey: "absensi.kehadiran",
   },
   {
     label: "Pengajuan Izin",
+    desc: "Form izin cuti/sakit",
     to: "/absensi/pengajuan-izin",
     icon: "bi-calendar-plus-fill",
-    bgStart: "#16a34a",
-    bgEnd: "#dcfce7",
+    iconBg: "#ecfdf5",
+    iconColor: "#059669",
     pageKey: "absensi.pengajuan-izin",
   },
   {
     label: "Laporan Kehadiran",
+    desc: "Rekap absensi bulanan",
     to: "/absensi/laporan-kehadiran",
     icon: "bi-clipboard-data-fill",
-    bgStart: "#ea580c",
-    bgEnd: "#ffedd5",
+    iconBg: "#fffbeb",
+    iconColor: "#d97706",
     pageKey: "absensi.laporan-kehadiran",
   },
   {
     label: "Laporan Izin",
+    desc: "Rekap izin & cuti",
     to: "/absensi/laporan-izin",
     icon: "bi-journal-check",
-    bgStart: "#d946ef",
-    bgEnd: "#fae8ff",
+    iconBg: "#f5f3ff",
+    iconColor: "#7c3aed",
     pageKey: "absensi.laporan-izin",
   },
 ];
@@ -400,7 +479,6 @@ const desktopQuickLinks = computed(() => {
   const source = normalizedRole.value === "hrd" ? hrdQuickLinks : quickLinks;
   let filtered = source.filter((item) => canOpen(item.pageKey));
 
-  // Tambahkan L2 admin quick links jika kondisi terpenuhi
   if (isL2Admin.value) {
     filtered = filtered.concat(l2AdminQuickLinks.filter((item) => canOpen(item.pageKey)));
   }
@@ -418,7 +496,6 @@ const mobileDashboardVariant = computed(() => {
   ) {
     return "admin";
   }
-  // Supervisor: gunakan dashboard desktop apa adanya.
   return null;
 });
 
@@ -488,52 +565,31 @@ const adminActionLinks = computed(() =>
 
 <style scoped>
 .dashboard-page {
-  --header-bg: linear-gradient(135deg, #ffffff 0%, #ececec 100%);
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
 }
 
-.page-header {
-  background: var(--header-bg);
-  border-radius: 16px;
-  padding: 1.1rem 1rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+/* Section Header Styles */
+.section-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f59e0b;
+  display: inline-block;
 }
 
-.page-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #1f2937;
+.section-heading {
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
 }
 
-.page-subtitle {
-  font-size: 0.84rem;
-  color: #637083;
-}
-
-.dashboard-stats-grid {
-  margin-bottom: 0;
-}
-
+/* System Cards */
 .system-card {
   position: relative;
-  display: flex;
-  gap: 0.8rem;
-  width: 100%;
-  align-items: center;
-  min-height: 108px;
-  height: 100%;
-  border-radius: 14px;
-  background: #fff;
-  border: 1px solid #e9ecef;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  padding: 0.9rem;
   overflow: hidden;
-  transition:
-    transform 0.22s ease,
-    box-shadow 0.22s ease;
-}
-
-.system-link {
-  min-width: 0;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  border-color: #eef2f6 !important;
 }
 
 .system-card::before {
@@ -542,129 +598,102 @@ const adminActionLinks = computed(() =>
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--grad-start), var(--grad-end));
+  height: 3px;
+  background: var(--top-color, #3b82f6);
 }
 
 .system-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+  border-color: #cbd5e1 !important;
 }
 
-.system-icon {
-  width: 46px;
-  height: 46px;
-  min-width: 46px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1.35rem;
+.system-icon-box {
+  width: 44px;
+  height: 44px;
+  color: #ffffff;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.system-info h5 {
-  margin-bottom: 0.3rem;
-  color: #273142;
-  font-size: 0.98rem;
-  font-weight: 700;
+.system-info h6 {
+  font-size: 0.95rem;
 }
 
-.system-info p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.mobile-role-card {
-  border-radius: 14px;
-  background: #fff;
-  border: 1px solid #eceff3;
-  padding: 0.95rem;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-}
-
-.mobile-role-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.45rem;
-}
-
-.mobile-role-head i {
-  font-size: 1.15rem;
-}
-
-.mobile-role-card h6 {
-  font-weight: 700;
-}
-
-.mobile-role-card p {
-  color: #64748b;
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-.mobile-role-card.is-staff .mobile-role-head i,
-.mobile-role-card.is-staff h6 {
-  color: #0d6efd;
-}
-
-.mobile-role-card.is-admin .mobile-role-head i,
-.mobile-role-card.is-admin h6 {
-  color: #d97706;
-}
-
-.quick-access-card {
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(245, 247, 250, 0.9));
-  border: 0;
-  box-shadow: 0 10px 30px rgba(18, 38, 63, 0.08);
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.5;
+  font-size: 0.82rem;
+  color: #475569;
 }
 
-.quick-btn {
-  --btn-bg-start: #ffa940;
-  --btn-bg-end: #ffe8cc;
-  border-radius: 12px;
-  padding: 0.85rem;
-  min-height: 70px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 0.35rem;
-  color: #272727;
-  transition:
-    transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1),
-    box-shadow 0.25s ease;
-  background: linear-gradient(135deg, var(--btn-bg-start) 0%, var(--btn-bg-end) 100%);
-  box-shadow: 0 8px 22px rgba(14, 35, 60, 0.08);
-  border: none;
-}
-
-.quick-btn i {
-  font-size: 1.2rem;
-}
-
-.quick-btn span {
+.system-card-footer {
   font-size: 0.78rem;
-  text-align: center;
-  font-weight: 700;
-  line-height: 1.15;
-  color: #272727;
+  border-color: #f1f5f9 !important;
 }
 
-.quick-btn:hover {
+.action-text {
+  letter-spacing: 0.01em;
+}
+
+/* Main Systems Card Container */
+.main-systems-card {
+  background: #ffffff;
+  border-radius: 12px;
+}
+
+.main-system-icon-box {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+/* Quick Access Section */
+.quick-access-card {
+  border-color: #eef2f6 !important;
+  background: #ffffff;
+}
+
+.quick-icon-title-box {
+  width: 26px;
+  height: 26px;
+  background-color: #fffbeb;
+}
+
+.quick-btn-item {
+  border-color: #eef2f6 !important;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.quick-btn-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 20px 50px rgba(10, 30, 60, 0.12);
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  background-color: #f8fafc !important;
 }
 
-.role-badge {
-  background: #c8a96e;
+.quick-btn-icon {
+  width: 38px;
+  height: 38px;
+  font-size: 1.1rem;
 }
 
+.quick-btn-title {
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.quick-btn-desc {
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+/* Mobile & Utility Styles */
 .dashboard-mobile-content {
   animation: fadeInUp 0.35s ease-out;
 }
@@ -763,35 +792,12 @@ const adminActionLinks = computed(() =>
   }
 }
 
-@media (min-width: 768px) {
+@media (max-width: 991.98px) {
   .page-header {
-    padding: 1.4rem 1.5rem;
+    padding: 1.1rem 1.2rem;
   }
-
   .page-title {
-    font-size: 1.7rem;
-  }
-
-  .page-subtitle {
-    font-size: 0.96rem;
-  }
-
-  .quick-btn {
-    flex-direction: row;
-    justify-content: flex-start;
-    align-items: center;
-    min-height: 74px;
-    gap: 0.55rem;
-    padding: 0.9rem;
-  }
-
-  .quick-btn i {
-    font-size: 1.2rem;
-  }
-
-  .quick-btn span {
-    text-align: left;
-    font-size: 0.8rem;
+    font-size: 1.35rem;
   }
 }
 </style>

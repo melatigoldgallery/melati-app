@@ -1,17 +1,29 @@
 <template>
   <div class="container-fluid py-3 stock-page">
-    <div class="page-header mb-3">
-      <h1>
-        <i class="bi bi-archive me-2 text-dark"></i>
-        Manajemen Stok
-      </h1>
-      <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-          <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
-          <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
-          <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
-        </ol>
-      </nav>
+    <div class="page-header mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <h1 class="mb-1">
+          <i class="bi bi-archive me-2 text-dark"></i>
+          Manajemen Stok
+        </h1>
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><router-link to="/dashboard">Home</router-link></li>
+            <li class="breadcrumb-item"><router-link to="/inventory/manajemen">Inventory</router-link></li>
+            <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
+          </ol>
+        </nav>
+      </div>
+      <div>
+        <button
+          class="btn btn-outline-primary btn-sm fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 rounded-pill"
+          @click="openFeatureUpdateModal"
+          title="Lihat riwayat pembaruan fitur sistem"
+        >
+          <i class="bi bi-clock-history me-2 text-primary"></i>
+          <span>Riwayat Update Fitur</span>
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="text-center py-5">
@@ -36,8 +48,16 @@
             :class="{ 'active': mainTab === 'lacakFisik' }"
             @click="mainTab = 'lacakFisik'"
           >
-            <i class="bi bi-qr-code-scan fs-6"></i>
+            <i class="bi bi-arrow-left-right fs-6"></i>
             <span>Lacak Barang</span>
+          </button>
+          <button
+            class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"
+            :class="{ 'active': mainTab === 'stokOpname' }"
+            @click="mainTab = 'stokOpname'"
+          >
+            <i class="bi bi-clipboard-check fs-6"></i>
+            <span>Stok Opname</span>
           </button>
           <button
             class="main-pill-btn rounded-pill border-0 px-4 py-2 fw-bold d-flex align-items-center gap-2"
@@ -230,10 +250,10 @@
         <StockGuideBoard v-if="isBarcodeEnabled" class="d-none" />
       </div>
 
-      <!-- Lacak Fisik (Barcode) Content -->
+      <!-- Lacak Barang (Riwayat Pindah Data) Content -->
       <div v-else-if="mainTab === 'lacakFisik'">
-        <ul class="nav nav-tabs compact justify-content-center overflow-auto mb-3">
-          <li v-if="ENABLE_MUTATION_QUEUE" class="nav-item">
+        <ul v-if="ENABLE_MUTATION_QUEUE" class="nav nav-tabs compact justify-content-center overflow-auto mb-3">
+          <li class="nav-item">
             <button
               class="nav-link text-nowrap small text-dark fw-bold"
               :class="{ active: physicalTab === 'antrian' }"
@@ -251,34 +271,27 @@
               Riwayat Pindah Data
             </button>
           </li>
-          <li class="nav-item">
-            <button
-              class="nav-link text-nowrap small text-dark fw-bold"
-              :class="{ active: physicalTab === 'opname' }"
-              @click="physicalTab = 'opname'"
-            >
-              Stok Opname Data
-            </button>
-          </li>
         </ul>
 
         <div v-if="ENABLE_MUTATION_QUEUE && physicalTab === 'antrian'">
           <MovementQueue />
         </div>
-        <div v-else-if="physicalTab === 'log'">
+        <div v-else>
           <MutationLog />
         </div>
-        <div v-else-if="physicalTab === 'opname'">
-          <StockOpname
-            :cards="nonComputerCards"
-            :locations="tableRows.filter((r) => r.key !== 'barang-display')"
-            :color-types="COLOR_TYPES"
-            :color-labels="COLOR_LABELS"
-            :hala-types="HALA_TYPES"
-            :hala-labels="HALA_LABELS"
-            :staff-options="staffOptions"
-          />
-        </div>
+      </div>
+
+      <!-- Stok Opname Content -->
+      <div v-else-if="mainTab === 'stokOpname'">
+        <StockOpname
+          :cards="nonComputerCards"
+          :locations="tableRows.filter((r) => r.key !== 'barang-display')"
+          :color-types="COLOR_TYPES"
+          :color-labels="COLOR_LABELS"
+          :hala-types="HALA_TYPES"
+          :hala-labels="HALA_LABELS"
+          :staff-options="staffOptions"
+        />
       </div>
 
       <!-- Klip Barcode Content -->
@@ -346,6 +359,7 @@
       :active-floor="auth.activeFloor"
       :user-role="auth.userRole"
       :enable-mutation-queue="ENABLE_MUTATION_QUEUE"
+      :cards="nonComputerCards"
       @success="handleBarcodeUpdateSuccess"
     />
 
@@ -374,6 +388,9 @@
       :hala-labels="HALA_LABELS"
       @reverted="handleRevertSuccess"
     />
+
+    <!-- Modal for Feature Updates Changelog -->
+    <FeatureUpdateModal ref="featureUpdateModalRef" />
   </div>
 </template>
 
@@ -390,6 +407,7 @@ import KomputerUpdateModal from "@/components/inventory/KomputerUpdateModal.vue"
 import BarcodeUpdateModal from "@/components/inventory/BarcodeUpdateModal.vue";
 import HistoryModal from "@/components/inventory/HistoryModal.vue";
 import BarcodeRincianModal from "@/components/inventory/BarcodeRincianModal.vue";
+import FeatureUpdateModal from "@/components/inventory/FeatureUpdateModal.vue";
 
 // Barcode-tracking specific components
 import MovementQueue from "@/components/inventory/barcode-tracking/MovementQueue.vue";
@@ -516,6 +534,8 @@ const rincianForm = ref({
   location: "",
   locationLabel: "",
 });
+
+const featureUpdateModalRef = ref(null);
 
 const isBarcodeEnabled = computed(() => {
   return !!displaySettings.value?.barcodeEnabled;
@@ -825,6 +845,12 @@ watch(
   },
   { immediate: true }
 );
+
+function openFeatureUpdateModal() {
+  if (featureUpdateModalRef.value) {
+    featureUpdateModalRef.value.show();
+  }
+}
 
 async function refreshData() {
   await syncActiveMutasiKodeToBarcodes(auth.activeFloor);

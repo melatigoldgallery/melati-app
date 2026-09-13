@@ -368,7 +368,7 @@ onUnmounted(() => {
   --text-main: #e7e5e4;
   --text-title: linear-gradient(135deg, #FFF1C5 0%, #F3E5AB 25%, #D4AF37 55%, #AA7C11 100%);
   --text-subtitle: rgba(223, 202, 134, 0.88);
-  --btn-color: rgba(223, 202, 134, 0.45);
+  --btn-color: rgba(85, 74, 38, 0.548);
   --btn-hover-color: #f3e5ab;
   --btn-hover-bg: rgba(212, 175, 55, 0.12);
   --orb-top: rgba(212, 175, 55, 0.14);
@@ -426,7 +426,7 @@ onUnmounted(() => {
   --text-main: #292524;
   --text-title: linear-gradient(135deg, #684803 0%, #B89228 35%, #D4AF37 55%, #8B6508 100%);
   --text-subtitle: rgba(90, 64, 9, 0.88);
-  --btn-color: rgba(120, 53, 15, 0.45);
+  --btn-color: rgba(219, 207, 141, 0.45);
   --btn-hover-color: #78350f;
   --btn-hover-bg: rgba(184, 146, 40, 0.12);
   --orb-top: rgba(212, 175, 55, 0.16);
@@ -893,8 +893,8 @@ onUnmounted(() => {
 }
 
 .gold-coin-radial {
-  width: clamp(3.6rem, 5.4vw, 5rem);
-  height: clamp(3.6rem, 5.4vw, 5rem);
+  width: clamp(3.8rem, 6vw, 5.5rem);
+  height: clamp(3.8rem, 6vw, 5.5rem);
   border-radius: 9999px;
   font-family: "Cinzel", "Playfair Display", serif;
   font-weight: 900;
@@ -1145,8 +1145,8 @@ onUnmounted(() => {
     display: none;
   }
   .gold-coin-radial {
-    width: 2.8rem;
-    height: 2.8rem;
+    width: 3rem;
+    height: 3rem;
     font-size: 1.1rem;
   }
   .price-value,
