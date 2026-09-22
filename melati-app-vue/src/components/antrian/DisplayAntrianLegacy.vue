@@ -1,160 +1,260 @@
 <template>
-  <div class="display-page" style="user-select: none">
-    <!-- Decorative Elements -->
-    <div class="gold-decoration top-left"></div>
-    <div class="gold-decoration bottom-right"></div>
+  <div class="display-page">
+    <!-- Ambient Background Lighting -->
+    <div class="ambient-glow top-glow"></div>
+    <div class="ambient-glow bottom-left-glow"></div>
+    <div class="ambient-glow bottom-right-glow"></div>
 
-    <!-- Header -->
-    <header class="header">
-      <div class="container">
-        <div class="row align-items-center justify-content-between">
-          <div class="col-md-6">
-            <div class="logo-container" style="cursor: pointer" @click="handleLogoClick">
-              <img src="/img/Melati.jfif" alt="Logo" class="logo gold-shimmer" />
-              <h1 class="brand-name">Melati Gold Shop</h1>
-            </div>
+    <!-- BEGIN: HeaderSection -->
+    <header class="display-header">
+      <!-- Brand identity & emblem -->
+      <div class="header-left">
+        <div
+          class="logo-emblem-outer"
+          @click="handleLogoClick"
+          title="Melati Gold"
+        >
+          <div class="logo-emblem-inner">
+            <img src="/img/Melati.jfif" alt="Logo" class="logo-img" />
           </div>
-          <div class="col-md-6 d-flex justify-content-end align-items-center">
-            <div class="date-time">
-              <div class="current-date">{{ currentDate }}</div>
-              <div class="d-flex align-items-center gap-3">
-                <div class="current-time">{{ currentTime }}</div>
-                <div class="display-promosi">
-                  <a href="/promosi/display" class="text-decoration-none">
-                    <i class="fas fa-desktop text-white fs-2" title="Display Promosi"></i>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
+        </div>
+
+        <div class="brand-titles">
+          <h1 class="brand-name">{{ brandName }}</h1>
+        </div>
+      </div>
+
+      <!-- Live Date, Clock & Timezone Widget -->
+      <div class="header-right">
+        <div class="date-text">{{ currentDate }}</div>
+        <div class="clock-box">
+          <span class="clock-digits">{{ currentTime }}</span>
+          <span class="timezone-badge">WITA</span>
         </div>
       </div>
     </header>
+    <!-- END: HeaderSection -->
 
-    <!-- Main Content -->
-    <main class="container-fluid" style="max-width: 1800px; margin: 0 auto">
-      <!-- Page Title -->
-      <div class="page-title">
-        <button 
-          type="button" 
-          class="back-btn-kiosk position-absolute start-0 top-50 translate-middle-y"
-          @click="goBack"
-          title="Kembali"
-        >
-          <i class="fas fa-arrow-left"></i>
-        </button>
-        <h1>ANTRIAN PELAYANAN</h1>
-      </div>
+    <!-- BEGIN: MainQueueBoard -->
+    <main class="main-board">
+      <!-- Card 1: Sedang Dilayani -->
+      <section class="queue-lane">
+        <div class="lane-top-stripe"></div>
 
-      <!-- Queue Cards -->
-      <div class="row justify-content-center align-items-stretch mt-0 g-2">
-        <!-- Current Queue Card -->
-        <div :class="['col-12', showMissed ? 'col-md-4' : 'col-md-5']">
-          <div class="queue-card card-current gold-border">
-            <div class="queue-card-header">
-              <h1 :class="{ 'queue-card-title--compact': showMissed }">SEDANG DILAYANI</h1>
+        <!-- Lane Category Header -->
+        <div class="lane-header-wrapper">
+          <div class="lane-header-row">
+            <div class="lane-info-left">
+              <div class="lane-icon-badge">
+                <i class="fas fa-user-check"></i>
+              </div>
+              <div>
+                <span class="lane-subtitle">Pelayanan Antrian</span>
+                <h2 class="lane-title">SEDANG DILAYANI</h2>
+              </div>
             </div>
-            <div class="queue-card-body">
-              <Transition name="queue-change" mode="out-in">
-                <div :key="currentDisplay" class="queue-number active">
-                  {{ currentDisplay }}
-                </div>
-              </Transition>
+
+            <!-- Optional Missed Queue Indicator Badge -->
+            <div v-if="missedDisplay !== '-'" class="missed-alert-badge">
+              <i class="fas fa-exclamation-circle"></i>
+              <span>Terlewat: {{ missedDisplay }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Missed Queue Card (opsional, muncul jika ada antrian terlewat) -->
-        <Transition name="card-fade">
-          <div v-if="showMissed" class="col-12 col-md-4">
-            <div class="queue-card card-delayed gold-border">
-              <div class="queue-card-header queue-card-header-delayed">
-                <h1 class="queue-card-title--compact">ANTRIAN TERLEWAT</h1>
-              </div>
-              <div class="queue-card-body">
-                <div :class="['queue-number', missedFontClass]">
-                  {{ missedDisplay }}
-                </div>
-              </div>
+        <!-- Massive Center Calling Number Display -->
+        <div class="number-center-container">
+          <Transition name="queue-change" mode="out-in">
+            <div :key="currentDisplay" class="number-wrapper">
+              <span class="queue-number-text">
+                {{ currentDisplay }}
+              </span>
             </div>
-          </div>
-        </Transition>
+          </Transition>
+        </div>
 
-        <!-- Next Queue Card -->
-        <div :class="['col-12', showMissed ? 'col-md-4' : 'col-md-5']">
-          <div class="queue-card card-next gold-border">
-            <div class="queue-card-header">
-              <h1 :class="{ 'queue-card-title--compact': showMissed }">
-                {{ showMissed ? "ANTRIAN BERIKUTNYA" : "AKAN DIPANGGIL" }}
-              </h1>
-            </div>
-            <div class="queue-card-body">
-              <Transition name="queue-change" mode="out-in">
-                <div :key="nextDisplay" class="queue-number">
-                  {{ nextDisplay }}
-                </div>
-              </Transition>
+        <!-- Delayed Queue Preview Footer -->
+        <div class="lane-footer">
+          <span class="next-label">
+            <i class="fas fa-pause-circle text-gold"></i>
+            Antrian Tertunda:
+          </span>
+          <div class="next-numbers-row">
+            <template v-if="delayedQueues.length > 0">
+              <span
+                v-for="(num, idx) in delayedQueues"
+                :key="num"
+                class="next-num-badge"
+                :class="{ 'next-num-primary': idx === 0, 'next-num-secondary': idx > 0 }"
+              >
+                {{ num }}
+              </span>
+            </template>
+            <span v-else class="next-num-empty">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card 2: Akan Dipanggil -->
+      <section class="queue-lane">
+        <div class="lane-top-stripe stripe-next"></div>
+
+        <!-- Lane Category Header -->
+        <div class="lane-header-wrapper">
+          <div class="lane-header-row">
+            <div class="lane-info-left">
+              <div class="lane-icon-badge">
+                <i class="fas fa-clock"></i>
+              </div>
+              <div>
+                <span class="lane-subtitle">Pelayanan Antrian</span>
+                <h2 class="lane-title">AKAN DIPANGGIL</h2>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="elegant-divider"></div>
+        <!-- Massive Center Next Number Display -->
+        <div class="number-center-container">
+          <Transition name="queue-change" mode="out-in">
+            <div :key="nextDisplay" class="number-wrapper">
+              <span class="queue-number-text">
+                {{ nextDisplay }}
+              </span>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Upcoming Queue Preview Footer -->
+        <div class="lane-footer">
+          <span class="next-label">
+            <i class="fas fa-clock text-gold"></i>
+            Antrian Berikutnya:
+          </span>
+          <div class="next-numbers-row">
+            <template v-if="nextThreeQueues.length > 0">
+              <span
+                v-for="(num, idx) in nextThreeQueues"
+                :key="num"
+                class="next-num-badge"
+                :class="{ 'next-num-primary': idx === 0, 'next-num-secondary': idx > 0 }"
+              >
+                {{ num }}
+              </span>
+            </template>
+            <span v-else class="next-num-empty">-</span>
+          </div>
+        </div>
+      </section>
     </main>
+    <!-- END: MainQueueBoard -->
 
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <div class="row justify-content-center align-items-center" style="min-height: 80px">
-          <div class="col-auto">
-            <p class="footer-text mb-0">&copy; 2026 Melati Gold Shop. All rights reserved.</p>
+    <!-- BEGIN: BottomInformationFooter (Continuous Ticker) -->
+    <footer class="display-footer">
+      <div class="ticker-wrapper">
+        <div class="ticker-track">
+          <!-- First stream -->
+          <div class="ticker-group">
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Selamat Datang di {{ brandName }} • Nikmati Pengalaman Transaksi Mewah, Nyaman, dan Terpercaya
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Simpan Invoice Perhiasan untuk Layanan Pasang Batu Kecil Gratis Seumur Hidup
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Perhatikan Panggilan Suara dan Layar Monitor Saat Nomor Antrian Anda Dipanggil
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Melayani Tukar Tambah Emas dengan Harga Terbaik Selama Kondisi Barang Tidak Ada Kerusakan
+            </span>
+          </div>
+          <!-- Seamless loop clone -->
+          <div class="ticker-group">
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Selamat Datang di {{ brandName }} • Nikmati Pengalaman Transaksi Mewah, Nyaman, dan Terpercaya
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Simpan Invoice Perhiasan untuk Layanan Pasang Batu Kecil Gratis Seumur Hidup
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Perhatikan Panggilan Suara dan Layar Monitor Saat Nomor Antrian Anda Dipanggil
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Melayani Tukar Tambah Emas dengan Harga Terbaik Selama Kondisi Barang Tidak Ada Kerusakan
+            </span>
           </div>
         </div>
       </div>
     </footer>
+    <!-- END: BottomInformationFooter -->
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
 import { subscribeQueue, formatQueue } from "@/services/antrian-service-legacy";
+
+const props = defineProps({
+  activeFloor: {
+    type: String,
+    default: "",
+  },
+});
 
 const currentDisplay = ref("-");
 const nextDisplay = ref("-");
 const missedDisplay = ref("-");
-const missedCount = ref(0);
 const currentTime = ref("");
 const currentDate = ref("");
+const queueState = ref({ currentLetter: 0, currentNumber: 1, delayedQueue: [], skipList: [], missedQueue: [] });
+
+// Upcoming 3 queues for Akan Dipanggil lane
+const nextThreeQueues = computed(() => {
+  const q = queueState.value;
+  if (!q.currentNumber) return [];
+  const LETTERS = ["A", "B", "C", "D"];
+  const list = [];
+  let curNum = Math.max(1, Number(q.currentNumber) || 1);
+  let curLet = q.currentLetter ?? 0;
+  
+  for (let i = 0; i < 3; i++) {
+    curNum++;
+    if (curNum > 99) {
+      curNum = 1;
+      curLet = (curLet + 1) % LETTERS.length;
+    }
+    const qStr = formatQueue(curLet, curNum);
+    if (!q.skipList?.includes(qStr)) {
+      list.push(qStr);
+    }
+  }
+  return list;
+});
+
+// Delayed queues for Sedang Dilayani lane
+const delayedQueues = computed(() => {
+  const delayed = (queueState.value.delayedQueue || []).filter(Boolean);
+  return delayed.slice(0, 3);
+});
 
 const route = useRoute();
-const router = useRouter();
-
-function goBack() {
-  router.back();
-}
 
 const activeFloor = computed(() => {
-  const normalized = normalizeFloorId(route.query.floor, DEFAULT_FLOOR_ID);
+  const rawFloor = props.activeFloor || route.query.floor || DEFAULT_FLOOR_ID;
+  const normalized = normalizeFloorId(rawFloor, DEFAULT_FLOOR_ID);
   return normalized || DEFAULT_FLOOR_ID;
+});
+
+const brandName = computed(() => {
+  return activeFloor.value === "L2" ? "Melati Gold Young" : "Melati Gold Shop";
 });
 
 let clockInterval = null;
 let audioCtx = null;
 let unsubscribeQueue = null;
 let prevDisplay = "-";
-
-const showMissed = computed(() => missedCount.value > 0);
-
-const missedFontClass = computed(() => {
-  const count = missedCount.value;
-  if (count <= 1) return "text-xl";
-  if (count <= 2) return "text-lg";
-  if (count <= 3) return "text-md";
-  if (count <= 4) return "text-sm";
-  return "text-xs";
-});
 
 function updateClock() {
   const now = new Date();
@@ -169,7 +269,7 @@ function updateClock() {
 
 function playNotif() {
   try {
-    if (!audioCtx) audioCtx = new AudioContext();
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
@@ -211,20 +311,10 @@ function handleLogoClick() {
   }, 1000);
 }
 
-onMounted(() => {
-  updateClock();
-  clockInterval = setInterval(updateClock, 1000);
-
-  subscribeToQueue();
-});
-
-watch(activeFloor, () => {
-  subscribeToQueue();
-});
-
 function subscribeToQueue() {
   if (unsubscribeQueue) unsubscribeQueue();
   unsubscribeQueue = subscribeQueue(activeFloor.value, (state) => {
+    queueState.value = state;
     const newDisplay = getCurrentServingDisplay(state.currentLetter, state.currentNumber);
     if (prevDisplay !== "-" && newDisplay !== prevDisplay) {
       playNotif();
@@ -235,11 +325,20 @@ function subscribeToQueue() {
     nextDisplay.value = formatQueue(state.currentLetter, Math.max(1, Number(state.currentNumber) || 1));
 
     // Missed queue
-    const missed = state.missedQueue.filter((v) => v);
-    missedCount.value = missed.length;
+    const missed = (state.missedQueue || []).filter(Boolean);
     missedDisplay.value = missed.length > 0 ? missed.join(", ") : "-";
   });
 }
+
+onMounted(() => {
+  updateClock();
+  clockInterval = setInterval(updateClock, 1000);
+  subscribeToQueue();
+});
+
+watch(activeFloor, () => {
+  subscribeToQueue();
+});
 
 onUnmounted(() => {
   clearInterval(clockInterval);
@@ -248,354 +347,486 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&display=swap");
 
+/* ── Fullscreen Page Container ─────────────────────────────────────────────── */
 .display-page {
-  font-family: "Poppins", sans-serif;
-  background-color: #f9f5eb;
-  color: #3a2c1c;
-  overflow-x: hidden;
-  min-height: 100vh;
-  padding-bottom: 100px;
+  height: 100vh;
+  width: 100vw;
+  background-color: #FAF7F2;
+  color: #201b18;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   position: relative;
+  user-select: none;
+  box-sizing: border-box;
 }
 
-/* ΓöÇΓöÇ Decorative Elements ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.gold-decoration {
+/* ── Ambient Background Lighting ──────────────────────────────────────────── */
+.ambient-glow {
   position: fixed;
-  opacity: 0.1;
-  z-index: 0;
   pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
 }
-.gold-decoration.top-left {
-  top: 10%;
+.top-glow {
+  top: -10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60vw;
+  height: 30vh;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.14) 0%, transparent 70%);
+}
+.bottom-left-glow {
+  bottom: 5%;
   left: 5%;
-  width: 200px;
-  height: 200px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path fill='%23d4af37' d='M50,0 L100,50 L50,100 L0,50 Z'/></svg>");
-  background-repeat: no-repeat;
-  transform: rotate(15deg);
+  width: 35vw;
+  height: 35vh;
+  background: radial-gradient(circle, rgba(184, 134, 11, 0.09) 0%, transparent 70%);
 }
-.gold-decoration.bottom-right {
-  bottom: 10%;
+.bottom-right-glow {
+  bottom: 5%;
   right: 5%;
-  width: 250px;
-  height: 250px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle fill='%23d4af37' cx='50' cy='50' r='50'/></svg>");
-  background-repeat: no-repeat;
-  transform: rotate(-10deg);
+  width: 35vw;
+  height: 35vh;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.09) 0%, transparent 70%);
 }
 
-/* ΓöÇΓöÇ Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.header {
-  background: linear-gradient(135deg, #9d7e2d, #3a2c1c);
-  padding: 1rem 0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  position: relative;
-  z-index: 10;
-}
-.header::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
-}
-.logo-container {
+/* ── Header Section ───────────────────────────────────────────────────────── */
+.display-header {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1.5px solid rgba(212, 175, 55, 0.35);
+  padding: 12px 32px;
   display: flex;
   align-items: center;
-}
-.logo {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #d4af37;
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-}
-.gold-shimmer {
+  justify-content: space-between;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  z-index: 20;
   position: relative;
+  box-sizing: border-box;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.logo-emblem-outer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #785b12, #e2c168, #997a15);
+  padding: 2px;
+  box-shadow: 0 4px 10px rgba(120, 91, 18, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.logo-emblem-outer:hover {
+  transform: scale(1.05);
+}
+
+.logo-emblem-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #f3e5ab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
-.gold-shimmer::after {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.3) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: rotate(30deg);
-  animation: shimmer 4s infinite;
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-@keyframes shimmer {
-  0% {
-    transform: rotate(30deg) translateX(-100%);
-  }
-  100% {
-    transform: rotate(30deg) translateX(100%);
-  }
+
+.brand-titles {
+  display: flex;
+  flex-direction: column;
 }
+
 .brand-name {
-  margin-left: 1rem;
-  font-family: "Playfair Display", serif;
-  font-weight: 700;
-  font-size: 3rem;
-  color: #ffffff;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-  margin-bottom: 0;
+  font-family: 'Playfair Display', serif;
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #5a4208, #997a15, #5a4208);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+  margin: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
-.date-time {
+
+.brand-subtitle {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #5c4202;
+  margin: 2px 0 0 0;
+}
+
+.header-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  color: #ffffff;
 }
-.current-date {
+
+.date-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #5c4202;
+  letter-spacing: 0.02em;
+}
+
+.clock-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.clock-digits {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 2rem;
-  font-weight: 500;
-  font-family: "Playfair Display", serif;
-}
-.current-time {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #f9d776;
-}
-.display-promosi a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  background: transparent;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-}
-.display-promosi a:hover {
-  background: rgba(212, 175, 55, 0.4);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #201b18;
+  line-height: 1;
 }
 
-/* ΓöÇΓöÇ Main / Page Title ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-main {
-  padding: 0;
-  min-height: calc(100vh - 250px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.page-title {
-  text-align: center;
-  margin-bottom: 1rem;
-  position: relative;
-  padding-bottom: 1rem;
-}
-.page-title h1 {
-  font-family: "Roboto", serif;
-  font-size: 6rem;
-  font-weight: 700;
-  color: #3a2c1c;
-  margin-bottom: 0;
-}
-.page-title::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 150px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
+.timezone-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #745718;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 222, 164, 0.5);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  letter-spacing: 0.06em;
 }
 
-/* ΓöÇΓöÇ Queue Cards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.queue-card {
-  border-radius: 15px;
-  overflow: hidden;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  width: 100%;
-  height: clamp(250px, 55vh, 500px);
-  border: none;
-  position: relative;
-  box-shadow: 0 20px 40px rgba(184, 152, 7, 0.63);
-  display: flex;
-  flex-direction: column;
-}
-.queue-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 5px;
-}
-.queue-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
-}
-.card-current::before {
-  background: linear-gradient(90deg, #f9d776, #9d7e2d);
-}
-.card-next::before {
-  background: linear-gradient(90deg, #9d7e2d, #f9d776);
-}
-.card-delayed::before {
-  background: linear-gradient(90deg, #ff9800, #ff6d00);
-}
-
-/* ΓöÇΓöÇ Card Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.queue-card-header {
-  background-color: #ffffff;
-  padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
-}
-.queue-card-header-delayed {
-  background-color: #fff8e1;
-  border-bottom-color: #ffcc02;
-}
-.queue-card-header h1 {
-  font-family: "Times New Roman", Times, serif;
-  font-size: clamp(1.6rem, 3.8vw, 5rem);
-  font-weight: bold;
-  margin: 0;
-  color: #3a2c1c;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-}
-
-.queue-card-header h1.queue-card-title--compact {
-  font-size: clamp(1.25rem, 2.8vw, 3.1rem);
-}
-
-/* ΓöÇΓöÇ Card Body ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.queue-card-body {
-  background-color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+/* ── Main Queue Board ─────────────────────────────────────────────────────── */
+.main-board {
   flex: 1;
-}
-
-/* ΓöÇΓöÇ Queue Number ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.queue-number {
-  font-family: "Playfair Display", serif;
-  font-weight: 700;
-  color: #3a2c1c;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-  position: relative;
+  width: 100%;
+  padding: 18px 32px;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  text-align: center;
-  width: 100%;
-  height: 100%;
-  line-height: 1.1;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  transition: font-size 0.3s ease;
-  font-size: clamp(4rem, 30vh, 20rem);
-}
-.queue-number::after {
-  content: "";
-  position: absolute;
-  bottom: -1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 150px;
-  height: 3px;
-  background: #d4af37;
-  border-radius: 3px;
-}
-.queue-number.active {
-  animation: numberPulse 2s infinite;
-  color: #9d7e2d;
+  gap: 28px;
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-/* Font size utilities for delayed card */
-.queue-number.text-xl {
-  font-size: clamp(3rem, 26vh, 17rem);
-}
-.queue-number.text-lg {
-  font-size: clamp(2.5rem, 17vh, 11rem);
-}
-.queue-number.text-md {
-  font-size: clamp(1.5rem, 10vh, 6rem);
-}
-.queue-number.text-sm {
-  font-size: clamp(1.25rem, 7vh, 4rem);
-}
-.queue-number.text-xs {
-  font-size: clamp(1rem, 5vh, 3rem);
-}
-
-/* ΓöÇΓöÇ Gold Border ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.gold-border {
-  border-radius: 10px;
-  background:
-    linear-gradient(#ffffff, #ffffff) padding-box,
-    linear-gradient(45deg, #d4af37, #f9d776, #d4af37) border-box;
-  border: 1px solid transparent;
+.queue-lane {
+  flex: 1;
+  max-width: 780px;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 2px solid rgba(212, 175, 55, 0.4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px 28px 24px 28px;
+  box-shadow: 0 15px 35px -5px rgba(184, 152, 7, 0.12), 0 0 0 1px rgba(212, 175, 55, 0.1);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-/* ΓöÇΓöÇ Footer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-.footer {
-  background: linear-gradient(135deg, #3a2c1c, #9d7e2d);
-  color: #ffffff;
-  text-align: center;
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  z-index: 100;
-}
-.footer::before {
-  content: "";
+.lane-top-stripe {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
-}
-.footer-text {
-  font-family: "Playfair Display", serif;
-  font-size: 1.5rem;
+  height: 6px;
+  background: linear-gradient(90deg, #d4af37, #f3e5ab, #d4af37);
 }
 
-/* ΓöÇΓöÇ Animations ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-@keyframes numberPulse {
+.stripe-next {
+  background: linear-gradient(90deg, #997a15, #d4af37, #997a15);
+}
+
+.lane-header-wrapper {
+  width: 100%;
+}
+
+.lane-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(226, 193, 104, 0.3);
+}
+
+.lane-info-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lane-icon-badge {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 222, 164, 0.45), rgba(253, 213, 137, 0.55), rgba(255, 222, 164, 0.25));
+  border: 2px solid rgba(212, 175, 55, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #745718;
+  font-size: 1.5rem;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+.lane-subtitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #8f702f;
+  display: block;
+}
+
+.lane-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #261900;
+  margin: 2px 0 0 0;
+  line-height: 1.15;
+}
+
+.missed-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 700;
+  animation: pulseAlert 2s infinite;
+}
+
+@keyframes pulseAlert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Massive Calling Number ───────────────────────────────────────────────── */
+.number-center-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+  text-align: center;
+  overflow: visible;
+}
+
+.number-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.queue-number-text {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  padding: 0 0.05em 0.12em 0.05em;
+  font-size: clamp(11rem, 17vw, 19rem);
+  background: linear-gradient(
+    180deg,
+    #0a0703 0%,
+    #140d05 50%,
+    #241808 72%,
+    #422c0e 86%,
+    #7a5717 94%,
+    #b88a24 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 8px 18px rgba(20, 14, 4, 0.28));
+  display: inline-block;
+  user-select: none;
+}
+
+/* ── Lane Footer (Upcoming & Delayed Numbers) ─────────────────────────────── */
+.lane-footer {
+  padding: 12px 28px;
+  border-top: 1px solid rgba(226, 193, 104, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FAF7F2;
+  margin-left: -28px;
+  margin-right: -28px;
+  margin-bottom: -24px;
+  border-bottom-left-radius: 22px;
+  border-bottom-right-radius: 22px;
+}
+
+.next-label {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5c4202;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-gold {
+  color: #745718;
+}
+
+.next-numbers-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.next-num-badge {
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.next-num-primary {
+  padding: 6px 16px;
+  background: #ffffff;
+  color: #261900;
+  border: 2px solid rgba(212, 175, 55, 0.6);
+  font-size: 1.35rem;
+  font-weight: 900;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.next-num-secondary {
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #5c4202;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.next-num-empty {
+  padding: 6px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #7f7667;
+  border: 1px solid rgba(209, 197, 180, 0.5);
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+.display-footer {
+  width: 100%;
+  background: #FAF7F2;
+  border-top: 2px solid rgba(212, 175, 55, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.ticker-wrapper {
+  width: 100%;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 9px 0;
+  border-top: 1px solid #ffffff;
+}
+
+.ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: tickerAnimation 34s linear infinite;
+}
+
+.ticker-items {
+  display: inline-flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.ticker-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.85rem;
+  color: #4e4639;
+}
+
+.star-accent {
+  color: #8f702f;
+  font-size: 1rem;
+}
+
+@keyframes tickerAnimation {
   0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
+    transform: translateX(0);
   }
   100% {
-    transform: scale(1);
+    transform: translateX(-50%);
   }
 }
 
-/* Vue Transitions */
+/* ── Vue Transitions ──────────────────────────────────────────────────────── */
 .queue-change-enter-active {
-  animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .queue-change-leave-active {
-  animation: popOut 0.2s ease-in;
+  animation: popOut 0.25s ease-in;
 }
+
 @keyframes popIn {
   from {
-    transform: scale(0.5);
+    transform: scale(0.65);
     opacity: 0;
   }
   to {
@@ -603,6 +834,7 @@ main {
     opacity: 1;
   }
 }
+
 @keyframes popOut {
   from {
     transform: scale(1);
@@ -612,45 +844,5 @@ main {
     transform: scale(1.1);
     opacity: 0;
   }
-}
-.card-fade-enter-active,
-.card-fade-leave-active {
-  transition:
-    opacity 0.4s ease,
-    transform 0.4s ease;
-}
-.card-fade-enter-from,
-.card-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Kiosk Back Button Styles */
-.back-btn-kiosk {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  background: transparent;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #fffbf6;
-  font-size: 1.1rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  z-index: 10;
-}
-
-.back-btn-kiosk:hover {
-  background: rgba(212, 175, 55, 0.15);
-  color: #836720;
-  border-color: rgba(212, 175, 55, 0.7);
-  transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2);
-}
-
-.back-btn-kiosk:active {
-  transform: scale(0.95);
 }
 </style>

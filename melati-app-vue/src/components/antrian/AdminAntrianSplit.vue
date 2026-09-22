@@ -933,6 +933,7 @@ import {
   padNumber,
   LETTERS_MAP,
   nextQueue,
+  callQueue,
   setCustomQueue,
   addToSkipList,
   removeFromSkipList,
@@ -1449,6 +1450,12 @@ async function callCurrent(type) {
   if (isAudioBusy()) return;
   primeAudioPlayback();
   audioActiveBtn.value = type === "jual" ? "callCurrentJual" : "callCurrentBeli";
+  try {
+    const updatedState = await callQueue(type, state.value, activeFloor.value);
+    state.value = updatedState;
+  } catch (err) {
+    console.error("Gagal update status panggil antrian:", err);
+  }
   await playQueueAnnouncement(curStr);
   audioActiveBtn.value = "";
 }

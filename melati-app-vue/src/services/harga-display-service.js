@@ -1,4 +1,15 @@
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { 
+  addDoc, 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  limit, 
+  onSnapshot, 
+  orderBy, 
+  query, 
+  setDoc 
+} from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 
 export const DEFAULT_HARGA_DISPLAY_SETTINGS = Object.freeze({
@@ -61,8 +72,12 @@ export const DEFAULT_HARGA_DISPLAY_SETTINGS = Object.freeze({
   updatedBy: "System",
 });
 
-function getHargaDisplayDoc() {
+export function getHargaDisplayDoc() {
   return doc(db, "settings", "hargaDisplay");
+}
+
+export function getHargaDisplayHistoryCol() {
+  return collection(db, "settings", "hargaDisplay", "history");
 }
 
 export function normalizeHargaDisplaySettings(raw = {}) {
@@ -106,6 +121,101 @@ export function normalizeHargaDisplaySettings(raw = {}) {
   };
 }
 
+export function calculateHargaDiff(previousItems = [], nextItems = []) {
+  const changes = [];
+  const prevMap = new Map();
+
+  (previousItems || []).forEach((item, index) => {
+    const key = item.id || item.kadar || `item-${index}`;
+    prevMap.set(key, item);
+  });
+
+  const nextMap = new Map();
+  (nextItems || []).forEach((item, index) => {
+    const key = item.id || item.kadar || `item-${index}`;
+    nextMap.set(key, item);
+  });
+
+  // Check updated and added items
+  (nextItems || []).forEach((nextItem, index) => {
+    const key = nextItem.id || nextItem.kadar || `item-${index}`;
+    const prevItem = prevMap.get(key) || (previousItems || []).find((p) => p.kadar && p.kadar === nextItem.kadar);
+
+    if (!prevItem) {
+      changes.push({
+        type: "added",
+        kadar: nextItem.kadar || `Kadar #${index + 1}`,
+        id: nextItem.id,
+        hargaNormal: { before: 0, after: Number(nextItem.hargaNormal) || 0, diff: Number(nextItem.hargaNormal) || 0 },
+        hargaBranded: { before: 0, after: Number(nextItem.hargaBranded) || 0, diff: Number(nextItem.hargaBranded) || 0 },
+        hargaBuyback: { before: 0, after: Number(nextItem.hargaBuyback) || 0, diff: Number(nextItem.hargaBuyback) || 0 },
+        hasBranded: { before: false, after: Boolean(nextItem.hasBranded) },
+      });
+    } else {
+      const prevNormal = Number(prevItem.hargaNormal) || 0;
+      const nextNormal = Number(nextItem.hargaNormal) || 0;
+      const prevBranded = Number(prevItem.hargaBranded) || 0;
+      const nextBranded = Number(nextItem.hargaBranded) || 0;
+      const prevBuyback = Number(prevItem.hargaBuyback) || 0;
+      const nextBuyback = Number(nextItem.hargaBuyback) || 0;
+      const prevHasBranded = Boolean(prevItem.hasBranded);
+      const nextHasBranded = Boolean(nextItem.hasBranded);
+
+      const isNormalChanged = prevNormal !== nextNormal;
+      const isBrandedChanged = prevBranded !== nextBranded || prevHasBranded !== nextHasBranded;
+      const isBuybackChanged = prevBuyback !== nextBuyback;
+      const isKadarNameChanged = String(prevItem.kadar || "").trim() !== String(nextItem.kadar || "").trim();
+
+      if (isNormalChanged || isBrandedChanged || isBuybackChanged || isKadarNameChanged) {
+        changes.push({
+          type: "modified",
+          kadar: nextItem.kadar || prevItem.kadar || `Kadar #${index + 1}`,
+          oldKadar: prevItem.kadar,
+          id: nextItem.id || prevItem.id,
+          hargaNormal: {
+            before: prevNormal,
+            after: nextNormal,
+            diff: nextNormal - prevNormal,
+          },
+          hargaBranded: {
+            before: prevBranded,
+            after: nextBranded,
+            diff: nextBranded - prevBranded,
+          },
+          hargaBuyback: {
+            before: prevBuyback,
+            after: nextBuyback,
+            diff: nextBuyback - prevBuyback,
+          },
+          hasBranded: {
+            before: prevHasBranded,
+            after: nextHasBranded,
+          },
+        });
+      }
+    }
+  });
+
+  // Check removed items
+  (previousItems || []).forEach((prevItem, index) => {
+    const key = prevItem.id || prevItem.kadar || `item-${index}`;
+    const existsInNext = nextMap.has(key) || (nextItems || []).some((n) => n.kadar && n.kadar === prevItem.kadar);
+    if (!existsInNext) {
+      changes.push({
+        type: "removed",
+        kadar: prevItem.kadar || `Kadar #${index + 1}`,
+        id: prevItem.id,
+        hargaNormal: { before: Number(prevItem.hargaNormal) || 0, after: 0, diff: -(Number(prevItem.hargaNormal) || 0) },
+        hargaBranded: { before: Number(prevItem.hargaBranded) || 0, after: 0, diff: -(Number(prevItem.hargaBranded) || 0) },
+        hargaBuyback: { before: Number(prevItem.hargaBuyback) || 0, after: 0, diff: -(Number(prevItem.hargaBuyback) || 0) },
+        hasBranded: { before: Boolean(prevItem.hasBranded), after: false },
+      });
+    }
+  });
+
+  return changes;
+}
+
 export async function ensureHargaDisplaySettings() {
   const docRef = getHargaDisplayDoc();
   const snap = await getDoc(docRef);
@@ -126,19 +236,81 @@ export async function fetchHargaDisplaySettings() {
   return await ensureHargaDisplaySettings();
 }
 
-export async function saveHargaDisplaySettings(payload, updatedBy = "") {
+export async function fetchHargaDisplayHistory(limitCount = 50) {
+  try {
+    const colRef = getHargaDisplayHistoryCol();
+    const q = query(colRef, orderBy("timestamp", "desc"), limit(limitCount));
+    const snap = await getDocs(q);
+    const historyList = [];
+    snap.forEach((docSnap) => {
+      historyList.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      });
+    });
+    return historyList;
+  } catch (err) {
+    console.warn("fetchHargaDisplayHistory ordered query failed, trying fallback:", err);
+    try {
+      const colRef = getHargaDisplayHistoryCol();
+      const snap = await getDocs(colRef);
+      const list = [];
+      snap.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      return list.slice(0, limitCount);
+    } catch (fallbackErr) {
+      console.error("Fallback fetch history failed:", fallbackErr);
+      return [];
+    }
+  }
+}
+
+export async function saveHargaDisplaySettings(payload, updatedBy = "", note = "") {
   const docRef = getHargaDisplayDoc();
+  const currentSnap = await getDoc(docRef);
+  const previousData = currentSnap.exists()
+    ? normalizeHargaDisplaySettings(currentSnap.data())
+    : DEFAULT_HARGA_DISPLAY_SETTINGS;
+
   const normalized = normalizeHargaDisplaySettings(payload);
   const now = new Date().toISOString();
+  const staff = updatedBy || auth.currentUser?.email || auth.currentUser?.displayName || "System";
+
+  const priceChanges = calculateHargaDiff(previousData.items || [], normalized.items || []);
 
   const finalData = {
     ...normalized,
     lastUpdated: now,
-    updatedBy: updatedBy || auth.currentUser?.email || "System",
+    updatedBy: staff,
   };
 
   await setDoc(docRef, finalData);
-  return finalData;
+
+  // Record audit log entry in history subcollection
+  try {
+    const historyCol = getHargaDisplayHistoryCol();
+    const historyEntry = {
+      timestamp: now,
+      updatedBy: staff,
+      note: String(note || "").trim(),
+      changes: priceChanges,
+      totalChanges: priceChanges.length,
+      themeChanged: previousData.theme !== normalized.theme,
+      titleChanged: previousData.title !== normalized.title,
+      snapshotBefore: previousData.items || [],
+      snapshotAfter: normalized.items || [],
+    };
+    await addDoc(historyCol, historyEntry);
+  } catch (historyErr) {
+    console.warn("Gagal mencatat audit log riwayat harga display:", historyErr);
+  }
+
+  return {
+    ...finalData,
+    priceChanges,
+  };
 }
 
 export function subscribeHargaDisplaySettings(onData, onError) {

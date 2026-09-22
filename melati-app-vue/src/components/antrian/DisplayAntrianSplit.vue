@@ -1,139 +1,206 @@
 <template>
-  <div class="display-page" style="user-select: none">
-    <!-- Decorative Elements -->
-    <div class="gold-decoration top-left"></div>
-    <div class="gold-decoration bottom-right"></div>
+  <div class="display-page">
+    <!-- Ambient Background Lighting -->
+    <div class="ambient-glow top-glow"></div>
+    <div class="ambient-glow bottom-left-glow"></div>
+    <div class="ambient-glow bottom-right-glow"></div>
 
-    <!-- Header -->
-    <header class="header">
-      <div class="container-fluid px-4 px-md-5">
-        <div class="row align-items-center justify-content-between">
-          <div class="col-md-6">
-            <div class="logo-container" style="cursor: pointer" @click="handleLogoClick">
-              <img src="/img/Melati.jfif" alt="Logo" class="logo gold-shimmer" />
-              <h1 class="brand-name">{{ brandName }}</h1>
-            </div>
-          </div>
-          <div class="col-md-6 d-flex justify-content-end align-items-center">
-            <div class="date-time">
-              <div class="current-date">{{ currentDate }}</div>
-                <div class="current-time">{{ currentTime }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="container-fluid" style="max-width: 1900px; margin: 0 auto">
-      <!-- Page Title -->
-      <div class="page-title mb-4">
-        <button 
-          type="button" 
-          class="back-btn-kiosk position-absolute start-0 top-50 translate-middle-y"
+    <!-- BEGIN: HeaderSection -->
+    <header class="display-header">
+      <!-- Brand identity & emblem -->
+      <div class="header-left">
+        <button
+          v-if="isKioskBackAvailable"
+          type="button"
+          class="back-btn-kiosk"
           @click="goBack"
           title="Kembali"
         >
           <i class="fas fa-arrow-left"></i>
         </button>
-        <h1>ANTRIAN PELAYANAN</h1>
-      </div>
 
-      <div class="row g-4 mt-1">
-        <!-- Column 1: Jual Perhiasan -->
-        <div class="col-12 col-lg-6">
-          <div class="section-title text-center mb-3">
-            <h2>JUAL / SERVIS</h2>
-          </div>
-          <div class="row g-2 justify-content-center align-items-stretch">
-            <!-- Current Queue Card -->
-            <div :class="['col-12', showJualMissed ? 'col-md-6' : 'col-md-12']">
-              <div class="queue-card card-current gold-border">
-                <div class="queue-card-header">
-                  <h1 :class="{ 'queue-card-title--compact': showJualMissed }">SEDANG DILAYANI</h1>
-                </div>
-                <div class="queue-card-body">
-                  <Transition name="queue-change" mode="out-in">
-                    <div :key="jualCurrentDisplay" :class="['queue-number', 'active', { 'queue-number--compact': showJualMissed }]">
-                      {{ jualCurrentDisplay }}
-                    </div>
-                  </Transition>
-                </div>
-              </div>
-            </div>
-
-            <!-- Missed Queue Card -->
-            <Transition name="card-fade">
-              <div v-if="showJualMissed" class="col-12 col-md-6">
-                <div class="queue-card card-delayed gold-border">
-                  <div class="queue-card-header queue-card-header-delayed">
-                    <h1 class="queue-card-title--compact">ANTRIAN TERLEWAT</h1>
-                  </div>
-                  <div class="queue-card-body">
-                    <div class="queue-number text-xl">
-                      {{ jualMissedDisplay }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Transition>
+        <div
+          class="logo-emblem-outer"
+          @click="handleLogoClick"
+          title="Melati Gold"
+        >
+          <div class="logo-emblem-inner">
+            <img src="/img/Melati.jfif" alt="Logo" class="logo-img" />
           </div>
         </div>
 
-        <!-- Column 2: Beli / Tukar Tambah -->
-        <div class="col-12 col-lg-6">
-          <div class="section-title text-center mb-3">
-            <h2>BELI / TUKAR TAMBAH</h2>
-          </div>
-          <div class="row g-2 justify-content-center align-items-stretch">
-            <!-- Current Queue Card -->
-            <div :class="['col-12', showBeliMissed ? 'col-md-6' : 'col-md-12']">
-              <div class="queue-card card-current gold-border">
-                <div class="queue-card-header">
-                  <h1 :class="{ 'queue-card-title--compact': showBeliMissed }">SEDANG DILAYANI</h1>
-                </div>
-                <div class="queue-card-body">
-                  <Transition name="queue-change" mode="out-in">
-                    <div :key="beliCurrentDisplay" :class="['queue-number', 'active', { 'queue-number--compact': showBeliMissed }]">
-                      {{ beliCurrentDisplay }}
-                    </div>
-                  </Transition>
-                </div>
-              </div>
-            </div>
-
-            <!-- Missed Queue Card -->
-            <Transition name="card-fade">
-              <div v-if="showBeliMissed" class="col-12 col-md-6">
-                <div class="queue-card card-delayed gold-border">
-                  <div class="queue-card-header queue-card-header-delayed">
-                    <h1 class="queue-card-title--compact">ANTRIAN TERLEWAT</h1>
-                  </div>
-                  <div class="queue-card-body">
-                    <div class="queue-number text-xl">
-                      {{ beliMissedDisplay }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Transition>
-          </div>
+        <div class="brand-titles">
+          <h1 class="brand-name">{{ brandName }}</h1>
+          <p class="brand-subtitle">Antrian Pelayanan</p>
         </div>
       </div>
 
-      <div class="elegant-divider my-4"></div>
+      <!-- Live Date, Clock & Timezone Widget -->
+      <div class="header-right">
+        <div class="date-text">{{ currentDate }}</div>
+        <div class="clock-box">
+          <span class="clock-digits">{{ currentTime }}</span>
+          <span class="timezone-badge">WITA</span>
+        </div>
+      </div>
+    </header>
+    <!-- END: HeaderSection -->
+
+    <!-- BEGIN: MainQueueBoard -->
+    <main class="main-board">
+      <!-- Left Column: Jual / Servis (Antrian A) -->
+      <section class="queue-lane">
+        <div class="lane-top-stripe"></div>
+
+        <!-- Lane Category Header -->
+        <div class="lane-header-wrapper">
+          <div class="lane-header-row">
+            <div class="lane-info-left">
+              <div class="lane-icon-badge">
+                <i class="fas fa-balance-scale"></i>
+              </div>
+              <div>
+                <span class="lane-subtitle">Pelayanan Transaksi</span>
+                <h2 class="lane-title">JUAL / SERVIS EMAS</h2>
+              </div>
+            </div>
+
+            <!-- Optional Missed Queue Indicator Badge -->
+            <div v-if="jualMissedDisplay !== '-'" class="missed-alert-badge">
+              <i class="fas fa-exclamation-circle"></i>
+              <span>Terlewat: {{ jualMissedDisplay }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Massive Center Calling Number Display -->
+        <div class="number-center-container">
+          <Transition name="queue-change" mode="out-in">
+            <div :key="jualCurrentDisplay" class="number-wrapper">
+              <span class="queue-number-text">
+                {{ jualCurrentDisplay }}
+              </span>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Upcoming Queue Preview Footer -->
+        <div class="lane-footer">
+          <span class="next-label">
+            <i class="fas fa-clock text-gold"></i>
+            Antrian Berikutnya:
+          </span>
+          <div class="next-numbers-row">
+            <template v-if="jualNextThreeQueues.length > 0">
+              <span
+                v-for="(num, idx) in jualNextThreeQueues"
+                :key="num"
+                class="next-num-badge"
+                :class="{ 'next-num-primary': idx === 0, 'next-num-secondary': idx > 0 }"
+              >
+                {{ num }}
+              </span>
+            </template>
+            <span v-else class="next-num-empty">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Beli / Tukar Tambah (Antrian B-C) -->
+      <section class="queue-lane">
+        <div class="lane-top-stripe"></div>
+
+        <!-- Lane Category Header -->
+        <div class="lane-header-wrapper">
+          <div class="lane-header-row">
+            <div class="lane-info-left">
+              <div class="lane-icon-badge">
+                <i class="fas fa-gem"></i>
+              </div>
+              <div>
+                <span class="lane-subtitle">Pelayanan Transaksi</span>
+                <h2 class="lane-title">BELI / TUKAR TAMBAH</h2>
+              </div>
+            </div>
+
+            <!-- Optional Missed Queue Indicator Badge -->
+            <div v-if="beliMissedDisplay !== '-'" class="missed-alert-badge">
+              <i class="fas fa-exclamation-circle"></i>
+              <span>Terlewat: {{ beliMissedDisplay }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Massive Center Calling Number Display -->
+        <div class="number-center-container">
+          <Transition name="queue-change" mode="out-in">
+            <div :key="beliCurrentDisplay" class="number-wrapper">
+              <span class="queue-number-text">
+                {{ beliCurrentDisplay }}
+              </span>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Upcoming Queue Preview Footer -->
+        <div class="lane-footer">
+          <span class="next-label">
+            <i class="fas fa-clock text-gold"></i>
+            Antrian Berikutnya:
+          </span>
+          <div class="next-numbers-row">
+            <template v-if="beliNextThreeQueues.length > 0">
+              <span
+                v-for="(num, idx) in beliNextThreeQueues"
+                :key="num"
+                class="next-num-badge"
+                :class="{ 'next-num-primary': idx === 0, 'next-num-secondary': idx > 0 }"
+              >
+                {{ num }}
+              </span>
+            </template>
+            <span v-else class="next-num-empty">-</span>
+          </div>
+        </div>
+      </section>
     </main>
+    <!-- END: MainQueueBoard -->
 
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <div class="row justify-content-center align-items-center" style="min-height: 80px">
-          <div class="col-auto">
-            <p class="footer-text mb-0">&copy; 2026 Melati Gold Shop. All rights reserved.</p>
+    <!-- BEGIN: BottomInformationFooter (Continuous Ticker) -->
+    <footer class="display-footer">
+      <div class="ticker-wrapper">
+        <div class="ticker-track">
+          <div class="ticker-items">
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Selamat Datang di {{ brandName }} • Nikmati Pengalaman Transaksi Mewah, Nyaman, dan Terpercaya
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Simpan Invoice Perhiasan untuk Layanan Pasang Batu Kecil Gratis Seumur Hidup
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Perhatikan Panggilan Suara dan Layar Monitor Saat Nomor Antrian Anda Dipanggil
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Melayani Tukar Tambah Emas dengan Harga Terbaik Selama Kondisi Barang Tidak Ada Kerusakan
+            </span>
+            <!-- Seamless loop clone -->
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Selamat Datang di {{ brandName }} • Nikmati Pengalaman Transaksi Mewah, Nyaman, dan Terpercaya
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Simpan Invoice Perhiasan untuk Layanan Pasang Batu Kecil Gratis Seumur Hidup
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Harap Perhatikan Panggilan Suara dan Layar Monitor Saat Nomor Antrian Anda Dipanggil
+            </span>
+            <span class="ticker-segment">
+              <span class="star-accent">✦</span> Melayani Tukar Tambah Emas dengan Harga Terbaik Selama Kondisi Barang Tidak Ada Kerusakan
+            </span>
           </div>
         </div>
       </div>
     </footer>
+    <!-- END: BottomInformationFooter -->
   </div>
 </template>
 
@@ -141,28 +208,22 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { DEFAULT_FLOOR_ID, normalizeFloorId } from "@/config/floor-config";
+import { subscribeQueue, formatQueue } from "@/services/antrian-service";
 
 const route = useRoute();
 const router = useRouter();
 
+const isKioskBackAvailable = computed(() => !!route.query.from || !!window.history.state?.back);
+
 function goBack() {
   router.back();
 }
-import { subscribeQueue, formatQueue } from "@/services/antrian-service";
 
 const currentTime = ref("");
 const currentDate = ref("");
 
-const jualState = ref({ currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [] });
-const beliState = ref({ currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, delayedQueue: [], missedQueue: [] });
-
-const currentShift = computed(() => {
-  const timeStr = currentTime.value;
-  if (!timeStr) return "morning";
-  const parts = timeStr.split(/[:\.]/);
-  const hour = Number(parts[0]);
-  return hour < 14 ? "morning" : "afternoon";
-});
+const jualState = ref({ currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, calledLetter: 0, calledNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] });
+const beliState = ref({ currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, calledLetter: 0, calledNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] });
 
 // Emptiness checks for circular queues
 const isJualEmpty = computed(() => {
@@ -185,91 +246,103 @@ const isBeliEmpty = computed(() => {
 
 // Computed displays for Jual
 const jualCurrentDisplay = computed(() => {
-  if (isJualEmpty.value) {
-    if (jualState.value.lastNumber === 0) return "A01";
-    return "-";
-  }
-  const { currentLetter, currentNumber } = jualState.value;
-  const letters = ["A"];
-  
-  const currentIdx = ((currentLetter ?? 0) % letters.length) * 99 + currentNumber;
-  if (currentIdx <= 1) {
+  const q = jualState.value;
+  if (isJualEmpty.value && q.lastNumber === 0) {
     return "A01";
   }
-  
-  const prevIdx = currentIdx - 1;
-  const prevLet = Math.floor((prevIdx - 1) / 99) % letters.length;
-  const prevNum = ((prevIdx - 1) % 99) + 1;
-  const letter = letters[prevLet] || "A";
-  return formatQueue(letter, prevNum);
-});
-
-const jualNextDisplay = computed(() => {
-  if (isJualEmpty.value) return "-";
-  const { currentLetter, currentNumber, lastLetter, lastNumber } = jualState.value;
   const letters = ["A"];
-  const currentIdx = ((currentLetter ?? 0) % letters.length) * 99 + currentNumber;
-  const lastIdx = ((lastLetter ?? 0) % letters.length) * 99 + lastNumber;
-  if (currentIdx === lastIdx) return "-";
-  
-  let nextNum = currentNumber + 1;
-  let nextLet = (currentLetter ?? 0) % letters.length;
-  if (nextNum > 99) {
-    nextNum = 1;
-    nextLet = (nextLet + 1) % letters.length;
+  if (q.calledNumber && q.calledNumber > 0) {
+    const letter = letters[(q.calledLetter ?? 0) % letters.length] || "A";
+    return formatQueue(letter, q.calledNumber);
   }
-  return formatQueue(letters[nextLet] || "A", nextNum);
+  if (q.lastNumber === 0) {
+    return "A01";
+  }
+  return formatQueue("A", 1);
 });
 
 const jualMissedDisplay = computed(() => {
-  const missed = jualState.value.missedQueue.filter(v => v);
+  const missed = (jualState.value.missedQueue || []).filter(Boolean);
   return missed.length > 0 ? missed.join(", ") : "-";
 });
-const showJualMissed = computed(() => jualState.value.missedQueue.filter(v => v).length > 0);
+
+// Upcoming 3 queues for Jual
+const jualNextThreeQueues = computed(() => {
+  const q = jualState.value;
+  if (isJualEmpty.value || q.lastNumber === 0) return [];
+  const letters = ["A"];
+  const list = [];
+  let curNum = q.currentNumber;
+  let curLet = (q.currentLetter ?? 0) % letters.length;
+  const lastIdx = ((q.lastLetter ?? 0) % letters.length) * 99 + q.lastNumber;
+
+  let checked = 0;
+  while (list.length < 3 && checked < 99) {
+    curNum++;
+    if (curNum > 99) {
+      curNum = 1;
+      curLet = (curLet + 1) % letters.length;
+    }
+    const idx = curLet * 99 + curNum;
+    if (idx > lastIdx && q.lastNumber > 0) break;
+    const qStr = formatQueue(letters[curLet] || "A", curNum);
+    if (!q.skipList?.includes(qStr)) {
+      list.push(qStr);
+    }
+    checked++;
+  }
+  return list;
+});
 
 // Computed displays for Beli
 const beliCurrentDisplay = computed(() => {
-  if (isBeliEmpty.value) {
-    if (beliState.value.lastNumber === 0) return "B01";
-    return "-";
-  }
-  const { currentLetter, currentNumber } = beliState.value;
-  const letters = ["B", "C"];
-  
-  const currentIdx = (currentLetter ?? 0) * 99 + currentNumber;
-  if (currentIdx <= 1) {
+  const q = beliState.value;
+  if (isBeliEmpty.value && q.lastNumber === 0) {
     return "B01";
   }
-  
-  const prevIdx = currentIdx - 1;
-  const prevLet = Math.floor((prevIdx - 1) / 99) % letters.length;
-  const prevNum = ((prevIdx - 1) % 99) + 1;
-  const letter = letters[prevLet] || "B";
-  return formatQueue(letter, prevNum);
-});
-
-const beliNextDisplay = computed(() => {
-  if (isBeliEmpty.value) return "-";
-  const { currentLetter, currentNumber, lastLetter, lastNumber } = beliState.value;
   const letters = ["B", "C"];
-  const currentIdx = (currentLetter ?? 0) * 99 + currentNumber;
-  const lastIdx = (lastLetter ?? 0) * 99 + lastNumber;
-  if (currentIdx === lastIdx) return "-";
-  
-  let nextNum = currentNumber + 1;
-  let nextLet = (currentLetter ?? 0) % letters.length;
-  if (nextNum > 99) {
-    nextNum = 1;
-    nextLet = (nextLet + 1) % letters.length;
+  if (q.calledNumber && q.calledNumber > 0) {
+    const letter = letters[(q.calledLetter ?? 0) % letters.length] || "B";
+    return formatQueue(letter, q.calledNumber);
   }
-  return formatQueue(letters[nextLet] || "B", nextNum);
+  if (q.lastNumber === 0) {
+    return "B01";
+  }
+  return formatQueue("B", 1);
 });
 
 const beliMissedDisplay = computed(() => {
-  const missed = beliState.value.missedQueue.filter(v => v);
+  const missed = (beliState.value.missedQueue || []).filter(Boolean);
   return missed.length > 0 ? missed.join(", ") : "-";
 });
-const showBeliMissed = computed(() => beliState.value.missedQueue.filter(v => v).length > 0);
+
+// Upcoming 3 queues for Beli
+const beliNextThreeQueues = computed(() => {
+  const q = beliState.value;
+  if (isBeliEmpty.value || q.lastNumber === 0) return [];
+  const letters = ["B", "C"];
+  const list = [];
+  let curNum = q.currentNumber;
+  let curLet = (q.currentLetter ?? 0) % letters.length;
+  const lastIdx = ((q.lastLetter ?? 0) % letters.length) * 99 + q.lastNumber;
+
+  let checked = 0;
+  while (list.length < 3 && checked < 198) {
+    curNum++;
+    if (curNum > 99) {
+      curNum = 1;
+      curLet = (curLet + 1) % letters.length;
+    }
+    const idx = curLet * 99 + curNum;
+    if (idx > lastIdx && q.lastNumber > 0) break;
+    const qStr = formatQueue(letters[curLet] || "B", curNum);
+    if (!q.skipList?.includes(qStr)) {
+      list.push(qStr);
+    }
+    checked++;
+  }
+  return list;
+});
 
 const activeFloor = computed(() => {
   const normalized = normalizeFloorId(route.query.floor, DEFAULT_FLOOR_ID);
@@ -336,35 +409,37 @@ function handleLogoClick() {
   }, 1000);
 }
 
-onMounted(() => {
-  updateClock();
-  clockInterval = setInterval(updateClock, 1000);
-
-  subscribeToQueue();
-});
-
-watch([activeFloor, currentShift], () => {
-  subscribeToQueue();
-});
-
 function subscribeToQueue() {
   if (unsubscribeQueue) unsubscribeQueue();
   unsubscribeQueue = subscribeQueue(activeFloor.value, (state) => {
     jualState.value = state.jual;
     beliState.value = state.beli;
     
-    // Check if queue pointers have changed
+    // Check if called queue pointers have changed
+    const currentJualCalled = (state.jual.calledLetter ?? 0) * 99 + (state.jual.calledNumber ?? 0);
+    const currentBeliCalled = (state.beli.calledLetter ?? 0) * 99 + (state.beli.calledNumber ?? 0);
+
     const changed = 
-      (prevJualNumber !== 0 && state.jual.currentNumber !== prevJualNumber) ||
-      (prevBeliNumber !== 0 && state.beli.currentNumber !== prevBeliNumber);
+      (prevJualNumber !== 0 && currentJualCalled !== 0 && currentJualCalled !== prevJualNumber) ||
+      (prevBeliNumber !== 0 && currentBeliCalled !== 0 && currentBeliCalled !== prevBeliNumber);
 
     if (changed) {
       playNotif();
     }
-    prevJualNumber = state.jual.currentNumber;
-    prevBeliNumber = state.beli.currentNumber;
+    prevJualNumber = currentJualCalled;
+    prevBeliNumber = currentBeliCalled;
   });
 }
+
+onMounted(() => {
+  updateClock();
+  clockInterval = setInterval(updateClock, 1000);
+  subscribeToQueue();
+});
+
+watch(activeFloor, () => {
+  subscribeToQueue();
+});
 
 onUnmounted(() => {
   clearInterval(clockInterval);
@@ -373,365 +448,481 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&display=swap");
 
+/* ── Fullscreen Page Container ─────────────────────────────────────────────── */
 .display-page {
-  font-family: "Poppins", sans-serif;
-  background-color: #f9f5eb;
-  color: #3a2c1c;
-  overflow-x: hidden;
-  min-height: 100vh;
-  padding-bottom: 100px;
+  height: 100vh;
+  width: 100vw;
+  background-color: #FAF7F2;
+  color: #201b18;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   position: relative;
+  user-select: none;
+  box-sizing: border-box;
 }
 
-/* ── Decorative Elements ─────────────────────────────────────────────────── */
-.gold-decoration {
+/* ── Ambient Background Lighting ──────────────────────────────────────────── */
+.ambient-glow {
   position: fixed;
-  opacity: 0.08;
-  z-index: 0;
   pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
 }
-.gold-decoration.top-left {
-  top: 10%;
+.top-glow {
+  top: -10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60vw;
+  height: 30vh;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.14) 0%, transparent 70%);
+}
+.bottom-left-glow {
+  bottom: 5%;
   left: 5%;
-  width: 200px;
-  height: 200px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path fill='%23d4af37' d='M50,0 L100,50 L50,100 L0,50 Z'/></svg>");
-  background-repeat: no-repeat;
-  transform: rotate(15deg);
+  width: 35vw;
+  height: 35vh;
+  background: radial-gradient(circle, rgba(184, 134, 11, 0.09) 0%, transparent 70%);
 }
-.gold-decoration.bottom-right {
-  bottom: 10%;
+.bottom-right-glow {
+  bottom: 5%;
   right: 5%;
-  width: 250px;
-  height: 250px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle fill='%23d4af37' cx='50' cy='50' r='50'/></svg>");
-  background-repeat: no-repeat;
-  transform: rotate(-10deg);
+  width: 35vw;
+  height: 35vh;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.09) 0%, transparent 70%);
 }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
-.header {
-  background: linear-gradient(135deg, #9d7e2d, #3a2c1c);
-  padding: 1rem 0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  position: relative;
-  z-index: 10;
-}
-.header::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
-}
-.logo-container {
+/* ── Header Section ───────────────────────────────────────────────────────── */
+.display-header {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1.5px solid rgba(212, 175, 55, 0.35);
+  padding: 12px 32px;
   display: flex;
   align-items: center;
-}
-.logo {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #d4af37;
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-}
-.gold-shimmer {
+  justify-content: space-between;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  z-index: 20;
   position: relative;
+  box-sizing: border-box;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.logo-emblem-outer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #785b12, #e2c168, #997a15);
+  padding: 2px;
+  box-shadow: 0 4px 10px rgba(120, 91, 18, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.logo-emblem-outer:hover {
+  transform: scale(1.05);
+}
+
+.logo-emblem-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #f3e5ab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
-.gold-shimmer::after {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.3) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: rotate(30deg);
-  animation: shimmer 4s infinite;
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-@keyframes shimmer {
-  0% {
-    transform: rotate(30deg) translateX(-100%);
-  }
-  100% {
-    transform: rotate(30deg) translateX(100%);
-  }
+
+.brand-titles {
+  display: flex;
+  flex-direction: column;
 }
+
 .brand-name {
-  margin-left: 1rem;
-  font-family: "Playfair Display", serif;
-  font-weight: 700;
-  font-size: 3rem;
-  color: #ffffff;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-  margin-bottom: 0;
+  font-family: 'Playfair Display', serif;
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #5a4208, #997a15, #5a4208);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+  margin: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
-.date-time {
+
+.brand-subtitle {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #5c4202;
+  margin: 2px 0 0 0;
+}
+
+.header-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  color: #ffffff;
 }
-.current-date {
+
+.date-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #5c4202;
+  letter-spacing: 0.02em;
+}
+
+.clock-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.clock-digits {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 2rem;
-  font-weight: 500;
-  font-family: "Playfair Display", serif;
-}
-.current-time {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #f9d776;
-}
-.display-promosi a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  background: transparent;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-}
-.display-promosi a:hover {
-  background: rgba(212, 175, 55, 0.4);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #201b18;
+  line-height: 1;
 }
 
-/* ── Main / Page Title ────────────────────────────────────────────────────── */
-main {
-  padding: 0;
-  min-height: calc(100vh - 250px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.page-title {
-  text-align: center;
-  position: relative;
-  padding-bottom: 1rem;
-}
-.page-title h1 {
-  font-family: "Poppins", sans-serif;
-  font-size: 4rem;
-  font-weight: 700;
-  color: #3a2c1c;
-  margin-bottom: 0;
-}
-.page-title::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 150px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
+.timezone-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #745718;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 222, 164, 0.5);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  letter-spacing: 0.06em;
 }
 
-.section-title h2 {
-  font-family: "Playfair Display", serif;
-  font-size: 3.4rem;
-  font-weight: 700;
-  color: #3a2c1c;
-  margin-bottom: 0;
-  position: relative;
-  display: inline-block;
-  padding-bottom: 5px;
-}
-.section-title h2::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 15%;
-  right: 15%;
-  height: 2px;
-  background: #d4af37;
-}
-
-/* ── Queue Cards ─────────────────────────────────────────────────────────── */
-.queue-card {
-  border-radius: 15px;
-  overflow: hidden;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  width: 100%;
-  height: clamp(200px, 48vh, 420px);
-  border: none;
-  position: relative;
-  box-shadow: 0 15px 30px rgba(184, 152, 7, 0.2);
-  display: flex;
-  flex-direction: column;
-}
-.queue-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 5px;
-}
-.queue-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
-}
-.card-current::before {
-  background: linear-gradient(90deg, #f9d776, #9d7e2d);
-}
-.card-next::before {
-  background: linear-gradient(90deg, #9d7e2d, #f9d776);
-}
-.card-delayed::before {
-  background: linear-gradient(90deg, #ff9800, #ff6d00);
-}
-
-/* ── Card Header ─────────────────────────────────────────────────────────── */
-.queue-card-header {
-  background-color: #ffffff;
-  padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
-}
-.queue-card-header-delayed {
-  background-color: #fff8e1;
-  border-bottom-color: #ffcc02;
-}
-.queue-card-header h1 {
-  font-family: "Playfair Display", serif;
-  font-size: clamp(1.4rem, 2.5vw, 3.2rem);
-  font-weight: bold;
-  margin: 0;
-  color: #3a2c1c;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-}
-
-.queue-card-header h1.queue-card-title--compact {
-  font-size: clamp(1.15rem, 2vw, 2.5rem);
-}
-
-/* ── Card Body ───────────────────────────────────────────────────────────── */
-.queue-card-body {
-  background-color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+/* ── Main Queue Board ─────────────────────────────────────────────────────── */
+.main-board {
   flex: 1;
-}
-
-/* ── Queue Number ────────────────────────────────────────────────────────── */
-.queue-number {
-  font-family: "Playfair Display", serif;
-  font-weight: 700;
-  color: #3a2c1c;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-  position: relative;
+  width: 100%;
+  padding: 16px 32px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  width: 100%;
-  height: 100%;
-  line-height: 1.1;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  transition: font-size 0.3s ease;
-  font-size: clamp(5rem, 30vh, 16rem);
-}
-.queue-number::after {
-  content: "";
-  position: absolute;
-  bottom: -0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100px;
-  height: 3px;
-  background: #d4af37;
-  border-radius: 3px;
-}
-.queue-number.active {
-  animation: numberPulse 2s infinite;
-  color: #342709;
+  align-items: stretch;
+  gap: 28px;
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-/* Font size utilities for delayed card */
-.queue-number.text-xl {
-  font-size: clamp(4rem, 26vh, 12rem);
+.queue-lane {
+  flex: 1;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 2px solid rgba(212, 175, 55, 0.4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px 28px 0 28px;
+  box-shadow: 0 15px 35px -5px rgba(184, 152, 7, 0.12), 0 0 0 1px rgba(212, 175, 55, 0.1);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.queue-number.queue-number--compact {
-  font-size: clamp(4rem, 26vh, 12rem);
-}
-
-/* ── Gold Border ─────────────────────────────────────────────────────────── */
-.gold-border {
-  border-radius: 10px;
-  background:
-    linear-gradient(#ffffff, #ffffff) padding-box,
-    linear-gradient(45deg, #d4af37, #f9d776, #d4af37) border-box;
-  border: 1px solid transparent;
-}
-
-/* ── Footer ──────────────────────────────────────────────────────────────── */
-.footer {
-  background: linear-gradient(135deg, #3a2c1c, #9d7e2d);
-  color: #ffffff;
-  text-align: center;
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  z-index: 100;
-}
-.footer::before {
-  content: "";
+.lane-top-stripe {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
-}
-.footer-text {
-  font-family: "Playfair Display", serif;
-  font-size: 1.5rem;
+  height: 6px;
+  background: linear-gradient(90deg, #d4af37, #f3e5ab, #d4af37);
 }
 
-/* ── Animations ──────────────────────────────────────────────────────────── */
-@keyframes numberPulse {
+.lane-header-wrapper {
+  width: 100%;
+}
+
+.lane-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(226, 193, 104, 0.3);
+}
+
+.lane-info-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lane-icon-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 222, 164, 0.45), rgba(253, 213, 137, 0.55), rgba(255, 222, 164, 0.25));
+  border: 2px solid rgba(212, 175, 55, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #745718;
+  font-size: 1.5rem;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+.lane-subtitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #8f702f;
+  display: block;
+}
+
+.lane-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #261900;
+  margin: 2px 0 0 0;
+  line-height: 1.15;
+}
+
+.missed-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 700;
+  animation: pulseAlert 2s infinite;
+}
+
+@keyframes pulseAlert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Massive Calling Number ───────────────────────────────────────────────── */
+.number-center-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  text-align: center;
+  overflow: visible;
+}
+
+.number-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.queue-number-text {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  padding: 0 0.05em 0.12em 0.05em;
+  font-size: clamp(11rem, 17vw, 19rem);
+  background: linear-gradient(
+    180deg,
+    #0a0703 0%,
+    #140d05 50%,
+    #241808 72%,
+    #422c0e 86%,
+    #7a5717 94%,
+    #b88a24 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 8px 18px rgba(20, 14, 4, 0.28));
+  display: inline-block;
+  user-select: none;
+}
+
+/* ── Lane Footer (Upcoming Numbers) ───────────────────────────────────────── */
+.lane-footer {
+  padding: 12px 28px;
+  border-top: 1px solid rgba(226, 193, 104, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FAF7F2;
+  margin-left: -28px;
+  margin-right: -28px;
+  border-bottom-left-radius: 22px;
+  border-bottom-right-radius: 22px;
+}
+
+.next-label {
+  font-size: 0.92rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: #5c4202;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-gold {
+  color: #745718;
+}
+
+.next-numbers-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.next-num-badge {
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.next-num-primary {
+  padding: 6px 16px;
+  background: #ffffff;
+  color: #261900;
+  border: 2px solid rgba(212, 175, 55, 0.6);
+  font-size: 1.35rem;
+  font-weight: 900;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.next-num-secondary {
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #5c4202;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.next-num-empty {
+  padding: 6px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #7f7667;
+  border: 1px solid rgba(209, 197, 180, 0.5);
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Running Ticker Marquee Footer ────────────────────────────────────────── */
+.display-footer {
+  width: 100%;
+  background: #FAF7F2;
+  border-top: 2px solid rgba(212, 175, 55, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.ticker-wrapper {
+  width: 100%;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 9px 0;
+  border-top: 1px solid #ffffff;
+}
+
+.ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: tickerAnimation 34s linear infinite;
+}
+
+.ticker-items {
+  display: inline-flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.ticker-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.85rem;
+  color: #4e4639;
+}
+
+.star-accent {
+  color: #8f702f;
+  font-size: 1rem;
+}
+
+@keyframes tickerAnimation {
   0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
+    transform: translateX(0);
   }
   100% {
-    transform: scale(1);
+    transform: translateX(-50%);
   }
 }
 
-/* Vue Transitions */
+/* ── Vue Transitions ──────────────────────────────────────────────────────── */
 .queue-change-enter-active {
-  animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .queue-change-leave-active {
-  animation: popOut 0.2s ease-in;
+  animation: popOut 0.25s ease-in;
 }
+
 @keyframes popIn {
   from {
-    transform: scale(0.5);
+    transform: scale(0.65);
     opacity: 0;
   }
   to {
@@ -739,6 +930,7 @@ main {
     opacity: 1;
   }
 }
+
 @keyframes popOut {
   from {
     transform: scale(1);
@@ -749,44 +941,27 @@ main {
     opacity: 0;
   }
 }
-.card-fade-enter-active,
-.card-fade-leave-active {
-  transition:
-    opacity 0.4s ease,
-    transform 0.4s ease;
-}
-.card-fade-enter-from,
-.card-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
 
-/* Kiosk Back Button Styles */
+/* ── Kiosk Back Button ────────────────────────────────────────────────────── */
 .back-btn-kiosk {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  border: 1px solid transparent;
-  background: transparent;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #ad9271;
-  font-size: 1.1rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1.5px solid rgba(212, 175, 55, 0.5);
+  background: rgba(255, 255, 255, 0.9);
+  color: #745718;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
-
 .back-btn-kiosk:hover {
-  background: rgba(212, 175, 55, 0.15);
-  color: #836720;
-  border-color: rgba(212, 175, 55, 0.7);
-  transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2);
-}
-
-.back-btn-kiosk:active {
-  transform: scale(0.95);
+  background: #fdf6e7;
+  color: #5a4208;
+  border-color: #d4af37;
+  transform: scale(1.05);
 }
 </style>

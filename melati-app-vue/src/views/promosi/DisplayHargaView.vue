@@ -140,7 +140,6 @@
                           v-if="item.hasBranded" 
                           class="price-box price-box-branded-purple"
                         >
-                          <span class="price-label-branded">Branded</span>
                           <span class="price-value-branded">{{ formatRupiah(item.hargaBranded) }}</span>
                         </div>
                       </div>

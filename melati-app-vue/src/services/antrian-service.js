@@ -38,6 +38,8 @@ function getQueueSectionState(val, type) {
     currentNumber: current.currentNumber ?? 1,
     lastLetter: current.lastLetter ?? 0,
     lastNumber: current.lastNumber ?? 0,
+    calledLetter: current.calledLetter ?? 0,
+    calledNumber: current.calledNumber ?? 0,
     delayedQueue: current.delayedQueue || [],
     missedQueue: current.missedQueue || [],
     skipList: current.skipList || []
@@ -416,6 +418,31 @@ export async function removeFromMissed(type, state, queueNumber, floorId = "") {
   return updatedVal;
 }
 
+export async function callQueue(type, state, floorId = "") {
+  const dbRefNode = queueRef(floorId);
+  const snap = await get(dbRefNode);
+  const val = snap.val() || {};
+  const current = getQueueSectionState(val, type);
+
+  const calledLetter = (current.currentLetter ?? 0);
+  const calledNumber = current.currentNumber ?? 1;
+
+  await update(dbRefNode, {
+    [`${type}/calledLetter`]: calledLetter,
+    [`${type}/calledNumber`]: calledNumber
+  });
+
+  const updatedVal = normalizeQueueState({
+    ...val,
+    [type]: {
+      ...current,
+      calledLetter,
+      calledNumber
+    }
+  });
+  return updatedVal;
+}
+
 export async function resetQueue(floorId = "") {
   await set(queueRef(floorId), {
     jual: {
@@ -423,6 +450,8 @@ export async function resetQueue(floorId = "") {
       currentNumber: 1,
       lastLetter: 0,
       lastNumber: 0,
+      calledLetter: 0,
+      calledNumber: 0,
       delayedQueue: [],
       missedQueue: [],
       skipList: []
@@ -432,6 +461,8 @@ export async function resetQueue(floorId = "") {
       currentNumber: 1,
       lastLetter: 0,
       lastNumber: 0,
+      calledLetter: 0,
+      calledNumber: 0,
       delayedQueue: [],
       missedQueue: [],
       skipList: []
