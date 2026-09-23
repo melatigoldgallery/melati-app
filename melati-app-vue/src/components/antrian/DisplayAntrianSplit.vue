@@ -38,10 +38,7 @@
       <!-- Live Date, Clock & Timezone Widget -->
       <div class="header-right">
         <div class="date-text">{{ currentDate }}</div>
-        <div class="clock-box">
-          <span class="clock-digits">{{ currentTime }}</span>
-          <span class="timezone-badge">WITA</span>
-        </div>
+
       </div>
     </header>
     <!-- END: HeaderSection -->
@@ -165,42 +162,6 @@
       </section>
     </main>
     <!-- END: MainQueueBoard -->
-
-    <!-- BEGIN: BottomInformationFooter (Continuous Ticker) -->
-    <footer class="display-footer">
-      <div class="ticker-wrapper">
-        <div class="ticker-track">
-          <div class="ticker-items">
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Selamat Datang di {{ brandName }} • Nikmati Pengalaman Transaksi Mewah, Nyaman, dan Terpercaya
-            </span>
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Harap Simpan Invoice Perhiasan untuk Layanan Pasang Batu Kecil Gratis Seumur Hidup
-            </span>
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Harap Perhatikan Panggilan Suara dan Layar Monitor Saat Nomor Antrian Anda Dipanggil
-            </span>
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Melayani Tukar Tambah Emas dengan Harga Terbaik Selama Kondisi Barang Tidak Ada Kerusakan
-            </span>
-            <!-- Seamless loop clone -->
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Selamat Datang di {{ brandName }} • Nikmati Pengalaman Transaksi Mewah, Nyaman, dan Terpercaya
-            </span>
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Harap Simpan Invoice Perhiasan untuk Layanan Pasang Batu Kecil Gratis Seumur Hidup
-            </span>
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Harap Perhatikan Panggilan Suara dan Layar Monitor Saat Nomor Antrian Anda Dipanggil
-            </span>
-            <span class="ticker-segment">
-              <span class="star-accent">✦</span> Melayani Tukar Tambah Emas dengan Harga Terbaik Selama Kondisi Barang Tidak Ada Kerusakan
-            </span>
-          </div>
-        </div>
-      </div>
-    </footer>
-    <!-- END: BottomInformationFooter -->
   </div>
 </template>
 
@@ -219,7 +180,6 @@ function goBack() {
   router.back();
 }
 
-const currentTime = ref("");
 const currentDate = ref("");
 
 const jualState = ref({ currentLetter: 0, currentNumber: 1, lastLetter: 0, lastNumber: 0, calledLetter: 0, calledNumber: 0, delayedQueue: [], missedQueue: [], skipList: [] });
@@ -361,7 +321,6 @@ let prevBeliNumber = 0;
 
 function updateClock() {
   const now = new Date();
-  currentTime.value = now.toLocaleTimeString("id-ID");
   currentDate.value = now.toLocaleDateString("id-ID", {
     weekday: "long",
     year: "numeric",
@@ -562,7 +521,7 @@ onUnmounted(() => {
 
 .brand-name {
   font-family: 'Playfair Display', serif;
-  font-size: 2.1rem;
+  font-size: 2.75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -591,45 +550,19 @@ onUnmounted(() => {
 }
 
 .date-text {
-  font-size: 0.95rem;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #5c4202;
   letter-spacing: 0.02em;
 }
 
-.clock-box {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 2px;
-}
 
-.clock-digits {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 2rem;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  color: #201b18;
-  line-height: 1;
-}
-
-.timezone-badge {
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: #745718;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: rgba(255, 222, 164, 0.5);
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  letter-spacing: 0.06em;
-}
 
 /* ── Main Queue Board ─────────────────────────────────────────────────────── */
 .main-board {
   flex: 1;
   width: 100%;
-  padding: 16px 32px;
+  padding: 24px 32px;
   display: flex;
   align-items: stretch;
   gap: 28px;
@@ -697,7 +630,7 @@ onUnmounted(() => {
 }
 
 .lane-subtitle {
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.18em;
@@ -706,8 +639,8 @@ onUnmounted(() => {
 }
 
 .lane-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 1.8rem;
+  font-family: 'Roboto', sans-serif;
+  font-size: 2.25rem;
   font-weight: 900;
   letter-spacing: 0.02em;
   color: #261900;
@@ -760,7 +693,7 @@ onUnmounted(() => {
   letter-spacing: -0.01em;
   line-height: 1.02;
   padding: 0 0.05em 0.12em 0.05em;
-  font-size: clamp(11rem, 17vw, 19rem);
+  font-size: clamp(14rem, 22vw, 26rem);
   background: linear-gradient(
     180deg,
     #0a0703 0%,
@@ -853,64 +786,7 @@ onUnmounted(() => {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* ── Running Ticker Marquee Footer ────────────────────────────────────────── */
-.display-footer {
-  width: 100%;
-  background: #FAF7F2;
-  border-top: 2px solid rgba(212, 175, 55, 0.4);
-  display: flex;
-  flex-direction: column;
-  z-index: 20;
-  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.03);
-}
 
-.ticker-wrapper {
-  width: 100%;
-  background: #ffffff;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  position: relative;
-  padding: 9px 0;
-  border-top: 1px solid #ffffff;
-}
-
-.ticker-track {
-  display: inline-flex;
-  white-space: nowrap;
-  animation: tickerAnimation 34s linear infinite;
-}
-
-.ticker-items {
-  display: inline-flex;
-  align-items: center;
-  gap: 36px;
-}
-
-.ticker-segment {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.85rem;
-  color: #4e4639;
-}
-
-.star-accent {
-  color: #8f702f;
-  font-size: 1rem;
-}
-
-@keyframes tickerAnimation {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
 
 /* ── Vue Transitions ──────────────────────────────────────────────────────── */
 .queue-change-enter-active {
