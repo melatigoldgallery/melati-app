@@ -823,9 +823,9 @@ onUnmounted(() => {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  border: 1.5px solid rgba(212, 175, 55, 0.5);
+  border: transparent;
   background: rgba(255, 255, 255, 0.9);
-  color: #745718;
+  color: #fbfaf9;
   font-size: 0.95rem;
   display: inline-flex;
   align-items: center;

@@ -40,23 +40,31 @@
 
           <!-- Physical locations (Barcode tracking enabled) -->
           <div v-else>
-            <div v-if="loadingBarcodes && barcodes.length === 0" class="text-center py-5">
+            <div v-if="loadingBarcodes && allBarcodes.length === 0" class="text-center py-5">
               <div class="spinner-border text-primary" role="status"></div>
               <p class="mt-2 text-muted small fw-semibold">Memuat daftar barcode...</p>
             </div>
             <div v-else :style="loadingBarcodes ? 'opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease;' : 'transition: opacity 0.15s ease;'">
               <!-- Control Toolbar -->
               <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
                   <button 
                     class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 shadow-sm transition-all hover-btn-scale"
                     @click="copyAllBarcodes"
-                    :disabled="copyingAll || barcodes.length === 0"
+                    :disabled="copyingAll || allBarcodes.length === 0"
                   >
                     <span v-if="copyingAll" class="spinner-border spinner-border-sm" role="status"></span>
                     <i v-else class="bi bi-clipboard"></i>
                     <span>Salin Semua Barcode</span>
                   </button>
+
+                  <span 
+                    class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.82rem;"
+                  >
+                    <i class="bi bi-upc-scan text-primary me-1"></i>
+                    <span>Total Barcode: <strong class="fw-bold">{{ Number(totalBarcodeCount || 0).toLocaleString('id-ID') }} pcs</strong></span>
+                  </span>
                 </div>
                 <div>
                   <form @submit.prevent="handleBarcodeSearch" class="d-flex gap-1 align-items-center">
@@ -82,10 +90,19 @@
                 </div>
               </div>
 
-              <!-- Barcodes empty list -->
-              <div v-if="barcodes.length === 0" class="text-center py-5 border border-dashed rounded-4 bg-white shadow-sm">
+              <!-- Barcodes empty list (no barcodes at all) -->
+              <div v-if="allBarcodes.length === 0" class="text-center py-5 border border-dashed rounded-4 bg-white shadow-sm">
                 <i class="bi bi-inbox fs-2 d-block mb-2 text-muted"></i>
                 <p class="text-secondary small mb-0">Tidak ada barcode terdaftar di lokasi/kategori ini.</p>
+              </div>
+
+              <!-- Barcodes empty search result -->
+              <div v-else-if="filteredBarcodes.length === 0" class="text-center py-5 border border-dashed rounded-4 bg-white shadow-sm">
+                <i class="bi bi-search fs-2 d-block mb-2 text-muted"></i>
+                <p class="text-secondary small mb-1">Tidak ada barcode yang cocok dengan "<strong>{{ barcodeSearchQuery }}</strong>".</p>
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 mt-2" @click="clearBarcodeSearch">
+                  <i class="bi bi-x-circle me-1"></i> Reset Pencarian
+                </button>
               </div>
 
               <!-- Barcodes list table -->
@@ -101,7 +118,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(b, idx) in barcodes" :key="b.id" class="barcode-row transition-all">
+                      <tr v-for="(b, idx) in paginatedBarcodes" :key="b.id || b.barcode" class="barcode-row transition-all">
                         <td class="ps-3 text-muted small">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
                         <td>
                           <div class="d-flex align-items-center gap-2">
@@ -114,11 +131,11 @@
                             <button 
                               type="button"
                               class="btn btn-link btn-xs p-1 text-secondary hover-primary border-0 bg-transparent rounded-circle d-inline-flex align-items-center justify-content-center transition-all hover-bg-light"
-                              @click="copySingleBarcode(b.barcode, idx)"
+                              @click="copySingleBarcode(b.barcode, (currentPage - 1) * pageSize + idx)"
                               title="Salin Barcode"
                               style="width: 26px; height: 26px;"
                             >
-                              <i :class="copiedIndex === idx ? 'bi bi-check-lg text-success' : 'bi bi-clipboard fs-7'"></i>
+                              <i :class="copiedIndex === ((currentPage - 1) * pageSize + idx) ? 'bi bi-check-lg text-success' : 'bi bi-clipboard fs-7'"></i>
                             </button>
                           </div>
                         </td>
@@ -145,25 +162,108 @@
                   </table>
                 </div>
 
-                <!-- Pagination -->
-                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-light">
-                  <button
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
-                    :disabled="currentPage === 1 || loadingBarcodes"
-                    @click="loadBarcodePage(currentPage - 1)"
-                  >
-                    <i class="bi bi-chevron-left"></i>
-                    Sebelumnya
-                  </button>
-                  <span class="small fw-bold text-secondary">Halaman {{ currentPage }}</span>
-                  <button
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5"
-                    :disabled="!hasMore || loadingBarcodes"
-                    @click="loadBarcodePage(currentPage + 1)"
-                  >
-                    Berikutnya
-                    <i class="bi bi-chevron-right"></i>
-                  </button>
+                <!-- Pagination Toolbar -->
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-light flex-wrap gap-2">
+                  <!-- Left: Limit selector & range info -->
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="d-flex align-items-center gap-1.5 small text-secondary">
+                      <select 
+                        v-model.number="pageSize" 
+                        @change="handlePageSizeChange"
+                        class="form-select form-select-sm rounded-pill py-1 px-2.5 bg-white border shadow-xs" 
+                        style="width: auto; font-size: 0.8rem; cursor: pointer;"
+                      >
+                        <option :value="10">10</option>
+                        <option :value="25">25</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                      </select>
+                    </div>
+
+                    <span class="text-secondary small ps-sm-2 border-start border-secondary-subtle">
+                      Menampilkan <strong class="text-dark">{{ rangeStart }}</strong> - <strong class="text-dark">{{ rangeEnd }}</strong> dari <strong class="text-dark">{{ totalFilteredCount }}</strong> barcode
+                    </span>
+                  </div>
+
+                  <!-- Right: Page numbers -->
+                  <nav v-if="totalPages > 1" aria-label="Navigasi Halaman Barcode">
+                    <ul class="pagination pagination-sm mb-0 align-items-center gap-1">
+                      <!-- First Page -->
+                      <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                        <button 
+                          type="button"
+                          class="page-link rounded-pill px-2 py-1 d-flex align-items-center justify-content-center" 
+                          @click="goToPage(1)" 
+                          title="Halaman Pertama"
+                          :disabled="currentPage === 1"
+                          style="min-width: 30px; height: 30px;"
+                        >
+                          <i class="bi bi-chevron-double-left" style="font-size: 0.75rem;"></i>
+                        </button>
+                      </li>
+
+                      <!-- Prev Page -->
+                      <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                        <button 
+                          type="button"
+                          class="page-link rounded-pill px-2 py-1 d-flex align-items-center justify-content-center" 
+                          @click="goToPage(currentPage - 1)" 
+                          title="Halaman Sebelumnya"
+                          :disabled="currentPage === 1"
+                          style="min-width: 30px; height: 30px;"
+                        >
+                          <i class="bi bi-chevron-left" style="font-size: 0.75rem;"></i>
+                        </button>
+                      </li>
+
+                      <!-- Page Numbers with Ellipsis -->
+                      <li 
+                        v-for="(page, pIdx) in visiblePages" 
+                        :key="pIdx" 
+                        class="page-item"
+                        :class="{ active: page === currentPage, disabled: page === '...' }"
+                      >
+                        <span v-if="page === '...'" class="page-link border-0 bg-transparent text-muted px-1">...</span>
+                        <button 
+                          v-else 
+                          type="button"
+                          class="page-link rounded-pill px-2.5 py-1 d-flex align-items-center justify-content-center fw-semibold" 
+                          @click="goToPage(page)"
+                          style="min-width: 30px; height: 30px; font-size: 0.8rem;"
+                        >
+                          {{ page }}
+                        </button>
+                      </li>
+
+                      <!-- Next Page -->
+                      <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                        <button 
+                          type="button"
+                          class="page-link rounded-pill px-2 py-1 d-flex align-items-center justify-content-center" 
+                          @click="goToPage(currentPage + 1)" 
+                          title="Halaman Berikutnya"
+                          :disabled="currentPage === totalPages"
+                          style="min-width: 30px; height: 30px;"
+                        >
+                          <i class="bi bi-chevron-right" style="font-size: 0.75rem;"></i>
+                        </button>
+                      </li>
+
+                      <!-- Last Page -->
+                      <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                        <button 
+                          type="button"
+                          class="page-link rounded-pill px-2 py-1 d-flex align-items-center justify-content-center" 
+                          @click="goToPage(totalPages)" 
+                          title="Halaman Terakhir"
+                          :disabled="currentPage === totalPages"
+                          style="min-width: 30px; height: 30px;"
+                        >
+                          <i class="bi bi-chevron-double-right" style="font-size: 0.75rem;"></i>
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
                 </div>
               </div>
             </div>
@@ -176,7 +276,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
-import { collection, query, where, getDocs, limit, startAfter, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useAlert } from "@/composables/useAlert";
 import { revertSingleBarcode } from "@/services/barcode-service";
@@ -199,12 +299,10 @@ const props = defineProps({
 const emit = defineEmits(["reverted"]);
 const { toast, error: showError, confirm } = useAlert();
 
-const barcodes = ref([]);
+const allBarcodes = ref([]);
 const currentPage = ref(1);
-const pageSize = 10;
+const pageSize = ref(10);
 const loadingBarcodes = ref(false);
-const hasMore = ref(false);
-const pageDocs = ref([]);
 const activeModalTab = ref("");
 const barcodeCache = ref({});
 const copyingAll = ref(false);
@@ -365,6 +463,17 @@ function getQty(cat, loc) {
   return parseInt(item.quantity, 10) || 0;
 }
 
+const totalBarcodeCount = computed(() => {
+  if (activeModalTab.value) {
+    return getSubQty(activeModalTab.value);
+  }
+  return getQty(props.mainCat, props.location);
+});
+
+const totalCategoryCount = computed(() => {
+  return getQty(props.mainCat, props.location);
+});
+
 function formatDate(value) {
   if (!value) return "-";
   let d;
@@ -379,274 +488,98 @@ function formatDate(value) {
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
 }
 
+const filteredBarcodes = computed(() => {
+  const queryStr = barcodeSearchQuery.value.trim().toUpperCase();
+  if (!queryStr) return allBarcodes.value;
+  return allBarcodes.value.filter((b) => 
+    b.barcode && b.barcode.toUpperCase().includes(queryStr)
+  );
+});
+
+const totalFilteredCount = computed(() => filteredBarcodes.value.length);
+
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalFilteredCount.value / pageSize.value));
+});
+
+const paginatedBarcodes = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredBarcodes.value.slice(start, start + pageSize.value);
+});
+
+const rangeStart = computed(() => {
+  if (totalFilteredCount.value === 0) return 0;
+  return (currentPage.value - 1) * pageSize.value + 1;
+});
+
+const rangeEnd = computed(() => {
+  return Math.min(currentPage.value * pageSize.value, totalFilteredCount.value);
+});
+
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const current = currentPage.value;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, '...', total];
+  }
+  if (current >= total - 3) {
+    return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, '...', current - 1, current, current + 1, '...', total];
+});
+
+function goToPage(page) {
+  if (typeof page === "number" && page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
+}
+
+function handlePageSizeChange() {
+  currentPage.value = 1;
+}
+
 function selectModalTab(tabKey) {
   activeModalTab.value = tabKey;
   barcodeSearchQuery.value = "";
-  pageDocs.value = [];
   currentPage.value = 1;
-  hasMore.value = false;
   if (props.location !== "barang-display") {
-    loadBarcodePage(1);
+    loadBarcodesForTab();
   }
 }
 
-async function loadBarcodePage(pageNumber) {
-  const cat = props.mainCat;
-  const loc = props.location;
-  const subType = activeModalTab.value || null;
-  const detailMode = getCardDetailMode(cat);
-  const hasDetails = detailMode === "color" || detailMode === "hala";
-  const searchVal = barcodeSearchQuery.value.trim().toUpperCase();
-  const isSearching = !!searchVal;
-
-  if (!isSearching) {
-    const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
-    const currentLastUpdated = props.stockData[loc]?.[cat]?.lastUpdated || "";
-    const currentQty = subType ? getSubQty(subType) : getQty(cat, loc);
-
-    const cachedData = barcodeCache.value[cacheKey];
-    const isCacheValid = cachedData && 
-                         cachedData.lastUpdated === currentLastUpdated &&
-                         cachedData.quantity === currentQty;
-
-    if (isCacheValid && cachedData.pages[pageNumber]) {
-      const pageData = cachedData.pages[pageNumber];
-      barcodes.value = pageData.barcodes;
-      hasMore.value = pageData.hasMore;
-      currentPage.value = pageNumber;
-      return;
-    }
-
-    let targetPage = pageNumber;
-    if (!isCacheValid) {
-      const prefix = `${cat}:${loc}:`;
-      Object.keys(barcodeCache.value).forEach((key) => {
-        if (key.startsWith(prefix)) {
-          delete barcodeCache.value[key];
-        }
-      });
-
-      barcodeCache.value[cacheKey] = {
-        lastUpdated: currentLastUpdated,
-        quantity: currentQty,
-        pages: {}
-      };
-      targetPage = 1;
-      pageDocs.value = [];
-    }
-
-    loadingBarcodes.value = true;
-    try {
-      let q;
-      if (hasDetails) {
-        q = query(
-          collection(db, "floors", props.activeFloor, "barcodes"),
-          where("category", "==", cat),
-          where("location", "==", loc),
-          where("detailType", "==", subType),
-          orderBy("barcode", "asc"),
-          limit(pageSize)
-        );
-      } else {
-        q = query(
-          collection(db, "floors", props.activeFloor, "barcodes"),
-          where("category", "==", cat),
-          where("location", "==", loc),
-          limit(pageSize)
-        );
-      }
-
-      if (targetPage > 1 && pageDocs.value[targetPage - 2]) {
-        if (hasDetails) {
-          q = query(
-            collection(db, "floors", props.activeFloor, "barcodes"),
-            where("category", "==", cat),
-            where("location", "==", loc),
-            where("detailType", "==", subType),
-            orderBy("barcode", "asc"),
-            startAfter(pageDocs.value[targetPage - 2]),
-            limit(pageSize)
-          );
-        } else {
-          q = query(
-            collection(db, "floors", props.activeFloor, "barcodes"),
-            where("category", "==", cat),
-            where("location", "==", loc),
-            startAfter(pageDocs.value[targetPage - 2]),
-            limit(pageSize)
-          );
-        }
-      }
-
-      const snaps = await getDocs(q);
-      const pageItems = [];
-      snaps.forEach((doc) => {
-        pageItems.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-
-      barcodes.value = pageItems;
-      hasMore.value = pageItems.length === pageSize;
-      currentPage.value = targetPage;
-
-      if (snaps.docs.length > 0) {
-        pageDocs.value[targetPage - 1] = snaps.docs[snaps.docs.length - 1];
-      }
-
-      barcodeCache.value[cacheKey].pages[targetPage] = {
-        barcodes: pageItems,
-        hasMore: hasMore.value,
-        lastDoc: snaps.docs.length > 0 ? snaps.docs[snaps.docs.length - 1] : null
-      };
-
-    } catch (e) {
-      showError("Gagal memuat list barcode", e.message);
-    } finally {
-      loadingBarcodes.value = false;
-    }
-  } else {
-    // Searching mode
-    loadingBarcodes.value = true;
-    try {
-      let q;
-      if (hasDetails) {
-        q = query(
-          collection(db, "floors", props.activeFloor, "barcodes"),
-          where("category", "==", cat),
-          where("location", "==", loc),
-          where("detailType", "==", subType),
-          where("barcode", ">=", searchVal),
-          where("barcode", "<=", searchVal + "\uf8ff"),
-          orderBy("barcode", "asc"),
-          limit(pageSize)
-        );
-      } else {
-        q = query(
-          collection(db, "floors", props.activeFloor, "barcodes"),
-          where("category", "==", cat),
-          where("location", "==", loc),
-          where("barcode", ">=", searchVal),
-          where("barcode", "<=", searchVal + "\uf8ff"),
-          orderBy("barcode", "asc"),
-          limit(pageSize)
-        );
-      }
-
-      if (pageNumber > 1 && pageDocs.value[pageNumber - 2]) {
-        if (hasDetails) {
-          q = query(
-            collection(db, "floors", props.activeFloor, "barcodes"),
-            where("category", "==", cat),
-            where("location", "==", loc),
-            where("detailType", "==", subType),
-            where("barcode", ">=", searchVal),
-            where("barcode", "<=", searchVal + "\uf8ff"),
-            orderBy("barcode", "asc"),
-            startAfter(pageDocs.value[pageNumber - 2]),
-            limit(pageSize)
-          );
-        } else {
-          q = query(
-            collection(db, "floors", props.activeFloor, "barcodes"),
-            where("category", "==", cat),
-            where("location", "==", loc),
-            where("barcode", ">=", searchVal),
-            where("barcode", "<=", searchVal + "\uf8ff"),
-            orderBy("barcode", "asc"),
-            startAfter(pageDocs.value[pageNumber - 2]),
-            limit(pageSize)
-          );
-        }
-      }
-
-      const snaps = await getDocs(q);
-      const pageItems = [];
-      snaps.forEach((doc) => {
-        pageItems.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-
-      barcodes.value = pageItems;
-      hasMore.value = pageItems.length === pageSize;
-      currentPage.value = pageNumber;
-
-      if (snaps.docs.length > 0) {
-        pageDocs.value[pageNumber - 1] = snaps.docs[snaps.docs.length - 1];
-      }
-    } catch (e) {
-      console.warn("Prefix range query failed, falling back to local memory filtering: ", e);
-      try {
-        let qFallback;
-        if (hasDetails) {
-          qFallback = query(
-            collection(db, "floors", props.activeFloor, "barcodes"),
-            where("category", "==", cat),
-            where("location", "==", loc),
-            where("detailType", "==", subType),
-            limit(1000)
-          );
-        } else {
-          qFallback = query(
-            collection(db, "floors", props.activeFloor, "barcodes"),
-            where("category", "==", cat),
-            where("location", "==", loc),
-            limit(1000)
-          );
-        }
-
-        const snaps = await getDocs(qFallback);
-        const allItems = [];
-        snaps.forEach((doc) => {
-          allItems.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-
-        allItems.sort((a, b) => (a.barcode || "").localeCompare(b.barcode || ""));
-        const filtered = allItems.filter(item => 
-          item.barcode && item.barcode.toUpperCase().includes(searchVal)
-        );
-
-        barcodes.value = filtered.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
-        hasMore.value = filtered.length > pageNumber * pageSize;
-        currentPage.value = pageNumber;
-      } catch (err) {
-        showError("Gagal mencari barcode", err.message);
-      }
-    } finally {
-      loadingBarcodes.value = false;
-    }
-  }
-}
-
-async function handleBarcodeSearch() {
-  pageDocs.value = [];
-  currentPage.value = 1;
-  await loadBarcodePage(1);
-}
-
-async function clearBarcodeSearch() {
-  barcodeSearchQuery.value = "";
-  pageDocs.value = [];
-  currentPage.value = 1;
-  await loadBarcodePage(1);
-}
-
-async function copyAllBarcodes() {
+async function loadBarcodesForTab(force = false) {
   const cat = props.mainCat;
   const loc = props.location;
   const subType = activeModalTab.value || null;
   const detailMode = getCardDetailMode(cat);
   const hasDetails = detailMode === "color" || detailMode === "hala";
 
-  if (!cat || !loc) return;
+  if (!cat || !loc || loc === "barang-display") {
+    allBarcodes.value = [];
+    return;
+  }
 
-  copyingAll.value = true;
+  const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
+  const currentLastUpdated = props.stockData[loc]?.[cat]?.lastUpdated || "";
+  const currentQty = subType ? getSubQty(subType) : getQty(cat, loc);
+
+  const cachedData = barcodeCache.value[cacheKey];
+  const isCacheValid = !force && cachedData && 
+                       cachedData.lastUpdated === currentLastUpdated &&
+                       cachedData.quantity === currentQty &&
+                       Array.isArray(cachedData.items);
+
+  if (isCacheValid) {
+    allBarcodes.value = cachedData.items;
+    currentPage.value = 1;
+    return;
+  }
+
+  loadingBarcodes.value = true;
   try {
     let q;
     if (hasDetails) {
@@ -655,31 +588,70 @@ async function copyAllBarcodes() {
         where("category", "==", cat),
         where("location", "==", loc),
         where("detailType", "==", subType),
-        orderBy("barcode", "asc")
+        limit(1000)
       );
     } else {
       q = query(
         collection(db, "floors", props.activeFloor, "barcodes"),
         where("category", "==", cat),
-        where("location", "==", loc)
+        where("location", "==", loc),
+        limit(1000)
       );
     }
+
     const snaps = await getDocs(q);
-    const list = [];
+    const items = [];
     snaps.forEach((doc) => {
-      const data = doc.data();
-      if (data?.barcode) {
-        list.push(data.barcode);
-      }
+      items.push({
+        id: doc.id,
+        ...doc.data()
+      });
     });
+
+    items.sort((a, b) => (a.barcode || "").localeCompare(b.barcode || ""));
+
+    allBarcodes.value = items;
+    currentPage.value = 1;
+
+    barcodeCache.value[cacheKey] = {
+      lastUpdated: currentLastUpdated,
+      quantity: currentQty,
+      items: items
+    };
+  } catch (e) {
+    showError("Gagal memuat list barcode", e.message);
+  } finally {
+    loadingBarcodes.value = false;
+  }
+}
+
+function handleBarcodeSearch() {
+  currentPage.value = 1;
+}
+
+function clearBarcodeSearch() {
+  barcodeSearchQuery.value = "";
+  currentPage.value = 1;
+}
+
+async function copyAllBarcodes() {
+  const cat = props.mainCat;
+  const loc = props.location;
+
+  if (!cat || !loc) return;
+
+  if (allBarcodes.value.length === 0) {
+    toast("Tidak ada barcode untuk disalin", "warning");
+    return;
+  }
+
+  copyingAll.value = true;
+  try {
+    const list = allBarcodes.value.map((b) => b.barcode).filter(Boolean);
 
     if (list.length === 0) {
       toast("Tidak ada barcode untuk disalin", "warning");
       return;
-    }
-
-    if (!hasDetails) {
-      list.sort();
     }
 
     const textToCopy = list.join("\n");
@@ -721,23 +693,24 @@ async function handleRevertBarcode(barcodeId) {
     toast(`Barcode ${barcodeId} berhasil dibatalkan/diubah.`);
 
     // 1. Hapus barcode dari list tampilan lokal instan
-    barcodes.value = barcodes.value.filter((b) => b.barcode !== barcodeId);
+    allBarcodes.value = allBarcodes.value.filter((b) => b.barcode !== barcodeId);
 
-    // 2. Bersihkan cache lokal untuk page rincian barcode agar sinkron
+    // 2. Adjust currentPage if needed
+    if (currentPage.value > totalPages.value) {
+      currentPage.value = Math.max(1, totalPages.value);
+    }
+
+    // 3. Bersihkan cache lokal untuk page rincian barcode agar sinkron
     const cat = props.mainCat;
     const loc = props.location;
     const subType = activeModalTab.value || null;
     const cacheKey = `${cat}:${loc}:${subType || 'default'}`;
-    if (barcodeCache.value[cacheKey]?.pages) {
-      Object.keys(barcodeCache.value[cacheKey].pages).forEach((pg) => {
-        const pgData = barcodeCache.value[cacheKey].pages[pg];
-        if (pgData && Array.isArray(pgData.barcodes)) {
-          pgData.barcodes = pgData.barcodes.filter((b) => b.barcode !== barcodeId);
-        }
-      });
+    if (barcodeCache.value[cacheKey]) {
+      barcodeCache.value[cacheKey].items = allBarcodes.value;
+      barcodeCache.value[cacheKey].quantity = allBarcodes.value.length;
     }
 
-    // 3. Emit event to parent to reload main stockData & sync database state
+    // 4. Emit event to parent to reload main stockData & sync database state
     emit("reverted", { barcodeId, category: cat, location: loc, subType });
 
   } catch (e) {
@@ -753,10 +726,8 @@ watch(
   () => {
     barcodeSearchQuery.value = "";
     barcodeCache.value = {};
-    pageDocs.value = [];
     currentPage.value = 1;
-    barcodes.value = [];
-    hasMore.value = false;
+    allBarcodes.value = [];
 
     if (modalTabs.value.length > 0) {
       const firstWithStock = modalTabs.value.find(tab => getSubQty(tab.key) > 0);
@@ -766,7 +737,7 @@ watch(
     }
 
     if (props.location && props.location !== "barang-display") {
-      loadBarcodePage(1);
+      loadBarcodesForTab();
     }
   },
   { immediate: true }
@@ -876,5 +847,28 @@ watch(
 }
 .search-input-group .form-control:focus {
   box-shadow: none !important;
+}
+.pagination .page-link {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #495057;
+  transition: all 0.15s ease-in-out;
+}
+.pagination .page-link:hover:not(:disabled) {
+  background-color: #e9ecef;
+  color: #0d6efd;
+}
+.pagination .page-item.active .page-link {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
+}
+.pagination .page-item.disabled .page-link {
+  opacity: 0.5;
+  background-color: #f8f9fa;
+  border-color: rgba(0, 0, 0, 0.05);
+}
+.shadow-xs {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 </style>
