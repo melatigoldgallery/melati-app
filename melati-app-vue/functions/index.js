@@ -1617,7 +1617,7 @@ function parseBarcodeCategoryAndType(code) {
   return { mainCat, subType };
 }
 
-async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "", defaultCategory = "", allowCategoryOverride = false, bypassLockCheck = false) {
+async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petugas, notes, origin = "any", defaultDetailType = "", defaultCategory = "", allowCategoryOverride = false, bypassLockCheck = false, logCollection = "") {
   const barcodeIds = barcodes.map(b => (typeof b === 'string' ? b : b.barcode).trim().toUpperCase());
   const barcodeRefs = barcodeIds.map(id => dbFloorRef.collection("barcodes").doc(id));
   
@@ -1758,7 +1758,10 @@ async function executeMutationLogic(t, dbFloorRef, barcodes, destination, petuga
   });
 
   // Write single history log document for the transaction
-  const logRef = dbFloorRef.collection("barcodeMutationLogs").doc();
+  const isSync = (String(petugas || "") + " " + String(notes || "")).toLowerCase().includes("sync") 
+    || (String(petugas || "") + " " + String(notes || "")).toLowerCase().includes("desktop");
+  const targetCollection = logCollection || (isSync ? "desktopSyncLogs" : "barcodeMutationLogs");
+  const logRef = dbFloorRef.collection(targetCollection).doc();
   const logData = {
     id: logRef.id,
     barcodeIds: barcodeDetails.map(info => info.id),
@@ -2982,7 +2985,12 @@ export const syncDesktopSales = onRequest(
             "laku", 
             "Sync Agent Sales", 
             notesText, 
-            "barang-display"
+            "barang-display",
+            "",
+            "",
+            false,
+            false,
+            "desktopSyncLogs"
           );
         });
       }
@@ -3126,9 +3134,14 @@ export const syncDesktopVoid = onRequest(
 
         const statusResult = await db.runTransaction(async (t) => {
           // 1. READ: Cari log mutasi terakhir barcode ini sebelum ia dijual (destination === 'laku')
+          const syncLogsQuery = dbFloorRef.collection("desktopSyncLogs")
+            .where("barcodeIds", "array-contains", bc);
           const mutationLogsQuery = dbFloorRef.collection("barcodeMutationLogs")
             .where("barcodeIds", "array-contains", bc);
-          const mutationLogsSnap = await t.get(mutationLogsQuery);
+          const [syncLogsSnap, mutationLogsSnap] = await Promise.all([
+            t.get(syncLogsQuery),
+            t.get(mutationLogsQuery)
+          ]);
           
           // 2. READ: Baca status barcode terkini di Firestore
           const barcodeRef = dbFloorRef.collection("barcodes").doc(bc);
@@ -3154,8 +3167,9 @@ export const syncDesktopVoid = onRequest(
           }
 
           let previousOrigin = "barang-display"; // default fallback
-          if (!mutationLogsSnap.empty) {
-            const sortedLogs = mutationLogsSnap.docs
+          const combinedDocs = [...syncLogsSnap.docs, ...mutationLogsSnap.docs];
+          if (combinedDocs.length > 0) {
+            const sortedLogs = combinedDocs
               .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
               .filter(log => log.destination === "laku" && log.timestamp)
               .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
@@ -3189,7 +3203,8 @@ export const syncDesktopVoid = onRequest(
             "",
             "",
             false,
-            true
+            true,
+            "desktopSyncLogs"
           );
 
           // 5. WRITE: Selesaikan laporan discrepancy yang berasosiasi dengan barcode ini

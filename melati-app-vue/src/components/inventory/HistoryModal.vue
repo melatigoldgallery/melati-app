@@ -378,12 +378,18 @@ async function handleShowBulkDetail(h) {
     isFetchingLogs.value = true;
     try {
       const firstBc = getBarcodeKey(h.barcodes[0]);
-      const q = query(
+      let snap = await getDocs(query(
         collection(db, "floors", props.activeFloor, "barcodeMutationLogs"),
         where("barcodeIds", "array-contains", firstBc),
         limit(1)
-      );
-      const snap = await getDocs(q);
+      ));
+      if (snap.empty) {
+        snap = await getDocs(query(
+          collection(db, "floors", props.activeFloor, "desktopSyncLogs"),
+          where("barcodeIds", "array-contains", firstBc),
+          limit(1)
+        ));
+      }
       if (!snap.empty) {
         matched = { id: snap.docs[0].id, ...snap.docs[0].data() };
       }

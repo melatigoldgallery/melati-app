@@ -527,21 +527,25 @@ async function handleSearch() {
       collection(db, "floors", auth.activeFloor, "barcodeMutationLogs"),
       where("barcodeIds", "array-contains", queryVal)
     );
+    const qSyncSingle = query(
+      collection(db, "floors", auth.activeFloor, "desktopSyncLogs"),
+      where("barcode", "==", queryVal)
+    );
+    const qSyncBulk = query(
+      collection(db, "floors", auth.activeFloor, "desktopSyncLogs"),
+      where("barcodeIds", "array-contains", queryVal)
+    );
 
-    const [snapSingle, snapBulk] = await Promise.all([
+    const [snapSingle, snapBulk, snapSyncSingle, snapSyncBulk] = await Promise.all([
       getDocs(qSingle),
-      getDocs(qBulk)
+      getDocs(qBulk),
+      getDocs(qSyncSingle),
+      getDocs(qSyncBulk)
     ]);
 
     const logMap = new Map();
-    [...snapSingle.docs, ...snapBulk.docs].forEach(doc => {
-      const data = doc.data();
-      const pemindah = String(data.pemindah || "").toLowerCase();
-      const notes = String(data.notes || "").toLowerCase();
-      const isSync = pemindah.includes("sync") || pemindah.includes("desktop") || notes.includes("sync") || notes.includes("kasir desktop");
-      if (!isSync) {
-        logMap.set(doc.id, { id: doc.id, ...data });
-      }
+    [...snapSingle.docs, ...snapBulk.docs, ...snapSyncSingle.docs, ...snapSyncBulk.docs].forEach(doc => {
+      logMap.set(doc.id, { id: doc.id, ...doc.data() });
     });
 
     const combined = Array.from(logMap.values()).sort((a, b) => {
