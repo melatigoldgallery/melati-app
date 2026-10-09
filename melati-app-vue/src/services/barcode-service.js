@@ -91,17 +91,6 @@ export async function executeBarcodeMutation({ barcodes, origin, destination, pe
   return res.data;
 }
 
-export async function submitBarcodeMoveRequest({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category, allowCategoryOverride }) {
-  const callable = httpsCallable(functions, "submitBarcodeMoveRequest");
-  const res = await callable({ barcodes, origin, destination, pemindah, notes, floorId, defaultDetailType, category, allowCategoryOverride });
-  return res.data;
-}
-
-export async function processBarcodeMoveRequest({ requestId, status, processor, floorId }) {
-  const callable = httpsCallable(functions, "processBarcodeMoveRequest");
-  const res = await callable({ requestId, status, processor, floorId });
-  return res.data;
-}
 
 export async function deleteSingleBarcode({ barcodeId, floorId }) {
   const callable = httpsCallable(functions, "deleteSingleBarcode");

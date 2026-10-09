@@ -252,33 +252,7 @@
 
       <!-- Lacak Barang (Riwayat Pindah Data) Content -->
       <div v-else-if="mainTab === 'lacakFisik'">
-        <ul v-if="ENABLE_MUTATION_QUEUE" class="nav nav-tabs compact justify-content-center overflow-auto mb-3">
-          <li class="nav-item">
-            <button
-              class="nav-link text-nowrap small text-dark fw-bold"
-              :class="{ active: physicalTab === 'antrian' }"
-              @click="physicalTab = 'antrian'"
-            >
-              Request Pindah Data
-            </button>
-          </li>
-          <li class="nav-item">
-            <button
-              class="nav-link text-nowrap small text-dark fw-bold"
-              :class="{ active: physicalTab === 'log' }"
-              @click="physicalTab = 'log'"
-            >
-              Riwayat Pindah Data
-            </button>
-          </li>
-        </ul>
-
-        <div v-if="ENABLE_MUTATION_QUEUE && physicalTab === 'antrian'">
-          <MovementQueue />
-        </div>
-        <div v-else>
-          <MutationLog />
-        </div>
+        <MutationLog />
       </div>
 
       <!-- Stok Opname Content -->
@@ -358,7 +332,6 @@
       :hala-labels="HALA_LABELS"
       :active-floor="auth.activeFloor"
       :user-role="auth.userRole"
-      :enable-mutation-queue="ENABLE_MUTATION_QUEUE"
       :cards="nonComputerCards"
       @success="handleBarcodeUpdateSuccess"
     />
@@ -410,7 +383,6 @@ import BarcodeRincianModal from "@/components/inventory/BarcodeRincianModal.vue"
 import FeatureUpdateModal from "@/components/inventory/FeatureUpdateModal.vue";
 
 // Barcode-tracking specific components
-import MovementQueue from "@/components/inventory/barcode-tracking/MovementQueue.vue";
 import MutationLog from "@/components/inventory/barcode-tracking/MutationLog.vue";
 import StockOpname from "@/components/inventory/barcode-tracking/StockOpname.vue";
 import ClipManager from "@/components/inventory/barcode-tracking/ClipManager.vue";
@@ -443,8 +415,6 @@ import { syncActiveMutasiKodeToBarcodes } from "@/services/mutasi-service";
 const { toast, error: showError } = useAlert();
 const auth = useAuthStore();
 
-// Toggle approval queue for mutation barcodes
-const ENABLE_MUTATION_QUEUE = false;
 
 const loading = ref(false);
 const saving = ref(false);
@@ -498,7 +468,6 @@ let unsubSettings = null;
 let unsubDiscrepancies = null;
 
 const mainTab = ref("agregat"); // "agregat" or "lacakFisik"
-const physicalTab = ref(ENABLE_MUTATION_QUEUE ? "antrian" : "log"); // "antrian" or "log"
 
 // Modals State Holders
 const updateForm = ref({

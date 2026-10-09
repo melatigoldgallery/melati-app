@@ -425,7 +425,6 @@ import {
 import {
   parseBarcodes,
   executeBarcodeMutation,
-  submitBarcodeMoveRequest,
   checkBarcodesStatus,
   parseBarcodeDetails,
   deleteSingleBarcode,
@@ -1094,11 +1093,6 @@ async function executeMoveData() {
   saving.value = true;
   try {
     const category = selectedClip.value.category || "KALUNG";
-    const userRole = auth.userRole?.toLowerCase();
-    const isSupervisor = ["supervisor", "admin", "input"].includes(userRole);
-    // Hardcode ENABLE_MUTATION_QUEUE logic (default false)
-    const shouldProcessDirectly = isSupervisor || true;
-
     // Real-time verification of barcodes' statuses to filter out moved ones
     const barcodesToCheck = selectedClip.value.barcodes || [];
     const res = await checkBarcodesStatus(barcodesToCheck, auth.activeFloor);
@@ -1147,30 +1141,16 @@ async function executeMoveData() {
     }
 
     for (let i = 0; i < chunks.length; i++) {
-      if (shouldProcessDirectly) {
-        await executeBarcodeMutation({
-          barcodes: chunks[i],
-          origin: belumPostingKey.value, // From Belum Posting
-          destination: sudahPostingKey.value, // To Already Posted / Admin
-          pemindah: petugasName.value,
-          notes: notesInput.value?.trim() || `Mutasi klip ${selectedClip.value.code}`,
-          floorId: auth.activeFloor,
-          category: category,
-          allowCategoryOverride: true,
-        });
-      } else {
-        // Fallback move request queue
-        await submitBarcodeMoveRequest({
-          barcodes: chunks[i],
-          origin: belumPostingKey.value,
-          destination: sudahPostingKey.value,
-          pemindah: petugasName.value,
-          notes: notesInput.value?.trim() || `Request klip ${selectedClip.value.code}`,
-          floorId: auth.activeFloor,
-          category: category,
-          allowCategoryOverride: true,
-        });
-      }
+      await executeBarcodeMutation({
+        barcodes: chunks[i],
+        origin: belumPostingKey.value, // From Belum Posting
+        destination: sudahPostingKey.value, // To Already Posted / Admin
+        pemindah: petugasName.value,
+        notes: notesInput.value?.trim() || `Mutasi klip ${selectedClip.value.code}`,
+        floorId: auth.activeFloor,
+        category: category,
+        allowCategoryOverride: true,
+      });
     }
 
     toast(`Data klip ${selectedClip.value.code} berhasil dipindahkan.`);

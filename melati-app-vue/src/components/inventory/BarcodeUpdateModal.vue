@@ -109,7 +109,6 @@ import { useAlert } from "@/composables/useAlert";
 import {
   parseBarcodes,
   executeBarcodeMutation,
-  submitBarcodeMoveRequest,
   checkBarcodesStatus,
   parseBarcodeDetails
 } from "@/services/barcode-service";
@@ -131,7 +130,6 @@ const props = defineProps({
   halaLabels: { type: Object, default: () => ({}) },
   activeFloor: { type: String, default: "" },
   userRole: { type: String, default: "" },
-  enableMutationQueue: { type: Boolean, default: false },
   cards: { type: Array, default: () => [] },
 });
 
@@ -405,10 +403,6 @@ async function submitBarcodeUpdate() {
   saving.value = true;
   barcodeStatus.value = `Memproses ${barcodesArray.length} barcode...`;
   try {
-    const userRoleLower = props.userRole?.toLowerCase();
-    const isSupervisor = ["supervisor", "admin", "input"].includes(userRoleLower);
-    const shouldProcessDirectly = isSupervisor || !props.enableMutationQueue;
-
     // Chunking logic (max 200 barcodes per transaction)
     const chunks = [];
     const chunkSize = 200;
@@ -416,39 +410,21 @@ async function submitBarcodeUpdate() {
       chunks.push(barcodesArray.slice(i, i + chunkSize));
     }
 
-    if (shouldProcessDirectly) {
-      for (let i = 0; i < chunks.length; i++) {
-        barcodeStatus.value = `Memproses ${barcodesArray.length} barcode (Bagian ${i + 1}/${chunks.length})...`;
-        await executeBarcodeMutation({
-          barcodes: chunks[i],
-          origin: props.subDoc,
-          destination: destination.value,
-          pemindah: petugas.value.trim(),
-          notes: keterangan.value?.trim() || "",
-          floorId: props.activeFloor,
-          defaultDetailType: detailType.value,
-          category: activeCategory,
-          allowCategoryOverride: true
-        });
-      }
-      toast("Mutasi barcode berhasil diproses langsung.");
-    } else {
-      for (let i = 0; i < chunks.length; i++) {
-        barcodeStatus.value = `Mengajukan ${barcodesArray.length} barcode (Bagian ${i + 1}/${chunks.length})...`;
-        await submitBarcodeMoveRequest({
-          barcodes: chunks[i],
-          origin: props.subDoc,
-          destination: destination.value,
-          pemindah: petugas.value.trim(),
-          notes: keterangan.value?.trim() || "",
-          floorId: props.activeFloor,
-          defaultDetailType: detailType.value,
-          category: activeCategory,
-          allowCategoryOverride: true
-        });
-      }
-      toast("Pengajuan mutasi barcode berhasil dikirim ke antrian.");
+    for (let i = 0; i < chunks.length; i++) {
+      barcodeStatus.value = `Memproses ${barcodesArray.length} barcode (Bagian ${i + 1}/${chunks.length})...`;
+      await executeBarcodeMutation({
+        barcodes: chunks[i],
+        origin: props.subDoc,
+        destination: destination.value,
+        pemindah: petugas.value.trim(),
+        notes: keterangan.value?.trim() || "",
+        floorId: props.activeFloor,
+        defaultDetailType: detailType.value,
+        category: activeCategory,
+        allowCategoryOverride: true
+      });
     }
+    toast("Mutasi barcode berhasil diproses.");
 
     // Mainkan audio & suara sukses menggunakan nama jenis / label tampilan
     const categoryName = getCategoryLabel(activeCategory);
